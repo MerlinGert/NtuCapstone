@@ -1,0 +1,161 @@
+{
+    "variablenodes": [
+        {
+            "name": "lastAuthor",
+            "stateVariable": true,
+            "type": "address",
+            "visibility": "internal",
+            "value": null
+        },
+        {
+            "name": "price",
+            "stateVariable": true,
+            "type": "uint256",
+            "visibility": "public",
+            "value": "0.01"
+        },
+        {
+            "name": "prevPrice",
+            "stateVariable": true,
+            "type": "uint256",
+            "visibility": "internal",
+            "value": "0"
+        },
+        {
+            "name": "increase",
+            "stateVariable": true,
+            "type": "uint256",
+            "visibility": "internal",
+            "value": "25"
+        },
+        {
+            "name": "messages",
+            "stateVariable": true,
+            "type": "mapping(uint256 => string)",
+            "visibility": "internal",
+            "value": null
+        },
+        {
+            "name": "messageCount",
+            "stateVariable": true,
+            "type": "uint256",
+            "visibility": "public",
+            "value": "0"
+        },
+        {
+            "name": "ownerAccount",
+            "stateVariable": true,
+            "type": "uint256",
+            "visibility": "public",
+            "value": "0"
+        },
+        {
+            "name": "storage_",
+            "stateVariable": true,
+            "type": "string",
+            "visibility": "public",
+            "value": null
+        },
+        {
+            "name": "owner",
+            "stateVariable": true,
+            "type": "address",
+            "visibility": "internal",
+            "value": null
+        }
+    ],
+    "functionnodes": [
+        {
+            "name:": "",
+            "isConstructor": true,
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "visibility": "public"
+        },
+        {
+            "name:": "buyMessage",
+            "isConstructor": false,
+            "payable": true,
+            "stateMutability": "payable",
+            "visibility": "public"
+        },
+        {
+            "name:": "store_message",
+            "isConstructor": false,
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "visibility": "internal"
+        },
+        {
+            "name:": "ownerWithdraw",
+            "isConstructor": false,
+            "payable": false,
+            "stateMutability": "nonpayable",
+            "visibility": "public"
+        },
+        {
+            "name:": "getMessages",
+            "isConstructor": false,
+            "payable": false,
+            "stateMutability": "view",
+            "visibility": "public"
+        }
+    ],
+    "calls": [
+        {
+            "func":"getMessages",
+            "from":0,
+            "type":"nonpayable"
+        },
+        {
+            "func":"ownerWithdraw",
+            "from":2,
+            "type":"nonpayable"
+        },
+        {
+            "func":"buyMessage",
+            "from":1,
+            "type":"payable"
+        },
+        {
+            "func":"getMessages",
+            "from":3,
+            "type":"nonpayable"
+        },
+        {
+            "func":"buyMessage",
+            "from":5,
+            "type":"payable"
+        },
+        {
+            "func":"getMessages",
+            "from":0,
+            "type":"nonpayable"
+        },
+        {
+            "func":"ownerWithdraw",
+            "from":6,
+            "type":"nonpayable"
+        },
+        {
+            "func":"buyMessages",
+            "from":2,
+            "type":"payable"
+        },
+        {
+            "func":"getMessages",
+            "from":4,
+            "type":"nonpayable"
+        },
+        {
+            "func":"ownerWithdraw",
+            "from":6,
+            "type":"nonpayable"
+        },
+        {
+            "func":"getMessages",
+            "from":3,
+            "type":"nonpayable"
+        }
+    ]
+}
