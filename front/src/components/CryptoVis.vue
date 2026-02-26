@@ -8,8 +8,21 @@
         style="width:100%;height:100%"
         :content-style="{ display: 'flex', flexDirection: 'row' }"
       >
+<div style="flex: 0 0 30%">
+        <n-card
+            size="small"
+            style="width:100%;height:60%;" 
+            header-style="text-align:left;height:50px;font-size:1.7em"
+        >
+            <template #header>
+                    Token Distribution
+            </template>
+            <TokenDistribution />
+        </n-card>
+    </div>
 
-    <div style="flex: 0 0 70%; display: flex; flex-direction: column">
+
+    <div style="flex: 0 0 50%; display: flex; flex-direction: column">
     <!-- <n-layout style="width:100%;height:100%" :content-style="{ display: 'flex', flexDirection: 'column'}"> -->
         <n-card 
           size="small"
@@ -22,6 +35,7 @@
               <span>Holder View</span>
             </div>
           </template>
+
         </n-card>     
         <n-card
             size="small"
@@ -29,13 +43,14 @@
             header-style="text-align:left;height:50px;font-size:1.7em"
         >
             <template #header>
-                    Query Execution Panel
+                    Balance View
             </template>
+            <HolderView />
         </n-card>
     </div>
 
 
-    <div style="flex: 0 0 30%">
+    <div style="flex: 0 0 20%">
         <n-card
             size="small"
             style="width:100%;height:60%;" 
@@ -44,14 +59,6 @@
             <template #header>
                     Result Overview
             </template>
-            <div style="padding:12px;font-size:14px;">
-              <div v-if="loading">加载中...</div>
-              <div v-else>
-                <div>已加载 {{ overview.rows }} 条记录 <span v-if="isPartial" style="color:orange">(部分数据)</span></div>
-                <div>交易对（Top）：{{ overview.pairs.size }} 个</div>
-                <div>日期范围：{{ overview.dateMin }} 到 {{ overview.dateMax }}</div>
-              </div>
-            </div>
         </n-card>
         <n-card
             size="small"
@@ -78,9 +85,11 @@
 <script>
 import { NSelect,NCheckbox,NCard,NLayout,NSwitch,NSpace,NLayoutHeader,NLayoutFooter,NLayoutContent} from "naive-ui"
 import * as d3 from "d3"
+import HolderView from "./HolderView.vue"
+import TokenDistribution from "./TokenDistribution.vue"
 
 export default {
-  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent},
+  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution},
   data(){
     return {
       overview:{
