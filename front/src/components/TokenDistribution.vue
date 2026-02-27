@@ -1,24 +1,9 @@
 <template>
     <div style="height:100%;width:100%;background:#ffffff;display:flex;flex-direction:column">
-        <!-- Controls -->
-        <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; gap: 5px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: bold;">{{ displayTime }}</span>
-                <span>Holders: {{ currentHolderCount }}</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <n-button size="tiny" @click="togglePlay">
-                    {{ isPlaying ? 'Pause' : 'Play' }}
-                </n-button>
-                <input 
-                    type="range" 
-                    min="0" 
-                    :max="maxIndex" 
-                    v-model.number="currentIndex" 
-                    style="flex: 1;"
-                    @input="onSliderInput"
-                />
-            </div>
+        <!-- Info Header -->
+        <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-weight: bold;">{{ displayTime }}</span>
+            <span>Active Users (Top 50%): {{ userCount }}</span>
         </div>
 
         <!-- Chart -->
@@ -27,191 +12,211 @@
             <div v-if="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">
                 Loading data...
             </div>
+            <!-- Tooltip -->
+            <div ref="tooltip" style="position: absolute; opacity: 0; background: rgba(0,0,0,0.8); color: white; padding: 5px; border-radius: 4px; pointer-events: none; font-size: 12px; z-index: 10;"></div>
         </div>
     </div>
 </template>
 
 <script>
 import * as d3 from "d3"
-import { NButton } from "naive-ui"
 
 export default {
     name: "TokenDistribution",
-    components: { NButton },
     data() {
         return {
-            snapshots: [],
-            currentIndex: 0,
-            isPlaying: false,
-            playInterval: null,
+            snapshotData: null,
             loading: true,
             svgWidth: 0,
             svgHeight: 0,
-            margin: { top: 10, right: 10, bottom: 10, left: 10 }
+            userCount: 0
         }
     },
     computed: {
-        maxIndex() {
-            return Math.max(0, this.snapshots.length - 1);
-        },
-        currentSnapshot() {
-            if (this.snapshots.length === 0) return null;
-            return this.snapshots[this.currentIndex];
-        },
         displayTime() {
-            if (!this.currentSnapshot) return "Loading...";
-            return this.currentSnapshot.time.replace(" UTC", "");
-        },
-        currentHolderCount() {
-            if (!this.currentSnapshot) return 0;
-            return Object.keys(this.currentSnapshot.balances).length;
+            if (!this.snapshotData) return "Loading...";
+            return this.snapshotData.time ? this.snapshotData.time.replace(" UTC", "") : "Unknown Time";
         }
     },
-    watch: {
-        currentIndex() {
-            this.drawChart();
-        }
+    mounted() {
+        this.loadData();
+        window.addEventListener('resize', this.setSvg);
+    },
+    beforeUnmount() {
+        window.removeEventListener('resize', this.setSvg);
     },
     methods: {
         async loadData() {
             try {
                 this.loading = true;
-                const response = await fetch('/processed/transfers/hourly_balance_snapshots.json');
-                this.snapshots = await response.json();
+                const response = await fetch('/processed/transfers/processed_latest_snapshot_50.json');
+                this.snapshotData = await response.json();
                 this.loading = false;
                 
-                // Draw initial chart
+                // Draw chart
                 this.$nextTick(() => {
                     this.setSvg();
                 });
             } catch (error) {
-                console.error("Failed to load snapshots:", error);
+                console.error("Failed to load snapshot:", error);
                 this.loading = false;
             }
         },
-        togglePlay() {
-            if (this.isPlaying) {
-                this.pause();
-            } else {
-                this.play();
-            }
-        },
-        play() {
-            this.isPlaying = true;
-            if (this.currentIndex >= this.maxIndex) {
-                this.currentIndex = 0;
-            }
-            this.playInterval = setInterval(() => {
-                if (this.currentIndex < this.maxIndex) {
-                    this.currentIndex++;
-                } else {
-                    this.pause();
-                }
-            }, 200); // 200ms per frame to be smoother
-        },
-        pause() {
-            this.isPlaying = false;
-            if (this.playInterval) {
-                clearInterval(this.playInterval);
-                this.playInterval = null;
-            }
-        },
-        onSliderInput() {
-            this.pause(); // Pause when user drags slider
-        },
         setSvg() {
-            if (this.$refs.chart_container && this.$refs.chart_container.offsetHeight) {
+            if (this.$refs.chart_container) {
                 this.svgHeight = this.$refs.chart_container.offsetHeight;
                 this.svgWidth = this.$refs.chart_container.offsetWidth;
                 this.drawChart();
             }
         },
         drawChart() {
-            if (!this.currentSnapshot || this.svgWidth === 0) return;
+            if (!this.snapshotData || this.svgWidth === 0) return;
 
             const width = this.svgWidth;
             const height = this.svgHeight;
-            const balances = this.currentSnapshot.balances;
+            const balances = this.snapshotData.balances;
 
-            // Prepare hierarchical data
+            // Prepare data: Only users, exclude 'Others'
+            let entries = [];
+            let othersBalance = 0;
+            if (balances && balances.users) {
+                othersBalance = balances.users['Others'] || 0;
+                entries = Object.entries(balances.users)
+                    .filter(([owner, balance]) => owner !== 'Others' && balance > 0)
+                    .map(([owner, balance]) => ({ owner, balance, type: 'user' }));
+            }
+
+            this.userCount = entries.length;
+            const usersBalance = entries.reduce((sum, d) => sum + d.balance, 0);
+
+            // 1. Pack bubbles first to find their layout area
+            // We use an arbitrary large size for high precision layout, then scale down
+            const packSize = 1000;
             const rootData = {
                 name: "root",
-                children: []
+                children: entries.map(d => ({ name: d.owner, value: d.balance }))
             };
-
-            // Filter top N and group others
-            const entries = Object.entries(balances)
-                .map(([owner, balance]) => ({ owner, balance }))
-                .filter(d => d.balance > 0)
-                .sort((a, b) => b.balance - a.balance);
-
-            const topN = 100; // Limit to 100 bubbles for performance
-            const topHolders = entries.slice(0, topN);
-            const others = entries.slice(topN);
-            
-            topHolders.forEach(h => {
-                rootData.children.push({ name: h.owner, value: h.balance });
-            });
-            
-            if (others.length > 0) {
-                const otherSum = others.reduce((sum, h) => sum + h.balance, 0);
-                rootData.children.push({ name: "Others", value: otherSum });
-            }
 
             const root = d3.hierarchy(rootData)
                 .sum(d => d.value)
                 .sort((a, b) => b.value - a.value);
 
             const pack = d3.pack()
-                .size([width - 20, height - 20])
+                .size([packSize, packSize])
                 .padding(3);
 
             const nodes = pack(root).leaves();
 
-            const svg = d3.select("svg.tokenDistribution");
+            // Calculate actual sum of bubble areas
+            const totalBubbleArea = nodes.reduce((sum, d) => sum + Math.PI * d.r * d.r, 0);
+
+            // Calculate required ring area based on proportion
+            // Area_Ring / Area_Bubbles = Balance_Others / Balance_Users
+            const ringArea = usersBalance > 0 ? totalBubbleArea * (othersBalance / usersBalance) : 0;
+
+            // The pack is centered at (packSize/2, packSize/2) with radius packSize/2
+            // Let's assume the enclosing circle of the pack is effectively the pack radius (packSize/2)
+            // But strictly, d3.pack fits into the box.
+            const packRadius = packSize / 2;
+
+            // Calculate outer radius of the ring
+            // Area_Ring = pi * (R_out^2 - R_in^2)
+            // where R_in = packRadius
+            const outerRadius = Math.sqrt(packRadius * packRadius + ringArea / Math.PI);
+
+            // Now we need to fit everything (pack + ring) into the SVG view
+            const viewMinDim = Math.min(width, height);
+            const margin = 20;
+            const maxViewRadius = (viewMinDim / 2) - margin;
+            
+            const scale = maxViewRadius / outerRadius;
+
+            const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
             svg.attr("width", width).attr("height", height);
 
             // Clear previous
             svg.selectAll("*").remove();
             
+            // Center group
             const g = svg.append("g")
-                .attr("transform", `translate(10,10)`);
+                .attr("transform", `translate(${width/2},${height/2})`);
 
-            const color = d3.scaleOrdinal(d3.schemeCategory10);
+            // Draw Ring (Others)
+            if (ringArea > 0) {
+                const arc = d3.arc()
+                    .innerRadius(packRadius * scale)
+                    .outerRadius(outerRadius * scale)
+                    .startAngle(0)
+                    .endAngle(2 * Math.PI);
 
-            const node = g.selectAll("g")
+                g.append("path")
+                    .attr("d", arc)
+                    .style("fill", "#e3f2fd") // Light blue
+                    .style("opacity", 0.5)
+                    .on("mouseover", (event) => {
+                        const tooltip = this.$refs.tooltip;
+                        tooltip.style.opacity = 1;
+                        tooltip.innerHTML = `Category: Others<br>Balance: ${othersBalance.toLocaleString()}`;
+                        tooltip.style.left = (event.pageX + 10) + "px";
+                        tooltip.style.top = (event.pageY - 10) + "px";
+                    })
+                    .on("mousemove", (event) => {
+                        const tooltip = this.$refs.tooltip;
+                        tooltip.style.left = (event.pageX + 10) + "px";
+                        tooltip.style.top = (event.pageY - 10) + "px";
+                    })
+                    .on("mouseout", () => {
+                        this.$refs.tooltip.style.opacity = 0;
+                    });
+            }
+
+            // Draw Bubbles
+            // Shift bubbles to center (they are currently in [0, packSize] coordinates)
+            const bubbleGroup = g.append("g")
+                .attr("transform", `translate(${-packSize/2 * scale}, ${-packSize/2 * scale})`);
+
+            // Color scale
+            const color = d3.scaleSequential(d3.interpolateBlues)
+                .domain([0, d3.max(entries, d => d.balance)]);
+
+            const node = bubbleGroup.selectAll("g")
                 .data(nodes)
                 .enter().append("g")
-                .attr("transform", d => `translate(${d.x},${d.y})`);
+                .attr("transform", d => `translate(${d.x * scale},${d.y * scale})`);
 
+            // Circles
             node.append("circle")
-                .attr("r", d => d.r)
-                .style("fill", (d, i) => {
-                    if (d.data.name === "Others") return "#ccc";
-                    return color(i % 10);
+                .attr("r", d => d.r * scale)
+                .style("fill", d => color(d.value))
+                .style("opacity", 0.8)
+                .style("stroke", "#fff")
+                .style("stroke-width", 1)
+                .on("mouseover", (event, d) => {
+                    d3.select(event.currentTarget).style("stroke", "#000");
+                    const tooltip = this.$refs.tooltip;
+                    tooltip.style.opacity = 1;
+                    tooltip.innerHTML = `Address: ${d.data.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
+                    tooltip.style.left = (event.pageX + 10) + "px";
+                    tooltip.style.top = (event.pageY - 10) + "px";
                 })
-                .style("opacity", 0.7)
-                .style("stroke", "#fff");
+                .on("mousemove", (event) => {
+                    const tooltip = this.$refs.tooltip;
+                    tooltip.style.left = (event.pageX + 10) + "px";
+                    tooltip.style.top = (event.pageY - 10) + "px";
+                })
+                .on("mouseout", (event) => {
+                    d3.select(event.currentTarget).style("stroke", "#fff");
+                    this.$refs.tooltip.style.opacity = 0;
+                });
 
-            node.append("title")
-                .text(d => `${d.data.name}\n${d.data.value.toLocaleString()}`);
-
-            // Labels for larger bubbles
-            node.filter(d => d.r > 15)
-                .append("text")
+            // Labels (only if big enough)
+            node.filter(d => (d.r * scale) > 15).append("text")
                 .attr("dy", ".3em")
                 .style("text-anchor", "middle")
-                .style("font-size", d => Math.min(d.r / 2, 10) + "px")
+                .style("font-size", d => Math.min((d.r * scale) / 3, 10) + "px")
+                .style("pointer-events", "none")
                 .text(d => d.data.name.substring(0, 4));
         }
-    },
-    mounted() {
-        this.loadData();
-        window.addEventListener("resize", this.setSvg);
-    },
-    unmounted() {
-        this.pause();
-        window.removeEventListener("resize", this.setSvg);
     }
 }
 </script>

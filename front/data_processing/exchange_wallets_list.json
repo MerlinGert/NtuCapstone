@@ -1,0 +1,399 @@
+{
+  "description": "List of Solscan Exchange Wallets (Partial/Matched)",
+  "source": "Solscan Label Cloud (Snippet) + Local Snapshot Matching",
+  "note": "Due to anti-scraping protection on Solscan, only the visible snippet patterns and locally matched addresses are included. The 'matched_wallets' are confirmed to exist in your current snapshot.",
+  "full_exchange_list": [
+    {
+      "address": "A77HErqtfN1hLLpvZ9pCtu66FEtM8BveoaKbbMoZ4RiR",
+      "label": "Bitget Exchange"
+    },
+    {
+      "address": "ASTyfSima4LLAdDgoFGkgqoKowG1LZFDr9fAQrg7iaJZ",
+      "label": "MEXC"
+    },
+    {
+      "address": "5PAhQiYdLBd6SVdjzBQDxUAEFyDdF5ExNPQfcscnPRj5",
+      "label": "MEXC 2"
+    },
+    {
+      "address": "BmFdpraQhkiDQE6SnfG5omcA1VwzqfXrwtNYBwWTymy6",
+      "label": "KuCoin 2"
+    },
+    {
+      "address": "u6PJ8DtQuPFnfmwHbGFULQ4u4EgjDiyYKjVEsynXq2w",
+      "label": "Wintermute 1"
+    },
+    {
+      "address": "25t5RCFqGbLTqG8TGJgpwxbnvhwJeJivWzjCSKGMA5FV",
+      "label": "Wintermute 3"
+    },
+    {
+      "label": "Bybit Wallet 1",
+      "address": "GGem2VAypSg7Ai7vjDKPTtqFahpoQWkfgVkyzx3rPoTka"
+    },
+    {
+      "label": "OKX 2",
+      "address": "9un5wqE3q4oCjyrDkwsdD48KteCJitQX5978Vh7KKxHo"
+    },
+    {
+      "label": "Stake.com Hot Wallet",
+      "address": "G9X7F4JzLzbSGMCndiBdWNi5YzZZakmtkdwq7xS3Q3FE"
+    },
+    {
+      "label": "Bybit Wallet 12",
+      "address": "2qo8jvuc49pFmTjmUHLiARSV6ppPTaE7gw27ZJ6DnNZy"
+    },
+    {
+      "label": "OKX: Hot Wallet",
+      "address": "C68a6RCGLiPskbPYtAcsCjhG8tfTWYcoB4JjCrXFdqyo"
+    },
+    {
+      "label": "Coinbase Hot Wallet 3",
+      "address": "D89hHJT5Aqyx1trP6EnGY9jJUB3whgnq3aUvvCqedvzf"
+    },
+    {
+      "label": "Coinbase Hot Wallet 4",
+      "address": "DPqsobysNf5iA9w7zrQM8HLzCKZEDMkZsWbiidsAt1xo"
+    },
+    {
+      "label": "Coinbase 1",
+      "address": "H8sMJSCQxfKiFTCfDR3DUMLPwcRbM61LGFJ8N4dK3WjS"
+    },
+    {
+      "label": "Kraken",
+      "address": "FWznbcNXWQuHTawe9RxvQ2LdCENssh12dsznf4RiouN5"
+    },
+    {
+      "label": "Rollbit Treasury",
+      "address": "RBHdGVfDfMjfU6iUfCb1LczMJcQLx7hGnxbzRsoDNvx"
+    },
+    {
+      "label": "Coinbase Hot Wallet 1",
+      "address": "FpwQQhQQoEaVu3WU2qZMfF1hx48YyfwsLoRgXG83E99Q"
+    },
+    {
+      "label": "Bitfinex Hot Wallet",
+      "address": "FxteHmLwG9nk1eL4pjNve3Eub2goGkkz6g6TbvdmW46a"
+    },
+    {
+      "label": "Crypto.com Hot Wallet 1",
+      "address": "6FEVkH17P9y8Q9aCkDdPcMDjvj7SVxrTETaYEm8f51Jy"
+    },
+    {
+      "label": "Binance 1",
+      "address": "2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S"
+    },
+    {
+      "label": "Robinhood Cold Wallet 4",
+      "address": "AeBwztwXScyNNuQCEdhS54wttRQrw3Nj1UtqddzB4C7b"
+    },
+    {
+      "label": "Coinbase 4",
+      "address": "9obNtb5GyUegcs3a1CbBkLuc5hEWynWfJC6gjz5uWQkE"
+    },
+    {
+      "label": "Crypto.com Hot Wallet 2",
+      "address": "AobVSwdW9BbpMdJvTqeCN4hPAmh4rHm7vwLnQ5ATSyrS"
+    },
+    {
+      "label": "Binance 2",
+      "address": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9"
+    },
+    {
+      "address": "HBxZShcE86UMmF93KUM8eWJKqeEXi5cqWCLYLMMhqMYm",
+      "label": "Bitstamp Hot Wallet"
+    },
+    {
+      "address": "9SLPTL41SPsYkgdsMzdfJsxymEANKr5bYoBsQzJyKpKS",
+      "label": "Hyperunit: Hot Wallet"
+    },
+    {
+      "address": "8s9j5qUtuE9PGA5s7QeAXEh5oc2UGr71pmJXgyiZMHkt",
+      "label": "LBank"
+    },
+    {
+      "address": "5LZkATrLwHYCQj2YuVbjjgsDZzBk6YfL4pFQRJmtboT2",
+      "label": "Bybit Wallet 15"
+    },
+    {
+      "address": "53unSgGWqEWANcPYRF35B2Bgf8BkszUtcccKiXwGGLyr",
+      "label": "Binance.us Hot Wallet"
+    },
+    {
+      "address": "9VWD3xbXWtC2aGN1mQcVFwZMRPSjJfknNYq4DqGQ7B8B",
+      "label": "Crypto.com Hot Wallet"
+    },
+    {
+      "address": "22Wnk8PwyWZV7BfkZGJEKT9jGGdtvu7xY6EXeRh7zkBa",
+      "label": "Crypto.com Hot Wallet 3"
+    },
+    {
+      "address": "BA7UdvSVywRisn8YLMpg6emrNNk3N3TFqSrKJXmTBKdt",
+      "label": "BtcTurk Hot Wallet"
+    },
+    {
+      "address": "GCRJD52pGwcCSs4oswYxTBCPatxY1P6WpxCC9R9zty6r",
+      "label": "Coinbase Hot Wallet"
+    },
+    {
+      "address": "AafGzY9eiC5Ud3YFZQwkaKApp48cVBAT2kksGvEjhUvH",
+      "label": "Coinbase Hot Wallet"
+    },
+    {
+      "address": "8JUEoHNMbWM4eegcMvx6ZQJt3V3fbo8JNjpWiCtJgxfF",
+      "label": "Coinbase Hot Wallet"
+    },
+    {
+      "address": "2E1UKoiiZPwsp4vn6tUh5k61kG2UqYpT7oBrFaJUJXXd",
+      "label": "SwissBorg Hot Wallet 1"
+    },
+    {
+      "address": "3vxheE5C46XzK4XftziRhwAf8QAfipD7HXXWj25mgkom",
+      "label": "Coinbase Prime"
+    },
+    {
+      "address": "9ZifroknFoYu4r6DUk6nYoJiUQnEyyoUyeAwjXbPoL2x",
+      "label": "Bybit Wallet 11"
+    },
+    {
+      "address": "CK8i4zFXkDE2KWfyg7g9S748r6mwxajbcKcyGhQMR3qQ",
+      "label": "Bybit Wallet 13"
+    },
+    {
+      "address": "Fi3kigPLsFtSvq7N1KBtz51C8Gc8XyMFWhYjbRkaFMxS",
+      "label": "Bithumb Hot Wallet 9"
+    },
+    {
+      "address": "7mhcgF1DVsj5iv4CxZDgp51H6MBBwqamsH1KnqXhSRc5",
+      "label": "Upbit Hot Wallet"
+    },
+    {
+      "address": "AEZoku1fLfUz5JYJ3kJ5YVdf3QT1T4RwdggGbuR8Eakd",
+      "label": "OKX: Hot Wallet"
+    },
+    {
+      "address": "8jjpnSUhm5UYghznhcdkwwEUFyke6z5TchHEtUUgW8hX",
+      "label": "Upbit Hot Wallet 4"
+    },
+    {
+      "address": "2YERiDP8JqbmKDDUhPQtEfWozafQm1cdwi6KrmYo2app",
+      "label": "Upbit Hot Wallet 6"
+    },
+    {
+      "address": "WR87TKyUfMDzGojFvRxq2f1xf7Jcgkvoc7Z2tDVLHdY",
+      "label": "Upbit Hot Wallet 3"
+    },
+    {
+      "address": "ADqZYsW9SVZ6bCSGDqfBiPkfaZuQKGg79MA357otX8Ud",
+      "label": "Crypto.com Hot Wallet 5"
+    },
+    {
+      "address": "AgsYPSd9jQZEpbTMsvBWKdiAux3eyghdSY355QVHH9Hs",
+      "label": "FalconX Hot Wallet"
+    },
+    {
+      "address": "6mearRPb9Bma9Ad9wCKnGtVbTeqDyZQ6PPxDRpBUNdJU",
+      "label": "Upbit Hot Wallet 8"
+    },
+    {
+      "address": "836euAuAeEWdjHFZ87vKhR6n4Vu1V22yMvj1MyzCdVU3",
+      "label": "Upbit Hot Wallet 9"
+    },
+    {
+      "address": "HVh6wHNBAsG3pq1Bj5oCzRjoWKVogEDHwUHkRz3ekFgt",
+      "label": "KuCoin 3"
+    },
+    {
+      "address": "Ahgd7ZczsP6XcWuhsF1Hn7i9W31uHMMPkmffrALL7ers",
+      "label": "Upbit Hot Wallet 11"
+    },
+    {
+      "address": "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
+      "label": "Binance 3"
+    },
+    {
+      "address": "3yHvm5kFrEqYURBekXAXEpEWggpb8q51VRWDZtjZRQpT",
+      "label": "Rapira"
+    },
+    {
+      "address": "4xLpwxgYuPwPvtQjE94RLS4WZ4aD8NJYYKr2AJk99Qdg",
+      "label": "Robinhood Hot Wallet"
+    },
+    {
+      "address": "i9XvhQqBCTQapqaFKPDuCbtPYMCwELmX8VTCsDhRG7d",
+      "label": "Bybit Wallet 8"
+    },
+    {
+      "address": "8Tp9fFkZ2KcRBLYDTUNXo98Ez6ojGb6MZEPXfGDdeBzG",
+      "label": "Robinhood Cold Wallet 1"
+    },
+    {
+      "address": "42brAgAVNzMBP7aaktPvAmBSPEkehnFQejiZc53EpJFd",
+      "label": "Bybit Cold Wallet"
+    },
+    {
+      "address": "F7RkX6Y1qTfBqoX5oHoZEgrG1Dpy55UZ3GfWwPbM58nQ",
+      "label": "Kraken Cold Wallet 2"
+    },
+    {
+      "address": "3gd3dqgtJ4jWfBfLYTX67DALFetjc5iS72sCgRhCkW2u",
+      "label": "Binance 10"
+    },
+    {
+      "address": "D5LmzoS7PXmT8oMVpSY1iSk1bZD2XLsc9nE5rSmwvyuQ",
+      "label": "Bithumb Hot Wallet 7"
+    },
+    {
+      "address": "7ReR6syi6gr7qUrKCL1FB9VFzGhVgHwLJ8wtfNtH9Mv4",
+      "label": "Bybit Wallet 9"
+    },
+    {
+      "address": "AaFm2LPX8NUKXe64JaxcRNUc8QPGYCxrPG1HjHcTTGAK",
+      "label": "Bybit Wallet 7"
+    },
+    {
+      "address": "6b4aypBhH337qSzzkbeoHWzTLt4DjG2aG8GkrrTQJfQA",
+      "label": "FTX Cold Storage #1"
+    },
+    {
+      "address": "HiRpdAZifEsZGdzQ5Xo5wcnaH3D2Jj9SoNsUzcYNK78J",
+      "label": "Gate.io 2"
+    },
+    {
+      "address": "9uyDy9VDBw4K7xoSkhmCAm8NAFCwu4pkF6JeHUCtVKcX",
+      "label": "FTX Cold Storage #2"
+    },
+    {
+      "address": "FyJBKcfcEBzGN74uNxZ95GxnCxeuJJujQCELpPv14ZfN",
+      "label": "Bitfinex Cold Wallet"
+    },
+    {
+      "address": "BbHG9GvPActFGogv3iNrpDAj4qpXr8t3jF16uGxXcKci",
+      "label": "Backpack Exchange 1"
+    },
+    {
+      "address": "3yFwqXBfZY4jBVUafQ1YEXw189y2dN3V5KQq9uzBDy1E",
+      "label": "Binance 8"
+    },
+    {
+      "address": "6QJzieMYfp7yr3EdrePaQoG3Ghxs2wM98xSLRu8Xh56U",
+      "label": "Binance 11"
+    },
+    {
+      "address": "GBrURzmtWujJRTA3Bkvo7ZgWuZYLMMwPCwre7BejJXnK",
+      "label": "Binance Cold Wallet"
+    },
+    {
+      "address": "GK35nWN6ZHSGZrRTf8kTQd8RkFCighChPEb41XwSFVAC",
+      "label": "Binance Cold Wallet"
+    },
+    {
+      "address": "28nYGHJyUVcVdxZtzKByBXEj127XnrUkrE3VaGuWj1ZU",
+      "label": "Ceffu Custody Cold Wallet"
+    },
+    {
+      "address": "bazxfWH6Vu2FncaSKc3kkgvyCuPwyFpx4ryZPcNiG7x",
+      "label": "Gemini: Cold Wallet"
+    },
+    {
+      "address": "G7vNg68KfbjVLCTc8Uw9JVmaC4ZajpX97ApkToBqvviy",
+      "label": "Binance Bidge"
+    },
+    {
+      "address": "DLY8RdtrGELZh7Dnmf1tm99sfcXh6KdMtgjgRD1m1uQ7",
+      "label": "Bitstamp Cold Wallet 1"
+    },
+    {
+      "address": "py5jDEUAynTufQHM7P6Tu9M8NUd8JYux7aMcLXcC51q",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "G6zmnfSdG6QJaDWYwbGQ4dpCSUC4gvjfZxYQ4ZharV7C",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "CKy3KzEMSL1PQV6Wppggoqi2nGA7teE4L7JipEK89yqj",
+      "label": "Coinbase Cold Wallet 1"
+    },
+    {
+      "address": "3qP77PzrHxSrW1S8dH4Ss1dmpJDHpC6ATVgwy5FmXDEf",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "85cPov8nuRCkJ88VNMcHaHZ26Ux85PbSrHW4jg7izW4h",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "9FtGm6hJULCpA8An4sFg5ysHUExDZBtMeDCxsYnTnWh5",
+      "label": "Robinhood Cold Wallet 3"
+    },
+    {
+      "address": "146yGthSmnTPuCo6Zfbmr56YbAyWZ3rzAhRcT7tTF5ha",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "AzAvbCQsXurd2PbGLYcB61tyvE8kLDaZShE1S5Bp3WeS",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "4pHKEisSmAr5CSump4dJnTJgG6eugmtieXcUxDBcQcG5",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "4S8C1yrRZmJYPzCqzEVjZYf6qCYWFoF7hWLRzssTCotX",
+      "label": "Bitget: Cold Wallet"
+    },
+    {
+      "address": "i57ExrKB2i4mSgjSuq2xz617mQXmu33WG2WEYypmdvX",
+      "label": "Bitstamp"
+    },
+    {
+      "address": "2PoMLnppbphUWkNReF15BJ4a6c4B348GnStSEv9tFsY1",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "GzHZpVPqDLK7sV6cFskSC4qaDzYWYryhf51VoFPtUvfz",
+      "label": "Coinbase Cold Wallet 4"
+    },
+    {
+      "address": "8mQnMuApYmNouGvj9wVL2Sh21DFsrzb3sbbFL3rUHXr5",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "FUKB7YPxP3vVQ4nry7LAzFcyUqPvswH6ciyRoReUYm7f",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "FeNayVKekV9FJzhD7ycTd6sbKEyzt9CRCiqxw5nr41yR",
+      "label": "Bybit Wallet 3"
+    },
+    {
+      "address": "6LzKPJ1Y6wdYTLfGDxe9WwoKpwAVMLHwXxmQpRgdD6ng",
+      "label": "Coinbase Cold Wallet 3"
+    },
+    {
+      "address": "F4C34HorTSr8C7Zmwj8Kdrbmq5XjV9d8iJywp74L8sZf",
+      "label": "Coinbase Cold Wallet 2"
+    },
+    {
+      "address": "BESeJ71U2d6V1oUEXzLmWktHWwsgvFsevYjXtYicjLhp",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "eynpJ4nVgJnCPMzSgJ4c5AmwstAvQRn4QqdAhGBynf2",
+      "label": "Coinbase: Cold Wallet"
+    },
+    {
+      "address": "32cT9eAwkEvAk631rUcUAbXVFPg21DaAXzGiz9AqHTVE",
+      "label": "Bybit wallet 4"
+    },
+    {
+      "address": "9Z7S8vCj6nDbK9t4m4AU3vZpKm4UufHAwpmRYyKgZf7r",
+      "label": "Bybit Wallet 5"
+    },
+    {
+      "address": "BY4StcU9Y2BpgH8quZzorg31EGE4L1rjomN8FNsCBEcx",
+      "label": "HTX: Hot Wallet"
+    }
+  ]
+}
