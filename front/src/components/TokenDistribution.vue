@@ -3,6 +3,10 @@
         <!-- Info Header -->
         <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
             <span style="font-weight: bold;">{{ displayTime }}</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-size: 12px;">Scale:</label>
+                <input type="range" min="0.1" max="1" step="0.05" v-model.number="scaleFactor" @input="drawChart" style="width: 100px;">
+            </div>
             <span>Active Users (Top 50%): {{ userCount }}</span>
         </div>
 
@@ -20,6 +24,7 @@
 
 <script>
 import * as d3 from "d3"
+import snapshotDataFile from '../assets/processed_latest_snapshot_50.json'
 
 export default {
     name: "TokenDistribution",
@@ -29,7 +34,8 @@ export default {
             loading: true,
             svgWidth: 0,
             svgHeight: 0,
-            userCount: 0
+            userCount: 0,
+            scaleFactor: 0.7 // Default scale parameter
         }
     },
     computed: {
@@ -49,8 +55,7 @@ export default {
         async loadData() {
             try {
                 this.loading = true;
-                const response = await fetch('/processed/transfers/processed_latest_snapshot_50.json');
-                this.snapshotData = await response.json();
+                this.snapshotData = snapshotDataFile;
                 this.loading = false;
                 
                 // Draw chart
@@ -83,53 +88,80 @@ export default {
                 othersBalance = balances.users['Others'] || 0;
                 entries = Object.entries(balances.users)
                     .filter(([owner, balance]) => owner !== 'Others' && balance > 0)
-                    .map(([owner, balance]) => ({ owner, balance, type: 'user' }));
+                    .map(([owner, balance]) => ({ 
+                        id: owner,
+                        name: owner, 
+                        value: balance,
+                        // Initial radius based on value, will be used for collision
+                        r: 0 // Will be set after scale calculation
+                    }));
             }
 
             this.userCount = entries.length;
-            const usersBalance = entries.reduce((sum, d) => sum + d.balance, 0);
+            const usersBalance = entries.reduce((sum, d) => sum + d.value, 0);
 
-            // 1. Pack bubbles first to find their layout area
-            // We use an arbitrary large size for high precision layout, then scale down
-            const packSize = 1000;
-            const rootData = {
-                name: "root",
-                children: entries.map(d => ({ name: d.owner, value: d.balance }))
-            };
-
-            const root = d3.hierarchy(rootData)
-                .sum(d => d.value)
-                .sort((a, b) => b.value - a.value);
-
-            const pack = d3.pack()
-                .size([packSize, packSize])
-                .padding(3);
-
-            const nodes = pack(root).leaves();
-
-            // Calculate actual sum of bubble areas
-            const totalBubbleArea = nodes.reduce((sum, d) => sum + Math.PI * d.r * d.r, 0);
-
-            // Calculate required ring area based on proportion
-            // Area_Ring / Area_Bubbles = Balance_Others / Balance_Users
-            const ringArea = usersBalance > 0 ? totalBubbleArea * (othersBalance / usersBalance) : 0;
-
-            // The pack is centered at (packSize/2, packSize/2) with radius packSize/2
-            // Let's assume the enclosing circle of the pack is effectively the pack radius (packSize/2)
-            // But strictly, d3.pack fits into the box.
-            const packRadius = packSize / 2;
-
-            // Calculate outer radius of the ring
-            // Area_Ring = pi * (R_out^2 - R_in^2)
-            // where R_in = packRadius
-            const outerRadius = Math.sqrt(packRadius * packRadius + ringArea / Math.PI);
-
-            // Now we need to fit everything (pack + ring) into the SVG view
-            const viewMinDim = Math.min(width, height);
+            // Calculate radius scale
+            // We want the total area of user bubbles to be somewhat proportional to screen size
+            // but ensuring they fit.
+            // Let's define a maximum possible radius for the "user group" circle.
+            const minDim = Math.min(width, height);
             const margin = 20;
-            const maxViewRadius = (viewMinDim / 2) - margin;
+            const maxGroupRadius = (minDim / 2) - margin;
+
+            // Calculate total value area (sum of values)
+            // We want: Area_Group = Area_Users + Area_Others (if we consider ring)
+            // But for force simulation, we only care about user bubbles radius.
+            // Let's first determine the 'scale' factor.
+            // Total Area of Bubbles = Sum(pi * r_i^2)
+            // We can relate value to area: r_i = sqrt(value) * K
+            // Sum(pi * value * K^2) = Total_Bubble_Area
+            // K = sqrt(Total_Bubble_Area / (pi * Sum(value)))
             
-            const scale = maxViewRadius / outerRadius;
+            // We need to determine Total_Bubble_Area.
+            // Let's assume the user bubbles form a packed circle with radius R_users.
+            // And we have an outer ring for 'Others' with radius R_outer.
+            // Area_Ring = Area_Others
+            // Area_Users_Circle = Area_Users (approx)
+            // R_outer^2 / R_users^2 = (Balance_Total) / Balance_Users
+            // R_users = R_outer * sqrt(Balance_Users / Balance_Total)
+            
+            const totalBalance = usersBalance + othersBalance;
+            
+            // "Shrink scale" logic:
+             // We define a 'fillFactor' that determines how much of the total available disk area
+             // is occupied by "ink" (ring area + sum of bubble areas).
+             // Small fillFactor => thin ring, small bubbles, sparse layout.
+             const fillFactor = this.scaleFactor; // Use user-controlled parameter 
+
+            const totalAvailableArea = Math.PI * maxGroupRadius * maxGroupRadius;
+            const targetTotalInkArea = totalAvailableArea * fillFactor;
+
+            // Split ink area proportionally
+            // Area_Ring / Area_Bubbles = Balance_Others / Balance_Users
+            const targetRingArea = totalBalance > 0 
+                ? targetTotalInkArea * (othersBalance / totalBalance) 
+                : 0;
+            const targetBubbleArea = totalBalance > 0 
+                ? targetTotalInkArea * (usersBalance / totalBalance) 
+                : 0;
+
+            // Calculate geometry
+            // Ring Area = pi * (R_out^2 - R_in^2)
+            // R_in = sqrt(R_out^2 - Area_Ring / pi)
+            const userGroupRadius = Math.sqrt(maxGroupRadius * maxGroupRadius - targetRingArea / Math.PI);
+            
+            // Calculate bubble radius scale k
+            // Sum(pi * (k * sqrt(val))^2) = TargetBubbleArea
+            // k^2 * pi * Sum(val) = TargetBubbleArea
+            // k = sqrt(TargetBubbleArea / (pi * Sum(val)))
+            const radiusScale = usersBalance > 0 
+                ? Math.sqrt(targetBubbleArea / (Math.PI * usersBalance)) 
+                : 1;
+
+            // Assign radii to nodes
+            entries.forEach(d => {
+                d.r = Math.sqrt(d.value) * radiusScale;
+            });
 
             const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
             svg.attr("width", width).attr("height", height);
@@ -138,14 +170,20 @@ export default {
             svg.selectAll("*").remove();
             
             // Center group
+            const centerX = width / 2;
+            const centerY = height / 2;
+            
             const g = svg.append("g")
-                .attr("transform", `translate(${width/2},${height/2})`);
+                .attr("transform", `translate(${centerX},${centerY})`);
 
             // Draw Ring (Others)
-            if (ringArea > 0) {
+            if (othersBalance > 0) {
+                const innerRadius = userGroupRadius; // The boundary of user bubbles
+                const outerRadius = maxGroupRadius;  // The boundary of the whole chart
+
                 const arc = d3.arc()
-                    .innerRadius(packRadius * scale)
-                    .outerRadius(outerRadius * scale)
+                    .innerRadius(innerRadius)
+                    .outerRadius(outerRadius)
                     .startAngle(0)
                     .endAngle(2 * Math.PI);
 
@@ -170,23 +208,43 @@ export default {
                     });
             }
 
-            // Draw Bubbles
-            // Shift bubbles to center (they are currently in [0, packSize] coordinates)
-            const bubbleGroup = g.append("g")
-                .attr("transform", `translate(${-packSize/2 * scale}, ${-packSize/2 * scale})`);
+            // Draw Bubbles Group
+            const bubbleGroup = g.append("g");
 
             // Color scale
             const color = d3.scaleSequential(d3.interpolateBlues)
-                .domain([0, d3.max(entries, d => d.balance)]);
+                .domain([0, d3.max(entries, d => d.value)]);
 
+            // Initialize simulation
+            const simulation = d3.forceSimulation(entries)
+                .force("charge", d3.forceManyBody().strength(-10)) // Negative strength for repulsion (dispersion)
+                .force("collide", d3.forceCollide().radius(d => d.r + 2).strength(1).iterations(2)) // Prevent overlap with padding
+                .force("r", d3.forceRadial(0, 0, 0).strength(0.05)) // Weak pull to center
+                .force("center", d3.forceCenter(0, 0).strength(0.05)) // Keep centered
+                .stop();
+
+            // Run simulation manually for faster rendering (static-like feel) or use tick
+            // For better UX with force, we often let it settle a bit then render, or render live.
+            // Since user wants "layout based on links" later, live simulation is better.
+            // But for now, just to show the layout, we can let it run.
+            // However, to ensure it stays "within circular range", forceRadial is key.
+            
+            // Let's run it for some ticks to stabilize initial positions
+            for (let i = 0; i < 120; ++i) simulation.tick();
+
+            // Render nodes
             const node = bubbleGroup.selectAll("g")
-                .data(nodes)
+                .data(entries)
                 .enter().append("g")
-                .attr("transform", d => `translate(${d.x * scale},${d.y * scale})`);
-
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+                // Note: d.x and d.y are relative to the center because forceCenter is at (0,0) relative to the simulation,
+                // but we translated 'g' to (centerX, centerY). 
+                // Wait, d3.forceCenter(x,y) sets the center of mass. If we want 0,0 to be center of 'g', we should use forceCenter(0,0).
+                // But forceCenter(0,0) means coordinates will be around 0.
+                
             // Circles
-            node.append("circle")
-                .attr("r", d => d.r * scale)
+            const circles = node.append("circle")
+                .attr("r", d => d.r)
                 .style("fill", d => color(d.value))
                 .style("opacity", 0.8)
                 .style("stroke", "#fff")
@@ -195,7 +253,7 @@ export default {
                     d3.select(event.currentTarget).style("stroke", "#000");
                     const tooltip = this.$refs.tooltip;
                     tooltip.style.opacity = 1;
-                    tooltip.innerHTML = `Address: ${d.data.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
+                    tooltip.innerHTML = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
                     tooltip.style.left = (event.pageX + 10) + "px";
                     tooltip.style.top = (event.pageY - 10) + "px";
                 })
@@ -209,13 +267,47 @@ export default {
                     this.$refs.tooltip.style.opacity = 0;
                 });
 
-            // Labels (only if big enough)
-            node.filter(d => (d.r * scale) > 15).append("text")
+            // Labels
+            const labels = node.filter(d => d.r > 15).append("text")
                 .attr("dy", ".3em")
                 .style("text-anchor", "middle")
-                .style("font-size", d => Math.min((d.r * scale) / 3, 10) + "px")
+                .style("font-size", d => Math.min(d.r / 3, 10) + "px")
                 .style("pointer-events", "none")
-                .text(d => d.data.name.substring(0, 4));
+                .text(d => d.name.substring(0, 4));
+            
+            // Add drag behavior
+            node.call(d3.drag()
+                .on("start", (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                })
+                .on("drag", (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on("end", (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }));
+
+            // Restart simulation to animate
+            simulation.on("tick", () => {
+                // Constrain nodes to be within userGroupRadius
+                // This is a hard constraint to ensure they don't go into the ring area
+                entries.forEach(d => {
+                    const dist = Math.sqrt(d.x * d.x + d.y * d.y);
+                    const maxDist = userGroupRadius - d.r - 2; // -2 for padding
+                    if (dist > maxDist) {
+                        const angle = Math.atan2(d.y, d.x);
+                        d.x = Math.cos(angle) * maxDist;
+                        d.y = Math.sin(angle) * maxDist;
+                    }
+                });
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
         }
     }
 }
