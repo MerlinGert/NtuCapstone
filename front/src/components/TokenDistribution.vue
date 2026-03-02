@@ -1,11 +1,12 @@
 <template>
     <div style="height:100%;width:100%;background:#ffffff;display:flex;flex-direction:column">
         <!-- Info Header -->
-        <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+        <div style="padding: 10px; background: #f0f0f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid #ddd;">
             <span style="font-weight: bold;">{{ displayTime }}</span>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <label style="font-size: 12px;">Scale:</label>
-                <input type="range" min="0.1" max="1" step="0.05" v-model.number="scaleFactor" @input="drawChart" style="width: 100px;">
+                <label>Scale:</label>
+                <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="drawChart">
+                <span>{{ scaleFactor }}</span>
             </div>
             <span>Active Users (Top 50%): {{ userCount }}</span>
         </div>
@@ -15,6 +16,9 @@
             <svg class="tokenDistribution"></svg>
             <div v-if="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">
                 Loading data...
+            </div>
+            <div v-if="detecting" style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,0.9);padding:5px;border-radius:4px;font-size:12px;border:1px solid #ddd;">
+                Detecting Entities...
             </div>
             <!-- Tooltip -->
             <div ref="tooltip" style="position: absolute; opacity: 0; background: rgba(0,0,0,0.8); color: white; padding: 5px; border-radius: 4px; pointer-events: none; font-size: 12px; z-index: 10;"></div>
@@ -32,10 +36,12 @@ export default {
         return {
             snapshotData: null,
             loading: true,
+            detecting: false,
             svgWidth: 0,
             svgHeight: 0,
             userCount: 0,
-            scaleFactor: 0.7 // Default scale parameter
+            scaleFactor: 0.7, // Default scale parameter
+            lastDetectionCount: null
         }
     },
     computed: {
@@ -52,9 +58,100 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
+        runEntityDetection(threshold, timeRange, ruleType) {
+            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType);
+            if (!this.snapshotData || !this.snapshotData.balances) {
+                 console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
+                 this.$emit('detection-complete', null);
+                 return;
+             }
+            
+            // Extract user list from current data
+            let users = [];
+            if (this.snapshotData.balances && this.snapshotData.balances.users) {
+                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
+            }
+            
+            console.log("TokenDistribution: Found", users.length, "users");
+
+            if (users.length === 0) {
+                console.warn("TokenDistribution: No users found");
+                alert("No users loaded to detect.");
+                this.$emit('detection-complete', 0);
+                return;
+            }
+
+            this.detecting = true;
+            this.lastDetectionCount = null;
+            console.log(`Sending ${users.length} users for detection...`);
+
+            // Call backend API
+            fetch('/api/entity/detect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    target_users: users,
+                    time_range: timeRange,
+                    rules: [
+                        {
+                            rule_type: ruleType,
+                            parameters: {
+                                threshold: threshold // Detect if > threshold transactions
+                            },
+                            enabled: true
+                        }
+                    ]
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                this.detecting = false;
+                console.log("Detection Result:", data);
+                if (data.detected_entities && data.detected_entities.length > 0) {
+                    this.lastDetectionCount = data.detected_entities.length;
+                    alert(`Detected ${data.detected_entities.length} entity groups.`);
+                    this.highlightEntities(data.detected_entities);
+                } else {
+                    this.lastDetectionCount = 0;
+                    alert("No entities detected.");
+                }
+                this.$emit('detection-complete', this.lastDetectionCount);
+            })
+            .catch(error => {
+                this.detecting = false;
+                console.error("Error detecting entities:", error);
+                alert("Detection failed. Check console.");
+                this.$emit('detection-complete', null);
+            });
+        },
+        highlightEntities(entities) {
+            // Create a set of all members in detected entities
+            const memberSet = new Set();
+            entities.forEach(entity => {
+                if (entity.details && entity.details.members) {
+                    entity.details.members.forEach(member => memberSet.add(member));
+                }
+            });
+            
+            // Highlight bubbles in D3 chart
+            const bubbles = d3.selectAll(".bubble");
+            
+            // Update data binding
+            bubbles.each(function(d) {
+                d.isHighlighted = memberSet.has(d.id);
+            });
+
+            // Update visuals
+            bubbles
+                .style("stroke", d => d.isHighlighted ? "#ff0000" : "#fff")
+                .style("stroke-width", d => d.isHighlighted ? 3 : 1);
+        },
         async loadData() {
             try {
                 this.loading = true;
+                console.log("TokenDistribution: Loading snapshot data...", snapshotDataFile);
                 this.snapshotData = snapshotDataFile;
                 this.loading = false;
                 
@@ -244,11 +341,12 @@ export default {
                 
             // Circles
             const circles = node.append("circle")
+                .attr("class", "bubble")
                 .attr("r", d => d.r)
                 .style("fill", d => color(d.value))
                 .style("opacity", 0.8)
-                .style("stroke", "#fff")
-                .style("stroke-width", 1)
+                .style("stroke", d => d.isHighlighted ? "#ff0000" : "#fff")
+                .style("stroke-width", d => d.isHighlighted ? 3 : 1)
                 .on("mouseover", (event, d) => {
                     d3.select(event.currentTarget).style("stroke", "#000");
                     const tooltip = this.$refs.tooltip;
@@ -262,8 +360,10 @@ export default {
                     tooltip.style.left = (event.pageX + 10) + "px";
                     tooltip.style.top = (event.pageY - 10) + "px";
                 })
-                .on("mouseout", (event) => {
-                    d3.select(event.currentTarget).style("stroke", "#fff");
+                .on("mouseout", (event, d) => {
+                    d3.select(event.currentTarget)
+                        .style("stroke", d.isHighlighted ? "#ff0000" : "#fff")
+                        .style("stroke-width", d.isHighlighted ? 3 : 1);
                     this.$refs.tooltip.style.opacity = 0;
                 });
 

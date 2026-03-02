@@ -17,7 +17,23 @@
             <template #header>
                     Token Distribution
             </template>
-            <TokenDistribution />
+            <TokenDistribution ref="tokenDistribution" 
+                @detection-complete="handleDetectionComplete"
+            />
+        </n-card>
+        <n-card
+            size="small"
+            style="width:100%;height:40%;" 
+            header-style="text-align:left;height:50px;font-size:1.7em"
+        >
+            <template #header>
+                    Control Panel
+            </template>
+            <ControlPanel 
+                :loading="detecting"
+                :lastResultCount="lastDetectionCount"
+                @run-detection="handleRunDetection"
+            />
         </n-card>
     </div>
 
@@ -32,10 +48,10 @@
           <template #header>
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
               <!-- 左侧文字 -->
-              <span>Holder View</span>
+              <span>Holder View / API Test</span>
             </div>
           </template>
-
+          <ApiTest />
         </n-card>     
         <n-card
             size="small"
@@ -87,11 +103,15 @@ import { NSelect,NCheckbox,NCard,NLayout,NSwitch,NSpace,NLayoutHeader,NLayoutFoo
 import * as d3 from "d3"
 import HolderView from "./HolderView.vue"
 import TokenDistribution from "./TokenDistribution.vue"
+import ApiTest from "./ApiTest.vue"
+import ControlPanel from "./ControlPanel.vue"
 
 export default {
-  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution},
+  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution, ApiTest, ControlPanel},
   data(){
     return {
+      detecting: false,
+      lastDetectionCount: null,
       overview:{
         rows:0,
         pairs:new Set(),
@@ -107,6 +127,26 @@ export default {
   watch:{
   },
   methods:{
+      handleRunDetection(params) {
+          console.log("CryptoVis: handleRunDetection called with", params);
+          this.detecting = true;
+          this.lastDetectionCount = null;
+          // Trigger detection in TokenDistribution component
+          if (this.$refs.tokenDistribution) {
+              console.log("CryptoVis: calling tokenDistribution.runEntityDetection");
+              this.$refs.tokenDistribution.runEntityDetection(
+                  params.threshold,
+                  params.timeRange,
+                  params.ruleType
+              );
+          } else {
+              console.error("CryptoVis: tokenDistribution ref not found");
+          }
+      },
+    handleDetectionComplete(count) {
+      this.detecting = false;
+      this.lastDetectionCount = count;
+    },
     async loadCSV(){
       this.loading = true
       const overviewUrl = '/processed/overview.json'
