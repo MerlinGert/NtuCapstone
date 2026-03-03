@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timedelta
 
 # Increase CSV field limit
-csv.field_size_limit(sys.maxsize)
+csv.field_size_limit(2**31 - 1)
 
 def load_owner_labels(json_path):
     print(f"Loading owner labels from {json_path}...")

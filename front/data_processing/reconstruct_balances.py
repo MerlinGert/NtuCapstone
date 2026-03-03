@@ -5,8 +5,8 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 
-# Increase CSV field limit for large fields
-csv.field_size_limit(sys.maxsize)
+# Increase CSV field limit for large fields (Windows-safe)
+csv.field_size_limit(2**31 - 1)
 
 def reconstruct_balances(trade_csv_path, transfer_csv_path, output_dir):
     print(f"Loading trades from {trade_csv_path}...")

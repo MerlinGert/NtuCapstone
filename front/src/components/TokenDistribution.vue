@@ -12,7 +12,7 @@
         </div>
 
         <!-- Chart -->
-        <div style="flex:1;position:relative;overflow:hidden;" ref="chart_container">
+        <div style="flex:1;position:relative;overflow:hidden;height:0;min-height:0;" ref="chart_container">
             <svg class="tokenDistribution"></svg>
             <div v-if="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">
                 Loading data...
@@ -28,7 +28,7 @@
 
 <script>
 import * as d3 from "d3"
-// import snapshotDataFile from '../assets/processed_latest_snapshot_50.json'
+import localSnapshotData from '../assets/processed_latest_snapshot_50.json'
 
 export default {
     name: "TokenDistribution",
@@ -176,9 +176,13 @@ export default {
                     this.setSvg();
                 });
             } catch (error) {
-                console.error("Failed to load snapshot:", error);
+                console.warn("API snapshot failed, using local fallback:", error);
+                // Fallback to local bundled JSON
+                this.snapshotData = localSnapshotData;
                 this.loading = false;
-                alert("Failed to load snapshot data. Check console.");
+                this.$nextTick(() => {
+                    this.setSvg();
+                });
             }
         },
         loadData() {
@@ -414,6 +418,7 @@ export default {
                 }));
 
             // Restart simulation to animate
+            simulation.restart();
             simulation.on("tick", () => {
                 // Constrain nodes to be within userGroupRadius
                 // This is a hard constraint to ensure they don't go into the ring area

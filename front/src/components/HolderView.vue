@@ -53,7 +53,7 @@ export default {
         },
         async loadData() {
             try {
-                const response = await fetch('/processed/transfers/top_holders_history.json');
+                const response = await fetch('/processed/transfers/top_holders_summary.json');
                 this.allData = await response.json();
                 
                 // Prepare options for select
@@ -137,9 +137,22 @@ export default {
             g.append("path")
                 .datum(data)
                 .attr("fill", "none")
-                .attr("stroke", "steelblue")
+                .attr("stroke", "#4a90e2")
                 .attr("stroke-width", 1.5)
                 .attr("d", line);
+
+            // Area fill under line
+            const area = d3.area()
+                .x(d => x(d.date))
+                .y0(height)
+                .y1(d => y(d.value))
+                .curve(d3.curveStepAfter);
+
+            g.insert("path", ":first-child")
+                .datum(data)
+                .attr("fill", "#4a90e2")
+                .attr("fill-opacity", 0.1)
+                .attr("d", area);
                 
             // Add tooltip logic (simple circle on hover)
             const focus = g.append("g")
@@ -194,7 +207,8 @@ export default {
                 const i = bisectDate(data, x0, 1);
                 const d0 = data[i - 1];
                 const d1 = data[i];
-                const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+                if (!d0) return;
+                const d = d1 && (x0 - d0.date > d1.date - x0) ? d1 : d0;
                 
                 focus.attr("transform", `translate(${x(d.date)},${y(d.value)})`);
                 tooltipLine1.text(`Date: ${d.date.toLocaleString()}`);
