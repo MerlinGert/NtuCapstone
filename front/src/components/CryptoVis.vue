@@ -26,23 +26,25 @@
         </n-card>
     </div>
 
-<div style="flex: 0 0 30%">
+<div style="flex: 0 0 30%; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
         <n-card
             size="small"
-            style="width:100%;height:60%;" 
+            style="width:100%;height:60%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.7em"
+            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
             <template #header>
                     Token Distribution
             </template>
-            <TokenDistribution ref="tokenDistribution" 
+            <TokenDistribution ref="tokenDistribution"
                 @detection-complete="handleDetectionComplete"
             />
         </n-card>
         <n-card
             size="small"
-            style="width:100%;height:40%;" 
+            style="width:100%;height:40%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.7em"
+            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
             <template #header>
                     Entity Details
@@ -52,24 +54,31 @@
     </div>
 
 
-    <div style="flex: 0 0 55%; display: flex; flex-direction: column">
-    <!-- <n-layout style="width:100%;height:100%" :content-style="{ display: 'flex', flexDirection: 'column'}"> -->
-        <n-card 
+    <div style="flex: 0 0 55%; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+        <n-card
           size="small"
-          style="width:100%;height:60%;" 
+          style="width:100%;height:60%;flex-shrink:0;"
           header-style="text-align:left;height:50px;font-size:1.7em"
-          >
+          :content-style="{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
+        >
           <template #header>
-            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-              <!-- 左侧文字 -->
-              <span>Manipulation Panel</span>
-            </div>
+            <span>Manipulation Panel</span>
           </template>
-          
-        </n-card>     
+          <!-- 上 1/3：空白占位 -->
+          <div style="flex:1;"></div>
+          <!-- 中 1/3：K 线图 -->
+          <div style="flex:1; border-top:1px solid #eef2f7; border-bottom:1px solid #eef2f7; overflow:hidden; position:relative;">
+            <div style="position:absolute;top:0;left:8px;font-size:11px;font-weight:600;color:#4a5568;line-height:20px;z-index:1;">RENA K-Line</div>
+            <div style="position:absolute;inset:0;padding-top:20px;">
+              <CandlestickChart />
+            </div>
+          </div>
+          <!-- 下 1/3：空白占位 -->
+          <div style="flex:1;"></div>
+        </n-card>
         <n-card
             size="small"
-            style="width:100%;height:40%;" 
+            style="width:100%;height:40%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.7em"
         >
             <template #header>
@@ -96,9 +105,10 @@ import HolderView from "./HolderView.vue"
 import TokenDistribution from "./TokenDistribution.vue"
 import ApiTest from "./ApiTest.vue"
 import ControlPanel from "./ControlPanel.vue"
+import CandlestickChart from "./CandlestickChart.vue"
 
 export default {
-  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution, ApiTest, ControlPanel},
+  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution, ApiTest, ControlPanel, CandlestickChart},
   data(){
     return {
       detecting: false,
