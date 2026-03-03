@@ -33,6 +33,7 @@
                 :loading="detecting"
                 :lastResultCount="lastDetectionCount"
                 @run-detection="handleRunDetection"
+                @update-snapshot="handleUpdateSnapshot"
             />
         </n-card>
     </div>
@@ -139,6 +140,16 @@ export default {
                   params.timeRange,
                   params.ruleType
               );
+          } else {
+              console.error("CryptoVis: tokenDistribution ref not found");
+          }
+      },
+      handleUpdateSnapshot(params) {
+          console.log("CryptoVis: handleUpdateSnapshot called with", params);
+          if (this.$refs.tokenDistribution) {
+              this.$refs.tokenDistribution.fetchSnapshotData(params.time, params.threshold);
+              // Clear previous detection result when data changes
+              this.lastDetectionCount = null;
           } else {
               console.error("CryptoVis: tokenDistribution ref not found");
           }

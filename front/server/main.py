@@ -7,6 +7,7 @@ import os
 import json
 import uvicorn
 import entity_detection
+import snapshot_service
 
 # Add data_processing directory to path to import scripts if needed
 # BASE_DIR is the 'server' directory
@@ -17,8 +18,9 @@ sys.path.append(DATA_PROCESSING_DIR)
 
 app = FastAPI()
 
-# Include the entity detection router
+# Include routers
 app.include_router(entity_detection.router)
+app.include_router(snapshot_service.router)
 
 class AnalyzeRequest(BaseModel):
     user_id: str

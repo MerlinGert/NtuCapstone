@@ -28,7 +28,7 @@
 
 <script>
 import * as d3 from "d3"
-import snapshotDataFile from '../assets/processed_latest_snapshot_50.json'
+// import snapshotDataFile from '../assets/processed_latest_snapshot_50.json'
 
 export default {
     name: "TokenDistribution",
@@ -51,7 +51,7 @@ export default {
         }
     },
     mounted() {
-        this.loadData();
+        this.fetchSnapshotData(); // Default fetch
         window.addEventListener('resize', this.setSvg);
     },
     beforeUnmount() {
@@ -148,11 +148,27 @@ export default {
                 .style("stroke", d => d.isHighlighted ? "#ff0000" : "#fff")
                 .style("stroke-width", d => d.isHighlighted ? 3 : 1);
         },
-        async loadData() {
+        async fetchSnapshotData(time = null, threshold = 0.5) {
             try {
                 this.loading = true;
-                console.log("TokenDistribution: Loading snapshot data...", snapshotDataFile);
-                this.snapshotData = snapshotDataFile;
+                console.log("TokenDistribution: Fetching snapshot data...", { time, threshold });
+                
+                const response = await fetch('/api/snapshot/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        time: time,
+                        threshold: threshold
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch data: ${response.statusText}`);
+                }
+                
+                this.snapshotData = await response.json();
                 this.loading = false;
                 
                 // Draw chart
@@ -162,7 +178,12 @@ export default {
             } catch (error) {
                 console.error("Failed to load snapshot:", error);
                 this.loading = false;
+                alert("Failed to load snapshot data. Check console.");
             }
+        },
+        loadData() {
+            // Legacy wrapper, calls fetchSnapshotData with defaults
+            this.fetchSnapshotData();
         },
         setSvg() {
             if (this.$refs.chart_container) {
