@@ -1,13 +1,31 @@
 <template>
 <n-layout class="h-screen max-h-screen" :content-style="{ display: 'flex', flexDirection: 'column',}">
   <n-layout-header>
-      <div class="techname text-light-50 text-shadow-lg font-bold" style="padding-left: 15px;" >CryptoVis</div>
+      <div class="techname text-light-50 text-shadow-lg font-bold" style="padding-left: 15px;" >ManiScope</div>
 </n-layout-header>
 <n-layout-content class="flex-1" style="width:100%;height:100%" >
   <n-layout
         style="width:100%;height:100%"
         :content-style="{ display: 'flex', flexDirection: 'row' }"
       >
+<div style="flex: 0 0 15%">
+        <n-card
+            size="small"
+            style="width:100%;height:40%;" 
+            header-style="text-align:left;height:50px;font-size:1.7em"
+        >
+            <template #header>
+                    Control Panel
+            </template>
+            <ControlPanel 
+                :loading="detecting"
+                :lastResultCount="lastDetectionCount"
+                @run-detection="handleRunDetection"
+                @update-snapshot="handleUpdateSnapshot"
+            />
+        </n-card>
+    </div>
+
 <div style="flex: 0 0 30%">
         <n-card
             size="small"
@@ -27,19 +45,14 @@
             header-style="text-align:left;height:50px;font-size:1.7em"
         >
             <template #header>
-                    Control Panel
+                    Entity Details
             </template>
-            <ControlPanel 
-                :loading="detecting"
-                :lastResultCount="lastDetectionCount"
-                @run-detection="handleRunDetection"
-                @update-snapshot="handleUpdateSnapshot"
-            />
+            <HolderView />
         </n-card>
     </div>
 
 
-    <div style="flex: 0 0 50%; display: flex; flex-direction: column">
+    <div style="flex: 0 0 55%; display: flex; flex-direction: column">
     <!-- <n-layout style="width:100%;height:100%" :content-style="{ display: 'flex', flexDirection: 'column'}"> -->
         <n-card 
           size="small"
@@ -49,10 +62,10 @@
           <template #header>
             <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
               <!-- 左侧文字 -->
-              <span>Holder View / API Test</span>
+              <span>Manipulation Panel</span>
             </div>
           </template>
-          <ApiTest />
+          
         </n-card>     
         <n-card
             size="small"
@@ -60,30 +73,7 @@
             header-style="text-align:left;height:50px;font-size:1.7em"
         >
             <template #header>
-                    Balance View
-            </template>
-            <HolderView />
-        </n-card>
-    </div>
-
-
-    <div style="flex: 0 0 20%">
-        <n-card
-            size="small"
-            style="width:100%;height:60%;" 
-            header-style="text-align:left;height:50px;font-size:1.7em"
-        >
-            <template #header>
-                    Result Overview
-            </template>
-        </n-card>
-        <n-card
-            size="small"
-            style="width:100%;height:40%;" 
-            header-style="text-align:left;height:50px;font-size:1.7em"
-        >
-            <template #header>
-                    Result List
+                    Insight Panel
             </template>
         </n-card>
     </div>

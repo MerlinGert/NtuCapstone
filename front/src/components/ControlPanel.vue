@@ -19,7 +19,7 @@
         </div>
 
         <!-- Rule Configuration -->
-        <div style="font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px;">Rule Configuration</div>
+        <div style="font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px;">Entity Detection Configuration</div>
         
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
             <!-- Rule Type -->
