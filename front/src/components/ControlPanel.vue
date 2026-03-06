@@ -128,8 +128,19 @@
                     <span>Network Based</span>
                     <span>{{ activeLinkSection === 'network' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeLinkSection === 'network'" style="padding: 10px;">
-                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                <div v-if="activeLinkSection === 'network'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Link Threshold (Min Tx)</label>
+                        <input type="number" v-model.number="linkThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="datetime-local" v-model="linkStartTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                            <span>to</span>
+                            <input type="datetime-local" v-model="linkEndTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -173,7 +184,7 @@ export default {
     },
     data() {
         return {
-            detectionThreshold: 1,
+            detectionThreshold: 2,
             // Default to empty strings which means "Full Range" in our logic
             startTime: "",
             endTime: "",
@@ -181,7 +192,7 @@ export default {
             // Snapshot Data
             snapshotTimes: [],
             selectedSnapshotTime: "",
-            snapshotThreshold: 50,
+            snapshotThreshold: 30,
             loadingSnapshot: false,
 
             // UI State
@@ -189,7 +200,12 @@ export default {
             activeManipulationSection: 'network', // 'network', 'behavior_sim'
             loadingManipulation: false,
             activeLinkSection: 'network', // 'network', 'behavior_sim', 'history'
-            loadingLinks: false
+            loadingLinks: false,
+            
+            // Link Config
+            linkThreshold: 1,
+            linkStartTime: "",
+            linkEndTime: ""
         }
     },
     mounted() {
@@ -217,24 +233,6 @@ export default {
                 this.activeLinkSection = section;
             }
         },
-        triggerManipulationDetection() {
-            this.loadingManipulation = true;
-            // TODO: Implement actual detection logic
-            console.log("ControlPanel: triggerManipulationDetection called");
-            setTimeout(() => {
-                this.loadingManipulation = false;
-                alert("Manipulation detection not yet implemented.");
-            }, 1000);
-        },
-        updateLinks() {
-            this.loadingLinks = true;
-            // TODO: Implement actual link update logic
-            console.log("ControlPanel: updateLinks called");
-            setTimeout(() => {
-                this.loadingLinks = false;
-                alert("Link update not yet implemented.");
-            }, 1000);
-        },
         async fetchSnapshotTimes() {
             try {
                 const response = await fetch('/api/snapshot/times');
@@ -249,11 +247,33 @@ export default {
                 console.error("ControlPanel: Failed to fetch snapshot times", error);
             }
         },
+        getDetectionParams() {
+            const timeRange = {};
+            if (this.startTime) timeRange.start = this.startTime.replace('T', ' ');
+            if (this.endTime) timeRange.end = this.endTime.replace('T', ' ');
+            return {
+                threshold: this.detectionThreshold,
+                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
+                ruleType: "transfer-network"
+            };
+        },
+        getLinkParams() {
+            const timeRange = {};
+            if (this.linkStartTime) timeRange.start = this.linkStartTime.replace('T', ' ');
+            if (this.linkEndTime) timeRange.end = this.linkEndTime.replace('T', ' ');
+            return {
+                threshold: this.linkThreshold,
+                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
+                ruleType: "transfer-network"
+            };
+        },
         updateSnapshot() {
             this.loadingSnapshot = true;
             this.$emit('update-snapshot', {
                 time: this.selectedSnapshotTime,
-                threshold: this.snapshotThreshold / 100 // Convert percentage to 0-1
+                threshold: this.snapshotThreshold / 100, // Convert percentage to 0-1
+                detectionParams: this.getDetectionParams(),
+                linkParams: this.getLinkParams()
             });
             // Simulate loading done after emit (actual data loading is in parent/sibling)
             // But we can just set it to false after a timeout or let parent handle it?
@@ -265,23 +285,29 @@ export default {
         },
         triggerDetection() {
             console.log("ControlPanel: triggerDetection called");
-            // Prepare time range object
-            const timeRange = {};
-            if (this.startTime) timeRange.start = this.startTime.replace('T', ' ');
-            if (this.endTime) timeRange.end = this.endTime.replace('T', ' ');
+            const params = this.getDetectionParams();
             
-            console.log("ControlPanel: emitting run-detection", {
-                threshold: this.detectionThreshold,
-                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
-                ruleType: "transfer-network"
-            });
+            console.log("ControlPanel: emitting run-detection", params);
 
-            this.$emit('run-detection', {
-                threshold: this.detectionThreshold,
-                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
-                ruleType: "transfer-network"
-            });
-        }
+            this.$emit('run-detection', params);
+        },
+        triggerManipulationDetection() {
+            this.loadingManipulation = true;
+            // TODO: Implement actual detection logic
+            console.log("ControlPanel: triggerManipulationDetection called");
+            setTimeout(() => {
+                this.loadingManipulation = false;
+                alert("Manipulation detection not yet implemented.");
+            }, 1000);
+        },
+        updateLinks() {
+            console.log("ControlPanel: updateLinks called");
+            const params = this.getLinkParams();
+            
+            console.log("ControlPanel: emitting update-links", params);
+            
+            this.$emit('update-links', params);
+        },
     }
 }
 </script>

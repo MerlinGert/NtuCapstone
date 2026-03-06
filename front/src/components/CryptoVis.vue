@@ -8,10 +8,10 @@
         style="width:100%;height:100%;overflow:hidden"
         :content-style="{ display: 'flex', flexDirection: 'row', overflow: 'hidden', width: '100%', height: '100%', boxSizing: 'border-box' }"
       >
-<div style="flex: 5; min-width:0; overflow:hidden;">
+<div style="flex: 4; min-width:0; overflow:hidden;">
         <n-card
             size="small"
-            style="width:100%;height:40%;"
+            style="width:100%;height:100%;"
             class="panel-card"
             header-style="text-align:left;height:50px;font-size:1.4em;"
         >
@@ -23,6 +23,7 @@
                 :lastResultCount="lastDetectionCount"
                 @run-detection="handleRunDetection"
                 @update-snapshot="handleUpdateSnapshot"
+                @update-links="handleUpdateLinks"
             />
         </n-card>
     </div>
@@ -163,7 +164,12 @@ export default {
       handleUpdateSnapshot(params) {
           console.log("CryptoVis: handleUpdateSnapshot called with", params);
           if (this.$refs.tokenDistribution) {
-              this.$refs.tokenDistribution.fetchSnapshotData(params.time, params.threshold);
+              this.$refs.tokenDistribution.fetchSnapshotData(
+                  params.time, 
+                  params.threshold,
+                  params.detectionParams,
+                  params.linkParams
+              );
               // Clear previous detection result when data changes
               this.lastDetectionCount = null;
           } else {
@@ -173,6 +179,17 @@ export default {
     handleDetectionComplete(count) {
       this.detecting = false;
       this.lastDetectionCount = count;
+    },
+    handleUpdateLinks(params) {
+      console.log("CryptoVis: handleUpdateLinks called with", params);
+      if (this.$refs.tokenDistribution) {
+          this.$refs.tokenDistribution.updateLinks(
+              params.threshold,
+              params.timeRange
+          );
+      } else {
+          console.error("CryptoVis: tokenDistribution ref not found");
+      }
     },
     async loadCSV(){
       this.loading = true

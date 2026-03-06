@@ -57,6 +57,20 @@ class DetectionResponse(BaseModel):
     detected_entities: List[DetectedEntity]
     metadata: Dict[str, Any]
 
+class LinkRequest(BaseModel):
+    """
+    Request body for link analysis.
+    """
+    target_users: Optional[List[str]] = Field(None, description="List of user IDs to check.")
+    time_range: Optional[Dict[str, str]] = Field(None, description="Start and end time.")
+    threshold: int = Field(1, description="Minimum transactions.")
+
+class LinkResponse(BaseModel):
+    """
+    Response body containing link analysis results.
+    """
+    links: List[Dict[str, Any]]
+
 # --- Logic Implementation ---
 
 def apply_detection_logic(user_data: Dict, rules: List[DetectionRule]) -> List[DetectedEntity]:
@@ -263,3 +277,70 @@ async def get_rule_templates():
             }
         ]
     }
+
+def process_transfer_network_links(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int) -> List[Dict[str, Any]]:
+    if not os.path.exists(TRANSFER_STATS_PATH):
+        return []
+
+    try:
+        # Load Pre-aggregated Stats
+        df = pd.read_csv(TRANSFER_STATS_PATH)
+        
+        # Filter by Time Range
+        if time_range:
+            start_time = time_range.get("start")
+            end_time = time_range.get("end")
+            
+            if start_time:
+                df = df[df['last_transaction'] >= start_time]
+            if end_time:
+                df = df[df['first_transaction'] <= end_time]
+        
+        # Filter by Target Users
+        if target_users:
+            target_set = set(target_users)
+            df = df[df['from_owner'].isin(target_set) & df['to_owner'].isin(target_set)]
+        
+        if df.empty:
+            return []
+
+        # Group by pair (undirected) and sum weights
+        G = nx.Graph()
+        for _, row in df.iterrows():
+            u, v = row['from_owner'], row['to_owner']
+            count = row['transaction_count']
+            
+            if G.has_edge(u, v):
+                G[u][v]['weight'] += count
+            else:
+                G.add_edge(u, v, weight=count)
+        
+        links = []
+        for u, v, d in G.edges(data=True):
+            if d['weight'] >= threshold:
+                links.append({
+                    "source": u,
+                    "target": v,
+                    "weight": d['weight']
+                })
+        
+        return links
+
+    except Exception as e:
+        print(f"Error in transfer network links: {e}")
+        return []
+
+@router.post("/links", response_model=LinkResponse)
+async def get_links(request: LinkRequest):
+    """
+    Get links (edges) based on transfer network rules.
+    """
+    try:
+        links = process_transfer_network_links(
+            request.target_users, 
+            request.time_range, 
+            request.threshold
+        )
+        return {"links": links}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
