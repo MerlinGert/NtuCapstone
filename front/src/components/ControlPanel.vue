@@ -18,42 +18,142 @@
             </button>
         </div>
 
-        <!-- Rule Configuration -->
-        <div style="font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px;">Entity Detection Configuration</div>
+        <!-- Entity Detection Configuration -->
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-weight: bold;">Entity Detection</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button @click="triggerDetection" :disabled="loading" style="padding: 5px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                    {{ loading ? 'Detecting...' : 'Run Detection' }}
+                </button>
+                <span v-if="lastResultCount !== null" style="color: #666; font-size: 12px;">
+                    Last Result: {{ lastResultCount }} groups
+                </span>
+            </div>
+        </div>
         
-        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-            <!-- Rule Type -->
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; font-weight: bold;">Rule Type</label>
-                <select style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                    <option value="transfer-network">Transfer Network Based</option>
-                </select>
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <!-- Transfer Network Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleSection('transfer')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Network Based</span>
+                    <span>{{ activeSection === 'transfer' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeSection === 'transfer'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Threshold (Min Tx Count)</label>
+                        <input type="number" v-model.number="detectionThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="datetime-local" v-model="startTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                            <span>to</span>
+                            <input type="datetime-local" v-model="endTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <!-- Threshold -->
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; font-weight: bold;">Threshold (Min Tx Count)</label>
-                <input type="number" v-model.number="detectionThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+            <!-- Behavior Similarity Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleSection('behavior')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Behavior Similarity Based</span>
+                    <span>{{ activeSection === 'behavior' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeSection === 'behavior'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
             </div>
 
-            <!-- Time Range -->
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="datetime-local" v-model="startTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                    <span>to</span>
-                    <input type="datetime-local" v-model="endTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+            <!-- Manipulation History Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleSection('history')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Manipulation History Based</span>
+                    <span>{{ activeSection === 'history' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeSection === 'history'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
                 </div>
             </div>
         </div>
 
-        <div style="margin-top: 5px;">
-            <button @click="triggerDetection" :disabled="loading" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                {{ loading ? 'Detecting...' : 'Run Detection' }}
-            </button>
-            <span v-if="lastResultCount !== null" style="margin-left: 10px; color: #666; font-size: 13px;">
-                Last Result: Found {{ lastResultCount }} entity groups
-            </span>
+        <!-- Manipulation Detection Configuration -->
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-weight: bold;">Manipulation Detection</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button @click="triggerManipulationDetection" :disabled="loadingManipulation" style="padding: 5px 15px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                    {{ loadingManipulation ? 'Detecting...' : 'Run Detection' }}
+                </button>
+            </div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <!-- Network Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleManipulationSection('network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Network Based</span>
+                    <span>{{ activeManipulationSection === 'network' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeManipulationSection === 'network'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
+
+            <!-- Behavior Similarity Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleManipulationSection('behavior_sim')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Behavior Similarity Based</span>
+                    <span>{{ activeManipulationSection === 'behavior_sim' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeManipulationSection === 'behavior_sim'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Link Configuration -->
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-weight: bold;">Link Configuration</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button @click="updateLinks" :disabled="loadingLinks" style="padding: 5px 15px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                    {{ loadingLinks ? 'Updating...' : 'Update Links' }}
+                </button>
+            </div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <!-- Network Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleLinkSection('network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Network Based</span>
+                    <span>{{ activeLinkSection === 'network' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeLinkSection === 'network'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
+
+            <!-- Behavior Similarity Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleLinkSection('behavior_sim')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Behavior Similarity Based</span>
+                    <span>{{ activeLinkSection === 'behavior_sim' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeLinkSection === 'behavior_sim'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
+
+            <!-- Manipulation History Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleLinkSection('history')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Manipulation History Based</span>
+                    <span>{{ activeLinkSection === 'history' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeLinkSection === 'history'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -82,13 +182,59 @@ export default {
             snapshotTimes: [],
             selectedSnapshotTime: "",
             snapshotThreshold: 50,
-            loadingSnapshot: false
+            loadingSnapshot: false,
+
+            // UI State
+            activeSection: 'transfer', // 'transfer', 'behavior', 'history'
+            activeManipulationSection: 'network', // 'network', 'behavior_sim'
+            loadingManipulation: false,
+            activeLinkSection: 'network', // 'network', 'behavior_sim', 'history'
+            loadingLinks: false
         }
     },
     mounted() {
         this.fetchSnapshotTimes();
     },
     methods: {
+        toggleSection(section) {
+            if (this.activeSection === section) {
+                this.activeSection = null;
+            } else {
+                this.activeSection = section;
+            }
+        },
+        toggleManipulationSection(section) {
+            if (this.activeManipulationSection === section) {
+                this.activeManipulationSection = null;
+            } else {
+                this.activeManipulationSection = section;
+            }
+        },
+        toggleLinkSection(section) {
+            if (this.activeLinkSection === section) {
+                this.activeLinkSection = null;
+            } else {
+                this.activeLinkSection = section;
+            }
+        },
+        triggerManipulationDetection() {
+            this.loadingManipulation = true;
+            // TODO: Implement actual detection logic
+            console.log("ControlPanel: triggerManipulationDetection called");
+            setTimeout(() => {
+                this.loadingManipulation = false;
+                alert("Manipulation detection not yet implemented.");
+            }, 1000);
+        },
+        updateLinks() {
+            this.loadingLinks = true;
+            // TODO: Implement actual link update logic
+            console.log("ControlPanel: updateLinks called");
+            setTimeout(() => {
+                this.loadingLinks = false;
+                alert("Link update not yet implemented.");
+            }, 1000);
+        },
         async fetchSnapshotTimes() {
             try {
                 const response = await fetch('/api/snapshot/times');
