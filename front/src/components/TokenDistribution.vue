@@ -8,7 +8,7 @@
                 <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="drawChart">
                 <span>{{ scaleFactor }}</span>
             </div>
-            <span>Active Users (Top {{ topPercent }}%): {{ userCount }}</span>
+            <span>Active Users: {{ userCount }}</span>
         </div>
 
         <!-- Chart -->
@@ -28,7 +28,6 @@
 
 <script>
 import * as d3 from "d3"
-import localSnapshotData from '../assets/processed_latest_snapshot_50.json'
 
 export default {
     name: "TokenDistribution",
@@ -52,7 +51,8 @@ export default {
             simulation: null,
             centerX: 0,
             centerY: 0,
-            topPercent: 50
+            topPercent: 50,
+            suspiciousTraders: []
         }
     },
     computed: {
@@ -143,6 +143,35 @@ export default {
         highlightEntities(entities) {
             // Keep for compatibility if needed, but logic moved to drawChart
         },
+        highlightSuspiciousTraders(suspiciousTraders) {
+            console.log("TokenDistribution: highlightSuspiciousTraders", suspiciousTraders.length);
+            
+            const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
+            const suspiciousMap = new Map();
+            suspiciousTraders.forEach(t => suspiciousMap.set(t.trader_id, t));
+
+            // Update Singles
+            svg.selectAll(".single").each(function(d) {
+                if (suspiciousMap.has(d.id)) {
+                    d.suspicious = suspiciousMap.get(d.id);
+                    d3.select(this).style("stroke", "#ff0000").style("stroke-width", 3);
+                } else {
+                    d.suspicious = null;
+                    d3.select(this).style("stroke", "#5976ba").style("stroke-width", 2);
+                }
+            });
+
+            // Update Group Members
+            svg.selectAll(".member").each(function(d) {
+                if (suspiciousMap.has(d.id)) {
+                    d.suspicious = suspiciousMap.get(d.id);
+                    d3.select(this).style("stroke", "#ff0000").style("stroke-width", 3);
+                } else {
+                    d.suspicious = null;
+                    d3.select(this).style("stroke", "#5976ba").style("stroke-width", 2);
+                }
+            });
+        },
         async fetchSnapshotData(time = this.selectedTime, threshold, detectionParams, linkParams) {
             console.log("TokenDistribution: fetchSnapshotData called", time, threshold, detectionParams, linkParams);
             this.loading = true;
@@ -175,7 +204,7 @@ export default {
                 }
                 
                 this.snapshotData = await response.json();
-                this.loading = false;
+                // this.loading = false; // Wait until all detections are done
                 
                 // Update topPercent display based on threshold
                 if (threshold !== undefined) {
@@ -186,15 +215,23 @@ export default {
                 
                 // Draw chart
                 this.$nextTick(async () => {
-                    this.setSvg();
+                    // Set dimensions but don't draw yet
+                    if (this.$refs.chart_container) {
+                        this.svgHeight = this.$refs.chart_container.offsetHeight;
+                        this.svgWidth = this.$refs.chart_container.offsetWidth;
+                    }
+                    
                     // Auto-load detection and links after initial render
                     // Run both concurrently and wait for both to finish before drawing
                     await Promise.all([
                         this.runEntityDetection(this.lastDetectionThreshold || 2, this.lastDetectionTimeRange || {}, 'transfer-network', true),
-                        this.updateLinks(this.lastLinkThreshold || 1, this.lastLinkTimeRange || {}, true)
+                        this.updateLinks(this.lastLinkThreshold || 1, this.lastLinkTimeRange || {}, true),
+                        // Run manipulation detection with default threshold (100) or last used
+                        this.runManipulationDetection(100, true) // Pass true for isAutoRun
                     ]);
                     // Only draw once after both are ready
                     this.drawChart();
+                    this.loading = false;
                 });
             } catch (error) {
                 console.warn("API snapshot failed, using local fallback:", error);
@@ -219,6 +256,12 @@ export default {
         },
         async updateLinks(threshold, timeRange, silent = false) {
             console.log("TokenDistribution: updateLinks called", threshold, timeRange);
+
+            // Update topPercent if threshold is provided
+            if (threshold) {
+                this.topPercent = threshold;
+            }
+
             if (!this.snapshotData || !this.snapshotData.balances) {
                 console.warn("No snapshot data available.");
                 return;
@@ -289,6 +332,17 @@ export default {
 
             this.userCount = entries.length;
             const usersBalance = entries.reduce((sum, d) => sum + d.value, 0);
+
+            // Mark suspicious traders
+            if (this.suspiciousTraders && this.suspiciousTraders.length > 0) {
+                const suspiciousMap = new Map();
+                this.suspiciousTraders.forEach(t => suspiciousMap.set(t.trader_id, t));
+                entries.forEach(d => {
+                    if (suspiciousMap.has(d.id)) {
+                        d.suspicious = suspiciousMap.get(d.id);
+                    }
+                });
+            }
 
             // 2. Calculate scale for bubbles
             const minDim = Math.min(width, height);
@@ -491,24 +545,30 @@ export default {
                 .attr("r", d => d.r)
                 .style("fill", d => color(d.value))
                 .style("opacity", 0.6)
-                .style("stroke", "#5976ba")
-                .style("stroke-width", 2)
+                .style("stroke", d => d.suspicious ? "#ff0000" : "#5976ba")
+                .style("stroke-width", d => d.suspicious ? 3 : 2)
                 .call(drag) // Attach drag
                 .on("mouseover", (event, d) => {
-                    d3.select(event.currentTarget).style("stroke", "#000");
+                    d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#000");
                     const tooltip = this.$refs.tooltip;
                     tooltip.style.opacity = 1;
-                    tooltip.innerHTML = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
-                    tooltip.style.left = (event.pageX + 10) + "px";
-                    tooltip.style.top = (event.pageY - 10) + "px";
+                    let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
+                    if (d.suspicious) {
+                        content += `<br><span style="color:red">Self-Trading Detected!</span><br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                    }
+                    tooltip.innerHTML = content;
+                    const [x, y] = d3.pointer(event, this.$refs.chart_container);
+                    tooltip.style.left = (x + 10) + "px";
+                    tooltip.style.top = (y - 10) + "px";
                 })
                 .on("mousemove", (event) => {
                     const tooltip = this.$refs.tooltip;
-                    tooltip.style.left = (event.pageX + 10) + "px";
-                    tooltip.style.top = (event.pageY - 10) + "px";
+                    const [x, y] = d3.pointer(event, this.$refs.chart_container);
+                    tooltip.style.left = (x + 10) + "px";
+                    tooltip.style.top = (y - 10) + "px";
                 })
-                .on("mouseout", (event) => {
-                    d3.select(event.currentTarget).style("stroke", "#5976ba");
+                .on("mouseout", (event, d) => {
+                    d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#5976ba");
                     this.$refs.tooltip.style.opacity = 0;
                 });
 
@@ -523,28 +583,34 @@ export default {
                     .attr("r", child => child.r)
                     .style("fill", child => color(child.value))
                     .style("opacity", 0.6)
-                    .style("stroke", "#5976ba")
-                    .style("stroke-width", 2);
+                    .style("stroke", child => child.suspicious ? "#ff0000" : "#5976ba")
+                    .style("stroke-width", child => child.suspicious ? 3 : 2);
             });
             
             // Re-bind events for members with correct scope
             const self = this;
             groups.selectAll(".member")
                  .on("mouseover", function(event, d) {
-                    d3.select(this).style("stroke", "#000");
+                    d3.select(this).style("stroke", d.suspicious ? "#ff0000" : "#000");
                     const tooltip = self.$refs.tooltip;
                     tooltip.style.opacity = 1;
-                    tooltip.innerHTML = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
-                    tooltip.style.left = (event.pageX + 10) + "px";
-                    tooltip.style.top = (event.pageY - 10) + "px";
+                    let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
+                    if (d.suspicious) {
+                        content += `<br><span style="color:red">Self-Trading Detected!</span><br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                    }
+                    tooltip.innerHTML = content;
+                    const [x, y] = d3.pointer(event, self.$refs.chart_container);
+                    tooltip.style.left = (x + 10) + "px";
+                    tooltip.style.top = (y - 10) + "px";
                 })
                 .on("mousemove", function(event) {
                      const tooltip = self.$refs.tooltip;
-                     tooltip.style.left = (event.pageX + 10) + "px";
-                     tooltip.style.top = (event.pageY - 10) + "px";
+                     const [x, y] = d3.pointer(event, self.$refs.chart_container);
+                     tooltip.style.left = (x + 10) + "px";
+                     tooltip.style.top = (y - 10) + "px";
                 })
-                .on("mouseout", function(event) {
-                    d3.select(this).style("stroke", "#5976ba");
+                .on("mouseout", function(event, d) {
+                    d3.select(this).style("stroke", d.suspicious ? "#ff0000" : "#5976ba");
                     self.$refs.tooltip.style.opacity = 0;
                 });
 
@@ -572,6 +638,55 @@ export default {
                 // Update Singles
                 singles.attr("transform", d => `translate(${d.x},${d.y})`);
             });
+        },
+        async runManipulationDetection(threshold, isAutoRun = false) {
+            console.log("TokenDistribution: runManipulationDetection called with threshold", threshold, "isAutoRun", isAutoRun);
+            
+            // Get current users from snapshot data
+            let users = [];
+            if (this.snapshotData && this.snapshotData.balances && this.snapshotData.balances.users) {
+                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
+            }
+
+            if (users.length === 0) {
+                console.warn("TokenDistribution: No users to detect manipulation for.");
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/manipulation/detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        threshold: threshold,
+                        limit_traders: users
+                    })
+                });
+                
+                if (!response.ok) throw new Error("Detection failed");
+                
+                const data = await response.json();
+                console.log("Manipulation detection result:", data);
+                
+                // Store results
+                this.suspiciousTraders = data.suspicious_traders || [];
+                
+                // If not auto-run (meaning triggered by user update), we might need to re-highlight or re-draw
+                // But since we are likely in a flow where drawChart handles it, we just update data.
+                // If the chart is already drawn, we can call highlightSuspiciousTraders to update it without full redraw?
+                // Or just call drawChart again? calling drawChart is safer but might restart simulation.
+                // Let's stick to updating data. If this is called standalone, we might want to trigger update.
+                
+                if (!isAutoRun) {
+                    this.highlightSuspiciousTraders(this.suspiciousTraders);
+                }
+                
+                // Emit result up
+                this.$emit('manipulation-detected', { ...data, isAutoRun });
+                
+            } catch (error) {
+                console.error("TokenDistribution: Manipulation detection error:", error);
+            }
         },
     }
 }

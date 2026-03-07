@@ -88,6 +88,21 @@
         </div>
         
         <div style="display: flex; flex-direction: column; gap: 5px;">
+            <!-- Self Trading -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleManipulationSection('self_trading')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Self Trading (Wash Trading)</span>
+                    <span>{{ activeManipulationSection === 'self_trading' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeManipulationSection === 'self_trading'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Volume Difference Threshold</label>
+                        <input type="number" v-model.number="selfTradingThreshold" min="0" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+                        <span style="font-size: 10px; color: #666;">Max difference between buy/sell amounts.</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Network Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
                 <div @click="toggleManipulationSection('network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
@@ -177,6 +192,10 @@ export default {
             type: Boolean,
             default: false
         },
+        loadingManipulation: {
+            type: Boolean,
+            default: false
+        },
         lastResultCount: {
             type: Number,
             default: null
@@ -197,10 +216,12 @@ export default {
 
             // UI State
             activeSection: 'transfer', // 'transfer', 'behavior', 'history'
-            activeManipulationSection: 'network', // 'network', 'behavior_sim'
-            loadingManipulation: false,
+            activeManipulationSection: 'self_trading', // 'network', 'behavior_sim', 'self_trading'
+            // loadingManipulation: false, // Moved to props
             activeLinkSection: 'network', // 'network', 'behavior_sim', 'history'
             loadingLinks: false,
+            
+            selfTradingThreshold: 100,
             
             // Link Config
             linkThreshold: 1,
@@ -291,14 +312,13 @@ export default {
 
             this.$emit('run-detection', params);
         },
-        triggerManipulationDetection() {
-            this.loadingManipulation = true;
-            // TODO: Implement actual detection logic
-            console.log("ControlPanel: triggerManipulationDetection called");
-            setTimeout(() => {
-                this.loadingManipulation = false;
-                alert("Manipulation detection not yet implemented.");
-            }, 1000);
+        async triggerManipulationDetection() {
+            // this.loadingManipulation = true; // Controlled by prop now
+            console.log("ControlPanel: emitting request-manipulation-detection");
+            
+            this.$emit('request-manipulation-detection', {
+                threshold: this.selfTradingThreshold
+            });
         },
         updateLinks() {
             console.log("ControlPanel: updateLinks called");

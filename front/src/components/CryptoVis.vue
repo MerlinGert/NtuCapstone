@@ -20,10 +20,12 @@
             </template>
             <ControlPanel 
                 :loading="detecting"
+                :loadingManipulation="detectingManipulation"
                 :lastResultCount="lastDetectionCount"
                 @run-detection="handleRunDetection"
                 @update-snapshot="handleUpdateSnapshot"
                 @update-links="handleUpdateLinks"
+                @request-manipulation-detection="handleRunManipulationDetection"
             />
         </n-card>
     </div>
@@ -41,6 +43,7 @@
             </template>
             <TokenDistribution ref="tokenDistribution"
                 @detection-complete="handleDetectionComplete"
+                @manipulation-detected="handleManipulationDetected"
             />
         </n-card>
         <n-card
@@ -129,6 +132,7 @@ export default {
       klineGranularity: '1D',
       klineGranularities: ['1H','1D','3D','1W'],
       detecting: false,
+      detectingManipulation: false,
       lastDetectionCount: null,
       overview:{
         rows:0,
@@ -181,7 +185,7 @@ export default {
       this.lastDetectionCount = count;
     },
     handleUpdateLinks(params) {
-      console.log("CryptoVis: handleUpdateLinks called with", params);
+      console.log("CryptoVis: handleUpdateLinks called", params);
       if (this.$refs.tokenDistribution) {
           this.$refs.tokenDistribution.updateLinks(
               params.threshold,
@@ -190,6 +194,46 @@ export default {
       } else {
           console.error("CryptoVis: tokenDistribution ref not found");
       }
+    },
+    async handleRunManipulationDetection(params) {
+        console.log("CryptoVis: handleRunManipulationDetection called", params);
+        this.detectingManipulation = true;
+        if (this.$refs.tokenDistribution) {
+            await this.$refs.tokenDistribution.runManipulationDetection(params.threshold);
+        } else {
+            console.error("CryptoVis: tokenDistribution ref not found");
+        }
+        this.detectingManipulation = false;
+    },
+    handleManipulationDetected(data) {
+        // This is now purely for logging or additional side effects, 
+        // as TokenDistribution handles the visualization.
+        console.log("CryptoVis: handleManipulationDetected received data", data);
+        
+        // Log to console for all detections (manual or auto)
+        if (data.suspicious_traders && data.suspicious_traders.length > 0) {
+             console.group("Suspicious Traders Details");
+             console.table(data.suspicious_traders.slice(0, 50));
+             if (data.suspicious_traders.length > 50) {
+                 console.log(`... and ${data.suspicious_traders.length - 50} more.`);
+             }
+             console.groupEnd();
+         }
+         
+         // Only alert if manual trigger (not auto run)
+         if (!data.isAutoRun) {
+             let message = `Detected ${data.count} suspicious traders.`;
+             if (data.saved_file) {
+                 message += `\nResults saved to: public/manipulation_results/${data.saved_file}`;
+                 console.log(`Results saved to server file: ${data.saved_file}`);
+             }
+             alert(message);
+         } else {
+             console.log(`Auto-detected ${data.count} suspicious traders.`);
+             if (data.saved_file) {
+                 console.log(`Results saved to server file: ${data.saved_file}`);
+             }
+         }
     },
     async loadCSV(){
       this.loading = true
@@ -212,7 +256,7 @@ export default {
     }
   },
   beforeMount(){
-    this.loadCSV()
+    // this.loadCSV()
   },
   mounted(){
     

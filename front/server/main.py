@@ -1,13 +1,12 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import pandas as pd
 import sys
 import os
-import json
 import uvicorn
 import entity_detection
 import snapshot_service
+import manipulation_detect
 
 # Add data_processing directory to path to import scripts if needed
 # BASE_DIR is the 'server' directory
@@ -21,40 +20,11 @@ app = FastAPI()
 # Include routers
 app.include_router(entity_detection.router)
 app.include_router(snapshot_service.router)
-
-class AnalyzeRequest(BaseModel):
-    user_id: str
-    params: dict = {}
+app.include_router(manipulation_detect.router)
 
 @app.get("/")
 def read_root():
     return {"message": "CryptoVis Backend is running!"}
-
-@app.post("/api/analyze")
-def analyze_user(request: AnalyzeRequest):
-    """
-    Example endpoint to process user data.
-    You can call your data processing scripts here.
-    """
-    try:
-        user_id = request.user_id
-        # Example: Just echo back for now, or load processed data
-        # In a real scenario, you might call:
-        # result = process_user_behavior.analyze(user_id, request.params)
-        
-        # Simulating processing...
-        result = {
-            "user_id": user_id,
-            "status": "processed",
-            "analysis": {
-                "score": 0.85,
-                "segments": ["active", "trader"],
-                "summary": f"Analysis for user {user_id} complete based on params {request.params}"
-            }
-        }
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

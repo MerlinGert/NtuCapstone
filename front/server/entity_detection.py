@@ -73,31 +73,6 @@ class LinkResponse(BaseModel):
 
 # --- Logic Implementation ---
 
-def apply_detection_logic(user_data: Dict, rules: List[DetectionRule]) -> List[DetectedEntity]:
-    # Placeholder for user-specific rules (like threshold)
-    # This function processes ONE user at a time
-    detected = []
-    
-    for rule in rules:
-        if not rule.enabled:
-            continue
-            
-        if rule.rule_type == "threshold":
-            limit = rule.parameters.get("limit", 1000)
-            metric = rule.parameters.get("metric", "balance")
-            # Check if user exceeds limit...
-            # mock result
-            user_val = user_data.get("value", 0)
-            if user_val > limit:
-                detected.append(DetectedEntity(
-                    entity_id=user_data.get("id", "unknown"),
-                    confidence=0.95,
-                    reason=f"Exceeded {metric} threshold limit of {limit}",
-                    details={"actual_value": user_val}
-                ))
-                
-    return detected
-
 def process_transfer_network_rule(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int) -> List[DetectedEntity]:
     """
     Implements transfer-network-based entity detection using pre-aggregated statistics.
@@ -202,18 +177,11 @@ async def detect_entities(request: DetectionRequest):
         
         # Separate rules
         transfer_network_rules = [r for r in request.rules if r.rule_type == "transfer-network" and r.enabled]
-        other_rules = [r for r in request.rules if r.rule_type != "transfer-network" and r.enabled]
         
         # 1. Process Transfer Network Rules (Batch process)
         for rule in transfer_network_rules:
             threshold = rule.parameters.get("threshold", 5)
-            # Use request.target_users if available, otherwise maybe use all users (careful!)
-            # For this specific rule, we need a list of addresses to check interactions between.
-            # If target_users is None, we might check ALL interactions in the CSV (computationally expensive but possible).
-            # Let's assume target_users is provided or we default to top active ones (but here we just pass what we have)
-            
-            # If target_users is None, we might want to scan the whole file. 
-            # For safety, let's proceed with request.target_users. If None, it means "all in file".
+            # Use request.target_users if available
             
             network_entities = process_transfer_network_rule(
                 request.target_users, 
@@ -222,27 +190,12 @@ async def detect_entities(request: DetectionRequest):
             )
             all_detected.extend(network_entities)
 
-        # 2. Process Per-User Rules (Threshold, etc.)
-        # Mock data for demonstration (as before) if target_users provided, else mock some
-        if request.target_users:
-            mock_user_data = [{"id": uid, "value": hash(uid) % 2000} for uid in request.target_users]
-        else:
-            mock_user_data = [
-                {"id": "user_A", "value": 500},
-                {"id": "user_B", "value": 1500}, 
-                {"id": "user_C", "value": 200}
-            ]
-            
-        for user in mock_user_data:
-            results = apply_detection_logic(user, other_rules)
-            all_detected.extend(results)
-            
         execution_time = time.time() - start_time
         
-        # 3. Return Results
+        # 2. Return Results
         return DetectionResponse(
             status="success",
-            processed_count=len(request.target_users) if request.target_users else len(mock_user_data), # Approximation
+            processed_count=len(request.target_users) if request.target_users else 0,
             detected_entities=all_detected,
             metadata={
                 "execution_time_seconds": execution_time,
@@ -252,31 +205,6 @@ async def detect_entities(request: DetectionRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/rules/templates")
-async def get_rule_templates():
-    """
-    Return available rule templates to help frontend build the UI.
-    """
-    return {
-        "templates": [
-            {
-                "type": "threshold",
-                "description": "Detects users exceeding a specific value",
-                "default_params": {"metric": "balance", "limit": 1000, "operator": ">"}
-            },
-            {
-                "type": "frequency",
-                "description": "Detects high frequency transactions",
-                "default_params": {"window_seconds": 60, "max_count": 10}
-            },
-            {
-                "type": "pattern",
-                "description": "Detects specific interaction patterns (e.g., wash trading)",
-                "default_params": {"pattern_type": "cycle", "min_depth": 3}
-            }
-        ]
-    }
 
 def process_transfer_network_links(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int) -> List[Dict[str, Any]]:
     if not os.path.exists(TRANSFER_STATS_PATH):
