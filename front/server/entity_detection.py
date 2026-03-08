@@ -6,6 +6,12 @@ import time
 import pandas as pd
 import networkx as nx
 import os
+from similarity_detection import (
+    rule3_similar_trading_sequence,
+    rule4_similar_balance_sequence,
+    rule5_similar_earning_sequence,
+)
+import similarity_detection
 
 # Create a router instance
 router = APIRouter(
@@ -57,6 +63,42 @@ class DetectionResponse(BaseModel):
     detected_entities: List[DetectedEntity]
     metadata: Dict[str, Any]
 
+<<<<<<< Updated upstream
+=======
+class LinkRequest(BaseModel):
+    """
+    Request body for link analysis.
+    """
+    target_users: Optional[List[str]] = Field(None, description="List of user IDs to check.")
+    time_range: Optional[Dict[str, str]] = Field(None, description="Start and end time.")
+    threshold: int = Field(1, description="Minimum transactions.")
+
+class LinkResponse(BaseModel):
+    """
+    Response body containing link analysis results.
+    """
+    links: List[Dict[str, Any]]
+
+class SimilarityRequest(BaseModel):
+    """
+    Request body for similarity-based detection.
+    """
+    target_users: Optional[List[str]] = Field(None, description="List of user IDs to check.")
+    time_range: Optional[Dict[str, str]] = Field(None, description="Start and end time.")
+    rule_type: str = Field(..., description="Rule type: 'similar_trading_sequence' | 'similar_balance_sequence' | 'similar_earning_sequence'")
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="Rule-specific parameters")
+
+class SimilarityResponse(BaseModel):
+    """
+    Response body for similarity detection results.
+    """
+    status: str
+    rule_type: str
+    pair_count: int
+    pairs: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
+
+>>>>>>> Stashed changes
 # --- Logic Implementation ---
 
 def apply_detection_logic(user_data: Dict, rules: List[DetectionRule]) -> List[DetectedEntity]:
@@ -260,6 +302,176 @@ async def get_rule_templates():
                 "type": "pattern",
                 "description": "Detects specific interaction patterns (e.g., wash trading)",
                 "default_params": {"pattern_type": "cycle", "min_depth": 3}
-            }
+            },
+            {
+                "type": "similar_trading_sequence",
+                "description": "Detects addresses with similar buy/sell action sequences",
+                "default_params": {
+                    "direction_mode": "same_side_only",
+                    "sequence_representation": "action_only",
+                    "min_contiguous_length": 3,
+                    "amount_similarity": 0.8,
+                    "price_similarity": 0.8,
+                }
+            },
+            {
+                "type": "similar_balance_sequence",
+                "description": "Detects addresses with similar balance curves (Pearson correlation)",
+                "default_params": {
+                    "balance_axis": "time_grid",
+                    "tx_step": 5,
+                    "time_bin": "1h",
+                    "similarity": 0.8,
+                    "topk_neighbors": 5,
+                }
+            },
+            {
+                "type": "similar_earning_sequence",
+                "description": "Detects addresses with similar earning/equity curves",
+                "default_params": {
+                    "earning_axis": "time_grid",
+                    "tx_step": 5,
+                    "time_bin": "1h",
+                    "similarity": 0.8,
+                    "topk_neighbors": 5,
+                }
+            },
         ]
     }
+<<<<<<< Updated upstream
+=======
+
+def process_transfer_network_links(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int) -> List[Dict[str, Any]]:
+    if not os.path.exists(TRANSFER_STATS_PATH):
+        return []
+
+    try:
+        # Load Pre-aggregated Stats
+        df = pd.read_csv(TRANSFER_STATS_PATH)
+        
+        # Filter by Time Range
+        if time_range:
+            start_time = time_range.get("start")
+            end_time = time_range.get("end")
+            
+            if start_time:
+                df = df[df['last_transaction'] >= start_time]
+            if end_time:
+                df = df[df['first_transaction'] <= end_time]
+        
+        # Filter by Target Users
+        if target_users:
+            target_set = set(target_users)
+            df = df[df['from_owner'].isin(target_set) & df['to_owner'].isin(target_set)]
+        
+        if df.empty:
+            return []
+
+        # Group by pair (undirected) and sum weights
+        G = nx.Graph()
+        for _, row in df.iterrows():
+            u, v = row['from_owner'], row['to_owner']
+            count = row['transaction_count']
+            
+            if G.has_edge(u, v):
+                G[u][v]['weight'] += count
+            else:
+                G.add_edge(u, v, weight=count)
+        
+        links = []
+        for u, v, d in G.edges(data=True):
+            if d['weight'] >= threshold:
+                links.append({
+                    "source": u,
+                    "target": v,
+                    "weight": d['weight']
+                })
+        
+        return links
+
+    except Exception as e:
+        print(f"Error in transfer network links: {e}")
+        return []
+
+@router.post("/links", response_model=LinkResponse)
+async def get_links(request: LinkRequest):
+    """
+    Get links (edges) based on transfer network rules.
+    """
+    try:
+        links = process_transfer_network_links(
+            request.target_users, 
+            request.time_range, 
+            request.threshold
+        )
+        return {"links": links}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/similarity", response_model=SimilarityResponse)
+async def detect_similarity(request: SimilarityRequest):
+    """
+    Run behavior-similarity-based entity detection.
+    Supports: similar_trading_sequence, similar_balance_sequence, similar_earning_sequence
+    """
+    try:
+        start_time_t = time.time()
+        params = request.parameters
+
+        if request.rule_type == "similar_trading_sequence":
+            pairs = rule3_similar_trading_sequence(
+                target_users=request.target_users,
+                time_window=request.time_range,
+                direction_mode=params.get("direction_mode", "same_side_only"),
+                sequence_representation=params.get("sequence_representation", "action_only"),
+                min_contiguous_length=params.get("min_contiguous_length", 3),
+                amount_similarity=params.get("amount_similarity", 0.8),
+                price_similarity=params.get("price_similarity", 0.8),
+            )
+        elif request.rule_type == "similar_balance_sequence":
+            pairs = rule4_similar_balance_sequence(
+                target_users=request.target_users,
+                time_window=request.time_range,
+                balance_axis=params.get("balance_axis", "time_grid"),
+                tx_step=params.get("tx_step", 5),
+                time_bin=params.get("time_bin", "1h"),
+                similarity=params.get("similarity", 0.8),
+                topk_neighbors=params.get("topk_neighbors", 5),
+            )
+        elif request.rule_type == "similar_earning_sequence":
+            pairs = rule5_similar_earning_sequence(
+                target_users=request.target_users,
+                time_window=request.time_range,
+                earning_axis=params.get("earning_axis", "time_grid"),
+                tx_step=params.get("tx_step", 5),
+                time_bin=params.get("time_bin", "1h"),
+                similarity=params.get("similarity", 0.8),
+                topk_neighbors=params.get("topk_neighbors", 5),
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown rule_type: {request.rule_type}")
+
+        execution_time = time.time() - start_time_t
+
+        return SimilarityResponse(
+            status="success",
+            rule_type=request.rule_type,
+            pair_count=len(pairs),
+            pairs=pairs,
+            metadata={
+                "execution_time_seconds": round(execution_time, 3),
+                "parameters": params,
+                "note": (
+                    f"User cap: auto={similarity_detection.MAX_USERS_RULE3_AUTO}, "
+                    f"explicit={similarity_detection.MAX_USERS_RULE3}; "
+                    f"seq_cap={similarity_detection.MAX_SEQ_LEN_RULE3}; "
+                    f"pair_cap={similarity_detection.MAX_CANDIDATE_PAIRS} "
+                    f"(numpy LCCS active for action_only)"
+                ) if request.rule_type == "similar_trading_sequence" else None,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+>>>>>>> Stashed changes

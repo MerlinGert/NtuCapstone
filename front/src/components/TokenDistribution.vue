@@ -8,7 +8,14 @@
                 <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="drawChart">
                 <span>{{ scaleFactor }}</span>
             </div>
+<<<<<<< Updated upstream
             <span>Active Users (Top 50%): {{ userCount }}</span>
+=======
+            <span>Active Users (Top {{ topPercent }}%): {{ userCount }}</span>
+            <button @click="toggleLinks" style="padding: 3px 10px; font-size: 12px; border: 1px solid #bbb; border-radius: 4px; background: #fff; cursor: pointer;">
+                {{ showLinks ? 'Hide Links' : 'Show Links' }}
+            </button>
+>>>>>>> Stashed changes
         </div>
 
         <!-- Chart -->
@@ -40,8 +47,27 @@ export default {
             svgWidth: 0,
             svgHeight: 0,
             userCount: 0,
+<<<<<<< Updated upstream
             scaleFactor: 0.7, // Default scale parameter
             lastDetectionCount: null
+=======
+            scaleFactor: 0.6, // Default scale parameter
+            showLinks: true,
+            lastDetectionCount: null,
+            lastDetectionThreshold: 2,
+            lastDetectionTimeRange: {},
+            lastLinkThreshold: 1,
+            lastLinkTimeRange: {},
+            detectedEntities: [],
+            similarityLinks: [],
+            lastDetectionRuleType: 'transfer-network',
+            nodes: [],
+            currentLinks: [],
+            simulation: null,
+            centerX: 0,
+            centerY: 0,
+            topPercent: 50
+>>>>>>> Stashed changes
         }
     },
     computed: {
@@ -58,7 +84,16 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
+<<<<<<< Updated upstream
         runEntityDetection(threshold, timeRange, ruleType) {
+=======
+        toggleLinks() {
+            this.showLinks = !this.showLinks;
+            const svg = d3.select(this.$refs.chart_container).select('svg');
+            svg.select('.links').style('display', this.showLinks ? null : 'none');
+        },
+        runEntityDetection(threshold, timeRange, ruleType, silent = false, parameters = {}) {
+>>>>>>> Stashed changes
             console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType);
             if (!this.snapshotData || !this.snapshotData.balances) {
                  console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
@@ -83,10 +118,27 @@ export default {
 
             this.detecting = true;
             this.lastDetectionCount = null;
+<<<<<<< Updated upstream
             console.log(`Sending ${users.length} users for detection...`);
 
             // Call backend API
             fetch('/api/entity/detect', {
+=======
+            this.lastDetectionThreshold = threshold;
+            this.lastDetectionTimeRange = timeRange;
+            this.lastDetectionRuleType = ruleType;
+            console.log(`Sending ${users.length} users for detection...`);
+
+            // Check if this is a similarity-based rule
+            const isSimilarityRule = ['similar_trading_sequence', 'similar_balance_sequence', 'similar_earning_sequence'].includes(ruleType);
+
+            if (isSimilarityRule) {
+                return this._runSimilarityDetection(users, timeRange, ruleType, parameters);
+            }
+
+            // Call backend API for transfer-network rule
+            return fetch('/api/entity/detect', {
+>>>>>>> Stashed changes
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -126,6 +178,94 @@ export default {
                 this.$emit('detection-complete', null);
             });
         },
+<<<<<<< Updated upstream
+=======
+        _runSimilarityDetection(users, timeRange, ruleType, parameters) {
+            return fetch('/api/entity/similarity', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    target_users: users,
+                    time_range: timeRange || undefined,
+                    rule_type: ruleType,
+                    parameters: parameters || {},
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                this.detecting = false;
+                console.log("Similarity Detection Result:", data);
+                if (data.pairs && data.pairs.length > 0) {
+                    // Convert similarity pairs into entity groups via connected components
+                    const groups = this._buildGroupsFromPairs(data.pairs);
+                    this.lastDetectionCount = groups.length;
+                    this.detectedEntities = groups;
+                    // Store similarity links for visualization
+                    this.similarityLinks = data.pairs;
+                    console.log(`Found ${data.pairs.length} similar pairs, ${groups.length} groups.`);
+                } else {
+                    this.lastDetectionCount = 0;
+                    this.detectedEntities = [];
+                    this.similarityLinks = [];
+                    console.log("No similar pairs found.");
+                }
+                this.$emit('detection-complete', this.lastDetectionCount);
+                this.$nextTick(() => this.drawChart());
+            })
+            .catch(error => {
+                this.detecting = false;
+                console.error("Error in similarity detection:", error);
+                this.$emit('detection-complete', null);
+            });
+        },
+        _buildGroupsFromPairs(pairs) {
+            // Build connected components from similarity pairs
+            const adj = {};
+            for (const pair of pairs) {
+                if (!adj[pair.source]) adj[pair.source] = new Set();
+                if (!adj[pair.target]) adj[pair.target] = new Set();
+                adj[pair.source].add(pair.target);
+                adj[pair.target].add(pair.source);
+            }
+
+            const visited = new Set();
+            const groups = [];
+            let groupIdx = 0;
+
+            for (const node of Object.keys(adj)) {
+                if (visited.has(node)) continue;
+                const members = [];
+                const queue = [node];
+                visited.add(node);
+                while (queue.length > 0) {
+                    const curr = queue.shift();
+                    members.push(curr);
+                    for (const neighbor of (adj[curr] || [])) {
+                        if (!visited.has(neighbor)) {
+                            visited.add(neighbor);
+                            queue.push(neighbor);
+                        }
+                    }
+                }
+                if (members.length > 1) {
+                    groups.push({
+                        entity_id: `similarity_group_${groupIdx}`,
+                        confidence: 0.85,
+                        reason: `Similarity detection: ${members.length} addresses with similar behavior`,
+                        details: {
+                            members: members,
+                            member_count: members.length,
+                        }
+                    });
+                    groupIdx++;
+                }
+            }
+            return groups;
+        },
+        // Old highlightEntities removed/deprecated as logic is now in drawChart
+>>>>>>> Stashed changes
         highlightEntities(entities) {
             // Create a set of all members in detected entities
             const memberSet = new Set();
@@ -351,12 +491,89 @@ export default {
             // But for now, just to show the layout, we can let it run.
             // However, to ensure it stays "within circular range", forceRadial is key.
             
+<<<<<<< Updated upstream
             // Let's run it for some ticks to stabilize initial positions
             for (let i = 0; i < 120; ++i) simulation.tick();
 
             // Render nodes
             const node = bubbleGroup.selectAll("g")
                 .data(entries)
+=======
+            // Link group (ABOVE nodes)
+            const linkGroup = g.append("g").attr("class", "links")
+                .style("display", this.showLinks ? null : "none");
+            
+            const color = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(entries, d => d.value)]);
+
+            // Prepare Links for Simulation
+            const simulationLinkMap = new Map();
+            const userToSimNode = new Map();
+
+            // Map independent nodes
+            simulationNodes.filter(n => !n.isGroup).forEach(n => userToSimNode.set(n.id, n));
+
+            // Map group members
+            simulationNodes.filter(n => n.isGroup).forEach(g => {
+                g.children.forEach(c => userToSimNode.set(c.id, g)); // Map member to GROUP
+            });
+
+            if (this.currentLinks && this.currentLinks.length > 0) {
+                this.currentLinks.forEach(link => {
+                    const sourceNode = userToSimNode.get(link.source);
+                    const targetNode = userToSimNode.get(link.target);
+                    
+                    if (sourceNode && targetNode && sourceNode !== targetNode) {
+                        // Link between different simulation bodies (Group-Group, Group-Single, Single-Single)
+                        // Create key for link aggregation
+                        const key = `${sourceNode.id}-${targetNode.id}`;
+                        if (!simulationLinkMap.has(key)) {
+                            simulationLinkMap.set(key, { 
+                                source: sourceNode.id, 
+                                target: targetNode.id, 
+                                weight: 0 
+                            });
+                        }
+                        simulationLinkMap.get(key).weight += link.weight;
+                    }
+                });
+            }
+
+            const simulationLinks = Array.from(simulationLinkMap.values());
+            console.log(`Simulation Links: ${simulationLinks.length} (from ${this.currentLinks ? this.currentLinks.length : 0} raw links)`);
+
+            // Draw Links — stroke-width and opacity scaled by transaction count
+            const maxWeight = simulationLinks.length > 0 ? Math.max(...simulationLinks.map(l => l.weight)) : 1;
+            const linkElements = linkGroup.selectAll("line")
+                .data(simulationLinks)
+                .join("line")
+                .attr("stroke", "#555")
+                .attr("stroke-opacity", d => 0.2 + 0.6 * Math.sqrt(d.weight / maxWeight))
+                .attr("stroke-width", d => 0.5 + 4 * Math.sqrt(d.weight / maxWeight));
+            
+            linkElements.append("title")
+                .text(d => `Source: ${d.source}\nTarget: ${d.target}\nWeight: ${d.weight}`);
+
+            // Drag Behavior
+            const drag = d3.drag()
+                .on("start", (event, d) => {
+                    if (!event.active) this.simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                })
+                .on("drag", (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on("end", (event, d) => {
+                    if (!event.active) this.simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                });
+
+            // Draw Group Boundaries
+            const groups = bubbleGroup.selectAll(".group")
+                .data(simulationNodes.filter(n => n.isGroup))
+>>>>>>> Stashed changes
                 .enter().append("g")
                 .attr("transform", d => `translate(${d.x},${d.y})`);
                 // Note: d.x and d.y are relative to the center because forceCenter is at (0,0) relative to the simulation,
