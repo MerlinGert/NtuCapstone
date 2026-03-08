@@ -69,8 +69,8 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
-        runEntityDetection(threshold, timeRange, ruleType, silent = false) {
-            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType);
+        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, silent = false) {
+            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType, checkFundingSource);
             if (!this.snapshotData || !this.snapshotData.balances) {
                  console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
                  this.$emit('detection-complete', null);
@@ -110,7 +110,8 @@ export default {
                         {
                             rule_type: ruleType,
                             parameters: {
-                                threshold: threshold // Detect if > threshold transactions
+                                threshold: threshold, // Detect if > threshold transactions
+                                check_funding_source: checkFundingSource
                             },
                             enabled: true
                         }
@@ -132,6 +133,7 @@ export default {
                     console.log("No entities detected.");
                 }
                 this.$emit('detection-complete', this.lastDetectionCount);
+                return this.lastDetectionCount;
             })
             .catch(error => {
                 this.detecting = false;

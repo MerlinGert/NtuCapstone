@@ -159,10 +159,13 @@ export default {
               this.$refs.tokenDistribution.runEntityDetection(
                   params.threshold,
                   params.timeRange,
-                  params.ruleType
-              );
-          } else {
-              console.error("CryptoVis: tokenDistribution ref not found");
+                  params.ruleType,
+                  params.checkFundingSource
+              ).then(count => {
+                  console.log("CryptoVis: detection complete, count:", count);
+                  this.detecting = false;
+                  this.lastDetectionCount = count;
+              });
           }
       },
       handleUpdateSnapshot(params) {

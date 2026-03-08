@@ -43,6 +43,12 @@
                         <label style="font-size: 12px; font-weight: bold;">Threshold (Min Tx Count)</label>
                         <input type="number" v-model.number="detectionThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
                     </div>
+                    <div style="display: flex; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                            <input type="checkbox" v-model="checkFundingSource">
+                            <span>Check Same Funding Source</span>
+                        </label>
+                    </div>
                     <div style="display: flex; flex-direction: column; gap: 5px;">
                         <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -204,6 +210,7 @@ export default {
     data() {
         return {
             detectionThreshold: 2,
+            checkFundingSource: true,
             // Default to empty strings which means "Full Range" in our logic
             startTime: "",
             endTime: "",
@@ -274,6 +281,7 @@ export default {
             if (this.endTime) timeRange.end = this.endTime.replace('T', ' ');
             return {
                 threshold: this.detectionThreshold,
+                checkFundingSource: this.checkFundingSource,
                 timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
                 ruleType: "transfer-network"
             };

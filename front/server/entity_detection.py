@@ -14,12 +14,40 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+import json
+
 # --- Configuration ---
 # Define path to the transfer CSV file
 # Using absolute path resolution based on project structure
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRANSFER_CSV_PATH = os.path.join(BASE_DIR, "public", "ACT_transfer_before_2024-11-10.csv")
 TRANSFER_STATS_PATH = os.path.join(BASE_DIR, "public", "transfer_network_stats.csv")
+EXCHANGE_WALLETS_PATH = os.path.join(BASE_DIR, "public", "exchange_wallets_list.json")
+ACCOUNT_LABELS_PATH = os.path.join(BASE_DIR, "public", "processed", "transfers", "account_labels.json")
+
+def get_blacklist_addresses() -> set:
+    """
+    Returns a set of addresses to exclude from funding source checks (Exchanges + Contracts).
+    """
+    blacklist = set()
+    
+    # 2. Load Account Labels (Contracts & Exchanges)
+    if os.path.exists(ACCOUNT_LABELS_PATH):
+        try:
+            with open(ACCOUNT_LABELS_PATH, 'r') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    for entry in data:
+                        # Exclude contract/exchange addresses AND their owners if labeled as such
+                        if entry.get("label") in ["contract", "exchange"]:
+                            if "address" in entry:
+                                blacklist.add(entry["address"])
+                            if "owner" in entry:
+                                blacklist.add(entry["owner"])
+        except Exception as e:
+            print(f"Error loading account labels: {e}")
+            
+    return blacklist
 
 # --- Data Models ---
 
@@ -73,7 +101,7 @@ class LinkResponse(BaseModel):
 
 # --- Logic Implementation ---
 
-def process_transfer_network_rule(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int) -> List[DetectedEntity]:
+def process_transfer_network_rule(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int, check_funding_source: bool = False) -> List[DetectedEntity]:
     """
     Implements transfer-network-based entity detection using pre-aggregated statistics.
     """
@@ -87,56 +115,107 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
         df = pd.read_csv(TRANSFER_STATS_PATH)
         
         # 2. Filter by Time Range (if provided)
-        # Since we have aggregated stats, precise time filtering is harder.
-        # Approximation: Check if the pair's interaction period overlaps with the query range.
-        # Strict Mode: Only count pairs where ALL transactions fall within range? No, we don't have individual timestamps.
-        # Loose Mode: Check if [first, last] overlaps with [start, end].
-        # Better: If time range is provided, we might need to fall back to raw data OR accept approximation.
-        # User asked to use "stats" to check, implying we accept the limitation or assume stats are sufficient.
-        # Let's filter pairs that have ANY activity within the range.
-        
         if time_range:
             start_time = time_range.get("start")
             end_time = time_range.get("end")
             
             if start_time:
-                # Keep pairs where last transaction is after start time
                 df = df[df['last_transaction'] >= start_time]
             if end_time:
-                # Keep pairs where first transaction is before end time
                 df = df[df['first_transaction'] <= end_time]
         
-        # 3. Filter by Target Users
-        if target_users:
-            target_set = set(target_users)
-            # Both sender and receiver must be in the target list (closed world assumption for entity detection)
-            # Or at least one? Usually entity detection looks for connections WITHIN a group.
-            df = df[df['from_owner'].isin(target_set) & df['to_owner'].isin(target_set)]
-        
-        if df.empty:
-            return []
-
-        # 4. Build Graph from Stats
+        # 3. Build Graph
         G = nx.Graph()
         
-        # Since stats are already grouped by (from, to), we just need to sum up weights if there are multiple entries (unlikely if unique pairs)
-        # The stats file has directed pairs (from, to). We want an undirected graph.
+        # --- Transfer Threshold Logic ---
+        # Filter for connections within target_users (if provided)
+        df_transfer = df.copy()
+        if target_users:
+            target_set = set(target_users)
+            df_transfer = df_transfer[df_transfer['from_owner'].isin(target_set) & df_transfer['to_owner'].isin(target_set)]
         
-        for _, row in df.iterrows():
-            u, v = row['from_owner'], row['to_owner']
-            count = row['transaction_count']
+        for _, row in df_transfer.iterrows():
+            if row['transaction_count'] > threshold:
+                u, v = row['from_owner'], row['to_owner']
+                if G.has_edge(u, v):
+                    G[u][v]['transfer_count'] = G[u][v].get('transfer_count', 0) + row['transaction_count']
+                else:
+                    G.add_edge(u, v, transfer_count=row['transaction_count'], reasons=["High frequency transfers"])
+
+        # --- Same Funding Source Logic ---
+        if check_funding_source and target_users:
+            # We need to find the "first" incoming transaction for each target user
+            # We look at the ENTIRE dataset (df) where to_owner is in target_users
+            # We do NOT restrict from_owner to target_users here, because the funding source might be external
             
-            if G.has_edge(u, v):
-                G[u][v]['weight'] += count
-            else:
-                G.add_edge(u, v, weight=count)
-        
-        # 5. Apply Threshold and Find Components
-        # Remove edges with weight <= threshold
-        edges_to_remove = [(u, v) for u, v, d in G.edges(data=True) if d['weight'] <= threshold]
-        G.remove_edges_from(edges_to_remove)
-        
-        # Find connected components
+            funding_map = {} # user -> funding_source
+            
+            # Filter rows where receiver is a target user
+            df_funding = df[df['to_owner'].isin(set(target_users))].sort_values('first_transaction')
+            
+            # Load blacklist
+            blacklist = get_blacklist_addresses()
+            
+            # Filter out blacklisted sources
+            if blacklist:
+                df_funding = df_funding[~df_funding['from_owner'].isin(blacklist)]
+
+            # Group by receiver and take the first one
+            # drop_duplicates(subset=['to_owner'], keep='first') works because we sorted by time
+            first_txs = df_funding.drop_duplicates(subset=['to_owner'], keep='first')
+            
+            for _, row in first_txs.iterrows():
+                funding_map[row['to_owner']] = row['from_owner']
+            
+            # Group users by funding source
+            source_groups = {}
+            for user, source in funding_map.items():
+                if source not in source_groups:
+                    source_groups[source] = []
+                source_groups[source].append(user)
+            
+            # 1. Add edges for co-funded groups (siblings)
+            for source, users in source_groups.items():
+                if len(users) > 1:
+                    reason_str = f"Same funding source ({source})"
+                    
+                    # Connect everyone to the first one
+                    hub = users[0]
+                    for i in range(1, len(users)):
+                        peer = users[i]
+                        if G.has_edge(hub, peer):
+                            if "Same funding source" not in str(G[hub][peer].get('reasons', [])):
+                                reasons = G[hub][peer].get('reasons', [])
+                                if isinstance(reasons, list):
+                                    reasons.append(reason_str)
+                                else:
+                                    # Handle legacy or string case
+                                    reasons = [reasons, reason_str]
+                                G[hub][peer]['reasons'] = reasons
+                        else:
+                            G.add_edge(hub, peer, reasons=[reason_str])
+
+            # 2. Add edges for direct funding (parent-child)
+            # If the funding source itself is one of the target users, connect them.
+            target_set = set(target_users)
+            for user, source in funding_map.items():
+                if source in target_set:
+                    # 'source' funded 'user', and both are in target list
+                    reason_str = f"Direct funding ({source} -> {user})"
+                    
+                    if G.has_edge(source, user):
+                         reasons = G[source][user].get('reasons', [])
+                         # Avoid duplicate reasons roughly
+                         if not any("Direct funding" in r for r in reasons):
+                             if isinstance(reasons, list):
+                                 reasons.append(reason_str)
+                             else:
+                                 reasons = [reasons, reason_str]
+                             G[source][user]['reasons'] = reasons
+                    else:
+                        G.add_edge(source, user, reasons=[reason_str])
+
+        # 4. Find Components
         components = list(nx.connected_components(G))
         
         detected_entities = []
@@ -144,16 +223,33 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
             if len(comp) > 1:
                 members = list(comp)
                 subgraph = G.subgraph(comp)
-                total_txs = sum(d['weight'] for u, v, d in subgraph.edges(data=True))
+                
+                # Collect reasons
+                reasons_set = set()
+                total_txs = 0
+                
+                for u, v, d in subgraph.edges(data=True):
+                    total_txs += d.get('transfer_count', 0)
+                    edge_reasons = d.get('reasons', [])
+                    for r in edge_reasons:
+                        reasons_set.add(r)
+                
+                # Format reasons point by point
+                formatted_reasons = []
+                for idx, r in enumerate(sorted(reasons_set), 1):
+                    formatted_reasons.append(f"{idx}. {r}")
+                
+                reason_text = "\n".join(formatted_reasons) if formatted_reasons else "Connected via network analysis"
                 
                 detected_entities.append(DetectedEntity(
                     entity_id=f"entity_group_{i}_{int(time.time())}",
-                    confidence=0.8 + (0.02 * min(10, total_txs)),
-                    reason=f"Network detection (stats): {len(members)} addresses connected via {int(total_txs)} transactions (threshold > {threshold})",
+                    confidence=0.8, # Simplified confidence
+                    reason=reason_text,
                     details={
                         "members": members,
                         "total_transactions": int(total_txs),
-                        "member_count": len(members)
+                        "member_count": len(members),
+                        "raw_reasons": list(reasons_set)
                     }
                 ))
         
@@ -161,6 +257,8 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
 
     except Exception as e:
         print(f"Error in transfer network detection (stats): {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 # --- Endpoints ---
@@ -181,12 +279,14 @@ async def detect_entities(request: DetectionRequest):
         # 1. Process Transfer Network Rules (Batch process)
         for rule in transfer_network_rules:
             threshold = rule.parameters.get("threshold", 5)
+            check_funding_source = rule.parameters.get("check_funding_source", False)
             # Use request.target_users if available
             
             network_entities = process_transfer_network_rule(
                 request.target_users, 
                 request.time_range, 
-                threshold
+                threshold,
+                check_funding_source
             )
             all_detected.extend(network_entities)
 
