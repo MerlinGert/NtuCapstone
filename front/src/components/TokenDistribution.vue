@@ -8,14 +8,10 @@
                 <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="drawChart">
                 <span>{{ scaleFactor }}</span>
             </div>
-<<<<<<< Updated upstream
             <span>Active Users (Top 50%): {{ userCount }}</span>
 =======
-            <span>Active Users (Top {{ topPercent }}%): {{ userCount }}</span>
-            <button @click="toggleLinks" style="padding: 3px 10px; font-size: 12px; border: 1px solid #bbb; border-radius: 4px; background: #fff; cursor: pointer;">
-                {{ showLinks ? 'Hide Links' : 'Show Links' }}
-            </button>
->>>>>>> Stashed changes
+            <span>Active Users: {{ userCount }}</span>
+ main
         </div>
 
         <!-- Chart -->
@@ -35,7 +31,6 @@
 
 <script>
 import * as d3 from "d3"
-import localSnapshotData from '../assets/processed_latest_snapshot_50.json'
 
 export default {
     name: "TokenDistribution",
@@ -47,12 +42,8 @@ export default {
             svgWidth: 0,
             svgHeight: 0,
             userCount: 0,
-<<<<<<< Updated upstream
             scaleFactor: 0.7, // Default scale parameter
             lastDetectionCount: null
-=======
-            scaleFactor: 0.6, // Default scale parameter
-            showLinks: true,
             lastDetectionCount: null,
             lastDetectionThreshold: 2,
             lastDetectionTimeRange: {},
@@ -66,8 +57,13 @@ export default {
             simulation: null,
             centerX: 0,
             centerY: 0,
+ k-line
             topPercent: 50
->>>>>>> Stashed changes
+ Stashed changes
+=======
+            topPercent: 50,
+            suspiciousTraders: []
+ main
         }
     },
     computed: {
@@ -84,21 +80,16 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
-<<<<<<< Updated upstream
         runEntityDetection(threshold, timeRange, ruleType) {
-=======
-        toggleLinks() {
-            this.showLinks = !this.showLinks;
-            const svg = d3.select(this.$refs.chart_container).select('svg');
-            svg.select('.links').style('display', this.showLinks ? null : 'none');
-        },
-        runEntityDetection(threshold, timeRange, ruleType, silent = false, parameters = {}) {
->>>>>>> Stashed changes
             console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType);
+=======
+        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, silent = false) {
+            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType, checkFundingSource);
+ main
             if (!this.snapshotData || !this.snapshotData.balances) {
                  console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
                  this.$emit('detection-complete', null);
-                 return;
+                 return Promise.resolve(); // Return promise
              }
             
             // Extract user list from current data
@@ -111,14 +102,12 @@ export default {
 
             if (users.length === 0) {
                 console.warn("TokenDistribution: No users found");
-                alert("No users loaded to detect.");
                 this.$emit('detection-complete', 0);
-                return;
+                return Promise.resolve();
             }
 
             this.detecting = true;
             this.lastDetectionCount = null;
-<<<<<<< Updated upstream
             console.log(`Sending ${users.length} users for detection...`);
 
             // Call backend API
@@ -126,19 +115,11 @@ export default {
 =======
             this.lastDetectionThreshold = threshold;
             this.lastDetectionTimeRange = timeRange;
-            this.lastDetectionRuleType = ruleType;
             console.log(`Sending ${users.length} users for detection...`);
 
-            // Check if this is a similarity-based rule
-            const isSimilarityRule = ['similar_trading_sequence', 'similar_balance_sequence', 'similar_earning_sequence'].includes(ruleType);
-
-            if (isSimilarityRule) {
-                return this._runSimilarityDetection(users, timeRange, ruleType, parameters);
-            }
-
-            // Call backend API for transfer-network rule
+            // Call backend API
             return fetch('/api/entity/detect', {
->>>>>>> Stashed changes
+ main
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -150,7 +131,8 @@ export default {
                         {
                             rule_type: ruleType,
                             parameters: {
-                                threshold: threshold // Detect if > threshold transactions
+                                threshold: threshold, // Detect if > threshold transactions
+                                check_funding_source: checkFundingSource
                             },
                             enabled: true
                         }
@@ -163,136 +145,74 @@ export default {
                 console.log("Detection Result:", data);
                 if (data.detected_entities && data.detected_entities.length > 0) {
                     this.lastDetectionCount = data.detected_entities.length;
-                    alert(`Detected ${data.detected_entities.length} entity groups.`);
-                    this.highlightEntities(data.detected_entities);
+                    console.log(`Detected ${data.detected_entities.length} entity groups.`);
+                    // Store detected entities for grouping
+                    this.detectedEntities = data.detected_entities;
                 } else {
                     this.lastDetectionCount = 0;
-                    alert("No entities detected.");
+                    this.detectedEntities = []; // Clear
+                    console.log("No entities detected.");
                 }
                 this.$emit('detection-complete', this.lastDetectionCount);
+                return this.lastDetectionCount;
             })
             .catch(error => {
                 this.detecting = false;
                 console.error("Error detecting entities:", error);
-                alert("Detection failed. Check console.");
                 this.$emit('detection-complete', null);
             });
         },
-<<<<<<< Updated upstream
 =======
-        _runSimilarityDetection(users, timeRange, ruleType, parameters) {
-            return fetch('/api/entity/similarity', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    target_users: users,
-                    time_range: timeRange || undefined,
-                    rule_type: ruleType,
-                    parameters: parameters || {},
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                this.detecting = false;
-                console.log("Similarity Detection Result:", data);
-                if (data.pairs && data.pairs.length > 0) {
-                    // Convert similarity pairs into entity groups via connected components
-                    const groups = this._buildGroupsFromPairs(data.pairs);
-                    this.lastDetectionCount = groups.length;
-                    this.detectedEntities = groups;
-                    // Store similarity links for visualization
-                    this.similarityLinks = data.pairs;
-                    console.log(`Found ${data.pairs.length} similar pairs, ${groups.length} groups.`);
-                } else {
-                    this.lastDetectionCount = 0;
-                    this.detectedEntities = [];
-                    this.similarityLinks = [];
-                    console.log("No similar pairs found.");
-                }
-                this.$emit('detection-complete', this.lastDetectionCount);
-                this.$nextTick(() => this.drawChart());
-            })
-            .catch(error => {
-                this.detecting = false;
-                console.error("Error in similarity detection:", error);
-                this.$emit('detection-complete', null);
-            });
-        },
-        _buildGroupsFromPairs(pairs) {
-            // Build connected components from similarity pairs
-            const adj = {};
-            for (const pair of pairs) {
-                if (!adj[pair.source]) adj[pair.source] = new Set();
-                if (!adj[pair.target]) adj[pair.target] = new Set();
-                adj[pair.source].add(pair.target);
-                adj[pair.target].add(pair.source);
-            }
-
-            const visited = new Set();
-            const groups = [];
-            let groupIdx = 0;
-
-            for (const node of Object.keys(adj)) {
-                if (visited.has(node)) continue;
-                const members = [];
-                const queue = [node];
-                visited.add(node);
-                while (queue.length > 0) {
-                    const curr = queue.shift();
-                    members.push(curr);
-                    for (const neighbor of (adj[curr] || [])) {
-                        if (!visited.has(neighbor)) {
-                            visited.add(neighbor);
-                            queue.push(neighbor);
-                        }
-                    }
-                }
-                if (members.length > 1) {
-                    groups.push({
-                        entity_id: `similarity_group_${groupIdx}`,
-                        confidence: 0.85,
-                        reason: `Similarity detection: ${members.length} addresses with similar behavior`,
-                        details: {
-                            members: members,
-                            member_count: members.length,
-                        }
-                    });
-                    groupIdx++;
-                }
-            }
-            return groups;
-        },
         // Old highlightEntities removed/deprecated as logic is now in drawChart
->>>>>>> Stashed changes
+ main
         highlightEntities(entities) {
-            // Create a set of all members in detected entities
-            const memberSet = new Set();
-            entities.forEach(entity => {
-                if (entity.details && entity.details.members) {
-                    entity.details.members.forEach(member => memberSet.add(member));
+            // Keep for compatibility if needed, but logic moved to drawChart
+        },
+        highlightSuspiciousTraders(suspiciousTraders) {
+            console.log("TokenDistribution: highlightSuspiciousTraders", suspiciousTraders.length);
+            
+            const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
+            const suspiciousMap = new Map();
+            suspiciousTraders.forEach(t => suspiciousMap.set(t.trader_id, t));
+
+            // Update Singles
+            svg.selectAll(".single").each(function(d) {
+                if (suspiciousMap.has(d.id)) {
+                    d.suspicious = suspiciousMap.get(d.id);
+                    d3.select(this).style("stroke", "#ff0000").style("stroke-width", 3);
+                } else {
+                    d.suspicious = null;
+                    d3.select(this).style("stroke", "#5976ba").style("stroke-width", 2);
                 }
             });
-            
-            // Highlight bubbles in D3 chart
-            const bubbles = d3.selectAll(".bubble");
-            
-            // Update data binding
-            bubbles.each(function(d) {
-                d.isHighlighted = memberSet.has(d.id);
-            });
 
-            // Update visuals
-            bubbles
-                .style("stroke", d => d.isHighlighted ? "#ff0000" : "#fff")
-                .style("stroke-width", d => d.isHighlighted ? 3 : 1);
+            // Update Group Members
+            svg.selectAll(".member").each(function(d) {
+                if (suspiciousMap.has(d.id)) {
+                    d.suspicious = suspiciousMap.get(d.id);
+                    d3.select(this).style("stroke", "#ff0000").style("stroke-width", 3);
+                } else {
+                    d.suspicious = null;
+                    d3.select(this).style("stroke", "#5976ba").style("stroke-width", 2);
+                }
+            });
         },
-        async fetchSnapshotData(time = null, threshold = 0.5) {
+        async fetchSnapshotData(time = this.selectedTime, threshold, detectionParams, linkParams) {
+            console.log("TokenDistribution: fetchSnapshotData called", time, threshold, detectionParams, linkParams);
+            this.loading = true;
+            this.selectedTime = time;
+
+            // Update internal state if new params provided
+            if (detectionParams) {
+                this.lastDetectionThreshold = detectionParams.threshold;
+                this.lastDetectionTimeRange = detectionParams.timeRange || {};
+            }
+            if (linkParams) {
+                this.lastLinkThreshold = linkParams.threshold;
+                this.lastLinkTimeRange = linkParams.timeRange || {};
+            }
+
             try {
-                this.loading = true;
-                console.log("TokenDistribution: Fetching snapshot data...", { time, threshold });
-                
                 const response = await fetch('/api/snapshot/process', {
                     method: 'POST',
                     headers: {
@@ -309,11 +229,34 @@ export default {
                 }
                 
                 this.snapshotData = await response.json();
-                this.loading = false;
+                // this.loading = false; // Wait until all detections are done
+                
+                // Update topPercent display based on threshold
+                if (threshold !== undefined) {
+                    this.topPercent = Math.round(threshold * 100);
+                } else {
+                     this.topPercent = 50; // default
+                }
                 
                 // Draw chart
-                this.$nextTick(() => {
-                    this.setSvg();
+                this.$nextTick(async () => {
+                    // Set dimensions but don't draw yet
+                    if (this.$refs.chart_container) {
+                        this.svgHeight = this.$refs.chart_container.offsetHeight;
+                        this.svgWidth = this.$refs.chart_container.offsetWidth;
+                    }
+                    
+                    // Auto-load detection and links after initial render
+                    // Run both concurrently and wait for both to finish before drawing
+                    await Promise.all([
+                        this.runEntityDetection(this.lastDetectionThreshold || 2, this.lastDetectionTimeRange || {}, 'transfer-network', true),
+                        this.updateLinks(this.lastLinkThreshold || 1, this.lastLinkTimeRange || {}, true),
+                        // Run manipulation detection with default threshold (100) or last used
+                        this.runManipulationDetection(100, true) // Pass true for isAutoRun
+                    ]);
+                    // Only draw once after both are ready
+                    this.drawChart();
+                    this.loading = false;
                 });
             } catch (error) {
                 console.warn("API snapshot failed, using local fallback:", error);
@@ -336,6 +279,60 @@ export default {
                 this.drawChart();
             }
         },
+        async updateLinks(threshold, timeRange, silent = false) {
+            console.log("TokenDistribution: updateLinks called", threshold, timeRange);
+
+            // Update topPercent if threshold is provided
+            if (threshold) {
+                this.topPercent = threshold;
+            }
+
+            if (!this.snapshotData || !this.snapshotData.balances) {
+                console.warn("No snapshot data available.");
+                return;
+            }
+
+            let users = [];
+            if (this.snapshotData.balances && this.snapshotData.balances.users) {
+                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
+            }
+
+            if (users.length === 0) {
+                console.warn("No users to check links for.");
+                return;
+            }
+
+            this.lastLinkThreshold = threshold;
+            this.lastLinkTimeRange = timeRange;
+
+            try {
+                const response = await fetch('/api/entity/links', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target_users: users,
+                        time_range: timeRange,
+                        threshold: threshold
+                    })
+                });
+
+                if (!response.ok) throw new Error("Failed to fetch links");
+                
+                const data = await response.json();
+                console.log("Links received:", data.links);
+                this.currentLinks = data.links || [];
+                
+                // If not silent (user triggered), redraw immediately. 
+                // If silent (initial load), caller handles redraw.
+                if (!silent) {
+                     this.drawChart(); 
+                }
+                console.log(`Updated ${this.currentLinks.length} links.`);
+                
+            } catch (error) {
+                console.error("Error fetching links:", error);
+            }
+        },
         drawChart() {
             if (!this.snapshotData || this.svgWidth === 0) return;
 
@@ -343,7 +340,7 @@ export default {
             const height = this.svgHeight;
             const balances = this.snapshotData.balances;
 
-            // Prepare data: Only users, exclude 'Others'
+            // 1. Prepare base entries
             let entries = [];
             let othersBalance = 0;
             if (balances && balances.users) {
@@ -354,7 +351,6 @@ export default {
                         id: owner,
                         name: owner, 
                         value: balance,
-                        // Initial radius based on value, will be used for collision
                         r: 0 // Will be set after scale calculation
                     }));
             }
@@ -362,146 +358,125 @@ export default {
             this.userCount = entries.length;
             const usersBalance = entries.reduce((sum, d) => sum + d.value, 0);
 
-            // Calculate radius scale
-            // We want the total area of user bubbles to be somewhat proportional to screen size
-            // but ensuring they fit.
-            // Let's define a maximum possible radius for the "user group" circle.
+            // Mark suspicious traders
+            if (this.suspiciousTraders && this.suspiciousTraders.length > 0) {
+                const suspiciousMap = new Map();
+                this.suspiciousTraders.forEach(t => suspiciousMap.set(t.trader_id, t));
+                entries.forEach(d => {
+                    if (suspiciousMap.has(d.id)) {
+                        d.suspicious = suspiciousMap.get(d.id);
+                    }
+                });
+            }
+
+            // 2. Calculate scale for bubbles
             const minDim = Math.min(width, height);
             const margin = 20;
             const maxGroupRadius = (minDim / 2) - margin;
-
-            // Calculate total value area (sum of values)
-            // We want: Area_Group = Area_Users + Area_Others (if we consider ring)
-            // But for force simulation, we only care about user bubbles radius.
-            // Let's first determine the 'scale' factor.
-            // Total Area of Bubbles = Sum(pi * r_i^2)
-            // We can relate value to area: r_i = sqrt(value) * K
-            // Sum(pi * value * K^2) = Total_Bubble_Area
-            // K = sqrt(Total_Bubble_Area / (pi * Sum(value)))
-            
-            // We need to determine Total_Bubble_Area.
-            // Let's assume the user bubbles form a packed circle with radius R_users.
-            // And we have an outer ring for 'Others' with radius R_outer.
-            // Area_Ring = Area_Others
-            // Area_Users_Circle = Area_Users (approx)
-            // R_outer^2 / R_users^2 = (Balance_Total) / Balance_Users
-            // R_users = R_outer * sqrt(Balance_Users / Balance_Total)
-            
             const totalBalance = usersBalance + othersBalance;
-            
-            // "Shrink scale" logic:
-             // We define a 'fillFactor' that determines how much of the total available disk area
-             // is occupied by "ink" (ring area + sum of bubble areas).
-             // Small fillFactor => thin ring, small bubbles, sparse layout.
-             const fillFactor = this.scaleFactor; // Use user-controlled parameter 
-
+            const fillFactor = this.scaleFactor; 
             const totalAvailableArea = Math.PI * maxGroupRadius * maxGroupRadius;
             const targetTotalInkArea = totalAvailableArea * fillFactor;
-
-            // Split ink area proportionally
-            // Area_Ring / Area_Bubbles = Balance_Others / Balance_Users
-            const targetRingArea = totalBalance > 0 
-                ? targetTotalInkArea * (othersBalance / totalBalance) 
-                : 0;
-            const targetBubbleArea = totalBalance > 0 
-                ? targetTotalInkArea * (usersBalance / totalBalance) 
-                : 0;
-
-            // Calculate geometry
-            // Ring Area = pi * (R_out^2 - R_in^2)
-            // R_in = sqrt(R_out^2 - Area_Ring / pi)
-            const userGroupRadius = Math.sqrt(maxGroupRadius * maxGroupRadius - targetRingArea / Math.PI);
+            const targetBubbleArea = totalBalance > 0 ? targetTotalInkArea * (usersBalance / totalBalance) : 0;
+            const radiusScale = usersBalance > 0 ? Math.sqrt(targetBubbleArea / (Math.PI * usersBalance)) : 1;
             
-            // Calculate bubble radius scale k
-            // Sum(pi * (k * sqrt(val))^2) = TargetBubbleArea
-            // k^2 * pi * Sum(val) = TargetBubbleArea
-            // k = sqrt(TargetBubbleArea / (pi * Sum(val)))
-            const radiusScale = usersBalance > 0 
-                ? Math.sqrt(targetBubbleArea / (Math.PI * usersBalance)) 
-                : 1;
-
-            // Assign radii to nodes
+            // Assign radii
             entries.forEach(d => {
                 d.r = Math.sqrt(d.value) * radiusScale;
             });
 
-            const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
-            svg.attr("width", width).attr("height", height);
+            // 3. Handle Grouping (Hierarchical Packing)
+            let simulationNodes = [];
+            let finalNodes = []; // Flattened list for rendering links and interactions
 
-            // Clear previous
-            svg.selectAll("*").remove();
-            
-            // Center group
-            const centerX = width / 2;
-            const centerY = height / 2;
-            
-            const g = svg.append("g")
-                .attr("transform", `translate(${centerX},${centerY})`);
+            if (this.detectedEntities && this.detectedEntities.length > 0) {
+                // Map user -> group
+                const userGroupMap = new Map();
+                this.detectedEntities.forEach(entity => {
+                    if (entity.details && entity.details.members) {
+                        entity.details.members.forEach(memberId => {
+                            userGroupMap.set(memberId, entity);
+                        });
+                    }
+                });
 
-            // Draw Ring (Others)
-            if (othersBalance > 0) {
-                const innerRadius = userGroupRadius; // The boundary of user bubbles
-                const outerRadius = maxGroupRadius;  // The boundary of the whole chart
+                // Separate nodes
+                const groupMap = new Map(); // entityId -> [nodes]
+                const independentNodes = [];
 
-                const arc = d3.arc()
-                    .innerRadius(innerRadius)
-                    .outerRadius(outerRadius)
-                    .startAngle(0)
-                    .endAngle(2 * Math.PI);
+                entries.forEach(node => {
+                    if (userGroupMap.has(node.id)) {
+                        const entity = userGroupMap.get(node.id);
+                        if (!groupMap.has(entity.entity_id)) {
+                            groupMap.set(entity.entity_id, []);
+                        }
+                        groupMap.get(entity.entity_id).push(node);
+                    } else {
+                        independentNodes.push(node);
+                        finalNodes.push(node);
+                    }
+                });
 
-                g.append("path")
-                    .attr("d", arc)
-                    .style("fill", "#e3f2fd") // Light blue
-                    .style("opacity", 0.5)
-                    .on("mouseover", (event) => {
-                        const tooltip = this.$refs.tooltip;
-                        tooltip.style.opacity = 1;
-                        tooltip.innerHTML = `Category: Others<br>Balance: ${othersBalance.toLocaleString()}`;
-                        tooltip.style.left = (event.pageX + 10) + "px";
-                        tooltip.style.top = (event.pageY - 10) + "px";
-                    })
-                    .on("mousemove", (event) => {
-                        const tooltip = this.$refs.tooltip;
-                        tooltip.style.left = (event.pageX + 10) + "px";
-                        tooltip.style.top = (event.pageY - 10) + "px";
-                    })
-                    .on("mouseout", () => {
-                        this.$refs.tooltip.style.opacity = 0;
-                    });
+                // Process Groups
+                const groupNodes = [];
+                groupMap.forEach((members, entityId) => {
+                    // Use d3.packSiblings to pack members tightly
+                    // This adds x, y to members relative to (0,0)
+                    d3.packSiblings(members);
+                    
+                    // Calculate enclosing circle
+                    const enclose = d3.packEnclose(members);
+                    
+                    // Create Super Node
+                    const groupNode = {
+                        id: entityId,
+                        isGroup: true,
+                        r: enclose.r + 5, // Add padding
+                        value: members.reduce((sum, m) => sum + m.value, 0),
+                        children: members,
+                        enclose: enclose // Store enclosure info for offset calculation
+                    };
+                    groupNodes.push(groupNode);
+                });
+
+                simulationNodes = [...independentNodes, ...groupNodes];
+            } else {
+                // No grouping
+                simulationNodes = entries;
+                finalNodes = entries;
             }
 
-            // Draw Bubbles Group
-            const bubbleGroup = g.append("g");
-
-            // Color scale
-            const color = d3.scaleSequential(d3.interpolateBlues)
-                .domain([0, d3.max(entries, d => d.value)]);
-
-            // Initialize simulation
-            const simulation = d3.forceSimulation(entries)
-                .force("charge", d3.forceManyBody().strength(-10)) // Negative strength for repulsion (dispersion)
-                .force("collide", d3.forceCollide().radius(d => d.r + 2).strength(1).iterations(2)) // Prevent overlap with padding
-                .force("r", d3.forceRadial(0, 0, 0).strength(0.05)) // Weak pull to center
-                .force("center", d3.forceCenter(0, 0).strength(0.05)) // Keep centered
-                .stop();
-
-            // Run simulation manually for faster rendering (static-like feel) or use tick
-            // For better UX with force, we often let it settle a bit then render, or render live.
-            // Since user wants "layout based on links" later, live simulation is better.
-            // But for now, just to show the layout, we can let it run.
-            // However, to ensure it stays "within circular range", forceRadial is key.
+            // 4. Setup SVG
+            const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
+            svg.attr("width", width).attr("height", height);
+            svg.selectAll("*").remove();
             
-<<<<<<< Updated upstream
-            // Let's run it for some ticks to stabilize initial positions
-            for (let i = 0; i < 120; ++i) simulation.tick();
+            const centerX = width / 2;
+            const centerY = height / 2;
+            this.centerX = centerX;
+            this.centerY = centerY;
+            
+            const g = svg.append("g").attr("transform", `translate(${centerX},${centerY})`);
+            
+            // Draw "Others" Ring
+             if (othersBalance > 0) {
+                const targetRingArea = totalBalance > 0 ? targetTotalInkArea * (othersBalance / totalBalance) : 0;
+                const userGroupRadius = Math.sqrt(maxGroupRadius * maxGroupRadius - targetRingArea / Math.PI);
+                const arc = d3.arc()
+                    .innerRadius(userGroupRadius)
+                    .outerRadius(maxGroupRadius)
+                    .startAngle(0)
+                    .endAngle(2 * Math.PI);
+                g.append("path")
+                    .attr("d", arc)
+                    .style("fill", "#e3f2fd")
+                    .style("opacity", 0.5);
+            }
 
-            // Render nodes
-            const node = bubbleGroup.selectAll("g")
-                .data(entries)
-=======
+            const bubbleGroup = g.append("g");
+            
             // Link group (ABOVE nodes)
-            const linkGroup = g.append("g").attr("class", "links")
-                .style("display", this.showLinks ? null : "none");
+            const linkGroup = g.append("g").attr("class", "links");
             
             const color = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(entries, d => d.value)]);
 
@@ -541,15 +516,22 @@ export default {
             const simulationLinks = Array.from(simulationLinkMap.values());
             console.log(`Simulation Links: ${simulationLinks.length} (from ${this.currentLinks ? this.currentLinks.length : 0} raw links)`);
 
-            // Draw Links — stroke-width and opacity scaled by transaction count
-            const maxWeight = simulationLinks.length > 0 ? Math.max(...simulationLinks.map(l => l.weight)) : 1;
+            // Draw Links
             const linkElements = linkGroup.selectAll("line")
                 .data(simulationLinks)
                 .join("line")
-                .attr("stroke", "#555")
-                .attr("stroke-opacity", d => 0.2 + 0.6 * Math.sqrt(d.weight / maxWeight))
-                .attr("stroke-width", d => 0.5 + 4 * Math.sqrt(d.weight / maxWeight));
+                .attr("stroke", "#999")
+                .attr("stroke-opacity", 0.6)
+                .attr("stroke-width", 3);
+                // .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
             
+            // Let's run it for some ticks to stabilize initial positions
+            for (let i = 0; i < 120; ++i) simulation.tick();
+
+            // Render nodes
+            const node = bubbleGroup.selectAll("g")
+                .data(entries)
+=======
             linkElements.append("title")
                 .text(d => `Source: ${d.source}\nTarget: ${d.target}\nWeight: ${d.weight}`);
 
@@ -573,85 +555,172 @@ export default {
             // Draw Group Boundaries
             const groups = bubbleGroup.selectAll(".group")
                 .data(simulationNodes.filter(n => n.isGroup))
->>>>>>> Stashed changes
+ main
                 .enter().append("g")
-                .attr("transform", d => `translate(${d.x},${d.y})`);
-                // Note: d.x and d.y are relative to the center because forceCenter is at (0,0) relative to the simulation,
-                // but we translated 'g' to (centerX, centerY). 
-                // Wait, d3.forceCenter(x,y) sets the center of mass. If we want 0,0 to be center of 'g', we should use forceCenter(0,0).
-                // But forceCenter(0,0) means coordinates will be around 0.
+                .attr("class", "group")
+                .attr("transform", d => `translate(${d.x},${d.y})`)
+                .call(drag); // Attach drag
                 
-            // Circles
-            const circles = node.append("circle")
-                .attr("class", "bubble")
+            groups.append("circle")
+                .attr("r", d => d.r)
+                .style("fill", "white") // Add fill to capture drag events inside
+                .style("fill-opacity", 0.3)
+                .style("stroke", "#ff9800")
+                .style("stroke-width", 2)
+                .style("stroke-dasharray", "5,5");
+
+            // Draw Independent Nodes
+            const singles = bubbleGroup.selectAll(".single")
+                .data(simulationNodes.filter(n => !n.isGroup))
+                .enter().append("circle")
+                .attr("class", "bubble single")
+                .attr("transform", d => `translate(${d.x},${d.y})`)
                 .attr("r", d => d.r)
                 .style("fill", d => color(d.value))
-                .style("opacity", 0.8)
-                .style("stroke", d => d.isHighlighted ? "#ff0000" : "#fff")
-                .style("stroke-width", d => d.isHighlighted ? 3 : 1)
+                .style("opacity", 0.6)
+                .style("stroke", d => d.suspicious ? "#ff0000" : "#5976ba")
+                .style("stroke-width", d => d.suspicious ? 3 : 2)
+                .call(drag) // Attach drag
                 .on("mouseover", (event, d) => {
-                    d3.select(event.currentTarget).style("stroke", "#000");
+                    d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#000");
                     const tooltip = this.$refs.tooltip;
                     tooltip.style.opacity = 1;
-                    tooltip.innerHTML = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
-                    tooltip.style.left = (event.pageX + 10) + "px";
-                    tooltip.style.top = (event.pageY - 10) + "px";
+                    let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
+                    if (d.suspicious) {
+                        content += `<br><span style="color:red">Self-Trading Detected!</span><br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                    }
+                    tooltip.innerHTML = content;
+                    const [x, y] = d3.pointer(event, this.$refs.chart_container);
+                    tooltip.style.left = (x + 10) + "px";
+                    tooltip.style.top = (y - 10) + "px";
                 })
                 .on("mousemove", (event) => {
                     const tooltip = this.$refs.tooltip;
-                    tooltip.style.left = (event.pageX + 10) + "px";
-                    tooltip.style.top = (event.pageY - 10) + "px";
+                    const [x, y] = d3.pointer(event, this.$refs.chart_container);
+                    tooltip.style.left = (x + 10) + "px";
+                    tooltip.style.top = (y - 10) + "px";
                 })
                 .on("mouseout", (event, d) => {
-                    d3.select(event.currentTarget)
-                        .style("stroke", d.isHighlighted ? "#ff0000" : "#fff")
-                        .style("stroke-width", d.isHighlighted ? 3 : 1);
+                    d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#5976ba");
                     this.$refs.tooltip.style.opacity = 0;
                 });
 
-            // Labels
-            const labels = node.filter(d => d.r > 15).append("text")
-                .attr("dy", ".3em")
-                .style("text-anchor", "middle")
-                .style("font-size", d => Math.min(d.r / 3, 10) + "px")
-                .style("pointer-events", "none")
-                .text(d => d.name.substring(0, 4));
+            // Draw Group Members
+            groups.each(function(d) {
+                d3.select(this).selectAll(".member")
+                    .data(d.children)
+                    .enter().append("circle")
+                    .attr("class", "bubble member")
+                    .attr("cx", child => child.x - d.enclose.x)
+                    .attr("cy", child => child.y - d.enclose.y)
+                    .attr("r", child => child.r)
+                    .style("fill", child => color(child.value))
+                    .style("opacity", 0.6)
+                    .style("stroke", child => child.suspicious ? "#ff0000" : "#5976ba")
+                    .style("stroke-width", child => child.suspicious ? 3 : 2);
+            });
             
-            // Add drag behavior
-            node.call(d3.drag()
-                .on("start", (event, d) => {
-                    if (!event.active) simulation.alphaTarget(0.3).restart();
-                    d.fx = d.x;
-                    d.fy = d.y;
-                })
-                .on("drag", (event, d) => {
-                    d.fx = event.x;
-                    d.fy = event.y;
-                })
-                .on("end", (event, d) => {
-                    if (!event.active) simulation.alphaTarget(0);
-                    d.fx = null;
-                    d.fy = null;
-                }));
-
-            // Restart simulation to animate
-            simulation.restart();
-            simulation.on("tick", () => {
-                // Constrain nodes to be within userGroupRadius
-                // This is a hard constraint to ensure they don't go into the ring area
-                entries.forEach(d => {
-                    const dist = Math.sqrt(d.x * d.x + d.y * d.y);
-                    const maxDist = userGroupRadius - d.r - 2; // -2 for padding
-                    if (dist > maxDist) {
-                        const angle = Math.atan2(d.y, d.x);
-                        d.x = Math.cos(angle) * maxDist;
-                        d.y = Math.sin(angle) * maxDist;
+            // Re-bind events for members with correct scope
+            const self = this;
+            groups.selectAll(".member")
+                 .on("mouseover", function(event, d) {
+                    d3.select(this).style("stroke", d.suspicious ? "#ff0000" : "#000");
+                    const tooltip = self.$refs.tooltip;
+                    tooltip.style.opacity = 1;
+                    let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
+                    if (d.suspicious) {
+                        content += `<br><span style="color:red">Self-Trading Detected!</span><br>Diff: ${d.suspicious.diff.toFixed(2)}`;
                     }
+                    tooltip.innerHTML = content;
+                    const [x, y] = d3.pointer(event, self.$refs.chart_container);
+                    tooltip.style.left = (x + 10) + "px";
+                    tooltip.style.top = (y - 10) + "px";
+                })
+                .on("mousemove", function(event) {
+                     const tooltip = self.$refs.tooltip;
+                     const [x, y] = d3.pointer(event, self.$refs.chart_container);
+                     tooltip.style.left = (x + 10) + "px";
+                     tooltip.style.top = (y - 10) + "px";
+                })
+                .on("mouseout", function(event, d) {
+                    d3.select(this).style("stroke", d.suspicious ? "#ff0000" : "#5976ba");
+                    self.$refs.tooltip.style.opacity = 0;
                 });
 
-                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            // 5. Run Simulation
+            if (this.simulation) this.simulation.stop();
+
+            this.simulation = d3.forceSimulation(simulationNodes)
+                .force("charge", d3.forceManyBody().strength(d => d.isGroup ? -50 : -15)) 
+                .force("collide", d3.forceCollide().radius(d => d.r + 5).strength(1))
+                .force("r", d3.forceRadial(0, 0, 0).strength(0.15))
+                .force("center", d3.forceCenter(0, 0).strength(0.1))
+                .force("link", d3.forceLink(simulationLinks).id(d => d.id).distance(20).strength(1));
+
+            this.simulation.on("tick", () => {
+                // Update Links
+                linkElements
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                // Update Groups
+                groups.attr("transform", d => `translate(${d.x},${d.y})`);
+
+                // Update Singles
+                singles.attr("transform", d => `translate(${d.x},${d.y})`);
             });
-        }
+        },
+        async runManipulationDetection(threshold, isAutoRun = false) {
+            console.log("TokenDistribution: runManipulationDetection called with threshold", threshold, "isAutoRun", isAutoRun);
+            
+            // Get current users from snapshot data
+            let users = [];
+            if (this.snapshotData && this.snapshotData.balances && this.snapshotData.balances.users) {
+                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
+            }
+
+            if (users.length === 0) {
+                console.warn("TokenDistribution: No users to detect manipulation for.");
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/manipulation/detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        threshold: threshold,
+                        limit_traders: users
+                    })
+                });
+                
+                if (!response.ok) throw new Error("Detection failed");
+                
+                const data = await response.json();
+                console.log("Manipulation detection result:", data);
+                
+                // Store results
+                this.suspiciousTraders = data.suspicious_traders || [];
+                
+                // If not auto-run (meaning triggered by user update), we might need to re-highlight or re-draw
+                // But since we are likely in a flow where drawChart handles it, we just update data.
+                // If the chart is already drawn, we can call highlightSuspiciousTraders to update it without full redraw?
+                // Or just call drawChart again? calling drawChart is safer but might restart simulation.
+                // Let's stick to updating data. If this is called standalone, we might want to trigger update.
+                
+                if (!isAutoRun) {
+                    this.highlightSuspiciousTraders(this.suspiciousTraders);
+                }
+                
+                // Emit result up
+                this.$emit('manipulation-detected', { ...data, isAutoRun });
+                
+            } catch (error) {
+                console.error("TokenDistribution: Manipulation detection error:", error);
+            }
+        },
     }
 }
 </script>

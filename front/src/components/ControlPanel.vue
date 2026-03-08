@@ -18,40 +18,8 @@
             </button>
         </div>
 
-<<<<<<< Updated upstream
         <!-- Rule Configuration -->
         <div style="font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px;">Entity Detection Configuration</div>
-        
-        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-            <!-- Rule Type -->
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; font-weight: bold;">Rule Type</label>
-                <select style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                    <option value="transfer-network">Transfer Network Based</option>
-                </select>
-            </div>
-
-            <!-- Threshold -->
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; font-weight: bold;">Threshold (Min Tx Count)</label>
-                <input type="number" v-model.number="detectionThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
-            </div>
-
-            <!-- Time Range -->
-            <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="datetime-local" v-model="startTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                    <span>to</span>
-                    <input type="datetime-local" v-model="endTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-=======
-        <!-- Entity Detection Configuration -->
-        <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
-            <div style="font-weight: bold;">Entity Detection</div>
-            <span v-if="lastResultCount !== null" style="color: #666; font-size: 12px;">
-                Last Result: {{ lastResultCount }} groups
-            </span>
-        </div>
         
         <div style="display: flex; flex-direction: column; gap: 5px;">
             <!-- Transfer Network Based -->
@@ -65,6 +33,12 @@
                         <label style="font-size: 12px; font-weight: bold;">Threshold (Min Tx Count)</label>
                         <input type="number" v-model.number="detectionThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
                     </div>
+                    <div style="display: flex; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                            <input type="checkbox" v-model="checkFundingSource">
+                            <span>Check Same Funding Source</span>
+                        </label>
+                    </div>
                     <div style="display: flex; flex-direction: column; gap: 5px;">
                         <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -73,9 +47,6 @@
                             <input type="datetime-local" v-model="endTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
                         </div>
                     </div>
-                    <button @click="triggerDetectionSection('transfer')" :disabled="loading" style="padding: 6px 14px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; align-self: flex-start;">
-                        {{ loading ? 'Detecting...' : 'Run Detection' }}
-                    </button>
                 </div>
             </div>
 
@@ -85,124 +56,18 @@
                     <span>Behavior Similarity Based</span>
                     <span>{{ activeSection === 'behavior' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeSection === 'behavior'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
-                    <!-- Sub-rule selector -->
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <label style="font-size: 12px; font-weight: bold;">Similarity Rule</label>
-                        <select v-model="similarityRuleType" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                            <option value="similar_trading_sequence">Similar Trading Sequence</option>
-                            <option value="similar_balance_sequence">Similar Balance Sequence</option>
-                            <option value="similar_earning_sequence">Similar Earning Sequence</option>
-                        </select>
-                    </div>
-
-                    <!-- Rule3: Similar Trading Sequence -->
-                    <template v-if="similarityRuleType === 'similar_trading_sequence'">
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Direction Mode</label>
-                            <select v-model="simTradingParams.direction_mode" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="same_side_only">Same Side Only</option>
-                                <option value="mixed_allowed">Mixed Allowed</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Sequence Representation</label>
-                            <select v-model="simTradingParams.sequence_representation" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="action_only">Action Only</option>
-                                <option value="action+amount">Action + Amount</option>
-                                <option value="action+price">Action + Price</option>
-                                <option value="action+amount+price">Action + Amount + Price</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Min Contiguous Length</label>
-                            <input type="number" v-model.number="simTradingParams.min_contiguous_length" min="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                        <div v-if="simTradingParams.sequence_representation.includes('amount')" style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Amount Similarity (0-1)</label>
-                            <input type="number" v-model.number="simTradingParams.amount_similarity" min="0" max="1" step="0.05" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                        <div v-if="simTradingParams.sequence_representation.includes('price')" style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Price Similarity (0-1)</label>
-                            <input type="number" v-model.number="simTradingParams.price_similarity" min="0" max="1" step="0.05" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                    </template>
-
-                    <!-- Rule4: Similar Balance Sequence -->
-                    <template v-if="similarityRuleType === 'similar_balance_sequence'">
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Balance Axis</label>
-                            <select v-model="simBalanceParams.balance_axis" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="time_grid">Time Grid</option>
-                                <option value="tx_step">Transaction Step</option>
-                            </select>
-                        </div>
-                        <div v-if="simBalanceParams.balance_axis === 'tx_step'" style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Tx Step</label>
-                            <input type="number" v-model.number="simBalanceParams.tx_step" min="2" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                        <div v-if="simBalanceParams.balance_axis === 'time_grid'" style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Time Bin</label>
-                            <select v-model="simBalanceParams.time_bin" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="1h">1 Hour</option>
-                                <option value="1d">1 Day</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Similarity Threshold (0-1)</label>
-                            <input type="number" v-model.number="simBalanceParams.similarity" min="0" max="1" step="0.05" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">TopK Neighbors</label>
-                            <input type="number" v-model.number="simBalanceParams.topk_neighbors" min="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                    </template>
-
-                    <!-- Rule5: Similar Earning Sequence -->
-                    <template v-if="similarityRuleType === 'similar_earning_sequence'">
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Earning Axis</label>
-                            <select v-model="simEarningParams.earning_axis" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="time_grid">Time Grid</option>
-                                <option value="tx_step">Transaction Step</option>
-                            </select>
-                        </div>
-                        <div v-if="simEarningParams.earning_axis === 'tx_step'" style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Tx Step</label>
-                            <input type="number" v-model.number="simEarningParams.tx_step" min="2" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                        <div v-if="simEarningParams.earning_axis === 'time_grid'" style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Time Bin</label>
-                            <select v-model="simEarningParams.time_bin" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                                <option value="1h">1 Hour</option>
-                                <option value="1d">1 Day</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">Similarity Threshold (0-1)</label>
-                            <input type="number" v-model.number="simEarningParams.similarity" min="0" max="1" step="0.05" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 5px;">
-                            <label style="font-size: 12px; font-weight: bold;">TopK Neighbors</label>
-                            <input type="number" v-model.number="simEarningParams.topk_neighbors" min="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
-                        </div>
-                    </template>
-
-                    <!-- Time Range for Similarity -->
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
-                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <input type="datetime-local" v-model="simStartTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                            <span>to</span>
-                            <input type="datetime-local" v-model="simEndTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                        </div>
-                    </div>
-                    <button @click="triggerDetectionSection('behavior')" :disabled="loading" style="padding: 6px 14px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; align-self: flex-start;">
-                        {{ loading ? 'Detecting...' : 'Run Detection' }}
-                    </button>
+                <div v-if="activeSection === 'behavior'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
                 </div>
             </div>
 
+            <!-- Time Range -->
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="datetime-local" v-model="startTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                    <span>to</span>
+                    <input type="datetime-local" v-model="endTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
             <!-- Manipulation History Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
                 <div @click="toggleSection('history')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
@@ -211,20 +76,119 @@
                 </div>
                 <div v-if="activeSection === 'history'" style="padding: 10px;">
                     <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+ k-line
                     <br><br>
                     <button disabled style="padding: 6px 14px; background: #ccc; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; cursor: not-allowed;">Run Detection</button>
->>>>>>> Stashed changes
+ Stashed changes
+=======
+ main
                 </div>
             </div>
         </div>
 
-        <div style="margin-top: 5px;">
-            <button @click="triggerDetection" :disabled="loading" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                {{ loading ? 'Detecting...' : 'Run Detection' }}
-            </button>
-            <span v-if="lastResultCount !== null" style="margin-left: 10px; color: #666; font-size: 13px;">
-                Last Result: Found {{ lastResultCount }} entity groups
-            </span>
+        <!-- Manipulation Detection Configuration -->
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-weight: bold;">Manipulation Detection</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button @click="triggerManipulationDetection" :disabled="loadingManipulation" style="padding: 5px 15px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                    {{ loadingManipulation ? 'Detecting...' : 'Run Detection' }}
+                </button>
+            </div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <!-- Self Trading -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleManipulationSection('self_trading')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Self Trading (Wash Trading)</span>
+                    <span>{{ activeManipulationSection === 'self_trading' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeManipulationSection === 'self_trading'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Volume Difference Threshold</label>
+                        <input type="number" v-model.number="selfTradingThreshold" min="0" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+                        <span style="font-size: 10px; color: #666;">Max difference between buy/sell amounts.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleManipulationSection('network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Network Based</span>
+                    <span>{{ activeManipulationSection === 'network' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeManipulationSection === 'network'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
+
+            <!-- Behavior Similarity Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleManipulationSection('behavior_sim')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Behavior Similarity Based</span>
+                    <span>{{ activeManipulationSection === 'behavior_sim' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeManipulationSection === 'behavior_sim'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Link Configuration -->
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-weight: bold;">Link Configuration</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button @click="updateLinks" :disabled="loadingLinks" style="padding: 5px 15px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                    {{ loadingLinks ? 'Updating...' : 'Update Links' }}
+                </button>
+            </div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <!-- Network Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleLinkSection('network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Network Based</span>
+                    <span>{{ activeLinkSection === 'network' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeLinkSection === 'network'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Link Threshold (Min Tx)</label>
+                        <input type="number" v-model.number="linkThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="datetime-local" v-model="linkStartTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                            <span>to</span>
+                            <input type="datetime-local" v-model="linkEndTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Behavior Similarity Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleLinkSection('behavior_sim')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Behavior Similarity Based</span>
+                    <span>{{ activeLinkSection === 'behavior_sim' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeLinkSection === 'behavior_sim'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
+
+            <!-- Manipulation History Based -->
+            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleLinkSection('history')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Manipulation History Based</span>
+                    <span>{{ activeLinkSection === 'history' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeLinkSection === 'history'" style="padding: 10px;">
+                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -237,6 +201,10 @@ export default {
             type: Boolean,
             default: false
         },
+        loadingManipulation: {
+            type: Boolean,
+            default: false
+        },
         lastResultCount: {
             type: Number,
             default: null
@@ -244,7 +212,8 @@ export default {
     },
     data() {
         return {
-            detectionThreshold: 1,
+            detectionThreshold: 2,
+            checkFundingSource: true,
             // Default to empty strings which means "Full Range" in our logic
             startTime: "",
             endTime: "",
@@ -252,15 +221,14 @@ export default {
             // Snapshot Data
             snapshotTimes: [],
             selectedSnapshotTime: "",
-<<<<<<< Updated upstream
             snapshotThreshold: 50,
             loadingSnapshot: false
-=======
             snapshotThreshold: 30,
             loadingSnapshot: false,
 
             // UI State
             activeSection: 'transfer', // 'transfer', 'behavior', 'history'
+ k-line
             activeManipulationSection: 'network', // 'network', 'behavior_sim'
             loadingManipulation: false,
             activeLinkSection: 'network', // 'network', 'behavior_sim', 'history'
@@ -296,13 +264,48 @@ export default {
                 similarity: 0.8,
                 topk_neighbors: 5,
             },
->>>>>>> Stashed changes
+ Stashed changes
+=======
+            activeManipulationSection: 'self_trading', // 'network', 'behavior_sim', 'self_trading'
+            // loadingManipulation: false, // Moved to props
+            activeLinkSection: 'network', // 'network', 'behavior_sim', 'history'
+            loadingLinks: false,
+            
+            selfTradingThreshold: 100,
+            
+            // Link Config
+            linkThreshold: 1,
+            linkStartTime: "",
+            linkEndTime: ""
+ main
         }
     },
-    mounted() {
+    mounted(
+) {
         this.fetchSnapshotTimes();
     },
     methods: {
+        toggleSection(section) {
+            if (this.activeSection === section) {
+                this.activeSection = null;
+            } else {
+                this.activeSection = section;
+            }
+        },
+        toggleManipulationSection(section) {
+            if (this.activeManipulationSection === section) {
+                this.activeManipulationSection = null;
+            } else {
+                this.activeManipulationSection = section;
+            }
+        },
+        toggleLinkSection(section) {
+            if (this.activeLinkSection === section) {
+                this.activeLinkSection = null;
+            } else {
+                this.activeLinkSection = section;
+            }
+        },
         async fetchSnapshotTimes() {
             try {
                 const response = await fetch('/api/snapshot/times');
@@ -317,43 +320,6 @@ export default {
                 console.error("ControlPanel: Failed to fetch snapshot times", error);
             }
         },
-<<<<<<< Updated upstream
-=======
-        triggerDetectionSection(section) {
-            const params = this.getDetectionParams(section);
-            this.$emit('run-detection', params);
-        },
-        getDetectionParams(section) {
-            const resolvedSection = section !== undefined ? section : this.activeSection;
-            const timeRange = {};
-            if (this.startTime) timeRange.start = this.startTime.replace('T', ' ');
-            if (this.endTime) timeRange.end = this.endTime.replace('T', ' ');
-
-            if (resolvedSection === 'behavior') {
-                // Similarity-based detection
-                const simTimeRange = {};
-                if (this.simStartTime) simTimeRange.start = this.simStartTime.replace('T', ' ');
-                if (this.simEndTime) simTimeRange.end = this.simEndTime.replace('T', ' ');
-
-                let parameters = {};
-                if (this.similarityRuleType === 'similar_trading_sequence') {
-                    parameters = { ...this.simTradingParams };
-                } else if (this.similarityRuleType === 'similar_balance_sequence') {
-                    parameters = { ...this.simBalanceParams };
-                } else if (this.similarityRuleType === 'similar_earning_sequence') {
-                    parameters = { ...this.simEarningParams };
-                }
-
-                return {
-                    threshold: this.detectionThreshold,
-                    timeRange: Object.keys(simTimeRange).length > 0 ? simTimeRange : undefined,
-                    ruleType: this.similarityRuleType,
-                    parameters: parameters,
-                };
-            }
-
-            return {
-                threshold: this.detectionThreshold,
                 timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
                 ruleType: "transfer-network"
             };
@@ -372,12 +338,17 @@ export default {
                 ruleType: "transfer-network"
             };
         },
->>>>>>> Stashed changes
+ k-line
+ Stashed changes
+=======
+ main
         updateSnapshot() {
             this.loadingSnapshot = true;
             this.$emit('update-snapshot', {
                 time: this.selectedSnapshotTime,
-                threshold: this.snapshotThreshold / 100 // Convert percentage to 0-1
+                threshold: this.snapshotThreshold / 100, // Convert percentage to 0-1
+                detectionParams: this.getDetectionParams(),
+                linkParams: this.getLinkParams()
             });
             // Simulate loading done after emit (actual data loading is in parent/sibling)
             // But we can just set it to false after a timeout or let parent handle it?
@@ -389,37 +360,23 @@ export default {
         },
         triggerDetection() {
             console.log("ControlPanel: triggerDetection called");
-<<<<<<< Updated upstream
             // Prepare time range object
             const timeRange = {};
             if (this.startTime) timeRange.start = this.startTime.replace('T', ' ');
             if (this.endTime) timeRange.end = this.endTime.replace('T', ' ');
             
-            console.log("ControlPanel: emitting run-detection", {
-                threshold: this.detectionThreshold,
-                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
-                ruleType: "transfer-network"
-            });
-
-            this.$emit('run-detection', {
-                threshold: this.detectionThreshold,
-                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
-                ruleType: "transfer-network"
-            });
-        }
-=======
-            const params = this.getDetectionParams();
             console.log("ControlPanel: emitting run-detection", params);
+
             this.$emit('run-detection', params);
         },
-        triggerManipulationDetection() {
-            this.loadingManipulation = true;
-            // TODO: Implement actual detection logic
-            console.log("ControlPanel: triggerManipulationDetection called");
-            setTimeout(() => {
-                this.loadingManipulation = false;
-                alert("Manipulation detection not yet implemented.");
-            }, 1000);
+        async triggerManipulationDetection() {
+            // this.loadingManipulation = true; // Controlled by prop now
+            console.log("ControlPanel: emitting request-manipulation-detection");
+            
+            this.$emit('request-manipulation-detection', {
+                threshold: this.selfTradingThreshold
+            });
+        }
         },
         updateLinks() {
             console.log("ControlPanel: updateLinks called");
@@ -429,7 +386,10 @@ export default {
             
             this.$emit('update-links', params);
         },
->>>>>>> Stashed changes
+ k-line
+ Stashed changes
+=======
+ main
     }
 }
 </script>
