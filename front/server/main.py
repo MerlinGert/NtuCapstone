@@ -7,6 +7,7 @@ import uvicorn
 import entity_detection
 import snapshot_service
 import manipulation_detect
+import behavior_detection
 
 # Add data_processing directory to path to import scripts if needed
 # BASE_DIR is the 'server' directory
@@ -21,6 +22,7 @@ app = FastAPI()
 app.include_router(entity_detection.router)
 app.include_router(snapshot_service.router)
 app.include_router(manipulation_detect.router)
+app.include_router(behavior_detection.router)
 
 @app.get("/")
 def read_root():
