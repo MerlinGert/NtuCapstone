@@ -42,6 +42,7 @@ export default {
             scaleFactor: 0.6, // Default scale parameter
             lastDetectionCount: null,
             lastDetectionThreshold: 2,
+            lastDetectionVolumeThreshold: 0,
             lastDetectionTimeRange: {},
             lastLinkThreshold: 1,
             lastLinkTimeRange: {},
@@ -69,8 +70,8 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
-        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, silent = false) {
-            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType, checkFundingSource);
+        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, volumeThreshold = 0, checkSameSender = false, checkSameRecipient = false, silent = false, enableTxCount = true, enableTxVolume = true) {
+            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType, checkFundingSource, volumeThreshold, checkSameSender, checkSameRecipient, enableTxCount, enableTxVolume);
             if (!this.snapshotData || !this.snapshotData.balances) {
                  console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
                  this.$emit('detection-complete', null);
@@ -94,6 +95,7 @@ export default {
             this.detecting = true;
             this.lastDetectionCount = null;
             this.lastDetectionThreshold = threshold;
+            this.lastDetectionVolumeThreshold = volumeThreshold;
             this.lastDetectionTimeRange = timeRange;
             console.log(`Sending ${users.length} users for detection...`);
 
@@ -111,7 +113,12 @@ export default {
                             rule_type: ruleType,
                             parameters: {
                                 threshold: threshold, // Detect if > threshold transactions
-                                check_funding_source: checkFundingSource
+                                volume_threshold: volumeThreshold,
+                                check_funding_source: checkFundingSource,
+                                check_same_sender: checkSameSender,
+                                check_same_recipient: checkSameRecipient,
+                                enable_tx_count: enableTxCount,
+                                enable_tx_volume: enableTxVolume
                             },
                             enabled: true
                         }
@@ -226,7 +233,7 @@ export default {
                     // Auto-load detection and links after initial render
                     // Run both concurrently and wait for both to finish before drawing
                     await Promise.all([
-                        this.runEntityDetection(this.lastDetectionThreshold || 2, this.lastDetectionTimeRange || {}, 'transfer-network', true),
+                        this.runEntityDetection(this.lastDetectionThreshold || 2, this.lastDetectionTimeRange || {}, 'transfer-network', true, this.lastDetectionVolumeThreshold || 0, true),
                         this.updateLinks(this.lastLinkThreshold || 1, this.lastLinkTimeRange || {}, true),
                         // Run manipulation detection with default threshold (100) or last used
                         this.runManipulationDetection(100, true) // Pass true for isAutoRun

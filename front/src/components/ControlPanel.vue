@@ -39,22 +39,55 @@
                     <span>{{ activeSection === 'transfer' ? '▼' : '►' }}</span>
                 </div>
                 <div v-if="activeSection === 'transfer'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Time Range -->
                     <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <label style="font-size: 12px; font-weight: bold;">Threshold (Min Tx Count)</label>
-                        <input type="number" v-model.number="detectionThreshold" min="1" max="50" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #555;">Time Range</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <input type="datetime-local" v-model="startTime" style="flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;">
+                            <span style="font-size: 11px;">-</span>
+                            <input type="datetime-local" v-model="endTime" style="flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;">
+                        </div>
                     </div>
-                    <div style="display: flex; align-items: center;">
-                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                            <input type="checkbox" v-model="checkFundingSource">
-                            <span>Check Same Funding Source</span>
-                        </label>
+
+                    <div style="height: 1px; background: #eee; margin: 2px 0;"></div>
+
+                    <!-- Threshold Rules -->
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
+                             <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" v-model="enableTxCount">
+                                <span :style="{color: enableTxCount ? '#000' : '#999'}">Min Tx Count</span>
+                            </label>
+                            <input type="number" v-model.number="detectionThreshold" :disabled="!enableTxCount" min="1" max="50" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" v-model="enableTxVolume">
+                                <span :style="{color: enableTxVolume ? '#000' : '#999'}">Min Volume</span>
+                            </label>
+                            <input type="number" v-model.number="volumeThreshold" :disabled="!enableTxVolume" min="0" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                        </div>
                     </div>
+
+                    <div style="height: 1px; background: #eee; margin: 2px 0;"></div>
+
+                    <!-- Pattern Rules -->
                     <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <label style="font-size: 12px; font-weight: bold;">Time Range (Empty = Full Range)</label>
-                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <input type="datetime-local" v-model="startTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
-                            <span>to</span>
-                            <input type="datetime-local" v-model="endTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" v-model="checkFundingSource">
+                                <span>Same Funding Source</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" v-model="checkSameSender">
+                                <span>Same Sender</span>
+                            </label>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" v-model="checkSameRecipient">
+                                <span>Same Recipient</span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -210,8 +243,13 @@ export default {
     data() {
         return {
             detectionThreshold: 2,
+            volumeThreshold: 0,
+            enableTxCount: true,
+            enableTxVolume: true,
             checkFundingSource: true,
-            // Default to empty strings which means "Full Range" in our logic
+            checkSameSender: false,
+            checkSameRecipient: false,
+            startTime: "",// Default to empty strings which means "Full Range" in our logic
             startTime: "",
             endTime: "",
             
@@ -281,7 +319,12 @@ export default {
             if (this.endTime) timeRange.end = this.endTime.replace('T', ' ');
             return {
                 threshold: this.detectionThreshold,
+                volumeThreshold: this.volumeThreshold,
+                enableTxCount: this.enableTxCount,
+                enableTxVolume: this.enableTxVolume,
                 checkFundingSource: this.checkFundingSource,
+                checkSameSender: this.checkSameSender,
+                checkSameRecipient: this.checkSameRecipient,
                 timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
                 ruleType: "transfer-network"
             };

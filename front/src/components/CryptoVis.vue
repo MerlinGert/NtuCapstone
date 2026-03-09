@@ -159,7 +159,13 @@ export default {
                   params.threshold,
                   params.timeRange,
                   params.ruleType,
-                  params.checkFundingSource
+                  params.checkFundingSource,
+                  params.volumeThreshold,
+                  params.checkSameSender,
+                  params.checkSameRecipient,
+                  false, // silent
+                  params.enableTxCount,
+                  params.enableTxVolume
               ).then(count => {
                   console.log("CryptoVis: detection complete, count:", count);
                   this.detecting = false;

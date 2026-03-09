@@ -22,7 +22,6 @@ import json
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRANSFER_CSV_PATH = os.path.join(BASE_DIR, "public", "ACT_transfer_before_2024-11-10.csv")
 TRANSFER_STATS_PATH = os.path.join(BASE_DIR, "public", "transfer_network_stats.csv")
-EXCHANGE_WALLETS_PATH = os.path.join(BASE_DIR, "public", "exchange_wallets_list.json")
 ACCOUNT_LABELS_PATH = os.path.join(BASE_DIR, "public", "processed", "transfers", "account_labels.json")
 
 def get_blacklist_addresses() -> set:
@@ -101,7 +100,7 @@ class LinkResponse(BaseModel):
 
 # --- Logic Implementation ---
 
-def process_transfer_network_rule(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int, check_funding_source: bool = False) -> List[DetectedEntity]:
+def process_transfer_network_rule(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int, check_funding_source: bool = False, volume_threshold: float = 0, check_same_sender: bool = False, check_same_recipient: bool = False, enable_tx_count: bool = True, enable_tx_volume: bool = True) -> List[DetectedEntity]:
     """
     Implements transfer-network-based entity detection using pre-aggregated statistics.
     """
@@ -135,12 +134,36 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
             df_transfer = df_transfer[df_transfer['from_owner'].isin(target_set) & df_transfer['to_owner'].isin(target_set)]
         
         for _, row in df_transfer.iterrows():
-            if row['transaction_count'] > threshold:
+            tx_count = row['transaction_count']
+            # Get volume, default to 0 if column missing
+            volume = row.get('total_volume', 0)
+            
+            # Check thresholds (OR logic: either high frequency OR high volume)
+            is_high_frequency = enable_tx_count and tx_count >= threshold
+            is_high_volume = enable_tx_volume and volume_threshold > 0 and volume >= volume_threshold
+            
+            if is_high_frequency or is_high_volume:
                 u, v = row['from_owner'], row['to_owner']
+                
+                reasons = []
+                if is_high_frequency:
+                    reasons.append(f"High frequency transfers ({tx_count} txs)")
+                if is_high_volume:
+                    reasons.append(f"High volume transfers ({volume:.2f} tokens)")
+                
                 if G.has_edge(u, v):
-                    G[u][v]['transfer_count'] = G[u][v].get('transfer_count', 0) + row['transaction_count']
+                    G[u][v]['transfer_count'] = G[u][v].get('transfer_count', 0) + tx_count
+                    
+                    # Merge reasons
+                    current_reasons = G[u][v].get('reasons', [])
+                    if isinstance(current_reasons, list):
+                        # Avoid duplicates
+                        for r in reasons:
+                            if r not in current_reasons:
+                                current_reasons.append(r)
+                        G[u][v]['reasons'] = current_reasons
                 else:
-                    G.add_edge(u, v, transfer_count=row['transaction_count'], reasons=["High frequency transfers"])
+                    G.add_edge(u, v, transfer_count=tx_count, reasons=reasons)
 
         # --- Same Funding Source Logic ---
         if check_funding_source and target_users:
@@ -195,8 +218,7 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
                         else:
                             G.add_edge(hub, peer, reasons=[reason_str])
 
-            # 2. Add edges for direct funding (parent-child)
-            # If the funding source itself is one of the target users, connect them.
+            # Add edges for direct funding (parent-child)
             target_set = set(target_users)
             for user, source in funding_map.items():
                 if source in target_set:
@@ -215,7 +237,82 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
                     else:
                         G.add_edge(source, user, reasons=[reason_str])
 
-        # 4. Find Components
+        # --- Same Sender Logic ---
+        if check_same_sender and target_users:
+            # Check if target users received transfers from the SAME sender within the time range
+            # 1. Filter: to_owner in target_users
+            target_set = set(target_users)
+            df_recv = df[df['to_owner'].isin(target_set)]
+            
+            # 2. Filter blacklist (senders)
+            blacklist = get_blacklist_addresses()
+            if blacklist:
+                df_recv = df_recv[~df_recv['from_owner'].isin(blacklist)]
+            
+            # 3. Group by sender
+            # sender -> list of recipients (who are in target_users)
+            sender_groups = df_recv.groupby('from_owner')['to_owner'].apply(list).to_dict()
+            
+            for sender, recipients in sender_groups.items():
+                # Remove duplicates (if one user received multiple txs from same sender)
+                unique_recipients = list(set(recipients))
+                
+                if len(unique_recipients) > 1:
+                    reason_str = f"Same sender ({sender})"
+                    
+                    # Link all recipients
+                    # Similar to funding source: connect first one to others
+                    hub = unique_recipients[0]
+                    for i in range(1, len(unique_recipients)):
+                        peer = unique_recipients[i]
+                        if G.has_edge(hub, peer):
+                            reasons = G[hub][peer].get('reasons', [])
+                            if isinstance(reasons, list):
+                                # Check duplicate reason
+                                already_exists = any(r.startswith(f"Same sender ({sender})") for r in reasons)
+                                if not already_exists:
+                                    reasons.append(reason_str)
+                                    G[hub][peer]['reasons'] = reasons
+                        else:
+                            G.add_edge(hub, peer, reasons=[reason_str])
+
+        # --- Same Recipient Logic ---
+        if check_same_recipient and target_users:
+            # Check if target users sent transfers to the SAME recipient within the time range
+            # 1. Filter: from_owner in target_users
+            target_set = set(target_users)
+            df_sent = df[df['from_owner'].isin(target_set)]
+            
+            # 2. Filter blacklist (recipients)
+            blacklist = get_blacklist_addresses()
+            if blacklist:
+                df_sent = df_sent[~df_sent['to_owner'].isin(blacklist)]
+                
+            # 3. Group by recipient
+            # recipient -> list of senders (who are in target_users)
+            recipient_groups = df_sent.groupby('to_owner')['from_owner'].apply(list).to_dict()
+            
+            for recipient, senders in recipient_groups.items():
+                unique_senders = list(set(senders))
+                
+                if len(unique_senders) > 1:
+                    reason_str = f"Same recipient ({recipient})"
+                    
+                    # Link all senders
+                    hub = unique_senders[0]
+                    for i in range(1, len(unique_senders)):
+                        peer = unique_senders[i]
+                        if G.has_edge(hub, peer):
+                            reasons = G[hub][peer].get('reasons', [])
+                            if isinstance(reasons, list):
+                                already_exists = any(r.startswith(f"Same recipient ({recipient})") for r in reasons)
+                                if not already_exists:
+                                    reasons.append(reason_str)
+                                    G[hub][peer]['reasons'] = reasons
+                        else:
+                            G.add_edge(hub, peer, reasons=[reason_str])
+
+        # Find connected components and return detected entities
         components = list(nx.connected_components(G))
         
         detected_entities = []
@@ -280,13 +377,22 @@ async def detect_entities(request: DetectionRequest):
         for rule in transfer_network_rules:
             threshold = rule.parameters.get("threshold", 5)
             check_funding_source = rule.parameters.get("check_funding_source", False)
-            # Use request.target_users if available
+            volume_threshold = rule.parameters.get("volume_threshold", 0)
+            check_same_sender = rule.parameters.get("check_same_sender", False)
+            check_same_recipient = rule.parameters.get("check_same_recipient", False)
+            enable_tx_count = rule.parameters.get("enable_tx_count", True)
+            enable_tx_volume = rule.parameters.get("enable_tx_volume", True)
             
             network_entities = process_transfer_network_rule(
                 request.target_users, 
                 request.time_range, 
                 threshold,
-                check_funding_source
+                check_funding_source,
+                volume_threshold,
+                check_same_sender,
+                check_same_recipient,
+                enable_tx_count,
+                enable_tx_volume
             )
             all_detected.extend(network_entities)
 
