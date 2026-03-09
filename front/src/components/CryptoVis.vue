@@ -121,12 +121,11 @@ import { NSelect,NCheckbox,NCard,NLayout,NSwitch,NSpace,NLayoutHeader,NLayoutFoo
 import * as d3 from "d3"
 import HolderView from "./HolderView.vue"
 import TokenDistribution from "./TokenDistribution.vue"
-import ApiTest from "./ApiTest.vue"
 import ControlPanel from "./ControlPanel.vue"
 import CandlestickChart from "./CandlestickChart.vue"
 
 export default {
-  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution, ApiTest, ControlPanel, CandlestickChart},
+  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution, ControlPanel, CandlestickChart},
   data(){
     return {
       klineGranularity: '1D',
