@@ -534,7 +534,7 @@ export default {
                 .data(simulationNodes.filter(n => n.isGroup))
                 .enter().append("g")
                 .attr("class", "group")
-                .attr("transform", d => `translate(${d.x},${d.y})`)
+                .attr("transform", d => `translate(${d.x ?? 0},${d.y ?? 0})`)
                 .call(drag); // Attach drag
                 
             groups.append("circle")
@@ -550,7 +550,7 @@ export default {
                 .data(simulationNodes.filter(n => !n.isGroup))
                 .enter().append("circle")
                 .attr("class", "bubble single")
-                .attr("transform", d => `translate(${d.x},${d.y})`)
+                .attr("transform", d => `translate(${d.x ?? 0},${d.y ?? 0})`)
                 .attr("r", d => d.r)
                 .style("fill", d => color(d.value))
                 .style("opacity", 0.6)
