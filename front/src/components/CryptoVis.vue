@@ -207,7 +207,11 @@ export default {
         console.log("CryptoVis: handleRunManipulationDetection called", params);
         this.detectingManipulation = true;
         if (this.$refs.tokenDistribution) {
-            await this.$refs.tokenDistribution.runManipulationDetection(params.threshold);
+            await this.$refs.tokenDistribution.runManipulationDetection(
+                params.threshold,
+                params.timeWindow,
+                params.checkEntityBased
+            );
         } else {
             console.error("CryptoVis: tokenDistribution ref not found");
         }

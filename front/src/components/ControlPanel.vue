@@ -49,6 +49,14 @@
                         </div>
                     </div>
 
+                    <!-- Funding Source -->
+                    <div style="display: flex; align-items: center; margin-top: 5px;">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
+                            <input type="checkbox" v-model="checkFundingSource">
+                            <span>Same Funding Source</span>
+                        </label>
+                    </div>
+
                     <div style="height: 1px; background: #eee; margin: 2px 0;"></div>
 
                     <!-- Threshold Rules -->
@@ -75,15 +83,9 @@
                     <div style="display: flex; flex-direction: column; gap: 5px;">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                                <input type="checkbox" v-model="checkFundingSource">
-                                <span>Same Funding Source</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
                                 <input type="checkbox" v-model="checkSameSender">
                                 <span>Same Sender</span>
                             </label>
-                        </div>
-                        <div style="display: flex; align-items: center;">
                             <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
                                 <input type="checkbox" v-model="checkSameRecipient">
                                 <span>Same Recipient</span>
@@ -138,6 +140,19 @@
                         <label style="font-size: 12px; font-weight: bold;">Volume Difference Threshold</label>
                         <input type="number" v-model.number="selfTradingThreshold" min="0" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
                         <span style="font-size: 10px; color: #666;">Max difference between buy/sell amounts.</span>
+                    </div>
+                    
+                    <div style="height: 1px; background: #eee; margin: 2px 0;"></div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                         <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" v-model="checkEntityBased">
+                            <span>Entity Based Self Trading</span>
+                        </label>
+                        <div v-if="checkEntityBased" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                             <label style="font-size: 11px; font-weight: bold;">Time Window (min)</label>
+                             <input type="number" v-model.number="entityBasedTimeWindow" min="1" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100px;">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -266,7 +281,9 @@ export default {
             activeLinkSection: 'network', // 'network', 'behavior_sim', 'history'
             loadingLinks: false,
             
-            selfTradingThreshold: 100,
+            selfTradingThreshold: 10,
+            entityBasedTimeWindow: 60,
+            checkEntityBased: true,
             
             // Link Config
             linkThreshold: 1,
@@ -363,12 +380,13 @@ export default {
 
             this.$emit('run-detection', params);
         },
-        async triggerManipulationDetection() {
+        triggerManipulationDetection() {
             // this.loadingManipulation = true; // Controlled by prop now
             console.log("ControlPanel: emitting request-manipulation-detection");
-            
             this.$emit('request-manipulation-detection', {
-                threshold: this.selfTradingThreshold
+                threshold: this.selfTradingThreshold,
+                timeWindow: this.entityBasedTimeWindow,
+                checkEntityBased: this.checkEntityBased
             });
         },
         updateLinks() {

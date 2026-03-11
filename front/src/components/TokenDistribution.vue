@@ -560,12 +560,22 @@ export default {
                 .on("mouseover", (event, d) => {
                     d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#000");
                     const tooltip = this.$refs.tooltip;
-                    tooltip.style.opacity = 1;
                     let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
                     if (d.suspicious) {
-                        content += `<br><span style="color:red">Self-Trading Detected!</span><br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                        content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
+                        if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
+                             content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                             d.suspicious.reasons.forEach(r => {
+                                 content += `<li style="font-size: 10px;">${r}</li>`;
+                             });
+                             content += `</ul>`;
+                        } else {
+                             content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                        }
                     }
                     tooltip.innerHTML = content;
+                    tooltip.style.display = "block";
+                    tooltip.style.opacity = 1;
                     const [x, y] = d3.pointer(event, this.$refs.chart_container);
                     tooltip.style.left = (x + 10) + "px";
                     tooltip.style.top = (y - 10) + "px";
@@ -602,12 +612,22 @@ export default {
                  .on("mouseover", function(event, d) {
                     d3.select(this).style("stroke", d.suspicious ? "#ff0000" : "#000");
                     const tooltip = self.$refs.tooltip;
-                    tooltip.style.opacity = 1;
                     let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
                     if (d.suspicious) {
-                        content += `<br><span style="color:red">Self-Trading Detected!</span><br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                        content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
+                        if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
+                             content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                             d.suspicious.reasons.forEach(r => {
+                                 content += `<li style="font-size: 10px;">${r}</li>`;
+                             });
+                             content += `</ul>`;
+                        } else {
+                             content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                        }
                     }
                     tooltip.innerHTML = content;
+                    tooltip.style.display = "block";
+                    tooltip.style.opacity = 1;
                     const [x, y] = d3.pointer(event, self.$refs.chart_container);
                     tooltip.style.left = (x + 10) + "px";
                     tooltip.style.top = (y - 10) + "px";
@@ -648,8 +668,8 @@ export default {
                 singles.attr("transform", d => `translate(${d.x},${d.y})`);
             });
         },
-        async runManipulationDetection(threshold, isAutoRun = false) {
-            console.log("TokenDistribution: runManipulationDetection called with threshold", threshold, "isAutoRun", isAutoRun);
+        async runManipulationDetection(threshold, timeWindow, checkEntityBased, isAutoRun = false) {
+            console.log("TokenDistribution: runManipulationDetection called with", threshold, timeWindow, checkEntityBased, isAutoRun);
             
             // Get current users from snapshot data
             let users = [];
@@ -661,6 +681,12 @@ export default {
                 console.warn("TokenDistribution: No users to detect manipulation for.");
                 return;
             }
+
+            // Prepare entities if checkEntityBased is true
+            let entities = [];
+            if (checkEntityBased && this.detectedEntities && this.detectedEntities.length > 0) {
+                entities = this.detectedEntities.map(e => e.details.members);
+            }
             
             try {
                 const response = await fetch('/api/manipulation/detect', {
@@ -668,7 +694,10 @@ export default {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         threshold: threshold,
-                        limit_traders: users
+                        limit_traders: users,
+                        time_window: timeWindow,
+                        check_entity_based: checkEntityBased,
+                        entities: entities
                     })
                 });
                 
