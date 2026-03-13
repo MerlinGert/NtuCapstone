@@ -9,6 +9,13 @@
                 <span>{{ scaleFactor }}</span>
             </div>
             <span>Active Users: {{ userCount }}</span>
+            
+            <!-- used by ezio -->
+            <button @click="openSnapshot" style="padding: 3px 6px; cursor: pointer; background-color: #4caf50; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px;">Snapshot</button>
+        </div>
+
+        <div v-if="showSnapshot" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+            <TokenSnapshot :snapshot-data="snapshotPayload" @close="showSnapshot = false" />
         </div>
 
         <!-- Chart -->
@@ -28,9 +35,11 @@
 
 <script>
 import * as d3 from "d3"
+import TokenSnapshot from "./TokenSnapshot.vue"
 
 export default {
     name: "TokenDistribution",
+    components: { TokenSnapshot },
     data() {
         return {
             snapshotData: null,
@@ -54,6 +63,9 @@ export default {
             centerY: 0,
             topPercent: 50,
             suspiciousTraders: []
+            // used by ezio
+            showSnapshot: false,
+            snapshotPayload: null,
         }
     },
     computed: {
@@ -317,6 +329,75 @@ export default {
                 console.error("Error fetching links:", error);
             }
         },
+        
+
+        // added by ezio
+        openSnapshot() {
+            this.snapshotPayload = this.captureSnapshot();
+            this.showSnapshot = true;
+        },
+        captureSnapshot() {
+            const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
+            const nodes = [];
+
+            // Capture singles — 直接读取SVG元素的fill颜色，不再重新计算
+            svg.selectAll(".single").each(function(d) {
+                nodes.push({
+                    id: d.id, name: d.name, value: d.value, r: d.r,
+                    x: d.x, y: d.y, suspicious: d.suspicious || null,
+                    fill: d3.select(this).style("fill"),
+                    type: 'single'
+                });
+            });
+
+            // Capture groups
+            svg.selectAll(".group").each(function(d) {
+                const members = [];
+                d3.select(this).selectAll(".member").each(function(child) {
+                    members.push({
+                        id: child.id, name: child.name, value: child.value, r: child.r,
+                        cx: +d3.select(this).attr("cx"),
+                        cy: +d3.select(this).attr("cy"),
+                        suspicious: child.suspicious || null,
+                        fill: d3.select(this).style("fill")
+                    });
+                });
+                nodes.push({
+                    id: d.id, isGroup: true, r: d.r, x: d.x, y: d.y,
+                    children: members, type: 'group'
+                });
+            });
+
+            // Capture Others ring data
+            const balances = this.snapshotData ? this.snapshotData.balances : null;
+            let othersBalance = 0;
+            let usersBalance = 0;
+            if (balances && balances.users) {
+                othersBalance = balances.users['Others'] || 0;
+                Object.entries(balances.users).forEach(([k, v]) => {
+                    if (k !== 'Others') usersBalance += v;
+                });
+            }
+
+            return {
+                nodes,
+                links: this.currentLinks ? this.currentLinks.map(l => ({
+                    source: l.source.id || l.source,
+                    target: l.target.id || l.target,
+                    weight: l.weight
+                })) : [],
+                width: this.svgWidth,
+                height: this.svgHeight,
+                centerX: this.centerX,
+                centerY: this.centerY,
+                othersBalance,
+                usersBalance,
+                scaleFactor: this.scaleFactor,
+                time: this.displayTime
+            };
+        },
+
+
         drawChart() {
             if (!this.snapshotData || this.svgWidth === 0) return;
 
