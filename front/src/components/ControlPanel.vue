@@ -35,7 +35,10 @@
             <!-- Transfer Network Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
                 <div @click="toggleSection('transfer')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Network Based</span>
+                    <div style="display:flex; align-items:center; gap:5px;" @click.stop>
+                        <input type="checkbox" v-model="enableNetworkBased">
+                        <span>Network Based</span>
+                    </div>
                     <span>{{ activeSection === 'transfer' ? '▼' : '►' }}</span>
                 </div>
                 <div v-if="activeSection === 'transfer'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
@@ -98,11 +101,82 @@
             <!-- Behavior Similarity Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
                 <div @click="toggleSection('behavior')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Behavior Similarity Based</span>
+                    <div style="display:flex; align-items:center; gap:5px;" @click.stop>
+                        <input type="checkbox" v-model="enableBehaviorBased">
+                        <span>Behavior Similarity Based</span>
+                    </div>
                     <span>{{ activeSection === 'behavior' ? '▼' : '►' }}</span>
                 </div>
                 <div v-if="activeSection === 'behavior'" style="padding: 10px;">
-                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <!-- Rule 3 -->
+                        <div style="display: flex; flex-direction: column; gap: 5px; padding-bottom: 5px; border-bottom: 1px dashed #eee;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" v-model="enableRule3">
+                                <span style="font-weight: bold; font-size: 12px;">Similar Trading Sequence</span>
+                            </div>
+                            <div v-if="enableRule3" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Max Time Diff (min):</label>
+                                    <input type="number" v-model.number="rule3MaxTimeDiff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Min Seq Length:</label>
+                                    <input type="number" v-model.number="rule3MinLength" min="2" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Sequence Rep:</label>
+                                    <select v-model="rule3SequenceRep" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 100px; font-size: 11px;">
+                                        <option value="action_only">Action Only</option>
+                                        <option value="action+amount">Action + Amount</option>
+                                        <option value="action+price">Action + Price</option>
+                                        <option value="action+amount+price">Action + Amt + Price</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rule 4 -->
+                        <div style="display: flex; flex-direction: column; gap: 5px; padding-bottom: 5px; border-bottom: 1px dashed #eee;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" v-model="enableRule4">
+                                <span style="font-weight: bold; font-size: 12px;">Similar Balance Sequence</span>
+                            </div>
+                            <div v-if="enableRule4" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Similarity Threshold:</label>
+                                    <input type="number" v-model.number="rule4Similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Time Bin:</label>
+                                    <input type="text" v-model="rule4TimeBin" placeholder="e.g. 1h" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rule 5 -->
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" v-model="enableRule5">
+                                <span style="font-weight: bold; font-size: 12px;">Similar Earning Sequence</span>
+                            </div>
+                            <div v-if="enableRule5" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Similarity Threshold:</label>
+                                    <input type="number" v-model.number="rule5Similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Time Bin:</label>
+                                    <input type="text" v-model="rule5TimeBin" placeholder="e.g. 1h" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 10px; padding-top: 5px; border-top: 1px solid #eee;">
+                            <label style="font-size: 11px; color: #666;">Data Loading Window (hours):</label>
+                            <input type="number" v-model.number="behaviorTimeWindow" min="1" step="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -288,7 +362,22 @@ export default {
             // Link Config
             linkThreshold: 1,
             linkStartTime: "",
-            linkEndTime: ""
+            linkEndTime: "",
+
+            // Behavior Config
+            enableNetworkBased: true,
+            enableBehaviorBased: true,
+            enableRule3: true,
+            rule3MaxTimeDiff: 2,
+            rule3MinLength: 5,
+            rule3SequenceRep: "action+amount",
+            enableRule4: false,
+            rule4Similarity: 0.9,
+            rule4TimeBin: "1h",
+            enableRule5: false,
+            rule5Similarity: 0.9,
+            rule5TimeBin: "1h",
+            behaviorTimeWindow: 24.0,
         }
     },
     mounted() {
@@ -343,7 +432,27 @@ export default {
                 checkSameSender: this.checkSameSender,
                 checkSameRecipient: this.checkSameRecipient,
                 timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
-                ruleType: "transfer-network"
+                ruleType: "transfer-network",
+                // Behavior Params
+                enableNetworkBased: this.enableNetworkBased,
+                enableBehaviorBased: this.enableBehaviorBased,
+                behaviorTimeWindow: this.behaviorTimeWindow,
+                enableRule3: this.enableRule3,
+                rule3Params: {
+                    max_time_diff_minutes: this.rule3MaxTimeDiff,
+                    min_contiguous_length: this.rule3MinLength,
+                    sequence_representation: this.rule3SequenceRep
+                },
+                enableRule4: this.enableRule4,
+                rule4Params: {
+                    similarity: this.rule4Similarity,
+                    time_bin: this.rule4TimeBin
+                },
+                enableRule5: this.enableRule5,
+                rule5Params: {
+                    similarity: this.rule5Similarity,
+                    time_bin: this.rule5TimeBin
+                }
             };
         },
         getLinkParams() {

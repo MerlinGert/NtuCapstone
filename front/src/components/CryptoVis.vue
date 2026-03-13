@@ -14,6 +14,7 @@
             style="width:100%;height:100%;"
             class="panel-card"
             header-style="text-align:left;height:50px;font-size:1.4em;"
+            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
             <template #header>
                 <span class="card-header-text">Control Panel</span>
@@ -56,7 +57,7 @@
             <template #header>
                 <span class="card-header-text">Entity Details</span>
             </template>
-            <HolderView />
+
         </n-card>
     </div>
 
@@ -165,7 +166,16 @@ export default {
                   params.checkSameRecipient,
                   false, // silent
                   params.enableTxCount,
-                  params.enableTxVolume
+                  params.enableTxVolume,
+                  params.enableNetworkBased,
+                  params.enableBehaviorBased,
+                  params.behaviorTimeWindow,
+                  params.enableRule3,
+                  params.enableRule4,
+                  params.enableRule5,
+                  params.rule3Params,
+                  params.rule4Params,
+                  params.rule5Params
               ).then(count => {
                   console.log("CryptoVis: detection complete, count:", count);
                   this.detecting = false;

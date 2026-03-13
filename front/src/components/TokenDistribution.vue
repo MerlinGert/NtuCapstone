@@ -70,8 +70,8 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
-        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, volumeThreshold = 0, checkSameSender = false, checkSameRecipient = false, silent = false, enableTxCount = true, enableTxVolume = true) {
-            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType, checkFundingSource, volumeThreshold, checkSameSender, checkSameRecipient, enableTxCount, enableTxVolume);
+        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, volumeThreshold = 0, checkSameSender = false, checkSameRecipient = false, silent = false, enableTxCount = true, enableTxVolume = true, enableNetworkBased = true, enableBehaviorBased = true, behaviorTimeWindow = 1.0, enableRule3 = true, enableRule4 = true, enableRule5 = true, rule3Params = {}, rule4Params = {}, rule5Params = {}) {
+            console.log("TokenDistribution: runEntityDetection called with params");
             if (!this.snapshotData || !this.snapshotData.balances) {
                  console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
                  this.$emit('detection-complete', null);
@@ -81,7 +81,9 @@ export default {
             // Extract user list from current data
             let users = [];
             if (this.snapshotData.balances && this.snapshotData.balances.users) {
-                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
+                users = Object.entries(this.snapshotData.balances.users)
+                    .filter(([u, bal]) => u !== 'Others' && bal > 0)
+                    .map(([u, _]) => u);
             }
             
             console.log("TokenDistribution: Found", users.length, "users");
@@ -99,6 +101,43 @@ export default {
             this.lastDetectionTimeRange = timeRange;
             console.log(`Sending ${users.length} users for detection...`);
 
+            // Construct rules
+            const rules = [];
+
+            // 1. Transfer Network Rule
+            if (enableNetworkBased) {
+                rules.push({
+                    rule_type: "transfer-network",
+                    parameters: {
+                        threshold: threshold, // Detect if > threshold transactions
+                        volume_threshold: volumeThreshold,
+                        check_funding_source: checkFundingSource,
+                        check_same_sender: checkSameSender,
+                        check_same_recipient: checkSameRecipient,
+                        enable_tx_count: enableTxCount,
+                        enable_tx_volume: enableTxVolume
+                    },
+                    enabled: true
+                });
+            }
+
+            // 2. Behavior Similarity Rule
+            if (enableBehaviorBased) {
+                rules.push({
+                    rule_type: "behavior-similarity",
+                    parameters: {
+                        time_window: behaviorTimeWindow,
+                        enable_rule3: enableRule3,
+                        enable_rule4: enableRule4,
+                        enable_rule5: enableRule5,
+                        rule3_params: rule3Params,
+                        rule4_params: rule4Params,
+                        rule5_params: rule5Params
+                    },
+                    enabled: true
+                });
+            }
+
             // Call backend API
             return fetch('/api/entity/detect', {
                 method: 'POST',
@@ -108,21 +147,7 @@ export default {
                 body: JSON.stringify({
                     target_users: users,
                     time_range: timeRange,
-                    rules: [
-                        {
-                            rule_type: ruleType,
-                            parameters: {
-                                threshold: threshold, // Detect if > threshold transactions
-                                volume_threshold: volumeThreshold,
-                                check_funding_source: checkFundingSource,
-                                check_same_sender: checkSameSender,
-                                check_same_recipient: checkSameRecipient,
-                                enable_tx_count: enableTxCount,
-                                enable_tx_volume: enableTxVolume
-                            },
-                            enabled: true
-                        }
-                    ]
+                    rules: rules
                 })
             })
             .then(response => response.json())
@@ -232,8 +257,34 @@ export default {
                     
                     // Auto-load detection and links after initial render
                     // Run both concurrently and wait for both to finish before drawing
+                    
+                    const p = detectionParams || {};
+                    const thresholdToUse = p.threshold || this.lastDetectionThreshold || 2;
+                    const timeRangeToUse = p.timeRange || this.lastDetectionTimeRange || {};
+                    const volumeToUse = p.volumeThreshold || this.lastDetectionVolumeThreshold || 0;
+                    
                     await Promise.all([
-                        this.runEntityDetection(this.lastDetectionThreshold || 2, this.lastDetectionTimeRange || {}, 'transfer-network', true, this.lastDetectionVolumeThreshold || 0, true),
+                        this.runEntityDetection(
+                            thresholdToUse, 
+                            timeRangeToUse, 
+                            'transfer-network', 
+                            p.checkFundingSource !== undefined ? p.checkFundingSource : false,
+                            volumeToUse,
+                            p.checkSameSender !== undefined ? p.checkSameSender : false,
+                            p.checkSameRecipient !== undefined ? p.checkSameRecipient : false,
+                            true, // silent
+                            p.enableTxCount !== undefined ? p.enableTxCount : true,
+                            p.enableTxVolume !== undefined ? p.enableTxVolume : true,
+                            p.enableNetworkBased !== undefined ? p.enableNetworkBased : true,
+                            p.enableBehaviorBased !== undefined ? p.enableBehaviorBased : true,
+                            p.behaviorTimeWindow !== undefined ? p.behaviorTimeWindow : 1.0,
+                            p.enableRule3 !== undefined ? p.enableRule3 : true,
+                            p.enableRule4 !== undefined ? p.enableRule4 : true,
+                            p.enableRule5 !== undefined ? p.enableRule5 : true,
+                            p.rule3Params || {},
+                            p.rule4Params || {},
+                            p.rule5Params || {}
+                        ),
                         this.updateLinks(this.lastLinkThreshold || 1, this.lastLinkTimeRange || {}, true),
                         // Run manipulation detection with default threshold (100) or last used
                         this.runManipulationDetection(100, true) // Pass true for isAutoRun
@@ -377,7 +428,7 @@ export default {
                 // Map user -> group
                 const userGroupMap = new Map();
                 this.detectedEntities.forEach(entity => {
-                    if (entity.details && entity.details.members) {
+                    if (entity.details && entity.details.members && entity.details.members.length > 1) {
                         entity.details.members.forEach(memberId => {
                             userGroupMap.set(memberId, entity);
                         });
@@ -391,6 +442,14 @@ export default {
                 entries.forEach(node => {
                     if (userGroupMap.has(node.id)) {
                         const entity = userGroupMap.get(node.id);
+                        
+                        // Attach detection info to the node
+                        node.detectionInfo = {
+                            entityId: entity.entity_id,
+                            reason: entity.reason, // List[str]
+                            confidence: entity.confidence
+                        };
+
                         if (!groupMap.has(entity.entity_id)) {
                             groupMap.set(entity.entity_id, []);
                         }
@@ -401,29 +460,38 @@ export default {
                     }
                 });
 
-                // Process Groups
-                const groupNodes = [];
+                // Post-process groups: Dismantle groups with < 2 members
+                const finalGroupNodes = [];
                 groupMap.forEach((members, entityId) => {
-                    // Use d3.packSiblings to pack members tightly
-                    // This adds x, y to members relative to (0,0)
-                    d3.packSiblings(members);
-                    
-                    // Calculate enclosing circle
-                    const enclose = d3.packEnclose(members);
-                    
-                    // Create Super Node
-                    const groupNode = {
-                        id: entityId,
-                        isGroup: true,
-                        r: enclose.r + 5, // Add padding
-                        value: members.reduce((sum, m) => sum + m.value, 0),
-                        children: members,
-                        enclose: enclose // Store enclosure info for offset calculation
-                    };
-                    groupNodes.push(groupNode);
+                    if (members.length > 1) {
+                         // Use d3.packSiblings to pack members tightly
+                        // This adds x, y to members relative to (0,0)
+                        d3.packSiblings(members);
+                        
+                        // Calculate enclosing circle
+                        const enclose = d3.packEnclose(members);
+                        
+                        // Create Super Node
+                        const groupNode = {
+                            id: entityId,
+                            isGroup: true,
+                            r: enclose.r + 5, // Add padding
+                            value: members.reduce((sum, m) => sum + m.value, 0),
+                            children: members,
+                            enclose: enclose // Store enclosure info for offset calculation
+                        };
+                        finalGroupNodes.push(groupNode);
+                    } else {
+                        // Dismantle single-node groups
+                        members.forEach(m => {
+                            m.detectionInfo = null; // Clear detection info as it's not shown as group
+                            independentNodes.push(m);
+                            finalNodes.push(m);
+                        });
+                    }
                 });
 
-                simulationNodes = [...independentNodes, ...groupNodes];
+                simulationNodes = [...independentNodes, ...finalGroupNodes];
             } else {
                 // No grouping
                 simulationNodes = entries;
@@ -573,6 +641,18 @@ export default {
                              content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
                         }
                     }
+
+                    if (d.detectionInfo) {
+                        content += `<br><strong style="color:orange">Entity Group Detected</strong>`;
+                        if (d.detectionInfo.reason && d.detectionInfo.reason.length > 0) {
+                             content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                             d.detectionInfo.reason.forEach(r => {
+                                 content += `<li style="font-size: 10px;">${r}</li>`;
+                             });
+                             content += `</ul>`;
+                        }
+                    }
+
                     tooltip.innerHTML = content;
                     tooltip.style.display = "block";
                     tooltip.style.opacity = 1;
@@ -614,18 +694,30 @@ export default {
                     const tooltip = self.$refs.tooltip;
                     let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
                     if (d.suspicious) {
-                        content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
-                        if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
-                             content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
-                             d.suspicious.reasons.forEach(r => {
-                                 content += `<li style="font-size: 10px;">${r}</li>`;
-                             });
-                             content += `</ul>`;
-                        } else {
-                             content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                            content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
+                            if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
+                                 content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                                 d.suspicious.reasons.forEach(r => {
+                                     content += `<li style="font-size: 10px;">${r}</li>`;
+                                 });
+                                 content += `</ul>`;
+                            } else {
+                                 content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                            }
                         }
-                    }
-                    tooltip.innerHTML = content;
+
+                        if (d.detectionInfo) {
+                            content += `<br><strong style="color:orange">Entity Group Detected</strong>`;
+                            if (d.detectionInfo.reason && d.detectionInfo.reason.length > 0) {
+                                 content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                                 d.detectionInfo.reason.forEach(r => {
+                                     content += `<li style="font-size: 10px;">${r}</li>`;
+                                 });
+                                 content += `</ul>`;
+                            }
+                        }
+
+                        tooltip.innerHTML = content;
                     tooltip.style.display = "block";
                     tooltip.style.opacity = 1;
                     const [x, y] = d3.pointer(event, self.$refs.chart_container);

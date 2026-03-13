@@ -6,6 +6,11 @@ import time
 import pandas as pd
 import networkx as nx
 import os
+import behavior_detection
+from behavior_detection import (
+    process_rule3, process_rule4, process_rule5, edges_to_groups,
+    TradingSequenceParams, BalanceSequenceParams, EarningSequenceParams
+)
 
 # Create a router instance
 router = APIRouter(
@@ -72,7 +77,7 @@ class DetectedEntity(BaseModel):
     """
     entity_id: str
     confidence: float
-    reason: str
+    reason: List[str]
     details: Dict[str, Any]
 
 class DetectionResponse(BaseModel):
@@ -100,13 +105,13 @@ class LinkResponse(BaseModel):
 
 # --- Logic Implementation ---
 
-def process_transfer_network_rule(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int, check_funding_source: bool = False, volume_threshold: float = 0, check_same_sender: bool = False, check_same_recipient: bool = False, enable_tx_count: bool = True, enable_tx_volume: bool = True) -> List[DetectedEntity]:
+def build_transfer_network_graph(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int, check_funding_source: bool = False, volume_threshold: float = 0, check_same_sender: bool = False, check_same_recipient: bool = False, enable_tx_count: bool = True, enable_tx_volume: bool = True) -> nx.Graph:
     """
-    Implements transfer-network-based entity detection using pre-aggregated statistics.
+    Builds a NetworkX graph based on transfer network rules.
     """
     if not os.path.exists(TRANSFER_STATS_PATH):
         print(f"Warning: Transfer stats file not found at {TRANSFER_STATS_PATH}. Please run precompute_transfer_stats.py first.")
-        return []
+        return nx.Graph()
 
     try:
         # 1. Load Pre-aggregated Stats
@@ -311,6 +316,22 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
                                     G[hub][peer]['reasons'] = reasons
                         else:
                             G.add_edge(hub, peer, reasons=[reason_str])
+        
+        return G
+
+    except Exception as e:
+        print(f"Error in transfer network graph build: {e}")
+        import traceback
+        traceback.print_exc()
+        return nx.Graph()
+
+
+def process_transfer_network_rule(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int, check_funding_source: bool = False, volume_threshold: float = 0, check_same_sender: bool = False, check_same_recipient: bool = False, enable_tx_count: bool = True, enable_tx_volume: bool = True) -> List[DetectedEntity]:
+    """
+    Implements transfer-network-based entity detection using pre-aggregated statistics.
+    """
+    try:
+        G = build_transfer_network_graph(target_users, time_range, threshold, check_funding_source, volume_threshold, check_same_sender, check_same_recipient, enable_tx_count, enable_tx_volume)
 
         # Find connected components and return detected entities
         components = list(nx.connected_components(G))
@@ -331,17 +352,13 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
                     for r in edge_reasons:
                         reasons_set.add(r)
                 
-                # Format reasons point by point
-                formatted_reasons = []
-                for idx, r in enumerate(sorted(reasons_set), 1):
-                    formatted_reasons.append(f"{idx}. {r}")
-                
-                reason_text = "\n".join(formatted_reasons) if formatted_reasons else "Connected via network analysis"
+                # Format reasons
+                final_reasons = sorted(list(reasons_set)) if reasons_set else ["Connected via network analysis"]
                 
                 detected_entities.append(DetectedEntity(
                     entity_id=f"entity_group_{i}_{int(time.time())}",
                     confidence=0.8, # Simplified confidence
-                    reason=reason_text,
+                    reason=final_reasons,
                     details={
                         "members": members,
                         "total_transactions": int(total_txs),
@@ -368,12 +385,17 @@ async def detect_entities(request: DetectionRequest):
     try:
         start_time = time.time()
         
-        all_detected = []
+        # Main graph for merging
+        G_master = nx.Graph()
+        
+        # Target set for strict filtering
+        target_set = set(request.target_users) if request.target_users else None
         
         # Separate rules
         transfer_network_rules = [r for r in request.rules if r.rule_type == "transfer-network" and r.enabled]
+        behavior_similarity_rules = [r for r in request.rules if r.rule_type == "behavior-similarity" and r.enabled]
         
-        # 1. Process Transfer Network Rules (Batch process)
+        # 1. Process Transfer Network Rules
         for rule in transfer_network_rules:
             threshold = rule.parameters.get("threshold", 5)
             check_funding_source = rule.parameters.get("check_funding_source", False)
@@ -383,7 +405,7 @@ async def detect_entities(request: DetectionRequest):
             enable_tx_count = rule.parameters.get("enable_tx_count", True)
             enable_tx_volume = rule.parameters.get("enable_tx_volume", True)
             
-            network_entities = process_transfer_network_rule(
+            G_rule = build_transfer_network_graph(
                 request.target_users, 
                 request.time_range, 
                 threshold,
@@ -394,11 +416,135 @@ async def detect_entities(request: DetectionRequest):
                 enable_tx_count,
                 enable_tx_volume
             )
-            all_detected.extend(network_entities)
+            
+            # Merge into G_master
+            for u, v, d in G_rule.edges(data=True):
+                if G_master.has_edge(u, v):
+                    # Merge attributes
+                    G_master[u][v]['transfer_count'] = G_master[u][v].get('transfer_count', 0) + d.get('transfer_count', 0)
+                    # Merge reasons
+                    master_reasons = G_master[u][v].get('reasons', [])
+                    new_reasons = d.get('reasons', [])
+                    for r in new_reasons:
+                        if r not in master_reasons:
+                            master_reasons.append(r)
+                    G_master[u][v]['reasons'] = master_reasons
+                else:
+                    G_master.add_edge(u, v, **d)
+
+        # 2. Process Behavior Similarity Rules
+        current_edges = []
+        for rule in behavior_similarity_rules:
+            # Extract params
+            params = rule.parameters
+            time_window = params.get("time_window", 1.0)
+            enable_rule3 = params.get("enable_rule3", True)
+            enable_rule4 = params.get("enable_rule4", True)
+            enable_rule5 = params.get("enable_rule5", True)
+            
+            # Extract sub-params
+            rule3_params = params.get("rule3_params", {})
+            rule4_params = params.get("rule4_params", {})
+            rule5_params = params.get("rule5_params", {})
+            
+            # Rule 3
+            if enable_rule3:
+                p3_args = {"enable": True, "time_window": time_window}
+                p3_args.update(rule3_params)
+                try:
+                    p3 = TradingSequenceParams(**p3_args)
+                    current_edges.extend(process_rule3(request.target_users, request.time_range, p3))
+                except Exception as e:
+                    print(f"Error in Rule3: {e}")
+            
+            # Rule 4
+            if enable_rule4:
+                p4_args = {"enable": True, "time_window": time_window}
+                p4_args.update(rule4_params)
+                try:
+                    p4 = BalanceSequenceParams(**p4_args)
+                    current_edges.extend(process_rule4(request.target_users, request.time_range, p4))
+                except Exception as e:
+                    print(f"Error in Rule4: {e}")
+            
+            # Rule 5
+            if enable_rule5:
+                p5_args = {"enable": True, "time_window": time_window}
+                p5_args.update(rule5_params)
+                try:
+                    p5 = EarningSequenceParams(**p5_args)
+                    current_edges.extend(process_rule5(request.target_users, request.time_range, p5))
+                except Exception as e:
+                    print(f"Error in Rule5: {e}")
+
+        # Add behavior edges to G_master
+        for edge in current_edges:
+            u, v = edge.source, edge.target
+            sim = edge.similarity
+            rule_name = edge.rule
+            details = edge.details
+            
+            reason_str = f"Behavior Similarity ({rule_name}, sim={sim})"
+            
+            if G_master.has_edge(u, v):
+                 master_reasons = G_master[u][v].get('reasons', [])
+                 if reason_str not in master_reasons:
+                     master_reasons.append(reason_str)
+                 G_master[u][v]['reasons'] = master_reasons
+                 
+                 master_details = G_master[u][v].get('behavior_details', [])
+                 master_details.append(details)
+                 G_master[u][v]['behavior_details'] = master_details
+            else:
+                 G_master.add_edge(u, v, reasons=[reason_str], behavior_details=[details])
+
+        # 3. Find Components (Merged Entities)
+        # Remove self-loops to ensure no single-node entities from self-edges
+        G_master.remove_edges_from(nx.selfloop_edges(G_master))
+        
+        components = list(nx.connected_components(G_master))
+        all_detected = []
+        
+        for i, comp in enumerate(components):
+            # Strict filtering:
+            # 1. Must have > 1 members
+            # 2. All members must be in target_users (if provided)
+            
+            members = list(comp)
+            if target_set:
+                members = [m for m in members if m in target_set]
+            
+            if len(members) > 1:
+                subgraph = G_master.subgraph(members)
+                
+                reasons_set = set()
+                total_txs = 0
+                behavior_details_list = []
+                
+                for u, v, d in subgraph.edges(data=True):
+                    total_txs += d.get('transfer_count', 0)
+                    for r in d.get('reasons', []):
+                        reasons_set.add(r)
+                    if 'behavior_details' in d:
+                        behavior_details_list.extend(d['behavior_details'])
+                
+                final_reasons = sorted(list(reasons_set)) if reasons_set else ["Connected via network analysis"]
+                
+                all_detected.append(DetectedEntity(
+                    entity_id=f"merged_entity_{i}_{int(time.time())}",
+                    confidence=0.8,
+                    reason=final_reasons,
+                    details={
+                        "members": members,
+                        "total_transactions": int(total_txs),
+                        "member_count": len(members),
+                        "behavior_details": behavior_details_list
+                    }
+                ))
 
         execution_time = time.time() - start_time
         
-        # 2. Return Results
+        # Return Results
         return DetectionResponse(
             status="success",
             processed_count=len(request.target_users) if request.target_users else 0,
@@ -410,7 +556,18 @@ async def detect_entities(request: DetectionRequest):
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error in detect_entities: {e}")
+        import traceback
+        traceback.print_exc()
+        return DetectionResponse(
+            status="error",
+            processed_count=0,
+            detected_entities=[],
+            metadata={
+                "error": str(e),
+                "execution_time_seconds": time.time() - start_time if 'start_time' in locals() else 0,
+            }
+        )
 
 def process_transfer_network_links(target_users: Optional[List[str]], time_range: Optional[Dict[str, str]], threshold: int) -> List[Dict[str, Any]]:
     if not os.path.exists(TRANSFER_STATS_PATH):

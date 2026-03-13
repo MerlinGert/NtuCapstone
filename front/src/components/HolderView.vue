@@ -53,7 +53,7 @@ export default {
         },
         async loadData() {
             try {
-                const response = await fetch('/processed/transfers/top_holders_summary.json');
+                const response = await fetch('/processed/transfers/top_holders_history.json');
                 this.allData = await response.json();
                 
                 // Prepare options for select
