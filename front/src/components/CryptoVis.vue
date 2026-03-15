@@ -120,13 +120,12 @@
 <script>
 import { NSelect,NCheckbox,NCard,NLayout,NSwitch,NSpace,NLayoutHeader,NLayoutFooter,NLayoutContent} from "naive-ui"
 import * as d3 from "d3"
-import HolderView from "./HolderView.vue"
 import TokenDistribution from "./TokenDistribution.vue"
 import ControlPanel from "./ControlPanel.vue"
 import CandlestickChart from "./CandlestickChart.vue"
 
 export default {
-  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution, ControlPanel, CandlestickChart},
+  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, TokenDistribution, ControlPanel, CandlestickChart},
   data(){
     return {
       klineGranularity: '1D',
@@ -205,10 +204,7 @@ export default {
     handleUpdateLinks(params) {
       console.log("CryptoVis: handleUpdateLinks called", params);
       if (this.$refs.tokenDistribution) {
-          this.$refs.tokenDistribution.updateLinks(
-              params.threshold,
-              params.timeRange
-          );
+          this.$refs.tokenDistribution.updateLinks(params);
       } else {
           console.error("CryptoVis: tokenDistribution ref not found");
       }
@@ -243,14 +239,14 @@ export default {
          }
          
          // Only alert if manual trigger (not auto run)
-         if (!data.isAutoRun) {
-             let message = `Detected ${data.count} suspicious traders.`;
-             if (data.saved_file) {
-                 message += `\nResults saved to: public/manipulation_results/${data.saved_file}`;
-                 console.log(`Results saved to server file: ${data.saved_file}`);
-             }
-             alert(message);
-         } else {
+        if (!data.isAutoRun) {
+            let message = `Detected ${data.count} suspicious traders.`;
+            if (data.saved_file) {
+                message += `\nResults saved to: public/manipulation_results/${data.saved_file}`;
+                console.log(`Results saved to server file: ${data.saved_file}`);
+            }
+            // alert(message);
+        } else {
              console.log(`Auto-detected ${data.count} suspicious traders.`);
              if (data.saved_file) {
                  console.log(`Results saved to server file: ${data.saved_file}`);

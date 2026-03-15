@@ -216,10 +216,7 @@ export default {
                 this.lastDetectionThreshold = detectionParams.threshold;
                 this.lastDetectionTimeRange = detectionParams.timeRange || {};
             }
-            if (linkParams) {
-                this.lastLinkThreshold = linkParams.threshold;
-                this.lastLinkTimeRange = linkParams.timeRange || {};
-            }
+            // linkParams will be handled in updateLinks
 
             try {
                 const response = await fetch('/api/snapshot/process', {
@@ -263,6 +260,12 @@ export default {
                     const timeRangeToUse = p.timeRange || this.lastDetectionTimeRange || {};
                     const volumeToUse = p.volumeThreshold || this.lastDetectionVolumeThreshold || 0;
                     
+                    // Prepare link params
+                    const linkP = linkParams || {
+                        threshold: this.lastLinkThreshold || 1,
+                        timeRange: this.lastLinkTimeRange || {}
+                    };
+
                     await Promise.all([
                         this.runEntityDetection(
                             thresholdToUse, 
@@ -276,16 +279,16 @@ export default {
                             p.enableTxCount !== undefined ? p.enableTxCount : true,
                             p.enableTxVolume !== undefined ? p.enableTxVolume : true,
                             p.enableNetworkBased !== undefined ? p.enableNetworkBased : true,
-                            p.enableBehaviorBased !== undefined ? p.enableBehaviorBased : true,
+                            p.enableBehaviorBased !== undefined ? p.enableBehaviorBased : false,
                             p.behaviorTimeWindow !== undefined ? p.behaviorTimeWindow : 1.0,
                             p.enableRule3 !== undefined ? p.enableRule3 : true,
-                            p.enableRule4 !== undefined ? p.enableRule4 : true,
-                            p.enableRule5 !== undefined ? p.enableRule5 : true,
+                            p.enableRule4 !== undefined ? p.enableRule4 : false,
+                            p.enableRule5 !== undefined ? p.enableRule5 : false,
                             p.rule3Params || {},
                             p.rule4Params || {},
                             p.rule5Params || {}
                         ),
-                        this.updateLinks(this.lastLinkThreshold || 1, this.lastLinkTimeRange || {}, true),
+                        this.updateLinks(linkP, true),
                         // Run manipulation detection with default threshold (100) or last used
                         this.runManipulationDetection(100, true) // Pass true for isAutoRun
                     ]);
@@ -314,13 +317,8 @@ export default {
                 this.drawChart();
             }
         },
-        async updateLinks(threshold, timeRange, silent = false) {
-            console.log("TokenDistribution: updateLinks called", threshold, timeRange);
-
-            // Update topPercent if threshold is provided
-            if (threshold) {
-                this.topPercent = threshold;
-            }
+        async updateLinks(linkParams, silent = false) {
+            console.log("TokenDistribution: updateLinks called", linkParams);
 
             if (!this.snapshotData || !this.snapshotData.balances) {
                 console.warn("No snapshot data available.");
@@ -329,7 +327,9 @@ export default {
 
             let users = [];
             if (this.snapshotData.balances && this.snapshotData.balances.users) {
-                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
+                users = Object.entries(this.snapshotData.balances.users)
+                    .filter(([u, bal]) => u !== 'Others' && bal > 0)
+                    .map(([u, _]) => u);
             }
 
             if (users.length === 0) {
@@ -337,24 +337,73 @@ export default {
                 return;
             }
 
+            // Destructure params with defaults
+            const p = linkParams || {};
+            const threshold = p.threshold !== undefined ? p.threshold : 1;
+            const timeRange = p.timeRange || {};
+            const enableNetworkBased = p.enableNetworkBased !== undefined ? p.enableNetworkBased : true;
+            const enableBehaviorBased = p.enableBehaviorBased !== undefined ? p.enableBehaviorBased : true;
+
             this.lastLinkThreshold = threshold;
             this.lastLinkTimeRange = timeRange;
 
+            // Construct rules
+            const rules = [];
+
+            // 1. Transfer Network Rule
+            if (enableNetworkBased) {
+                rules.push({
+                    rule_type: "transfer-network",
+                    parameters: {
+                        threshold: threshold,
+                        volume_threshold: p.volumeThreshold || 0,
+                        check_funding_source: p.checkFundingSource || false,
+                        check_same_sender: p.checkSameSender || false,
+                        check_same_recipient: p.checkSameRecipient || false,
+                        enable_tx_count: p.enableTxCount !== undefined ? p.enableTxCount : true,
+                        enable_tx_volume: p.enableTxVolume !== undefined ? p.enableTxVolume : true
+                    },
+                    enabled: true
+                });
+            }
+
+            // 2. Behavior Similarity Rule
+            if (enableBehaviorBased) {
+                rules.push({
+                    rule_type: "behavior-similarity",
+                    parameters: {
+                        time_window: p.behaviorTimeWindow || 1.0,
+                        enable_rule3: p.enableRule3 !== undefined ? p.enableRule3 : true,
+                        enable_rule4: p.enableRule4 !== undefined ? p.enableRule4 : false,
+                        enable_rule5: p.enableRule5 !== undefined ? p.enableRule5 : false,
+                        rule3_params: p.rule3Params || {},
+                        rule4_params: p.rule4Params || {},
+                        rule5_params: p.rule5Params || {}
+                    },
+                    enabled: true
+                });
+            }
+
             try {
+                console.log("TokenDistribution: Sending link request with rules:", JSON.stringify(rules, null, 2));
                 const response = await fetch('/api/entity/links', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         target_users: users,
                         time_range: timeRange,
-                        threshold: threshold
+                        rules: rules
                     })
                 });
 
                 if (!response.ok) throw new Error("Failed to fetch links");
                 
                 const data = await response.json();
-                console.log("Links received:", data.links);
+                console.log("Links received:", data.links ? data.links.length : 0);
+                if (data.links && data.links.length > 0) {
+                     const behaviorLinks = data.links.filter(l => l.reasons && l.reasons.some(r => r.includes("Behavior") || r.includes("Sequence")));
+                     console.log(`Behavior-based links count: ${behaviorLinks.length}`);
+                }
                 this.currentLinks = data.links || [];
                 
                 // If not silent (user triggered), redraw immediately. 
@@ -544,23 +593,42 @@ export default {
                 g.children.forEach(c => userToSimNode.set(c.id, g)); // Map member to GROUP
             });
 
+            // Map user ID to member node for internal links
+            const userToMemberNode = new Map();
+            entries.forEach(d => userToMemberNode.set(d.id, d));
+
             if (this.currentLinks && this.currentLinks.length > 0) {
                 this.currentLinks.forEach(link => {
                     const sourceNode = userToSimNode.get(link.source);
                     const targetNode = userToSimNode.get(link.target);
                     
-                    if (sourceNode && targetNode && sourceNode !== targetNode) {
-                        // Link between different simulation bodies (Group-Group, Group-Single, Single-Single)
-                        // Create key for link aggregation
-                        const key = `${sourceNode.id}-${targetNode.id}`;
-                        if (!simulationLinkMap.has(key)) {
-                            simulationLinkMap.set(key, { 
-                                source: sourceNode.id, 
-                                target: targetNode.id, 
-                                weight: 0 
+                    if (sourceNode && targetNode) {
+                        if (sourceNode !== targetNode) {
+                            // Link between different simulation bodies (Group-Group, Group-Single, Single-Single)
+                            // Create key for link aggregation
+                            const key = `${sourceNode.id}-${targetNode.id}`;
+                            if (!simulationLinkMap.has(key)) {
+                                simulationLinkMap.set(key, { 
+                                    source: sourceNode.id, 
+                                    target: targetNode.id, 
+                                    weight: 0,
+                                    originalLinks: []
+                                });
+                            }
+                            const simLink = simulationLinkMap.get(key);
+                            simLink.weight += link.weight;
+                            simLink.originalLinks.push(link);
+                        } else if (sourceNode.isGroup) {
+                            // Internal link within a group
+                            if (!sourceNode.internalLinks) {
+                                sourceNode.internalLinks = [];
+                            }
+                            sourceNode.internalLinks.push({
+                                source: userToMemberNode.get(link.source),
+                                target: userToMemberNode.get(link.target),
+                                ...link
                             });
                         }
-                        simulationLinkMap.get(key).weight += link.weight;
                     }
                 });
             }
@@ -578,7 +646,20 @@ export default {
                 // .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
             
             linkElements.append("title")
-                .text(d => `Source: ${d.source}\nTarget: ${d.target}\nWeight: ${d.weight}`);
+                .text(d => {
+                    let info = `Source: ${d.source}\nTarget: ${d.target}\nTotal Weight: ${d.weight}`;
+                    if (d.originalLinks && d.originalLinks.length > 0) {
+                        const reasons = new Set();
+                        d.originalLinks.forEach(l => {
+                            if (l.reasons) l.reasons.forEach(r => reasons.add(r));
+                        });
+                        if (reasons.size > 0) {
+                            info += `\nReasons:\n- ${Array.from(reasons).join('\n- ')}`;
+                        }
+                        info += `\nOriginal Links: ${d.originalLinks.length}`;
+                    }
+                    return info;
+                });
 
             // Drag Behavior
             const drag = d3.drag()
@@ -673,7 +754,10 @@ export default {
 
             // Draw Group Members
             groups.each(function(d) {
-                d3.select(this).selectAll(".member")
+                const groupG = d3.select(this);
+
+                // Draw Members first (so links are on top)
+                groupG.selectAll(".member")
                     .data(d.children)
                     .enter().append("circle")
                     .attr("class", "bubble member")
@@ -684,6 +768,31 @@ export default {
                     .style("opacity", 0.6)
                     .style("stroke", child => child.suspicious ? "#ff0000" : "#5976ba")
                     .style("stroke-width", child => child.suspicious ? 3 : 2);
+
+                // Draw Internal Links on top
+                if (d.internalLinks && d.internalLinks.length > 0) {
+                    console.log(`Group ${d.id} has ${d.internalLinks.length} internal links.`);
+                    groupG.selectAll(".internal-link")
+                        .data(d.internalLinks)
+                        .enter().append("line")
+                        .attr("class", "internal-link")
+                        .attr("x1", l => l.source.x - d.enclose.x)
+                        .attr("y1", l => l.source.y - d.enclose.y)
+                        .attr("x2", l => l.target.x - d.enclose.x)
+                        .attr("y2", l => l.target.y - d.enclose.y)
+                        .attr("stroke", "#555") 
+                        .attr("stroke-width", 1.5)
+                        .attr("stroke-opacity", 0.6)
+                        // .style("pointer-events", "none") // Let clicks pass through to bubbles
+                        .append("title")
+                        .text(l => {
+                            let info = `Internal Link\nSource: ${l.source.name}\nTarget: ${l.target.name}`;
+                            if (l.reasons && l.reasons.length > 0) {
+                                info += `\nReasons:\n- ${l.reasons.join('\n- ')}`;
+                            }
+                            return info;
+                        });
+                }
             });
             
             // Re-bind events for members with correct scope

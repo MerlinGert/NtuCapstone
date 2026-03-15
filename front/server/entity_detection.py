@@ -377,6 +377,126 @@ def process_transfer_network_rule(target_users: Optional[List[str]], time_range:
 
 # --- Endpoints ---
 
+
+def build_entity_graph(request: DetectionRequest) -> nx.Graph:
+    """
+    Builds the master graph based on all enabled rules in the request.
+    """
+    start_time = time.time()
+    
+    # Main graph for merging
+    G_master = nx.Graph()
+    
+    # Separate rules
+    transfer_network_rules = [r for r in request.rules if r.rule_type == "transfer-network" and r.enabled]
+    behavior_similarity_rules = [r for r in request.rules if r.rule_type == "behavior-similarity" and r.enabled]
+    
+    # 1. Process Transfer Network Rules
+    for rule in transfer_network_rules:
+        threshold = rule.parameters.get("threshold", 5)
+        check_funding_source = rule.parameters.get("check_funding_source", False)
+        volume_threshold = rule.parameters.get("volume_threshold", 0)
+        check_same_sender = rule.parameters.get("check_same_sender", False)
+        check_same_recipient = rule.parameters.get("check_same_recipient", False)
+        enable_tx_count = rule.parameters.get("enable_tx_count", True)
+        enable_tx_volume = rule.parameters.get("enable_tx_volume", True)
+        
+        G_rule = build_transfer_network_graph(
+            request.target_users, 
+            request.time_range, 
+            threshold,
+            check_funding_source,
+            volume_threshold,
+            check_same_sender,
+            check_same_recipient,
+            enable_tx_count,
+            enable_tx_volume
+        )
+        
+        # Merge into G_master
+        for u, v, d in G_rule.edges(data=True):
+            if G_master.has_edge(u, v):
+                # Merge attributes
+                G_master[u][v]['transfer_count'] = G_master[u][v].get('transfer_count', 0) + d.get('transfer_count', 0)
+                # Merge reasons
+                master_reasons = G_master[u][v].get('reasons', [])
+                new_reasons = d.get('reasons', [])
+                for r in new_reasons:
+                    if r not in master_reasons:
+                        master_reasons.append(r)
+                G_master[u][v]['reasons'] = master_reasons
+            else:
+                G_master.add_edge(u, v, **d)
+
+    # 2. Process Behavior Similarity Rules
+    current_edges = []
+    for rule in behavior_similarity_rules:
+        # Extract params
+        params = rule.parameters
+        time_window = params.get("time_window", 1.0)
+        enable_rule3 = params.get("enable_rule3", True)
+        enable_rule4 = params.get("enable_rule4", True)
+        enable_rule5 = params.get("enable_rule5", True)
+        
+        # Extract sub-params
+        rule3_params = params.get("rule3_params", {})
+        rule4_params = params.get("rule4_params", {})
+        rule5_params = params.get("rule5_params", {})
+        
+        # Rule 3
+        if enable_rule3:
+            p3_args = {"enable": True, "time_window": time_window}
+            p3_args.update(rule3_params)
+            try:
+                p3 = TradingSequenceParams(**p3_args)
+                current_edges.extend(process_rule3(request.target_users, request.time_range, p3))
+            except Exception as e:
+                print(f"Error in Rule3: {e}")
+        
+        # Rule 4
+        if enable_rule4:
+            p4_args = {"enable": True, "time_window": time_window}
+            p4_args.update(rule4_params)
+            try:
+                p4 = BalanceSequenceParams(**p4_args)
+                current_edges.extend(process_rule4(request.target_users, request.time_range, p4))
+            except Exception as e:
+                print(f"Error in Rule4: {e}")
+                
+        # Rule 5
+        if enable_rule5:
+            p5_args = {"enable": True, "time_window": time_window}
+            p5_args.update(rule5_params)
+            try:
+                p5 = EarningSequenceParams(**p5_args)
+                current_edges.extend(process_rule5(request.target_users, request.time_range, p5))
+            except Exception as e:
+                print(f"Error in Rule5: {e}")
+                
+    # Merge behavior edges into G_master
+    for edge in current_edges:
+        u, v = edge.source, edge.target
+        sim = edge.similarity
+        rule_name = edge.rule
+        details = edge.details
+        
+        reason_str = f"Behavior Similarity ({rule_name}, sim={sim})"
+        
+        if G_master.has_edge(u, v):
+            master_reasons = G_master[u][v].get('reasons', [])
+            if reason_str not in master_reasons:
+                master_reasons.append(reason_str)
+            G_master[u][v]['reasons'] = master_reasons
+            
+            # Merge details
+            master_details = G_master[u][v].get('behavior_details', [])
+            master_details.append(details)
+            G_master[u][v]['behavior_details'] = master_details
+        else:
+            G_master.add_edge(u, v, reasons=[reason_str], behavior_details=[details])
+            
+    return G_master
+
 @router.post("/detect", response_model=DetectionResponse)
 async def detect_entities(request: DetectionRequest):
     """
@@ -385,118 +505,11 @@ async def detect_entities(request: DetectionRequest):
     try:
         start_time = time.time()
         
-        # Main graph for merging
-        G_master = nx.Graph()
+        # Build the graph
+        G_master = build_entity_graph(request)
         
         # Target set for strict filtering
         target_set = set(request.target_users) if request.target_users else None
-        
-        # Separate rules
-        transfer_network_rules = [r for r in request.rules if r.rule_type == "transfer-network" and r.enabled]
-        behavior_similarity_rules = [r for r in request.rules if r.rule_type == "behavior-similarity" and r.enabled]
-        
-        # 1. Process Transfer Network Rules
-        for rule in transfer_network_rules:
-            threshold = rule.parameters.get("threshold", 5)
-            check_funding_source = rule.parameters.get("check_funding_source", False)
-            volume_threshold = rule.parameters.get("volume_threshold", 0)
-            check_same_sender = rule.parameters.get("check_same_sender", False)
-            check_same_recipient = rule.parameters.get("check_same_recipient", False)
-            enable_tx_count = rule.parameters.get("enable_tx_count", True)
-            enable_tx_volume = rule.parameters.get("enable_tx_volume", True)
-            
-            G_rule = build_transfer_network_graph(
-                request.target_users, 
-                request.time_range, 
-                threshold,
-                check_funding_source,
-                volume_threshold,
-                check_same_sender,
-                check_same_recipient,
-                enable_tx_count,
-                enable_tx_volume
-            )
-            
-            # Merge into G_master
-            for u, v, d in G_rule.edges(data=True):
-                if G_master.has_edge(u, v):
-                    # Merge attributes
-                    G_master[u][v]['transfer_count'] = G_master[u][v].get('transfer_count', 0) + d.get('transfer_count', 0)
-                    # Merge reasons
-                    master_reasons = G_master[u][v].get('reasons', [])
-                    new_reasons = d.get('reasons', [])
-                    for r in new_reasons:
-                        if r not in master_reasons:
-                            master_reasons.append(r)
-                    G_master[u][v]['reasons'] = master_reasons
-                else:
-                    G_master.add_edge(u, v, **d)
-
-        # 2. Process Behavior Similarity Rules
-        current_edges = []
-        for rule in behavior_similarity_rules:
-            # Extract params
-            params = rule.parameters
-            time_window = params.get("time_window", 1.0)
-            enable_rule3 = params.get("enable_rule3", True)
-            enable_rule4 = params.get("enable_rule4", True)
-            enable_rule5 = params.get("enable_rule5", True)
-            
-            # Extract sub-params
-            rule3_params = params.get("rule3_params", {})
-            rule4_params = params.get("rule4_params", {})
-            rule5_params = params.get("rule5_params", {})
-            
-            # Rule 3
-            if enable_rule3:
-                p3_args = {"enable": True, "time_window": time_window}
-                p3_args.update(rule3_params)
-                try:
-                    p3 = TradingSequenceParams(**p3_args)
-                    current_edges.extend(process_rule3(request.target_users, request.time_range, p3))
-                except Exception as e:
-                    print(f"Error in Rule3: {e}")
-            
-            # Rule 4
-            if enable_rule4:
-                p4_args = {"enable": True, "time_window": time_window}
-                p4_args.update(rule4_params)
-                try:
-                    p4 = BalanceSequenceParams(**p4_args)
-                    current_edges.extend(process_rule4(request.target_users, request.time_range, p4))
-                except Exception as e:
-                    print(f"Error in Rule4: {e}")
-            
-            # Rule 5
-            if enable_rule5:
-                p5_args = {"enable": True, "time_window": time_window}
-                p5_args.update(rule5_params)
-                try:
-                    p5 = EarningSequenceParams(**p5_args)
-                    current_edges.extend(process_rule5(request.target_users, request.time_range, p5))
-                except Exception as e:
-                    print(f"Error in Rule5: {e}")
-
-        # Add behavior edges to G_master
-        for edge in current_edges:
-            u, v = edge.source, edge.target
-            sim = edge.similarity
-            rule_name = edge.rule
-            details = edge.details
-            
-            reason_str = f"Behavior Similarity ({rule_name}, sim={sim})"
-            
-            if G_master.has_edge(u, v):
-                 master_reasons = G_master[u][v].get('reasons', [])
-                 if reason_str not in master_reasons:
-                     master_reasons.append(reason_str)
-                 G_master[u][v]['reasons'] = master_reasons
-                 
-                 master_details = G_master[u][v].get('behavior_details', [])
-                 master_details.append(details)
-                 G_master[u][v]['behavior_details'] = master_details
-            else:
-                 G_master.add_edge(u, v, reasons=[reason_str], behavior_details=[details])
 
         # 3. Find Components (Merged Entities)
         # Remove self-loops to ensure no single-node entities from self-edges
@@ -622,16 +635,42 @@ def process_transfer_network_links(target_users: Optional[List[str]], time_range
         return []
 
 @router.post("/links", response_model=LinkResponse)
-async def get_links(request: LinkRequest):
+async def get_links(request: DetectionRequest):
     """
-    Get links (edges) based on transfer network rules.
+    Get links (edges) based on detection rules (Network + Behavior).
     """
     try:
-        links = process_transfer_network_links(
-            request.target_users, 
-            request.time_range, 
-            request.threshold
-        )
+        # Build the graph using the same logic as entity detection
+        G = build_entity_graph(request)
+        
+        # Filter edges to ensure both source and target are in target_users
+        # This is to strictly follow the requirement: "Only calculate edges between the filtered nodes"
+        valid_users = set(request.target_users) if request.target_users else None
+        
+        links = []
+        for u, v, d in G.edges(data=True):
+            # Strict filtering
+            if valid_users:
+                if u not in valid_users or v not in valid_users:
+                    continue
+            
+            # Calculate a weight for visualization
+            # Default to transfer_count, or 1 if it's purely behavior-based
+            weight = d.get('transfer_count', 0)
+            if weight == 0:
+                weight = 1
+                
+            links.append({
+                "source": u,
+                "target": v,
+                "weight": weight,
+                "reasons": d.get('reasons', []),
+                "details": d
+            })
+            
         return {"links": links}
     except Exception as e:
+        print(f"Error in get_links: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
