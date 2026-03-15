@@ -70,6 +70,13 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
+        setDetectionResults(entities, links) {
+            console.log("TokenDistribution: setDetectionResults called", entities.length, links.length);
+            this.detectedEntities = entities;
+            this.currentLinks = links;
+            this.lastDetectionCount = entities.length;
+            this.drawChart();
+        },
         runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, volumeThreshold = 0, checkSameSender = false, checkSameRecipient = false, silent = false, enableTxCount = true, enableTxVolume = true, enableNetworkBased = true, enableBehaviorBased = true, behaviorTimeWindow = 1.0, enableRule3 = true, enableRule4 = true, enableRule5 = true, rule3Params = {}, rule4Params = {}, rule5Params = {}) {
             console.log("TokenDistribution: runEntityDetection called with params");
             if (!this.snapshotData || !this.snapshotData.balances) {
@@ -154,6 +161,9 @@ export default {
             .then(data => {
                 this.detecting = false;
                 console.log("Detection Result:", data);
+                if (data.debug_relations) {
+                    console.log("Debug Relations (Backend):", data.debug_relations);
+                }
                 if (data.detected_entities && data.detected_entities.length > 0) {
                     this.lastDetectionCount = data.detected_entities.length;
                     console.log(`Detected ${data.detected_entities.length} entity groups.`);
@@ -206,8 +216,8 @@ export default {
                 }
             });
         },
-        async fetchSnapshotData(time = this.selectedTime, threshold, detectionParams, linkParams) {
-            console.log("TokenDistribution: fetchSnapshotData called", time, threshold, detectionParams, linkParams);
+        async fetchSnapshotData(time = this.selectedTime, threshold, relatedUserThreshold = 0.2, detectionParams, linkParams) {
+            console.log("TokenDistribution: fetchSnapshotData called", time, threshold, relatedUserThreshold, detectionParams, linkParams);
             this.loading = true;
             this.selectedTime = time;
 
@@ -226,7 +236,8 @@ export default {
                     },
                     body: JSON.stringify({
                         time: time,
-                        threshold: threshold
+                        threshold: threshold,
+                        related_user_threshold: relatedUserThreshold
                     })
                 });
                 
@@ -235,6 +246,7 @@ export default {
                 }
                 
                 this.snapshotData = await response.json();
+                this.$emit('snapshot-loaded', this.snapshotData);
                 // this.loading = false; // Wait until all detections are done
                 
                 // Update topPercent display based on threshold
@@ -308,7 +320,7 @@ export default {
         },
         loadData() {
             // Legacy wrapper, calls fetchSnapshotData with defaults
-            this.fetchSnapshotData();
+            this.fetchSnapshotData(this.selectedTime, 0.5, 0.2);
         },
         setSvg() {
             if (this.$refs.chart_container) {

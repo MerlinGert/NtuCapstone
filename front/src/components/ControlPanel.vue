@@ -5,16 +5,21 @@
         <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
             <div style="display: flex; flex-direction: column; gap: 5px;">
                 <label style="font-size: 12px; font-weight: bold;">Snapshot Time</label>
-                <select v-model="selectedSnapshotTime" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; min-width: 200px;">
+                <select v-if="snapshotTimes && snapshotTimes.length > 0" v-model="snapshotConfig.time" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; min-width: 200px;">
                     <option v-for="time in snapshotTimes" :key="time" :value="time">{{ time }}</option>
                 </select>
+                <input v-else type="text" v-model="snapshotConfig.time" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; min-width: 200px;" placeholder="YYYY-MM-DD HH:mm:ss UTC">
             </div>
             <div style="display: flex; flex-direction: column; gap: 5px;">
-                <label style="font-size: 12px; font-weight: bold;">Top Holders Threshold (%)</label>
-                <input type="number" v-model.number="snapshotThreshold" min="1" max="100" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
+                <label style="font-size: 12px; font-weight: bold;">Top Holders Threshold</label>
+                <input type="number" v-model.number="snapshotConfig.top_holder_threshold" step="0.01" min="0" max="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
             </div>
-            <button @click="updateSnapshot" :disabled="loadingSnapshot" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; height: 36px;">
-                {{ loadingSnapshot ? 'Loading...' : 'Update View' }}
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 12px; font-weight: bold;">Related User Threshold</label>
+                <input type="number" v-model.number="snapshotConfig.related_user_threshold" step="0.01" min="0" max="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
+            </div>
+            <button @click="$emit('update-snapshot')" :disabled="loading" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; height: 36px;">
+                {{ loading ? 'Loading...' : 'Update View' }}
             </button>
         </div>
 
@@ -22,7 +27,7 @@
         <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
             <div style="font-weight: bold;">Entity Detection</div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <button @click="triggerDetection" :disabled="loading" style="padding: 5px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                <button @click="$emit('run-detection')" :disabled="loading" style="padding: 5px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
                     {{ loading ? 'Detecting...' : 'Run Detection' }}
                 </button>
                 <span v-if="lastResultCount !== null" style="color: #666; font-size: 12px;">
@@ -32,31 +37,22 @@
         </div>
         
         <div style="display: flex; flex-direction: column; gap: 5px;">
-            <!-- Transfer Network Based -->
+            <!-- Network Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleSection('transfer')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                <div @click="toggleSection('entity_network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display:flex; align-items:center; gap:5px;" @click.stop>
-                        <input type="checkbox" v-model="enableNetworkBased">
+                        <input type="checkbox" v-model="entityConfig.enable_network_based">
                         <span>Network Based</span>
                     </div>
-                    <span>{{ activeSection === 'transfer' ? '▼' : '►' }}</span>
+                    <span>{{ activeSection === 'entity_network' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeSection === 'transfer'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
-                    <!-- Time Range -->
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <label style="font-size: 12px; font-weight: bold; color: #555;">Time Range</label>
-                        <div style="display: flex; gap: 5px; align-items: center;">
-                            <input type="datetime-local" v-model="startTime" style="flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;">
-                            <span style="font-size: 11px;">-</span>
-                            <input type="datetime-local" v-model="endTime" style="flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;">
-                        </div>
-                    </div>
+                <div v-if="activeSection === 'entity_network'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Time Range Removed as it is not in configuration -->
 
-                    <!-- Funding Source -->
-                    <div style="display: flex; align-items: center; margin-top: 5px;">
-                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                            <input type="checkbox" v-model="checkFundingSource">
-                            <span>Same Funding Source</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                         <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" v-model="entityConfig.transfer_network_based_params.enable_direct_transfer">
+                            <span>Direct Transfer</span>
                         </label>
                     </div>
 
@@ -66,17 +62,17 @@
                     <div style="display: flex; gap: 10px;">
                         <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
                              <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" v-model="enableTxCount">
-                                <span :style="{color: enableTxCount ? '#000' : '#999'}">Min Tx Count</span>
+                                <input type="checkbox" v-model="entityConfig.transfer_network_based_params.direct_transfer_params.enable_min_count">
+                                <span>Min Tx Count</span>
                             </label>
-                            <input type="number" v-model.number="detectionThreshold" :disabled="!enableTxCount" min="1" max="50" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                            <input type="number" v-model.number="entityConfig.transfer_network_based_params.direct_transfer_params.min_tx_count" min="1" :disabled="!entityConfig.transfer_network_based_params.direct_transfer_params.enable_min_count" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
                         </div>
                         <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
                             <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" v-model="enableTxVolume">
-                                <span :style="{color: enableTxVolume ? '#000' : '#999'}">Min Volume</span>
+                                <input type="checkbox" v-model="entityConfig.transfer_network_based_params.direct_transfer_params.enable_min_volume">
+                                <span>Min Volume</span>
                             </label>
-                            <input type="number" v-model.number="volumeThreshold" :disabled="!enableTxVolume" min="0" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                            <input type="number" v-model.number="entityConfig.transfer_network_based_params.direct_transfer_params.min_tx_volume" min="0" :disabled="!entityConfig.transfer_network_based_params.direct_transfer_params.enable_min_volume" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
                         </div>
                     </div>
 
@@ -84,13 +80,17 @@
 
                     <!-- Pattern Rules -->
                     <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; justify-content: flex-start; gap: 15px; flex-wrap: wrap;">
+                            <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" v-model="entityConfig.transfer_network_based_params.enable_funding_relationship">
+                                <span>Funding Relationship</span>
+                            </label>
                             <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                                <input type="checkbox" v-model="checkSameSender">
+                                <input type="checkbox" v-model="entityConfig.transfer_network_based_params.enable_same_sender">
                                 <span>Same Sender</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                                <input type="checkbox" v-model="checkSameRecipient">
+                                <input type="checkbox" v-model="entityConfig.transfer_network_based_params.enable_same_recipient">
                                 <span>Same Recipient</span>
                             </label>
                         </div>
@@ -98,96 +98,105 @@
                 </div>
             </div>
 
-            <!-- Behavior Similarity Based -->
+            <!-- Similarity Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleSection('behavior')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                <div @click="toggleSection('entity_similarity')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display:flex; align-items:center; gap:5px;" @click.stop>
-                        <input type="checkbox" v-model="enableBehaviorBased">
-                        <span>Behavior Similarity Based</span>
+                        <input type="checkbox" v-model="entityConfig.enable_similarity_based">
+                        <span>Similarity Based</span>
                     </div>
-                    <span>{{ activeSection === 'behavior' ? '▼' : '►' }}</span>
+                    <span>{{ activeSection === 'entity_similarity' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeSection === 'behavior'" style="padding: 10px;">
+                <div v-if="activeSection === 'entity_similarity'" style="padding: 10px;">
                     <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <!-- Rule 3 -->
+                        <!-- Trading Action Sequence -->
                         <div style="display: flex; flex-direction: column; gap: 5px; padding-bottom: 5px; border-bottom: 1px dashed #eee;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" v-model="enableRule3">
-                                <span style="font-weight: bold; font-size: 12px;">Similar Trading Sequence</span>
+                                <input type="checkbox" v-model="entityConfig.similarity_based_params.enable_trading_action_sequence">
+                                <span style="font-weight: bold; font-size: 12px;">Trading Action Sequence</span>
                             </div>
-                            <div v-if="enableRule3" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                            <div v-if="entityConfig.similarity_based_params.enable_trading_action_sequence" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Max Time Diff (min):</label>
-                                    <input type="number" v-model.number="rule3MaxTimeDiff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                    <label style="font-size: 11px; width: 100px;">Type:</label>
+                                    <select v-model="entityConfig.similarity_based_params.trading_action_sequence_params.type" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 120px; font-size: 11px;">
+                                        <option value="action_only">Action Only</option>
+                                        <option value="action_amount">Action + Amount</option>
+                                        <option value="action_price">Action + Price</option>
+                                        <option value="action_amount_price">Action + Amt + Price</option>
+                                    </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <label style="font-size: 11px; width: 100px;">Min Seq Length:</label>
-                                    <input type="number" v-model.number="rule3MinLength" min="2" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                    <input type="number" v-model.number="entityConfig.similarity_based_params.trading_action_sequence_params.min_seq_length" min="2" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Sequence Rep:</label>
-                                    <select v-model="rule3SequenceRep" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 100px; font-size: 11px;">
-                                        <option value="action_only">Action Only</option>
-                                        <option value="action+amount">Action + Amount</option>
-                                        <option value="action+price">Action + Price</option>
-                                        <option value="action+amount+price">Action + Amt + Price</option>
-                                    </select>
+                                    <label style="font-size: 11px; width: 100px;">Max Time Diff:</label>
+                                    <input type="number" v-model.number="entityConfig.similarity_based_params.trading_action_sequence_params.max_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Rule 4 -->
+                        <!-- Balance Sequence -->
                         <div style="display: flex; flex-direction: column; gap: 5px; padding-bottom: 5px; border-bottom: 1px dashed #eee;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" v-model="enableRule4">
-                                <span style="font-weight: bold; font-size: 12px;">Similar Balance Sequence</span>
+                                <input type="checkbox" v-model="entityConfig.similarity_based_params.enable_balance_sequence">
+                                <span style="font-weight: bold; font-size: 12px;">Balance Sequence</span>
                             </div>
-                            <div v-if="enableRule4" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                            <div v-if="entityConfig.similarity_based_params.enable_balance_sequence" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Similarity Threshold:</label>
-                                    <input type="number" v-model.number="rule4Similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                    <label style="font-size: 11px; width: 100px;">Granularity:</label>
+                                    <select v-model="entityConfig.similarity_based_params.balance_sequence_params.balance_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                        <option value="1Min">1Min</option>
+                                        <option value="1H">1H</option>
+                                        <option value="1D">1D</option>
+                                    </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Time Bin:</label>
-                                    <input type="text" v-model="rule4TimeBin" placeholder="e.g. 1h" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                    <label style="font-size: 11px; width: 100px;">Similarity:</label>
+                                    <input type="number" v-model.number="entityConfig.similarity_based_params.balance_sequence_params.balance_similarity_threshold" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Rule 5 -->
+                        <!-- Earning Sequence -->
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" v-model="enableRule5">
-                                <span style="font-weight: bold; font-size: 12px;">Similar Earning Sequence</span>
+                                <input type="checkbox" v-model="entityConfig.similarity_based_params.enable_earning_sequence">
+                                <span style="font-weight: bold; font-size: 12px;">Earning Sequence</span>
                             </div>
-                            <div v-if="enableRule5" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                            <div v-if="entityConfig.similarity_based_params.enable_earning_sequence" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Similarity Threshold:</label>
-                                    <input type="number" v-model.number="rule5Similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                    <label style="font-size: 11px; width: 100px;">Granularity:</label>
+                                    <select v-model="entityConfig.similarity_based_params.earning_sequence_params.earning_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                        <option value="1Min">1Min</option>
+                                        <option value="1H">1H</option>
+                                        <option value="1D">1D</option>
+                                    </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Time Bin:</label>
-                                    <input type="text" v-model="rule5TimeBin" placeholder="e.g. 1h" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                    <label style="font-size: 11px; width: 100px;">Similarity:</label>
+                                    <input type="number" v-model.number="entityConfig.similarity_based_params.earning_sequence_params.earning_similarity_threshold" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                             </div>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 10px; padding-top: 5px; border-top: 1px solid #eee;">
-                            <label style="font-size: 11px; color: #666;">Data Loading Window (hours):</label>
-                            <input type="number" v-model.number="behaviorTimeWindow" min="1" step="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Manipulation History Based -->
-            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleSection('history')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Manipulation History Based</span>
-                    <span>{{ activeSection === 'history' ? '▼' : '►' }}</span>
+            <!-- Entity Manipulation Based -->
+             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleSection('entity_manipulation')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display:flex; align-items:center; gap:5px;" @click.stop>
+                        <input type="checkbox" v-model="entityConfig.enable_manipulation_based">
+                        <span>Manipulation Based</span>
+                    </div>
+                    <span>{{ activeSection === 'entity_manipulation' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeSection === 'history'" style="padding: 10px;">
-                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                <div v-if="activeSection === 'entity_manipulation'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                     <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Max Time Diff:</label>
+                        <input type="number" v-model.number="entityConfig.manipulation_based_params.max_manipulation_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
                 </div>
             </div>
         </div>
@@ -196,100 +205,103 @@
         <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
             <div style="font-weight: bold;">Manipulation Detection</div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <button @click="triggerManipulationDetection" :disabled="loadingManipulation" style="padding: 5px 15px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                <button @click="$emit('request-manipulation-detection')" :disabled="loadingManipulation" style="padding: 5px 15px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
                     {{ loadingManipulation ? 'Detecting...' : 'Run Detection' }}
                 </button>
             </div>
         </div>
         
         <div style="display: flex; flex-direction: column; gap: 5px;">
-            <!-- Self Trading -->
+            <!-- Round Trip -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleManipulationSection('self_trading')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Self Trading (Wash Trading)</span>
-                    <span>{{ activeManipulationSection === 'self_trading' ? '▼' : '►' }}</span>
-                </div>
-                <div v-if="activeManipulationSection === 'self_trading'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <label style="font-size: 12px; font-weight: bold;">Volume Difference Threshold</label>
-                        <input type="number" v-model.number="selfTradingThreshold" min="0" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 150px;">
-                        <span style="font-size: 10px; color: #666;">Max difference between buy/sell amounts.</span>
+                <div @click="toggleManipulationSection('round_trip')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display:flex; align-items:center; gap:5px;" @click.stop>
+                         <input type="checkbox" v-model="manipulationConfig.enable_round_trip_detection">
+                        <span>Round Trip</span>
                     </div>
-                    
-                    <div style="height: 1px; background: #eee; margin: 2px 0;"></div>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                         <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="checkbox" v-model="checkEntityBased">
-                            <span>Entity Based Self Trading</span>
+                    <span>{{ activeManipulationSection === 'round_trip' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeManipulationSection === 'round_trip'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Max Time Diff:</label>
+                        <input type="number" v-model.number="manipulationConfig.round_trip_params.max_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Max Position Diff:</label>
+                        <input type="number" v-model.number="manipulationConfig.round_trip_params.max_position_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Max Earning:</label>
+                        <input type="number" v-model.number="manipulationConfig.round_trip_params.max_earning" min="0" step="0.1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                         <label style="font-size: 11px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" v-model="manipulationConfig.round_trip_params.enable_entity_based">
+                            <span>Enable Entity Based</span>
                         </label>
-                        <div v-if="checkEntityBased" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
-                             <label style="font-size: 11px; font-weight: bold;">Time Window (min)</label>
-                             <input type="number" v-model.number="entityBasedTimeWindow" min="1" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100px;">
-                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Network Based -->
+            <!-- Same Direction -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleManipulationSection('network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Network Based</span>
-                    <span>{{ activeManipulationSection === 'network' ? '▼' : '►' }}</span>
+                <div @click="toggleManipulationSection('same_direction')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display:flex; align-items:center; gap:5px;" @click.stop>
+                         <input type="checkbox" v-model="manipulationConfig.enable_same_direction_detection">
+                        <span>Same Direction</span>
+                    </div>
+                    <span>{{ activeManipulationSection === 'same_direction' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeManipulationSection === 'network'" style="padding: 10px;">
-                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
-                </div>
-            </div>
-
-            <!-- Behavior Similarity Based -->
-            <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleManipulationSection('behavior_sim')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
-                    <span>Behavior Similarity Based</span>
-                    <span>{{ activeManipulationSection === 'behavior_sim' ? '▼' : '►' }}</span>
-                </div>
-                <div v-if="activeManipulationSection === 'behavior_sim'" style="padding: 10px;">
-                    <span style="color: #999; font-size: 12px;">Configuration not yet available.</span>
+                <div v-if="activeManipulationSection === 'same_direction'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Max Time Diff:</label>
+                        <input type="number" v-model.number="manipulationConfig.same_direction_params.max_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Min Seq Length:</label>
+                        <input type="number" v-model.number="manipulationConfig.same_direction_params.min_seq_length" min="2" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Max Diff Direction:</label>
+                        <input type="number" v-model.number="manipulationConfig.same_direction_params.max_diff_direction" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                         <label style="font-size: 11px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" v-model="manipulationConfig.same_direction_params.enable_entity_based">
+                            <span>Enable Entity Based</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Link Configuration -->
+        <!-- Link Detection Configuration -->
         <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
             <div style="font-weight: bold;">Link Configuration</div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <button @click="updateLinks" :disabled="loadingLinks" style="padding: 5px 15px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                <button @click="$emit('update-links')" :disabled="loadingLinks" style="padding: 5px 15px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
                     {{ loadingLinks ? 'Updating...' : 'Update Links' }}
                 </button>
             </div>
         </div>
         
         <div style="display: flex; flex-direction: column; gap: 5px;">
-            <!-- Network Based -->
+             <!-- Link Network Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleLinkSection('network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                <div @click="toggleLinkSection('link_network')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display:flex; align-items:center; gap:5px;" @click.stop>
-                        <input type="checkbox" v-model="linkEnableNetworkBased" @change="updateLinks">
+                        <input type="checkbox" v-model="linkConfig.enable_network_based">
                         <span>Network Based</span>
                     </div>
-                    <span>{{ activeLinkSection === 'network' ? '▼' : '►' }}</span>
+                    <span>{{ activeLinkSection === 'link_network' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeLinkSection === 'network'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
-                    <!-- Time Range -->
-                    <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <label style="font-size: 12px; font-weight: bold; color: #555;">Time Range</label>
-                        <div style="display: flex; gap: 5px; align-items: center;">
-                            <input type="datetime-local" v-model="linkStartTime" style="flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;">
-                            <span style="font-size: 11px;">-</span>
-                            <input type="datetime-local" v-model="linkEndTime" style="flex: 1; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 11px;">
-                        </div>
-                    </div>
+                <div v-if="activeLinkSection === 'link_network'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                     <!-- Time Range Removed as it is not in configuration -->
 
-                    <!-- Funding Source -->
-                    <div style="display: flex; align-items: center; margin-top: 5px;">
-                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                            <input type="checkbox" v-model="linkCheckFundingSource" @change="updateLinks">
-                            <span>Same Funding Source</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                         <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" v-model="linkConfig.transfer_network_based_params.enable_direct_transfer">
+                            <span>Direct Transfer</span>
                         </label>
                     </div>
 
@@ -299,17 +311,17 @@
                     <div style="display: flex; gap: 10px;">
                         <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
                              <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" v-model="linkEnableTxCount" @change="updateLinks">
-                                <span :style="{color: linkEnableTxCount ? '#000' : '#999'}">Min Tx Count</span>
+                                <input type="checkbox" v-model="linkConfig.transfer_network_based_params.direct_transfer_params.enable_min_count">
+                                <span>Min Tx Count</span>
                             </label>
-                            <input type="number" v-model.number="linkThreshold" :disabled="!linkEnableTxCount" min="1" max="50" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" @change="updateLinks">
+                            <input type="number" v-model.number="linkConfig.transfer_network_based_params.direct_transfer_params.min_tx_count" min="1" :disabled="!linkConfig.transfer_network_based_params.direct_transfer_params.enable_min_count" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
                         </div>
                         <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
                             <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" v-model="linkEnableTxVolume" @change="updateLinks">
-                                <span :style="{color: linkEnableTxVolume ? '#000' : '#999'}">Min Volume</span>
+                                <input type="checkbox" v-model="linkConfig.transfer_network_based_params.direct_transfer_params.enable_min_volume">
+                                <span>Min Volume</span>
                             </label>
-                            <input type="number" v-model.number="linkVolumeThreshold" :disabled="!linkEnableTxVolume" min="0" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" @change="updateLinks">
+                            <input type="number" v-model.number="linkConfig.transfer_network_based_params.direct_transfer_params.min_tx_volume" min="0" :disabled="!linkConfig.transfer_network_based_params.direct_transfer_params.enable_min_volume" style="padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
                         </div>
                     </div>
 
@@ -317,13 +329,17 @@
 
                     <!-- Pattern Rules -->
                     <div style="display: flex; flex-direction: column; gap: 5px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; justify-content: flex-start; gap: 15px; flex-wrap: wrap;">
+                            <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" v-model="linkConfig.transfer_network_based_params.enable_funding_relationship">
+                                <span>Funding Relationship</span>
+                            </label>
                             <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                                <input type="checkbox" v-model="linkCheckSameSender" @change="updateLinks">
+                                <input type="checkbox" v-model="linkConfig.transfer_network_based_params.enable_same_sender">
                                 <span>Same Sender</span>
                             </label>
                             <label style="display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer;">
-                                <input type="checkbox" v-model="linkCheckSameRecipient" @change="updateLinks">
+                                <input type="checkbox" v-model="linkConfig.transfer_network_based_params.enable_same_recipient">
                                 <span>Same Recipient</span>
                             </label>
                         </div>
@@ -331,87 +347,108 @@
                 </div>
             </div>
 
-            <!-- Behavior Similarity Based -->
+            <!-- Link Similarity Based -->
             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
-                <div @click="toggleLinkSection('behavior_sim')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                <div @click="toggleLinkSection('link_similarity')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display:flex; align-items:center; gap:5px;" @click.stop>
-                        <input type="checkbox" v-model="linkEnableBehaviorBased" @change="updateLinks">
-                        <span>Behavior Similarity Based</span>
+                        <input type="checkbox" v-model="linkConfig.enable_similarity_based">
+                        <span>Similarity Based</span>
                     </div>
-                    <span>{{ activeLinkSection === 'behavior_sim' ? '▼' : '►' }}</span>
+                    <span>{{ activeLinkSection === 'link_similarity' ? '▼' : '►' }}</span>
                 </div>
-                <div v-if="activeLinkSection === 'behavior_sim'" style="padding: 10px;">
+                <div v-if="activeLinkSection === 'link_similarity'" style="padding: 10px;">
                     <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <!-- Rule 3 -->
+                        <!-- Trading Action Sequence -->
                         <div style="display: flex; flex-direction: column; gap: 5px; padding-bottom: 5px; border-bottom: 1px dashed #eee;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" v-model="linkEnableRule3" @change="updateLinks">
-                                <span style="font-weight: bold; font-size: 12px;">Similar Trading Sequence</span>
+                                <input type="checkbox" v-model="linkConfig.similarity_based_params.enable_trading_action_sequence">
+                                <span style="font-weight: bold; font-size: 12px;">Trading Action Sequence</span>
                             </div>
-                            <div v-if="linkEnableRule3" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                            <div v-if="linkConfig.similarity_based_params.enable_trading_action_sequence" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Max Time Diff (min):</label>
-                                    <input type="number" v-model.number="linkRule3MaxTimeDiff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;" @change="updateLinks">
+                                    <label style="font-size: 11px; width: 100px;">Type:</label>
+                                    <select v-model="linkConfig.similarity_based_params.trading_action_sequence_params.type" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 120px; font-size: 11px;">
+                                        <option value="action_only">Action Only</option>
+                                        <option value="action_amount">Action + Amount</option>
+                                        <option value="action_price">Action + Price</option>
+                                        <option value="action_amount_price">Action + Amt + Price</option>
+                                    </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <label style="font-size: 11px; width: 100px;">Min Seq Length:</label>
-                                    <input type="number" v-model.number="linkRule3MinLength" min="2" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;" @change="updateLinks">
+                                    <input type="number" v-model.number="linkConfig.similarity_based_params.trading_action_sequence_params.min_seq_length" min="2" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Sequence Rep:</label>
-                                    <select v-model="linkRule3SequenceRep" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 100px; font-size: 11px;" @change="updateLinks">
-                                        <option value="action_only">Action Only</option>
-                                        <option value="action+amount">Action + Amount</option>
-                                        <option value="action+price">Action + Price</option>
-                                        <option value="action+amount+price">Action + Amt + Price</option>
-                                    </select>
+                                    <label style="font-size: 11px; width: 100px;">Max Time Diff:</label>
+                                    <input type="number" v-model.number="linkConfig.similarity_based_params.trading_action_sequence_params.max_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Rule 4 -->
+                        <!-- Balance Sequence -->
                         <div style="display: flex; flex-direction: column; gap: 5px; padding-bottom: 5px; border-bottom: 1px dashed #eee;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" v-model="linkEnableRule4" @change="updateLinks">
-                                <span style="font-weight: bold; font-size: 12px;">Similar Balance Sequence</span>
+                                <input type="checkbox" v-model="linkConfig.similarity_based_params.enable_balance_sequence">
+                                <span style="font-weight: bold; font-size: 12px;">Balance Sequence</span>
                             </div>
-                            <div v-if="linkEnableRule4" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                            <div v-if="linkConfig.similarity_based_params.enable_balance_sequence" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Similarity Threshold:</label>
-                                    <input type="number" v-model.number="linkRule4Similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;" @change="updateLinks">
+                                    <label style="font-size: 11px; width: 100px;">Granularity:</label>
+                                    <select v-model="linkConfig.similarity_based_params.balance_sequence_params.balance_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                        <option value="1Min">1Min</option>
+                                        <option value="1H">1H</option>
+                                        <option value="1D">1D</option>
+                                    </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Time Bin:</label>
-                                    <input type="text" v-model="linkRule4TimeBin" placeholder="e.g. 1h" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;" @change="updateLinks">
+                                    <label style="font-size: 11px; width: 100px;">Similarity:</label>
+                                    <input type="number" v-model.number="linkConfig.similarity_based_params.balance_sequence_params.balance_similarity_threshold" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Rule 5 -->
+                        <!-- Earning Sequence -->
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <input type="checkbox" v-model="linkEnableRule5" @change="updateLinks">
-                                <span style="font-weight: bold; font-size: 12px;">Similar Earning Sequence</span>
+                                <input type="checkbox" v-model="linkConfig.similarity_based_params.enable_earning_sequence">
+                                <span style="font-weight: bold; font-size: 12px;">Earning Sequence</span>
                             </div>
-                            <div v-if="linkEnableRule5" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
+                            <div v-if="linkConfig.similarity_based_params.enable_earning_sequence" style="display: flex; flex-direction: column; gap: 5px; padding-left: 20px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Similarity Threshold:</label>
-                                    <input type="number" v-model.number="linkRule5Similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;" @change="updateLinks">
+                                    <label style="font-size: 11px; width: 100px;">Granularity:</label>
+                                    <select v-model="linkConfig.similarity_based_params.earning_sequence_params.earning_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                        <option value="1Min">1Min</option>
+                                        <option value="1H">1H</option>
+                                        <option value="1D">1D</option>
+                                    </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <label style="font-size: 11px; width: 100px;">Time Bin:</label>
-                                    <input type="text" v-model="linkRule5TimeBin" placeholder="e.g. 1h" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;" @change="updateLinks">
+                                    <label style="font-size: 11px; width: 100px;">Similarity:</label>
+                                    <input type="number" v-model.number="linkConfig.similarity_based_params.earning_sequence_params.earning_similarity_threshold" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
                             </div>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 10px; padding-top: 5px; border-top: 1px solid #eee;">
-                            <label style="font-size: 11px; color: #666;">Data Loading Window (hours):</label>
-                            <input type="number" v-model.number="linkBehaviorTimeWindow" min="1" step="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" @change="updateLinks">
                         </div>
                     </div>
                 </div>
             </div>
+
+             <!-- Link Manipulation Based -->
+             <div style="border: 1px solid #eee; border-radius: 4px; overflow: hidden;">
+                <div @click="toggleLinkSection('link_manipulation')" style="padding: 10px; background: #f9f9f9; cursor: pointer; font-weight: bold; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display:flex; align-items:center; gap:5px;" @click.stop>
+                        <input type="checkbox" v-model="linkConfig.enable_manipulation_based">
+                        <span>Manipulation Based</span>
+                    </div>
+                    <span>{{ activeLinkSection === 'link_manipulation' ? '▼' : '►' }}</span>
+                </div>
+                <div v-if="activeLinkSection === 'link_manipulation'" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                     <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 11px; width: 120px;">Max Time Diff:</label>
+                        <input type="number" v-model.number="linkConfig.manipulation_based_params.max_manipulation_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </template>
@@ -424,6 +461,10 @@ export default {
             type: Boolean,
             default: false
         },
+        loadingLinks: {
+            type: Boolean,
+            default: false
+        },
         loadingManipulation: {
             type: Boolean,
             default: false
@@ -431,233 +472,46 @@ export default {
         lastResultCount: {
             type: Number,
             default: null
+        },
+        snapshotTimes: {
+            type: Array,
+            default: () => []
+        },
+        snapshotConfig: {
+            type: Object,
+            required: true
+        },
+        entityConfig: {
+            type: Object,
+            required: true
+        },
+        linkConfig: {
+            type: Object,
+            required: true
+        },
+        manipulationConfig: {
+            type: Object,
+            required: true
         }
     },
     data() {
         return {
-            detectionThreshold: 2,
-            volumeThreshold: 0,
-            enableTxCount: true,
-            enableTxVolume: true,
-            checkFundingSource: true,
-            checkSameSender: false,
-            checkSameRecipient: false,
-            startTime: "",// Default to empty strings which means "Full Range" in our logic
-            startTime: "",
-            endTime: "",
-            
-            // Snapshot Data
-            snapshotTimes: [],
-            selectedSnapshotTime: "",
-            snapshotThreshold: 30,
-            loadingSnapshot: false,
-
             // UI State
-            activeSection: 'transfer', // 'transfer', 'behavior', 'history'
-            activeManipulationSection: 'self_trading', // 'network', 'behavior_sim', 'self_trading'
-            // loadingManipulation: false, // Moved to props
-            activeLinkSection: 'network', // 'network', 'behavior_sim', 'history'
-            loadingLinks: false,
-            
-            selfTradingThreshold: 10,
-            entityBasedTimeWindow: 60,
-            checkEntityBased: true,
-            
-            // Link Config
-            linkThreshold: 1,
-            linkVolumeThreshold: 0,
-            linkEnableTxCount: true,
-            linkEnableTxVolume: true,
-            linkCheckFundingSource: true,
-            linkCheckSameSender: false,
-            linkCheckSameRecipient: false,
-            linkStartTime: "",
-            linkEndTime: "",
-            linkEnableNetworkBased: true,
-            linkEnableBehaviorBased: true,
-            linkBehaviorTimeWindow: 24.0,
-            linkEnableRule3: true,
-            linkRule3MaxTimeDiff: 2,
-            linkRule3MinLength: 5,
-            linkRule3SequenceRep: "action+amount",
-            linkEnableRule4: false,
-            linkRule4Similarity: 0.9,
-            linkRule4TimeBin: "1h",
-            linkEnableRule5: false,
-            linkRule5Similarity: 0.9,
-            linkRule5TimeBin: "1h",
-
-            // Behavior Config
-            enableNetworkBased: true,
-            enableBehaviorBased: false,
-            enableRule3: true,
-            rule3MaxTimeDiff: 2,
-            rule3MinLength: 5,
-            rule3SequenceRep: "action+amount",
-            enableRule4: false,
-            rule4Similarity: 0.9,
-            rule4TimeBin: "1h",
-            enableRule5: false,
-            rule5Similarity: 0.9,
-            rule5TimeBin: "1h",
-            behaviorTimeWindow: 24.0,
+            activeSection: 'entity_network', 
+            activeManipulationSection: 'round_trip',
+            activeLinkSection: 'link_network',
         }
-    },
-    mounted() {
-        this.fetchSnapshotTimes();
     },
     methods: {
         toggleSection(section) {
-            if (this.activeSection === section) {
-                this.activeSection = null;
-            } else {
-                this.activeSection = section;
-            }
+            this.activeSection = this.activeSection === section ? '' : section;
         },
         toggleManipulationSection(section) {
-            if (this.activeManipulationSection === section) {
-                this.activeManipulationSection = null;
-            } else {
-                this.activeManipulationSection = section;
-            }
+            this.activeManipulationSection = this.activeManipulationSection === section ? '' : section;
         },
         toggleLinkSection(section) {
-            if (this.activeLinkSection === section) {
-                this.activeLinkSection = null;
-            } else {
-                this.activeLinkSection = section;
-            }
-        },
-        async fetchSnapshotTimes() {
-            try {
-                const response = await fetch('/api/snapshot/times');
-                const data = await response.json();
-                if (data.times && data.times.length > 0) {
-                    this.snapshotTimes = data.times;
-                    this.selectedSnapshotTime = data.times[data.times.length - 1]; // Default to last
-                    // Trigger initial load
-                    this.updateSnapshot();
-                }
-            } catch (error) {
-                console.error("ControlPanel: Failed to fetch snapshot times", error);
-            }
-        },
-        getDetectionParams() {
-            const timeRange = {};
-            if (this.startTime) timeRange.start = this.startTime.replace('T', ' ');
-            if (this.endTime) timeRange.end = this.endTime.replace('T', ' ');
-            return {
-                threshold: this.detectionThreshold,
-                volumeThreshold: this.volumeThreshold,
-                enableTxCount: this.enableTxCount,
-                enableTxVolume: this.enableTxVolume,
-                checkFundingSource: this.checkFundingSource,
-                checkSameSender: this.checkSameSender,
-                checkSameRecipient: this.checkSameRecipient,
-                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
-                ruleType: "transfer-network",
-                // Behavior Params
-                enableNetworkBased: this.enableNetworkBased,
-                enableBehaviorBased: this.enableBehaviorBased,
-                behaviorTimeWindow: this.behaviorTimeWindow,
-                enableRule3: this.enableRule3,
-                rule3Params: {
-                    max_time_diff_minutes: this.rule3MaxTimeDiff,
-                    min_contiguous_length: this.rule3MinLength,
-                    sequence_representation: this.rule3SequenceRep
-                },
-                enableRule4: this.enableRule4,
-                rule4Params: {
-                    similarity: this.rule4Similarity,
-                    time_bin: this.rule4TimeBin
-                },
-                enableRule5: this.enableRule5,
-                rule5Params: {
-                    similarity: this.rule5Similarity,
-                    time_bin: this.rule5TimeBin
-                }
-            };
-        },
-        getLinkParams() {
-            const timeRange = {};
-            if (this.linkStartTime) timeRange.start = this.linkStartTime.replace('T', ' ');
-            if (this.linkEndTime) timeRange.end = this.linkEndTime.replace('T', ' ');
-            return {
-                threshold: this.linkThreshold,
-                volumeThreshold: this.linkVolumeThreshold,
-                enableTxCount: this.linkEnableTxCount,
-                enableTxVolume: this.linkEnableTxVolume,
-                checkFundingSource: this.linkCheckFundingSource,
-                checkSameSender: this.linkCheckSameSender,
-                checkSameRecipient: this.linkCheckSameRecipient,
-                timeRange: Object.keys(timeRange).length > 0 ? timeRange : undefined,
-                ruleType: "transfer-network",
-                // Behavior Params
-                enableNetworkBased: this.linkEnableNetworkBased,
-                enableBehaviorBased: this.linkEnableBehaviorBased,
-                behaviorTimeWindow: this.linkBehaviorTimeWindow,
-                enableRule3: this.linkEnableRule3,
-                rule3Params: {
-                    max_time_diff_minutes: this.linkRule3MaxTimeDiff,
-                    min_contiguous_length: this.linkRule3MinLength,
-                    sequence_representation: this.linkRule3SequenceRep
-                },
-                enableRule4: this.linkEnableRule4,
-                rule4Params: {
-                    similarity: this.linkRule4Similarity,
-                    time_bin: this.linkRule4TimeBin
-                },
-                enableRule5: this.linkEnableRule5,
-                rule5Params: {
-                    similarity: this.linkRule5Similarity,
-                    time_bin: this.linkRule5TimeBin
-                }
-            };
-        },
-        updateSnapshot() {
-            this.loadingSnapshot = true;
-            this.$emit('update-snapshot', {
-                time: this.selectedSnapshotTime,
-                threshold: this.snapshotThreshold / 100, // Convert percentage to 0-1
-                detectionParams: this.getDetectionParams(),
-                linkParams: this.getLinkParams()
-            });
-            // Simulate loading done after emit (actual data loading is in parent/sibling)
-            // But we can just set it to false after a timeout or let parent handle it?
-            // For now, let's just reset it after a short delay or rely on parent.
-            // Actually, we don't know when parent is done. Let's just set it false after 500ms.
-            setTimeout(() => {
-                this.loadingSnapshot = false;
-            }, 500);
-        },
-        triggerDetection() {
-            console.log("ControlPanel: triggerDetection called");
-            const params = this.getDetectionParams();
-            
-            console.log("ControlPanel: emitting run-detection", params);
-
-            this.$emit('run-detection', params);
-        },
-        triggerManipulationDetection() {
-            // this.loadingManipulation = true; // Controlled by prop now
-            console.log("ControlPanel: emitting request-manipulation-detection");
-            this.$emit('request-manipulation-detection', {
-                threshold: this.selfTradingThreshold,
-                timeWindow: this.entityBasedTimeWindow,
-                checkEntityBased: this.checkEntityBased
-            });
-        },
-        updateLinks() {
-            console.log("ControlPanel: updateLinks called");
-            const params = this.getLinkParams();
-            
-            console.log("ControlPanel: emitting update-links", params);
-            
-            this.$emit('update-links', params);
-        },
+            this.activeLinkSection = this.activeLinkSection === section ? '' : section;
+        }
     }
 }
 </script>
-
-<style scoped>
-</style>
