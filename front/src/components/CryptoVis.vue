@@ -49,6 +49,9 @@
                 <span class="card-header-text">Token Distribution</span>
             </template>
             <TokenDistribution ref="tokenDistribution"
+                :snapshot-data="snapshot_data"
+                :entity-detection-results="entity_detection_results"
+                :link-detection-results="link_generation_results"
                 @detection-complete="handleDetectionComplete"
                 @manipulation-detected="handleManipulationDetected"
                 @snapshot-loaded="handleSnapshotLoaded"
@@ -162,7 +165,7 @@ export default {
         },
         enable_similarity_based: true,
         similarity_based_params: {
-          enable_trading_action_sequence: true,
+          enable_trading_action_sequence: false,
           trading_action_sequence_params: {
             type: "action_amount_price", //action_only, action_amount, action_price, action_amount_price
             min_seq_length: 3, //min matching sequence length
@@ -175,7 +178,7 @@ export default {
             balance_granularity: '1h', //1min, 1h, 1d
             balance_similarity_threshold: 0.6, //0.5-1.0
           },
-          enable_earning_sequence: true,
+          enable_earning_sequence: false,
           earning_sequence_params: {
             earning_granularity: '1d', //1min, 1h, 1d
             earning_similarity_threshold: 0.8, //0.5-1.0
@@ -475,25 +478,6 @@ export default {
              }
          }
     },
-    async loadCSV(){
-      this.loading = true
-      const overviewUrl = '/processed/overview.json'
-      try{
-        const res = await fetch(overviewUrl)
-        const data = await res.json()
-        this.overview.rows = data.rows
-        this.overview.pairs = new Set(Array.from({length:data.top_pairs.length},(_,i)=>data.top_pairs[i].token_pair))
-        this.overview.dateSet = new Set([...(data.date_min? [data.date_min]:[]),...(data.date_max? [data.date_max]:[])])
-        this.overview.dateMin = data.date_min || ''
-        this.overview.dateMax = data.date_max || ''
-        this.overview.topPairs = data.top_pairs || []
-        this.isPartial = true
-      }catch(e){
-        console.error('Failed to load overview.json:',e)
-      }finally{
-        this.loading = false
-      }      
-    },
     async fetchInitialSnapshotData() { 
         console.log("CryptoVis: Fetching initial snapshot data...");
         try {
@@ -539,15 +523,25 @@ export default {
             const detectionResults = await detectionResponse.json();
             console.log("CryptoVis: Detection results received:", detectionResults);
 
-            this.entity_detection_results = detectionResults.entities;
-            this.link_generation_results = detectionResults.links;
+            this.entity_detection_results = detectionResults.entity_results;
+            this.link_generation_results = detectionResults.relations;
 
             // Update TokenDistribution if available
             if (this.$refs.tokenDistribution) {
-                this.$refs.tokenDistribution.setDetectionResults(
-                    this.entity_detection_results,
-                    this.link_generation_results
-                );
+                // Ensure data is set before drawing
+                // We don't need setDetectionResults anymore as props are reactive
+                // But we need to call drawChart() explicitly as requested
+                // "把drawchart函数暴露给cryptovis，在第一次fetchinitial计算出结果调用一次"
+                
+                // Wait for Vue to update props
+                this.$nextTick(() => {
+                    if (this.$refs.tokenDistribution.drawChart) {
+                        console.log("CryptoVis: Calling tokenDistribution.drawChart() after initial detection");
+                        this.$refs.tokenDistribution.drawChart();
+                    } else {
+                        console.warn("CryptoVis: tokenDistribution.drawChart method not found");
+                    }
+                });
             } else {
                 console.warn("CryptoVis: tokenDistribution ref not found when updating detection results");
             }
@@ -557,11 +551,8 @@ export default {
         }
     }
   },
-  beforeMount(){
-    this.fetchInitialSnapshotData();
-  },
   mounted(){
-    
+    this.fetchInitialSnapshotData();
   },
   updated(){
   }

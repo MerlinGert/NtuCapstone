@@ -33,7 +33,6 @@ export default {
     name: "TokenDistribution",
     data() {
         return {
-            snapshotData: null,
             loading: true,
             detecting: false,
             svgWidth: 0,
@@ -46,9 +45,8 @@ export default {
             lastDetectionTimeRange: {},
             lastLinkThreshold: 1,
             lastLinkTimeRange: {},
-            detectedEntities: [],
-            nodes: [],
-            currentLinks: [],
+            // detectedEntities: [], // Removed local state, use prop
+            // currentLinks: [], // Removed local state, use prop
             simulation: null,
             centerX: 0,
             centerY: 0,
@@ -56,137 +54,67 @@ export default {
             suspiciousTraders: []
         }
     },
+    props: {
+        snapshotData: {
+            type: Object,
+            default: null
+        },
+        entityDetectionResults: {
+            type: Object,
+            default: () => ({})
+        },
+        linkDetectionResults: {
+            type: [Array, Object],
+            default: () => []
+        }
+    },
+    watch: {
+        snapshotData: {
+            handler(newVal) {
+                if (newVal) {
+                    this.loading = false;
+                    this.drawChart();
+                } else {
+                    this.loading = true;
+                }
+            },
+            deep: true
+        },
+        entityDetectionResults: {
+            handler(newVal) {
+                console.log("TokenDistribution: entityDetectionResults changed", newVal ? newVal.length : 0);
+                this.drawChart();
+            },
+            deep: true
+        },
+        linkDetectionResults: {
+            handler(newVal) {
+                console.log("TokenDistribution: linkDetectionResults changed", newVal ? newVal.length : 0);
+                this.drawChart();
+            },
+            deep: true
+        }
+    },
     computed: {
         displayTime() {
             if (!this.snapshotData) return "Loading...";
             return this.snapshotData.time ? this.snapshotData.time.replace(" UTC", "") : "Unknown Time";
+        },
+        detectedEntities() {
+            return this.entityDetectionResults || [];
+        },
+        currentLinks() {
+            return this.linkDetectionResults || [];
         }
     },
     mounted() {
-        this.fetchSnapshotData(); // Default fetch
         window.addEventListener('resize', this.setSvg);
+        this.setSvg();
     },
     beforeUnmount() {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
-        setDetectionResults(entities, links) {
-            console.log("TokenDistribution: setDetectionResults called", entities.length, links.length);
-            this.detectedEntities = entities;
-            this.currentLinks = links;
-            this.lastDetectionCount = entities.length;
-            this.drawChart();
-        },
-        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, volumeThreshold = 0, checkSameSender = false, checkSameRecipient = false, silent = false, enableTxCount = true, enableTxVolume = true, enableNetworkBased = true, enableBehaviorBased = true, behaviorTimeWindow = 1.0, enableRule3 = true, enableRule4 = true, enableRule5 = true, rule3Params = {}, rule4Params = {}, rule5Params = {}) {
-            console.log("TokenDistribution: runEntityDetection called with params");
-            if (!this.snapshotData || !this.snapshotData.balances) {
-                 console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
-                 this.$emit('detection-complete', null);
-                 return Promise.resolve(); // Return promise
-             }
-            
-            // Extract user list from current data
-            let users = [];
-            if (this.snapshotData.balances && this.snapshotData.balances.users) {
-                users = Object.entries(this.snapshotData.balances.users)
-                    .filter(([u, bal]) => u !== 'Others' && bal > 0)
-                    .map(([u, _]) => u);
-            }
-            
-            console.log("TokenDistribution: Found", users.length, "users");
-
-            if (users.length === 0) {
-                console.warn("TokenDistribution: No users found");
-                this.$emit('detection-complete', 0);
-                return Promise.resolve();
-            }
-
-            this.detecting = true;
-            this.lastDetectionCount = null;
-            this.lastDetectionThreshold = threshold;
-            this.lastDetectionVolumeThreshold = volumeThreshold;
-            this.lastDetectionTimeRange = timeRange;
-            console.log(`Sending ${users.length} users for detection...`);
-
-            // Construct rules
-            const rules = [];
-
-            // 1. Transfer Network Rule
-            if (enableNetworkBased) {
-                rules.push({
-                    rule_type: "transfer-network",
-                    parameters: {
-                        threshold: threshold, // Detect if > threshold transactions
-                        volume_threshold: volumeThreshold,
-                        check_funding_source: checkFundingSource,
-                        check_same_sender: checkSameSender,
-                        check_same_recipient: checkSameRecipient,
-                        enable_tx_count: enableTxCount,
-                        enable_tx_volume: enableTxVolume
-                    },
-                    enabled: true
-                });
-            }
-
-            // 2. Behavior Similarity Rule
-            if (enableBehaviorBased) {
-                rules.push({
-                    rule_type: "behavior-similarity",
-                    parameters: {
-                        time_window: behaviorTimeWindow,
-                        enable_rule3: enableRule3,
-                        enable_rule4: enableRule4,
-                        enable_rule5: enableRule5,
-                        rule3_params: rule3Params,
-                        rule4_params: rule4Params,
-                        rule5_params: rule5Params
-                    },
-                    enabled: true
-                });
-            }
-
-            // Call backend API
-            return fetch('/api/entity/detect', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    target_users: users,
-                    time_range: timeRange,
-                    rules: rules
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                this.detecting = false;
-                console.log("Detection Result:", data);
-                if (data.debug_relations) {
-                    console.log("Debug Relations (Backend):", data.debug_relations);
-                }
-                if (data.detected_entities && data.detected_entities.length > 0) {
-                    this.lastDetectionCount = data.detected_entities.length;
-                    console.log(`Detected ${data.detected_entities.length} entity groups.`);
-                    // Store detected entities for grouping
-                    this.detectedEntities = data.detected_entities;
-                } else {
-                    this.lastDetectionCount = 0;
-                    this.detectedEntities = []; // Clear
-                    console.log("No entities detected.");
-                }
-                this.$emit('detection-complete', this.lastDetectionCount);
-                return this.lastDetectionCount;
-            })
-            .catch(error => {
-                this.detecting = false;
-                console.error("Error detecting entities:", error);
-                this.$emit('detection-complete', null);
-            });
-        },
-        // Old highlightEntities removed/deprecated as logic is now in drawChart
-        highlightEntities(entities) {
-            // Keep for compatibility if needed, but logic moved to drawChart
-        },
         highlightSuspiciousTraders(suspiciousTraders) {
             console.log("TokenDistribution: highlightSuspiciousTraders", suspiciousTraders.length);
             
@@ -216,112 +144,6 @@ export default {
                 }
             });
         },
-        async fetchSnapshotData(time = this.selectedTime, threshold, relatedUserThreshold = 0.2, detectionParams, linkParams) {
-            console.log("TokenDistribution: fetchSnapshotData called", time, threshold, relatedUserThreshold, detectionParams, linkParams);
-            this.loading = true;
-            this.selectedTime = time;
-
-            // Update internal state if new params provided
-            if (detectionParams) {
-                this.lastDetectionThreshold = detectionParams.threshold;
-                this.lastDetectionTimeRange = detectionParams.timeRange || {};
-            }
-            // linkParams will be handled in updateLinks
-
-            try {
-                const response = await fetch('/api/snapshot/process', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        time: time,
-                        threshold: threshold,
-                        related_user_threshold: relatedUserThreshold
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch data: ${response.statusText}`);
-                }
-                
-                this.snapshotData = await response.json();
-                this.$emit('snapshot-loaded', this.snapshotData);
-                // this.loading = false; // Wait until all detections are done
-                
-                // Update topPercent display based on threshold
-                if (threshold !== undefined) {
-                    this.topPercent = Math.round(threshold * 100);
-                } else {
-                     this.topPercent = 50; // default
-                }
-                
-                // Draw chart
-                this.$nextTick(async () => {
-                    // Set dimensions but don't draw yet
-                    if (this.$refs.chart_container) {
-                        this.svgHeight = this.$refs.chart_container.offsetHeight;
-                        this.svgWidth = this.$refs.chart_container.offsetWidth;
-                    }
-                    
-                    // Auto-load detection and links after initial render
-                    // Run both concurrently and wait for both to finish before drawing
-                    
-                    const p = detectionParams || {};
-                    const thresholdToUse = p.threshold || this.lastDetectionThreshold || 2;
-                    const timeRangeToUse = p.timeRange || this.lastDetectionTimeRange || {};
-                    const volumeToUse = p.volumeThreshold || this.lastDetectionVolumeThreshold || 0;
-                    
-                    // Prepare link params
-                    const linkP = linkParams || {
-                        threshold: this.lastLinkThreshold || 1,
-                        timeRange: this.lastLinkTimeRange || {}
-                    };
-
-                    await Promise.all([
-                        this.runEntityDetection(
-                            thresholdToUse, 
-                            timeRangeToUse, 
-                            'transfer-network', 
-                            p.checkFundingSource !== undefined ? p.checkFundingSource : false,
-                            volumeToUse,
-                            p.checkSameSender !== undefined ? p.checkSameSender : false,
-                            p.checkSameRecipient !== undefined ? p.checkSameRecipient : false,
-                            true, // silent
-                            p.enableTxCount !== undefined ? p.enableTxCount : true,
-                            p.enableTxVolume !== undefined ? p.enableTxVolume : true,
-                            p.enableNetworkBased !== undefined ? p.enableNetworkBased : true,
-                            p.enableBehaviorBased !== undefined ? p.enableBehaviorBased : false,
-                            p.behaviorTimeWindow !== undefined ? p.behaviorTimeWindow : 1.0,
-                            p.enableRule3 !== undefined ? p.enableRule3 : true,
-                            p.enableRule4 !== undefined ? p.enableRule4 : false,
-                            p.enableRule5 !== undefined ? p.enableRule5 : false,
-                            p.rule3Params || {},
-                            p.rule4Params || {},
-                            p.rule5Params || {}
-                        ),
-                        this.updateLinks(linkP, true),
-                        // Run manipulation detection with default threshold (100) or last used
-                        this.runManipulationDetection(100, true) // Pass true for isAutoRun
-                    ]);
-                    // Only draw once after both are ready
-                    this.drawChart();
-                    this.loading = false;
-                });
-            } catch (error) {
-                console.warn("API snapshot failed, using local fallback:", error);
-                // Fallback to local bundled JSON
-                this.snapshotData = localSnapshotData;
-                this.loading = false;
-                this.$nextTick(() => {
-                    this.setSvg();
-                });
-            }
-        },
-        loadData() {
-            // Legacy wrapper, calls fetchSnapshotData with defaults
-            this.fetchSnapshotData(this.selectedTime, 0.5, 0.2);
-        },
         setSvg() {
             if (this.$refs.chart_container) {
                 this.svgHeight = this.$refs.chart_container.offsetHeight;
@@ -329,109 +151,12 @@ export default {
                 this.drawChart();
             }
         },
-        async updateLinks(linkParams, silent = false) {
-            console.log("TokenDistribution: updateLinks called", linkParams);
-
-            if (!this.snapshotData || !this.snapshotData.balances) {
-                console.warn("No snapshot data available.");
-                return;
-            }
-
-            let users = [];
-            if (this.snapshotData.balances && this.snapshotData.balances.users) {
-                users = Object.entries(this.snapshotData.balances.users)
-                    .filter(([u, bal]) => u !== 'Others' && bal > 0)
-                    .map(([u, _]) => u);
-            }
-
-            if (users.length === 0) {
-                console.warn("No users to check links for.");
-                return;
-            }
-
-            // Destructure params with defaults
-            const p = linkParams || {};
-            const threshold = p.threshold !== undefined ? p.threshold : 1;
-            const timeRange = p.timeRange || {};
-            const enableNetworkBased = p.enableNetworkBased !== undefined ? p.enableNetworkBased : true;
-            const enableBehaviorBased = p.enableBehaviorBased !== undefined ? p.enableBehaviorBased : true;
-
-            this.lastLinkThreshold = threshold;
-            this.lastLinkTimeRange = timeRange;
-
-            // Construct rules
-            const rules = [];
-
-            // 1. Transfer Network Rule
-            if (enableNetworkBased) {
-                rules.push({
-                    rule_type: "transfer-network",
-                    parameters: {
-                        threshold: threshold,
-                        volume_threshold: p.volumeThreshold || 0,
-                        check_funding_source: p.checkFundingSource || false,
-                        check_same_sender: p.checkSameSender || false,
-                        check_same_recipient: p.checkSameRecipient || false,
-                        enable_tx_count: p.enableTxCount !== undefined ? p.enableTxCount : true,
-                        enable_tx_volume: p.enableTxVolume !== undefined ? p.enableTxVolume : true
-                    },
-                    enabled: true
-                });
-            }
-
-            // 2. Behavior Similarity Rule
-            if (enableBehaviorBased) {
-                rules.push({
-                    rule_type: "behavior-similarity",
-                    parameters: {
-                        time_window: p.behaviorTimeWindow || 1.0,
-                        enable_rule3: p.enableRule3 !== undefined ? p.enableRule3 : true,
-                        enable_rule4: p.enableRule4 !== undefined ? p.enableRule4 : false,
-                        enable_rule5: p.enableRule5 !== undefined ? p.enableRule5 : false,
-                        rule3_params: p.rule3Params || {},
-                        rule4_params: p.rule4Params || {},
-                        rule5_params: p.rule5Params || {}
-                    },
-                    enabled: true
-                });
-            }
-
-            try {
-                console.log("TokenDistribution: Sending link request with rules:", JSON.stringify(rules, null, 2));
-                const response = await fetch('/api/entity/links', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        target_users: users,
-                        time_range: timeRange,
-                        rules: rules
-                    })
-                });
-
-                if (!response.ok) throw new Error("Failed to fetch links");
-                
-                const data = await response.json();
-                console.log("Links received:", data.links ? data.links.length : 0);
-                if (data.links && data.links.length > 0) {
-                     const behaviorLinks = data.links.filter(l => l.reasons && l.reasons.some(r => r.includes("Behavior") || r.includes("Sequence")));
-                     console.log(`Behavior-based links count: ${behaviorLinks.length}`);
-                }
-                this.currentLinks = data.links || [];
-                
-                // If not silent (user triggered), redraw immediately. 
-                // If silent (initial load), caller handles redraw.
-                if (!silent) {
-                     this.drawChart(); 
-                }
-                console.log(`Updated ${this.currentLinks.length} links.`);
-                
-            } catch (error) {
-                console.error("Error fetching links:", error);
-            }
-        },
+        // updateLinks removed as logic moved to parent
+        // async updateLinks(linkParams, silent = false) { ... }
+        
         drawChart() {
             if (!this.snapshotData || this.svgWidth === 0) return;
-
+            console.log("TokenDistribution: drawChart called with", this.entityDetectionResults, " and", this.linkDetectionResults);
             const width = this.svgWidth;
             const height = this.svgHeight;
             const balances = this.snapshotData.balances;
@@ -485,13 +210,19 @@ export default {
             let simulationNodes = [];
             let finalNodes = []; // Flattened list for rendering links and interactions
 
-            if (this.detectedEntities && this.detectedEntities.length > 0) {
+            if (this.entityDetectionResults && this.entityDetectionResults.length > 0) {
                 // Map user -> group
                 const userGroupMap = new Map();
-                this.detectedEntities.forEach(entity => {
-                    if (entity.details && entity.details.members && entity.details.members.length > 1) {
-                        entity.details.members.forEach(memberId => {
-                            userGroupMap.set(memberId, entity);
+                // entityDetectionResults structure: [{users: [...], relations: [...]}, ...]
+                // We need to assign IDs to these entities if they don't have one, or use index
+                
+                this.entityDetectionResults.forEach((entity, index) => {
+                    const entityId = `entity_${index}`;
+                    entity.id = entityId; // Assign ID for reference
+                    
+                    if (entity.users && entity.users.length > 1) {
+                        entity.users.forEach(userId => {
+                            userGroupMap.set(userId, entity);
                         });
                     }
                 });
@@ -506,15 +237,14 @@ export default {
                         
                         // Attach detection info to the node
                         node.detectionInfo = {
-                            entityId: entity.entity_id,
-                            reason: entity.reason, // List[str]
-                            confidence: entity.confidence
+                            entityId: entity.id,
+                            relations: entity.relations, // Should be array of relations
                         };
 
-                        if (!groupMap.has(entity.entity_id)) {
-                            groupMap.set(entity.entity_id, []);
+                        if (!groupMap.has(entity.id)) {
+                            groupMap.set(entity.id, []);
                         }
-                        groupMap.get(entity.entity_id).push(node);
+                        groupMap.get(entity.id).push(node);
                     } else {
                         independentNodes.push(node);
                         finalNodes.push(node);
@@ -596,7 +326,7 @@ export default {
             // Prepare Links for Simulation
             const simulationLinkMap = new Map();
             const userToSimNode = new Map();
-
+            
             // Map independent nodes
             simulationNodes.filter(n => !n.isGroup).forEach(n => userToSimNode.set(n.id, n));
 
@@ -609,8 +339,51 @@ export default {
             const userToMemberNode = new Map();
             entries.forEach(d => userToMemberNode.set(d.id, d));
 
-            if (this.currentLinks && this.currentLinks.length > 0) {
-                this.currentLinks.forEach(link => {
+            // Process Links from linkDetectionResults
+            // Expected format: array of relations (objects)
+            // But linkDetectionResults might be a dictionary with keys 'target_relations_for_links', etc.
+            // Or if it's the `links` array from detection response?
+            // The previous logic used `this.currentLinks` which was `data.links`.
+            // Now `this.linkDetectionResults` is passed from parent.
+            // Let's assume parent passes `link_generation_results` which is `detectionResults.links`.
+            // Wait, `detectionResults.links` from backend is typically a dictionary of 4 types of relations?
+            // Or is it a list of links?
+            // In `detection_service.py`, response has `target_relations_for_links` etc inside `current_results`?
+            // Or does it return a unified list?
+            // Let's check `CryptoVis.vue`: `this.link_generation_results = detectionResults.links;`
+            // And `detectionResults` comes from `/api/detection/run`.
+            // In `detection_service.py`, `detect_all` returns `response`.
+            // `response` contains `entity_results` and `current_results` (the dict of 4 maps).
+            // It does NOT seem to return a simple list of links.
+            // However, the user instruction says: "link根据linkresults里面的ttrelation去画"
+            // So `linkDetectionResults` is likely the object containing `target_relations_for_links` (tt_relations).
+            
+            // Let's extract TT relations
+            let linksToDraw = [];
+            if (this.linkDetectionResults) {
+                // If it's the object with keys
+                if (this.linkDetectionResults.target_relations_for_links) {
+                     // The value is a Dict[str, List[Relation]] where key is "u1-u2"
+                     // We need to flatten this to list of links
+                     Object.entries(this.linkDetectionResults.target_relations_for_links).forEach(([key, relations]) => {
+                         const parts = key.split('-');
+                         if (parts.length >= 2) {
+                             linksToDraw.push({
+                                 source: parts[0],
+                                 target: parts[1],
+                                 weight: relations.length, // Simple weight
+                                 relations: relations
+                             });
+                         }
+                     });
+                } else if (Array.isArray(this.linkDetectionResults)) {
+                    // Fallback if it is an array
+                    linksToDraw = this.linkDetectionResults;
+                }
+            }
+
+            if (linksToDraw.length > 0) {
+                linksToDraw.forEach(link => {
                     const sourceNode = userToSimNode.get(link.source);
                     const targetNode = userToSimNode.get(link.target);
                     
@@ -628,7 +401,7 @@ export default {
                                 });
                             }
                             const simLink = simulationLinkMap.get(key);
-                            simLink.weight += link.weight;
+                            simLink.weight += (link.weight || 1);
                             simLink.originalLinks.push(link);
                         } else if (sourceNode.isGroup) {
                             // Internal link within a group
@@ -646,7 +419,7 @@ export default {
             }
 
             const simulationLinks = Array.from(simulationLinkMap.values());
-            console.log(`Simulation Links: ${simulationLinks.length} (from ${this.currentLinks ? this.currentLinks.length : 0} raw links)`);
+            console.log(`Simulation Links: ${simulationLinks.length} (from ${linksToDraw.length} raw links)`);
 
             // Draw Links
             const linkElements = linkGroup.selectAll("line")
@@ -661,13 +434,8 @@ export default {
                 .text(d => {
                     let info = `Source: ${d.source}\nTarget: ${d.target}\nTotal Weight: ${d.weight}`;
                     if (d.originalLinks && d.originalLinks.length > 0) {
-                        const reasons = new Set();
-                        d.originalLinks.forEach(l => {
-                            if (l.reasons) l.reasons.forEach(r => reasons.add(r));
-                        });
-                        if (reasons.size > 0) {
-                            info += `\nReasons:\n- ${Array.from(reasons).join('\n- ')}`;
-                        }
+                        // In new structure, relations are in d.originalLinks[i].relations
+                        // We can just show count
                         info += `\nOriginal Links: ${d.originalLinks.length}`;
                     }
                     return info;
@@ -737,12 +505,9 @@ export default {
 
                     if (d.detectionInfo) {
                         content += `<br><strong style="color:orange">Entity Group Detected</strong>`;
-                        if (d.detectionInfo.reason && d.detectionInfo.reason.length > 0) {
-                             content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
-                             d.detectionInfo.reason.forEach(r => {
-                                 content += `<li style="font-size: 10px;">${r}</li>`;
-                             });
-                             content += `</ul>`;
+                        if (d.detectionInfo.relations && d.detectionInfo.relations.length > 0) {
+                             // Assuming relations have reasons or types
+                             content += `<br>Relations: ${d.detectionInfo.relations.length}`;
                         }
                     }
 
