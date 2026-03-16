@@ -133,6 +133,14 @@
                                     <label style="font-size: 11px; width: 100px;">Max Time Diff:</label>
                                     <input type="number" v-model.number="entityConfig.similarity_based_params.trading_action_sequence_params.max_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Amount Sim:</label>
+                                    <input type="number" v-model.number="entityConfig.similarity_based_params.trading_action_sequence_params.amount_similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Price Sim:</label>
+                                    <input type="number" v-model.number="entityConfig.similarity_based_params.trading_action_sequence_params.price_similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
                             </div>
                         </div>
 
@@ -146,9 +154,9 @@
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <label style="font-size: 11px; width: 100px;">Granularity:</label>
                                     <select v-model="entityConfig.similarity_based_params.balance_sequence_params.balance_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
-                                        <option value="1Min">1Min</option>
-                                        <option value="1H">1H</option>
-                                        <option value="1D">1D</option>
+                                        <option value="1min">1Min</option>
+                                        <option value="1h">1H</option>
+                                        <option value="1d">1D</option>
                                     </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -168,9 +176,9 @@
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <label style="font-size: 11px; width: 100px;">Granularity:</label>
                                     <select v-model="entityConfig.similarity_based_params.earning_sequence_params.earning_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
-                                        <option value="1Min">1Min</option>
-                                        <option value="1H">1H</option>
-                                        <option value="1D">1D</option>
+                                        <option value="1min">1Min</option>
+                                        <option value="1h">1H</option>
+                                        <option value="1d">1D</option>
                                     </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -382,6 +390,14 @@
                                     <label style="font-size: 11px; width: 100px;">Max Time Diff:</label>
                                     <input type="number" v-model.number="linkConfig.similarity_based_params.trading_action_sequence_params.max_time_diff" min="0" step="1" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
                                 </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Amount Sim:</label>
+                                    <input type="number" v-model.number="linkConfig.similarity_based_params.trading_action_sequence_params.amount_similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <label style="font-size: 11px; width: 100px;">Price Sim:</label>
+                                    <input type="number" v-model.number="linkConfig.similarity_based_params.trading_action_sequence_params.price_similarity" min="0" max="1" step="0.05" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
+                                </div>
                             </div>
                         </div>
 
@@ -395,9 +411,9 @@
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <label style="font-size: 11px; width: 100px;">Granularity:</label>
                                     <select v-model="linkConfig.similarity_based_params.balance_sequence_params.balance_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
-                                        <option value="1Min">1Min</option>
-                                        <option value="1H">1H</option>
-                                        <option value="1D">1D</option>
+                                        <option value="1min">1Min</option>
+                                        <option value="1h">1H</option>
+                                        <option value="1d">1D</option>
                                     </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -417,9 +433,9 @@
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <label style="font-size: 11px; width: 100px;">Granularity:</label>
                                     <select v-model="linkConfig.similarity_based_params.earning_sequence_params.earning_granularity" style="padding: 3px; border: 1px solid #ccc; border-radius: 4px; width: 60px;">
-                                        <option value="1Min">1Min</option>
-                                        <option value="1H">1H</option>
-                                        <option value="1D">1D</option>
+                                        <option value="1min">1Min</option>
+                                        <option value="1h">1H</option>
+                                        <option value="1d">1D</option>
                                     </select>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 10px;">

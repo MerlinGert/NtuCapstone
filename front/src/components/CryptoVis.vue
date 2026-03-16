@@ -147,7 +147,7 @@ export default {
 
       //entity detection configuration
       entity_detection_configuration: {
-        enable_network_based: true,
+        enable_network_based: false,
         transfer_network_based_params: {
            enable_direct_transfer: true,
            direct_transfer_params: {
@@ -160,23 +160,25 @@ export default {
            enable_same_sender: false,
            enable_same_recipient: false,
         },
-        enable_similarity_based: false,
+        enable_similarity_based: true,
         similarity_based_params: {
-          enable_trading_action_sequence: false,
+          enable_trading_action_sequence: true,
           trading_action_sequence_params: {
             type: "action_amount_price", //action_only, action_amount, action_price, action_amount_price
-            min_seq_length: 5, //min matching sequence length
-            max_time_diff: 2, //max time difference between the first and last matching actions in the sequence
+            min_seq_length: 3, //min matching sequence length
+            max_time_diff: 20, //max time difference between the first and last matching actions in the sequence
+            amount_similarity: 0.7, //0.5-1.0
+            price_similarity: 0.7, //0.5-1.0
           },
-          enable_balance_sequence: false,
+          enable_balance_sequence: true,
           balance_sequence_params: {
-            balance_granularity: '1D', //1min, 1H, 1D
-            balance_similarity_threshold: 0.9, //0.5-1.0
+            balance_granularity: '1h', //1min, 1h, 1d
+            balance_similarity_threshold: 0.6, //0.5-1.0
           },
-          enable_earning_sequence: false,
+          enable_earning_sequence: true,
           earning_sequence_params: {
-            earning_granularity: '1D', //1min, 1H, 1D
-            earning_similarity_threshold: 0.9, //0.5-1.0
+            earning_granularity: '1d', //1min, 1h, 1d
+            earning_similarity_threshold: 0.8, //0.5-1.0
           },
         },
         enable_manipulation_based: false,
@@ -188,7 +190,7 @@ export default {
 
       // link detection configuration
       link_detection_configuration: {
-        enable_network_based: true,
+        enable_network_based: false,
         transfer_network_based_params: {
            enable_direct_transfer: true,
            direct_transfer_params: {
@@ -197,27 +199,29 @@ export default {
              enable_min_volume: false,
              min_tx_volume: 0,
            },
-           enable_funding_relationship: true, //direct fund or co funder
+           enable_funding_relationship: false, //direct fund or co funder
            enable_same_sender: false,
            enable_same_recipient: false,
         },
-        enable_similarity_based: false,
+        enable_similarity_based: true,
         similarity_based_params: {
-          enable_trading_action_sequence: false,
+          enable_trading_action_sequence: true,
           trading_action_sequence_params: {
-            type: "action_amount_price", //action_only, action_amount, action_price, action_amount_price
-            min_seq_length: 5, //min matching sequence length
-            max_time_diff: 2, //max time difference between the first and last matching actions in the sequence
+            type: "action_only", //action_only, action_amount, action_price, action_amount_price
+            min_seq_length: 3, //min matching sequence length
+            max_time_diff: 120, //max time difference between the first and last matching actions in the sequence
+            amount_similarity: 0.7, //0.5-1.0
+            price_similarity: 0.7, //0.5-1.0
           },
           enable_balance_sequence: false,
           balance_sequence_params: {
-            balance_granularity: '1D', //1min, 1H, 1D
-            balance_similarity_threshold: 0.9, //0.5-1.0
+            balance_granularity: '1h', //1min, 1h, 1d
+            balance_similarity_threshold: 0.7, //0.5-1.0
           },
           enable_earning_sequence: false,
           earning_sequence_params: {
-            earning_granularity: '1D', //1min, 1H, 1D
-            earning_similarity_threshold: 0.9, //0.5-1.0
+            earning_granularity: '1d', //1min, 1h, 1d
+            earning_similarity_threshold: 0.7, //0.5-1.0
           },
         },
         enable_manipulation_based: false,
