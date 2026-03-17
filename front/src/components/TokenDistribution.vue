@@ -42,7 +42,6 @@ export default {
     components: { TokenSnapshot },
     data() {
         return {
-            snapshotData: null,
             loading: true,
             detecting: false,
             svgWidth: 0,
@@ -55,9 +54,8 @@ export default {
             lastDetectionTimeRange: {},
             lastLinkThreshold: 1,
             lastLinkTimeRange: {},
-            detectedEntities: [],
-            nodes: [],
-            currentLinks: [],
+            // detectedEntities: [], // Removed local state, use prop
+            // currentLinks: [], // Removed local state, use prop
             simulation: null,
             centerX: 0,
             centerY: 0,
@@ -68,102 +66,67 @@ export default {
             snapshotPayload: null,
         }
     },
+    props: {
+        snapshotData: {
+            type: Object,
+            default: null
+        },
+        entityDetectionResults: {
+            type: Object,
+            default: () => ({})
+        },
+        linkDetectionResults: {
+            type: [Array, Object],
+            default: () => []
+        }
+    },
+    watch: {
+        snapshotData: {
+            handler(newVal) {
+                if (newVal) {
+                    this.loading = false;
+                    this.drawChart();
+                } else {
+                    this.loading = true;
+                }
+            },
+            deep: true
+        },
+        entityDetectionResults: {
+            handler(newVal) {
+                console.log("TokenDistribution: entityDetectionResults changed", newVal ? newVal.length : 0);
+                this.drawChart();
+            },
+            deep: true
+        },
+        linkDetectionResults: {
+            handler(newVal) {
+                console.log("TokenDistribution: linkDetectionResults changed", newVal ? newVal.length : 0);
+                this.drawChart();
+            },
+            deep: true
+        }
+    },
     computed: {
         displayTime() {
             if (!this.snapshotData) return "Loading...";
             return this.snapshotData.time ? this.snapshotData.time.replace(" UTC", "") : "Unknown Time";
+        },
+        detectedEntities() {
+            return this.entityDetectionResults || [];
+        },
+        currentLinks() {
+            return this.linkDetectionResults || [];
         }
     },
     mounted() {
-        this.fetchSnapshotData(); // Default fetch
         window.addEventListener('resize', this.setSvg);
+        this.setSvg();
     },
     beforeUnmount() {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
-        runEntityDetection(threshold, timeRange, ruleType, checkFundingSource = false, volumeThreshold = 0, checkSameSender = false, checkSameRecipient = false, silent = false, enableTxCount = true, enableTxVolume = true) {
-            console.log("TokenDistribution: runEntityDetection called with", threshold, timeRange, ruleType, checkFundingSource, volumeThreshold, checkSameSender, checkSameRecipient, enableTxCount, enableTxVolume);
-            if (!this.snapshotData || !this.snapshotData.balances) {
-                 console.error("TokenDistribution: snapshotData not ready", this.snapshotData);
-                 this.$emit('detection-complete', null);
-                 return Promise.resolve(); // Return promise
-             }
-            
-            // Extract user list from current data
-            let users = [];
-            if (this.snapshotData.balances && this.snapshotData.balances.users) {
-                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
-            }
-            
-            console.log("TokenDistribution: Found", users.length, "users");
-
-            if (users.length === 0) {
-                console.warn("TokenDistribution: No users found");
-                this.$emit('detection-complete', 0);
-                return Promise.resolve();
-            }
-
-            this.detecting = true;
-            this.lastDetectionCount = null;
-            this.lastDetectionThreshold = threshold;
-            this.lastDetectionVolumeThreshold = volumeThreshold;
-            this.lastDetectionTimeRange = timeRange;
-            console.log(`Sending ${users.length} users for detection...`);
-
-            // Call backend API
-            return fetch('/api/entity/detect', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    target_users: users,
-                    time_range: timeRange,
-                    rules: [
-                        {
-                            rule_type: ruleType,
-                            parameters: {
-                                threshold: threshold, // Detect if > threshold transactions
-                                volume_threshold: volumeThreshold,
-                                check_funding_source: checkFundingSource,
-                                check_same_sender: checkSameSender,
-                                check_same_recipient: checkSameRecipient,
-                                enable_tx_count: enableTxCount,
-                                enable_tx_volume: enableTxVolume
-                            },
-                            enabled: true
-                        }
-                    ]
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                this.detecting = false;
-                console.log("Detection Result:", data);
-                if (data.detected_entities && data.detected_entities.length > 0) {
-                    this.lastDetectionCount = data.detected_entities.length;
-                    console.log(`Detected ${data.detected_entities.length} entity groups.`);
-                    // Store detected entities for grouping
-                    this.detectedEntities = data.detected_entities;
-                } else {
-                    this.lastDetectionCount = 0;
-                    this.detectedEntities = []; // Clear
-                    console.log("No entities detected.");
-                }
-                this.$emit('detection-complete', this.lastDetectionCount);
-                return this.lastDetectionCount;
-            })
-            .catch(error => {
-                this.detecting = false;
-                console.error("Error detecting entities:", error);
-                this.$emit('detection-complete', null);
-            });
-        },
-        // Old highlightEntities removed/deprecated as logic is now in drawChart
-        highlightEntities(entities) {
-            // Keep for compatibility if needed, but logic moved to drawChart
-        },
         highlightSuspiciousTraders(suspiciousTraders) {
             console.log("TokenDistribution: highlightSuspiciousTraders", suspiciousTraders.length);
             
@@ -193,81 +156,6 @@ export default {
                 }
             });
         },
-        async fetchSnapshotData(time = this.selectedTime, threshold, detectionParams, linkParams) {
-            console.log("TokenDistribution: fetchSnapshotData called", time, threshold, detectionParams, linkParams);
-            this.loading = true;
-            this.selectedTime = time;
-
-            // Update internal state if new params provided
-            if (detectionParams) {
-                this.lastDetectionThreshold = detectionParams.threshold;
-                this.lastDetectionTimeRange = detectionParams.timeRange || {};
-            }
-            if (linkParams) {
-                this.lastLinkThreshold = linkParams.threshold;
-                this.lastLinkTimeRange = linkParams.timeRange || {};
-            }
-
-            try {
-                const response = await fetch('/api/snapshot/process', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        time: time,
-                        threshold: threshold
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch data: ${response.statusText}`);
-                }
-                
-                this.snapshotData = await response.json();
-                // this.loading = false; // Wait until all detections are done
-                
-                // Update topPercent display based on threshold
-                if (threshold !== undefined) {
-                    this.topPercent = Math.round(threshold * 100);
-                } else {
-                     this.topPercent = 50; // default
-                }
-                
-                // Draw chart
-                this.$nextTick(async () => {
-                    // Set dimensions but don't draw yet
-                    if (this.$refs.chart_container) {
-                        this.svgHeight = this.$refs.chart_container.offsetHeight;
-                        this.svgWidth = this.$refs.chart_container.offsetWidth;
-                    }
-                    
-                    // Auto-load detection and links after initial render
-                    // Run both concurrently and wait for both to finish before drawing
-                    await Promise.all([
-                        this.runEntityDetection(this.lastDetectionThreshold || 2, this.lastDetectionTimeRange || {}, 'transfer-network', true, this.lastDetectionVolumeThreshold || 0, true),
-                        this.updateLinks(this.lastLinkThreshold || 1, this.lastLinkTimeRange || {}, true),
-                        // Run manipulation detection with default threshold (100) or last used
-                        this.runManipulationDetection(100, true) // Pass true for isAutoRun
-                    ]);
-                    // Only draw once after both are ready
-                    this.drawChart();
-                    this.loading = false;
-                });
-            } catch (error) {
-                console.warn("API snapshot failed, using local fallback:", error);
-                // Fallback to local bundled JSON
-                this.snapshotData = localSnapshotData;
-                this.loading = false;
-                this.$nextTick(() => {
-                    this.setSvg();
-                });
-            }
-        },
-        loadData() {
-            // Legacy wrapper, calls fetchSnapshotData with defaults
-            this.fetchSnapshotData();
-        },
         setSvg() {
             if (this.$refs.chart_container) {
                 this.svgHeight = this.$refs.chart_container.offsetHeight;
@@ -275,62 +163,8 @@ export default {
                 this.drawChart();
             }
         },
-        async updateLinks(threshold, timeRange, silent = false) {
-            console.log("TokenDistribution: updateLinks called", threshold, timeRange);
-
-            // Update topPercent if threshold is provided
-            if (threshold) {
-                this.topPercent = threshold;
-            }
-
-            if (!this.snapshotData || !this.snapshotData.balances) {
-                console.warn("No snapshot data available.");
-                return;
-            }
-
-            let users = [];
-            if (this.snapshotData.balances && this.snapshotData.balances.users) {
-                users = Object.keys(this.snapshotData.balances.users).filter(u => u !== 'Others');
-            }
-
-            if (users.length === 0) {
-                console.warn("No users to check links for.");
-                return;
-            }
-
-            this.lastLinkThreshold = threshold;
-            this.lastLinkTimeRange = timeRange;
-
-            try {
-                const response = await fetch('/api/entity/links', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        target_users: users,
-                        time_range: timeRange,
-                        threshold: threshold
-                    })
-                });
-
-                if (!response.ok) throw new Error("Failed to fetch links");
-                
-                const data = await response.json();
-                console.log("Links received:", data.links);
-                this.currentLinks = data.links || [];
-                
-                // If not silent (user triggered), redraw immediately. 
-                // If silent (initial load), caller handles redraw.
-                if (!silent) {
-                     this.drawChart(); 
-                }
-                console.log(`Updated ${this.currentLinks.length} links.`);
-                
-            } catch (error) {
-                console.error("Error fetching links:", error);
-            }
-        },
-        
-
+        // updateLinks removed as logic moved to parent
+        // async updateLinks(linkParams, silent = false) { ... }
         // added by ezio
         openSnapshot() {
             this.snapshotPayload = this.captureSnapshot();
@@ -400,7 +234,7 @@ export default {
 
         drawChart() {
             if (!this.snapshotData || this.svgWidth === 0) return;
-
+            console.log("TokenDistribution: drawChart called with", this.entityDetectionResults, " and", this.linkDetectionResults);
             const width = this.svgWidth;
             const height = this.svgHeight;
             const balances = this.snapshotData.balances;
@@ -454,13 +288,19 @@ export default {
             let simulationNodes = [];
             let finalNodes = []; // Flattened list for rendering links and interactions
 
-            if (this.detectedEntities && this.detectedEntities.length > 0) {
+            if (this.entityDetectionResults && this.entityDetectionResults.length > 0) {
                 // Map user -> group
                 const userGroupMap = new Map();
-                this.detectedEntities.forEach(entity => {
-                    if (entity.details && entity.details.members) {
-                        entity.details.members.forEach(memberId => {
-                            userGroupMap.set(memberId, entity);
+                // entityDetectionResults structure: [{users: [...], relations: [...]}, ...]
+                // We need to assign IDs to these entities if they don't have one, or use index
+                
+                this.entityDetectionResults.forEach((entity, index) => {
+                    const entityId = `entity_${index}`;
+                    entity.id = entityId; // Assign ID for reference
+                    
+                    if (entity.users && entity.users.length > 1) {
+                        entity.users.forEach(userId => {
+                            userGroupMap.set(userId, entity);
                         });
                     }
                 });
@@ -472,39 +312,55 @@ export default {
                 entries.forEach(node => {
                     if (userGroupMap.has(node.id)) {
                         const entity = userGroupMap.get(node.id);
-                        if (!groupMap.has(entity.entity_id)) {
-                            groupMap.set(entity.entity_id, []);
+                        
+                        // Attach detection info to the node
+                        node.detectionInfo = {
+                            entityId: entity.id,
+                            relations: entity.relations, // Should be array of relations
+                        };
+
+                        if (!groupMap.has(entity.id)) {
+                            groupMap.set(entity.id, []);
                         }
-                        groupMap.get(entity.entity_id).push(node);
+                        groupMap.get(entity.id).push(node);
                     } else {
                         independentNodes.push(node);
                         finalNodes.push(node);
                     }
                 });
 
-                // Process Groups
-                const groupNodes = [];
+                // Post-process groups: Dismantle groups with < 2 members
+                const finalGroupNodes = [];
                 groupMap.forEach((members, entityId) => {
-                    // Use d3.packSiblings to pack members tightly
-                    // This adds x, y to members relative to (0,0)
-                    d3.packSiblings(members);
-                    
-                    // Calculate enclosing circle
-                    const enclose = d3.packEnclose(members);
-                    
-                    // Create Super Node
-                    const groupNode = {
-                        id: entityId,
-                        isGroup: true,
-                        r: enclose.r + 5, // Add padding
-                        value: members.reduce((sum, m) => sum + m.value, 0),
-                        children: members,
-                        enclose: enclose // Store enclosure info for offset calculation
-                    };
-                    groupNodes.push(groupNode);
+                    if (members.length > 1) {
+                         // Use d3.packSiblings to pack members tightly
+                        // This adds x, y to members relative to (0,0)
+                        d3.packSiblings(members);
+                        
+                        // Calculate enclosing circle
+                        const enclose = d3.packEnclose(members);
+                        
+                        // Create Super Node
+                        const groupNode = {
+                            id: entityId,
+                            isGroup: true,
+                            r: enclose.r + 5, // Add padding
+                            value: members.reduce((sum, m) => sum + m.value, 0),
+                            children: members,
+                            enclose: enclose // Store enclosure info for offset calculation
+                        };
+                        finalGroupNodes.push(groupNode);
+                    } else {
+                        // Dismantle single-node groups
+                        members.forEach(m => {
+                            m.detectionInfo = null; // Clear detection info as it's not shown as group
+                            independentNodes.push(m);
+                            finalNodes.push(m);
+                        });
+                    }
                 });
 
-                simulationNodes = [...independentNodes, ...groupNodes];
+                simulationNodes = [...independentNodes, ...finalGroupNodes];
             } else {
                 // No grouping
                 simulationNodes = entries;
@@ -548,7 +404,7 @@ export default {
             // Prepare Links for Simulation
             const simulationLinkMap = new Map();
             const userToSimNode = new Map();
-
+            
             // Map independent nodes
             simulationNodes.filter(n => !n.isGroup).forEach(n => userToSimNode.set(n.id, n));
 
@@ -557,29 +413,91 @@ export default {
                 g.children.forEach(c => userToSimNode.set(c.id, g)); // Map member to GROUP
             });
 
-            if (this.currentLinks && this.currentLinks.length > 0) {
-                this.currentLinks.forEach(link => {
+            // Map user ID to member node for internal links
+            const userToMemberNode = new Map();
+            entries.forEach(d => userToMemberNode.set(d.id, d));
+
+            // Process Links from linkDetectionResults
+            // Expected format: array of relations (objects)
+            // But linkDetectionResults might be a dictionary with keys 'target_relations_for_links', etc.
+            // Or if it's the `links` array from detection response?
+            // The previous logic used `this.currentLinks` which was `data.links`.
+            // Now `this.linkDetectionResults` is passed from parent.
+            // Let's assume parent passes `link_generation_results` which is `detectionResults.links`.
+            // Wait, `detectionResults.links` from backend is typically a dictionary of 4 types of relations?
+            // Or is it a list of links?
+            // In `detection_service.py`, response has `target_relations_for_links` etc inside `current_results`?
+            // Or does it return a unified list?
+            // Let's check `CryptoVis.vue`: `this.link_generation_results = detectionResults.links;`
+            // And `detectionResults` comes from `/api/detection/run`.
+            // In `detection_service.py`, `detect_all` returns `response`.
+            // `response` contains `entity_results` and `current_results` (the dict of 4 maps).
+            // It does NOT seem to return a simple list of links.
+            // However, the user instruction says: "link根据linkresults里面的ttrelation去画"
+            // So `linkDetectionResults` is likely the object containing `target_relations_for_links` (tt_relations).
+            
+            // Let's extract TT relations
+            let linksToDraw = [];
+            if (this.linkDetectionResults) {
+                // If it's the object with keys
+                if (this.linkDetectionResults.target_relations_for_links) {
+                     // The value is a Dict[str, List[Relation]] where key is "u1-u2"
+                     // We need to flatten this to list of links
+                     Object.entries(this.linkDetectionResults.target_relations_for_links).forEach(([key, relations]) => {
+                         const parts = key.split('-');
+                         if (parts.length >= 2) {
+                             linksToDraw.push({
+                                 source: parts[0],
+                                 target: parts[1],
+                                 weight: relations.length, // Simple weight
+                                 relations: relations
+                             });
+                         }
+                     });
+                } else if (Array.isArray(this.linkDetectionResults)) {
+                    // Fallback if it is an array
+                    linksToDraw = this.linkDetectionResults;
+                }
+            }
+
+            if (linksToDraw.length > 0) {
+                linksToDraw.forEach(link => {
                     const sourceNode = userToSimNode.get(link.source);
                     const targetNode = userToSimNode.get(link.target);
                     
-                    if (sourceNode && targetNode && sourceNode !== targetNode) {
-                        // Link between different simulation bodies (Group-Group, Group-Single, Single-Single)
-                        // Create key for link aggregation
-                        const key = `${sourceNode.id}-${targetNode.id}`;
-                        if (!simulationLinkMap.has(key)) {
-                            simulationLinkMap.set(key, { 
-                                source: sourceNode.id, 
-                                target: targetNode.id, 
-                                weight: 0 
+                    if (sourceNode && targetNode) {
+                        if (sourceNode !== targetNode) {
+                            // Link between different simulation bodies (Group-Group, Group-Single, Single-Single)
+                            // Create key for link aggregation
+                            const key = `${sourceNode.id}-${targetNode.id}`;
+                            if (!simulationLinkMap.has(key)) {
+                                simulationLinkMap.set(key, { 
+                                    source: sourceNode.id, 
+                                    target: targetNode.id, 
+                                    weight: 0,
+                                    originalLinks: []
+                                });
+                            }
+                            const simLink = simulationLinkMap.get(key);
+                            simLink.weight += (link.weight || 1);
+                            simLink.originalLinks.push(link);
+                        } else if (sourceNode.isGroup) {
+                            // Internal link within a group
+                            if (!sourceNode.internalLinks) {
+                                sourceNode.internalLinks = [];
+                            }
+                            sourceNode.internalLinks.push({
+                                source: userToMemberNode.get(link.source),
+                                target: userToMemberNode.get(link.target),
+                                ...link
                             });
                         }
-                        simulationLinkMap.get(key).weight += link.weight;
                     }
                 });
             }
 
             const simulationLinks = Array.from(simulationLinkMap.values());
-            console.log(`Simulation Links: ${simulationLinks.length} (from ${this.currentLinks ? this.currentLinks.length : 0} raw links)`);
+            console.log(`Simulation Links: ${simulationLinks.length} (from ${linksToDraw.length} raw links)`);
 
             // Draw Links
             const linkElements = linkGroup.selectAll("line")
@@ -591,7 +509,15 @@ export default {
                 // .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
             
             linkElements.append("title")
-                .text(d => `Source: ${d.source}\nTarget: ${d.target}\nWeight: ${d.weight}`);
+                .text(d => {
+                    let info = `Source: ${d.source}\nTarget: ${d.target}\nTotal Weight: ${d.weight}`;
+                    if (d.originalLinks && d.originalLinks.length > 0) {
+                        // In new structure, relations are in d.originalLinks[i].relations
+                        // We can just show count
+                        info += `\nOriginal Links: ${d.originalLinks.length}`;
+                    }
+                    return info;
+                });
 
             // Drag Behavior
             const drag = d3.drag()
@@ -654,6 +580,15 @@ export default {
                              content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
                         }
                     }
+
+                    if (d.detectionInfo) {
+                        content += `<br><strong style="color:orange">Entity Group Detected</strong>`;
+                        if (d.detectionInfo.relations && d.detectionInfo.relations.length > 0) {
+                             // Assuming relations have reasons or types
+                             content += `<br>Relations: ${d.detectionInfo.relations.length}`;
+                        }
+                    }
+
                     tooltip.innerHTML = content;
                     tooltip.style.display = "block";
                     tooltip.style.opacity = 1;
@@ -674,7 +609,10 @@ export default {
 
             // Draw Group Members
             groups.each(function(d) {
-                d3.select(this).selectAll(".member")
+                const groupG = d3.select(this);
+
+                // Draw Members first (so links are on top)
+                groupG.selectAll(".member")
                     .data(d.children)
                     .enter().append("circle")
                     .attr("class", "bubble member")
@@ -685,6 +623,31 @@ export default {
                     .style("opacity", 0.6)
                     .style("stroke", child => child.suspicious ? "#ff0000" : "#5976ba")
                     .style("stroke-width", child => child.suspicious ? 3 : 2);
+
+                // Draw Internal Links on top
+                if (d.internalLinks && d.internalLinks.length > 0) {
+                    console.log(`Group ${d.id} has ${d.internalLinks.length} internal links.`);
+                    groupG.selectAll(".internal-link")
+                        .data(d.internalLinks)
+                        .enter().append("line")
+                        .attr("class", "internal-link")
+                        .attr("x1", l => l.source.x - d.enclose.x)
+                        .attr("y1", l => l.source.y - d.enclose.y)
+                        .attr("x2", l => l.target.x - d.enclose.x)
+                        .attr("y2", l => l.target.y - d.enclose.y)
+                        .attr("stroke", "#555") 
+                        .attr("stroke-width", 1.5)
+                        .attr("stroke-opacity", 0.6)
+                        // .style("pointer-events", "none") // Let clicks pass through to bubbles
+                        .append("title")
+                        .text(l => {
+                            let info = `Internal Link\nSource: ${l.source.name}\nTarget: ${l.target.name}`;
+                            if (l.reasons && l.reasons.length > 0) {
+                                info += `\nReasons:\n- ${l.reasons.join('\n- ')}`;
+                            }
+                            return info;
+                        });
+                }
             });
             
             // Re-bind events for members with correct scope
@@ -695,18 +658,30 @@ export default {
                     const tooltip = self.$refs.tooltip;
                     let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
                     if (d.suspicious) {
-                        content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
-                        if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
-                             content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
-                             d.suspicious.reasons.forEach(r => {
-                                 content += `<li style="font-size: 10px;">${r}</li>`;
-                             });
-                             content += `</ul>`;
-                        } else {
-                             content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                            content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
+                            if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
+                                 content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                                 d.suspicious.reasons.forEach(r => {
+                                     content += `<li style="font-size: 10px;">${r}</li>`;
+                                 });
+                                 content += `</ul>`;
+                            } else {
+                                 content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
+                            }
                         }
-                    }
-                    tooltip.innerHTML = content;
+
+                        if (d.detectionInfo) {
+                            content += `<br><strong style="color:orange">Entity Group Detected</strong>`;
+                            if (d.detectionInfo.reason && d.detectionInfo.reason.length > 0) {
+                                 content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                                 d.detectionInfo.reason.forEach(r => {
+                                     content += `<li style="font-size: 10px;">${r}</li>`;
+                                 });
+                                 content += `</ul>`;
+                            }
+                        }
+
+                        tooltip.innerHTML = content;
                     tooltip.style.display = "block";
                     tooltip.style.opacity = 1;
                     const [x, y] = d3.pointer(event, self.$refs.chart_container);

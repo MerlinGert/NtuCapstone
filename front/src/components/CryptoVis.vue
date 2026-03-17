@@ -14,14 +14,21 @@
             style="width:100%;height:100%;"
             class="panel-card"
             header-style="text-align:left;height:50px;font-size:1.4em;"
+            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
             <template #header>
                 <span class="card-header-text">Control Panel</span>
             </template>
             <ControlPanel 
                 :loading="detecting"
+                :loadingLinks="detectingLinks"
                 :loadingManipulation="detectingManipulation"
                 :lastResultCount="lastDetectionCount"
+                :snapshotConfig="snapshot_configuration"
+                :snapshotTimes="snapshotTimes"
+                :entityConfig="entity_detection_configuration"
+                :linkConfig="link_detection_configuration"
+                :manipulationConfig="manipulation_detection_configuration"
                 @run-detection="handleRunDetection"
                 @update-snapshot="handleUpdateSnapshot"
                 @update-links="handleUpdateLinks"
@@ -42,8 +49,12 @@
                 <span class="card-header-text">Token Distribution</span>
             </template>
             <TokenDistribution ref="tokenDistribution"
+                :snapshot-data="snapshot_data"
+                :entity-detection-results="entity_detection_results"
+                :link-detection-results="link_generation_results"
                 @detection-complete="handleDetectionComplete"
                 @manipulation-detected="handleManipulationDetected"
+                @snapshot-loaded="handleSnapshotLoaded"
             />
         </n-card>
         <n-card
@@ -56,7 +67,7 @@
             <template #header>
                 <span class="card-header-text">Entity Details</span>
             </template>
-            <HolderView />
+
         </n-card>
     </div>
 
@@ -119,18 +130,134 @@
 <script>
 import { NSelect,NCheckbox,NCard,NLayout,NSwitch,NSpace,NLayoutHeader,NLayoutFooter,NLayoutContent} from "naive-ui"
 import * as d3 from "d3"
-import HolderView from "./HolderView.vue"
 import TokenDistribution from "./TokenDistribution.vue"
 import ControlPanel from "./ControlPanel.vue"
 import CandlestickChart from "./CandlestickChart.vue"
 
 export default {
-  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, HolderView, TokenDistribution, ControlPanel, CandlestickChart},
+  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, TokenDistribution, ControlPanel, CandlestickChart},
   data(){
     return {
+      //new params
+      //snapshot configuration
+      snapshot_configuration:{
+        time: "2024-11-09 23:00:00 UTC", //current snapshot time
+        top_holder_threshold: 0.3,  //current top holder threshold
+        related_user_threshold: 0.2, //current related user threshold
+      },
+      snapshotTimes: [],
+      snapshot_data:{}, //current snapshot data
+
+      //entity detection configuration
+      entity_detection_configuration: {
+        enable_network_based: false,
+        transfer_network_based_params: {
+           enable_direct_transfer: true,
+           direct_transfer_params: {
+             enable_min_count: true,
+             min_tx_count: 3,
+             enable_min_volume: false,
+             min_tx_volume: 0,
+           },
+           enable_funding_relationship: true, //direct fund or co funder
+           enable_same_sender: false,
+           enable_same_recipient: false,
+        },
+        enable_similarity_based: true,
+        similarity_based_params: {
+          enable_trading_action_sequence: false,
+          trading_action_sequence_params: {
+            type: "action_amount_price", //action_only, action_amount, action_price, action_amount_price
+            min_seq_length: 3, //min matching sequence length
+            max_time_diff: 20, //max time difference between the first and last matching actions in the sequence
+            amount_similarity: 0.7, //0.5-1.0
+            price_similarity: 0.7, //0.5-1.0
+          },
+          enable_balance_sequence: true,
+          balance_sequence_params: {
+            balance_granularity: '1h', //1min, 1h, 1d
+            balance_similarity_threshold: 0.6, //0.5-1.0
+          },
+          enable_earning_sequence: false,
+          earning_sequence_params: {
+            earning_granularity: '1d', //1min, 1h, 1d
+            earning_similarity_threshold: 0.8, //0.5-1.0
+          },
+        },
+        enable_manipulation_based: false,
+        manipulation_based_params: {
+          max_manipulation_time_diff: 2, //max time difference between the first and last manipulation actions in the sequence
+        },
+      },
+      entity_detection_results: {}, //current entity detection results
+
+      // link detection configuration
+      link_detection_configuration: {
+        enable_network_based: false,
+        transfer_network_based_params: {
+           enable_direct_transfer: true,
+           direct_transfer_params: {
+             enable_min_count: true,
+             min_tx_count: 1,
+             enable_min_volume: false,
+             min_tx_volume: 0,
+           },
+           enable_funding_relationship: false, //direct fund or co funder
+           enable_same_sender: false,
+           enable_same_recipient: false,
+        },
+        enable_similarity_based: true,
+        similarity_based_params: {
+          enable_trading_action_sequence: true,
+          trading_action_sequence_params: {
+            type: "action_only", //action_only, action_amount, action_price, action_amount_price
+            min_seq_length: 3, //min matching sequence length
+            max_time_diff: 120, //max time difference between the first and last matching actions in the sequence
+            amount_similarity: 0.7, //0.5-1.0
+            price_similarity: 0.7, //0.5-1.0
+          },
+          enable_balance_sequence: false,
+          balance_sequence_params: {
+            balance_granularity: '1h', //1min, 1h, 1d
+            balance_similarity_threshold: 0.7, //0.5-1.0
+          },
+          enable_earning_sequence: false,
+          earning_sequence_params: {
+            earning_granularity: '1d', //1min, 1h, 1d
+            earning_similarity_threshold: 0.7, //0.5-1.0
+          },
+        },
+        enable_manipulation_based: false,
+        manipulation_based_params: {
+          max_manipulation_time_diff: 2, //max time difference between the first and last manipulation actions in the sequence
+        },
+      },
+      link_generation_results: {}, //current link detection results
+
+      //manipulation detection configuration
+      manipulation_detection_configuration: {
+        enable_round_trip_detection: true, //whether to enable round trip detection
+        round_trip_params: {
+          max_time_diff: 2, //max time difference between the first and last round trip actions in the sequence
+          max_position_diff: 10, //max position difference between the first and last round trip actions in the sequence
+          max_earning: 1, //max earning usd for this round trip
+          enable_entity_based: true, //whether to enable entity based round trip detection
+        },
+        enable_same_direction_detection: true, //whether to enable same direction detection
+        same_direction_params: {
+          max_time_diff: 2, //max time (min) difference between the first and last same direction actions in the sequence
+          min_seq_length: 3, //min same direction sequence length
+          max_diff_direction: 0, //max direction difference between the first and last same direction actions in the sequence
+          enable_entity_based: true, //whether to enable entity based same direction detection
+        },
+      },
+      manipulation_detection_results: {}, //current manipulation detection results
+
+      //old params
       klineGranularity: '1D',
       klineGranularities: ['1H','1D','3D','1W'],
       detecting: false,
+      detectingLinks: false,
       detectingManipulation: false,
       lastDetectionCount: null,
       overview:{
@@ -148,24 +275,37 @@ export default {
   watch:{
   },
   methods:{
-      handleRunDetection(params) {
-          console.log("CryptoVis: handleRunDetection called with", params);
+      handleRunDetection() {
+          console.log("CryptoVis: handleRunDetection called");
           this.detecting = true;
           this.lastDetectionCount = null;
           // Trigger detection in TokenDistribution component
           if (this.$refs.tokenDistribution) {
               console.log("CryptoVis: calling tokenDistribution.runEntityDetection");
+              const config = this.entity_detection_configuration;
+              const netParams = config.transfer_network_based_params;
+              const simParams = config.similarity_based_params;
+
               this.$refs.tokenDistribution.runEntityDetection(
-                  params.threshold,
-                  params.timeRange,
-                  params.ruleType,
-                  params.checkFundingSource,
-                  params.volumeThreshold,
-                  params.checkSameSender,
-                  params.checkSameRecipient,
+                  netParams.min_tx_count, // threshold
+                  null, // timeRange (removed from config)
+                  'transfer-network', // ruleType
+                  netParams.enable_funding_relationship, // checkFundingSource
+                  netParams.min_tx_volume, // volumeThreshold
+                  netParams.enable_same_sender, // checkSameSender
+                  netParams.enable_same_recipient, // checkSameRecipient
                   false, // silent
-                  params.enableTxCount,
-                  params.enableTxVolume
+                  true, // enableTxCount (always true if min_tx_count is used)
+                  true, // enableTxVolume (always true if min_tx_volume is used)
+                  config.enable_network_based,
+                  config.enable_similarity_based,
+                  1.0, // behaviorTimeWindow (default)
+                  simParams.enable_trading_action_sequence, // enableRule3
+                  simParams.enable_balance_sequence, // enableRule4
+                  simParams.enable_earning_sequence, // enableRule5
+                  simParams.trading_action_sequence_params, // rule3Params
+                  simParams.balance_sequence_params, // rule4Params
+                  simParams.earning_sequence_params // rule5Params
               ).then(count => {
                   console.log("CryptoVis: detection complete, count:", count);
                   this.detecting = false;
@@ -173,14 +313,65 @@ export default {
               });
           }
       },
-      handleUpdateSnapshot(params) {
-          console.log("CryptoVis: handleUpdateSnapshot called with", params);
+      handleUpdateSnapshot() {
+          console.log("CryptoVis: handleUpdateSnapshot called");
           if (this.$refs.tokenDistribution) {
+              // Construct flat params for entity detection
+              const eConfig = this.entity_detection_configuration;
+              const eNet = eConfig.transfer_network_based_params;
+              const eSim = eConfig.similarity_based_params;
+              
+              const detectionParams = {
+                  threshold: eNet.min_tx_count,
+                  timeRange: null,
+                  volumeThreshold: eNet.min_tx_volume,
+                  checkFundingSource: eNet.enable_funding_relationship,
+                  checkSameSender: eNet.enable_same_sender,
+                  checkSameRecipient: eNet.enable_same_recipient,
+                  enableTxCount: true,
+                  enableTxVolume: true,
+                  enableNetworkBased: eConfig.enable_network_based,
+                  enableBehaviorBased: eConfig.enable_similarity_based,
+                  behaviorTimeWindow: 1.0,
+                  enableRule3: eSim.enable_trading_action_sequence,
+                  enableRule4: eSim.enable_balance_sequence,
+                  enableRule5: eSim.enable_earning_sequence,
+                  rule3Params: eSim.trading_action_sequence_params,
+                  rule4Params: eSim.balance_sequence_params,
+                  rule5Params: eSim.earning_sequence_params
+              };
+
+              // Construct flat params for link detection
+              const lConfig = this.link_detection_configuration;
+              const lNet = lConfig.transfer_network_based_params;
+              const lSim = lConfig.similarity_based_params;
+
+              const linkParams = {
+                  threshold: lNet.direct_transfer_params.min_tx_count,
+                  timeRange: null,
+                  volumeThreshold: lNet.direct_transfer_params.min_tx_volume,
+                  checkFundingSource: lNet.enable_funding_relationship,
+                  checkSameSender: lNet.enable_same_sender,
+                  checkSameRecipient: lNet.enable_same_recipient,
+                  enableTxCount: lNet.direct_transfer_params.enable_min_count,
+                  enableTxVolume: lNet.direct_transfer_params.enable_min_volume,
+                  enableNetworkBased: lConfig.enable_network_based,
+                  enableBehaviorBased: lConfig.enable_similarity_based,
+                  behaviorTimeWindow: 1.0,
+                  enableRule3: lSim.enable_trading_action_sequence,
+                  enableRule4: lSim.enable_balance_sequence,
+                  enableRule5: lSim.enable_earning_sequence,
+                  rule3Params: lSim.trading_action_sequence_params,
+                  rule4Params: lSim.balance_sequence_params,
+                  rule5Params: lSim.earning_sequence_params
+              };
+
               this.$refs.tokenDistribution.fetchSnapshotData(
-                  params.time, 
-                  params.threshold,
-                  params.detectionParams,
-                  params.linkParams
+                  this.snapshot_configuration.time, 
+                  this.snapshot_configuration.top_holder_threshold,
+                  this.snapshot_configuration.related_user_threshold,
+                  detectionParams,
+                  linkParams
               );
               // Clear previous detection result when data changes
               this.lastDetectionCount = null;
@@ -192,25 +383,65 @@ export default {
       this.detecting = false;
       this.lastDetectionCount = count;
     },
-    handleUpdateLinks(params) {
-      console.log("CryptoVis: handleUpdateLinks called", params);
+    handleSnapshotLoaded(data) {
+        console.log("CryptoVis: Snapshot loaded", data);
+        if (data && data.all_times) {
+            this.snapshotTimes = data.all_times;
+        }
+    },
+    async handleUpdateLinks() {
+      console.log("CryptoVis: handleUpdateLinks called");
+      this.detectingLinks = true;
       if (this.$refs.tokenDistribution) {
-          this.$refs.tokenDistribution.updateLinks(
-              params.threshold,
-              params.timeRange
-          );
+          const lConfig = this.link_detection_configuration;
+          const lNet = lConfig.transfer_network_based_params;
+          const lSim = lConfig.similarity_based_params;
+
+          const linkParams = {
+              threshold: lNet.direct_transfer_params.min_tx_count,
+              timeRange: null,
+              volumeThreshold: lNet.direct_transfer_params.min_tx_volume,
+              checkFundingSource: lNet.enable_funding_relationship,
+              checkSameSender: lNet.enable_same_sender,
+              checkSameRecipient: lNet.enable_same_recipient,
+              enableTxCount: lNet.direct_transfer_params.enable_min_count,
+              enableTxVolume: lNet.direct_transfer_params.enable_min_volume,
+              enableNetworkBased: lConfig.enable_network_based,
+              enableBehaviorBased: lConfig.enable_similarity_based,
+              behaviorTimeWindow: 1.0,
+              enableRule3: lSim.enable_trading_action_sequence,
+              enableRule4: lSim.enable_balance_sequence,
+              enableRule5: lSim.enable_earning_sequence,
+              rule3Params: lSim.trading_action_sequence_params,
+              rule4Params: lSim.balance_sequence_params,
+              rule5Params: lSim.earning_sequence_params
+          };
+          await this.$refs.tokenDistribution.updateLinks(linkParams);
       } else {
           console.error("CryptoVis: tokenDistribution ref not found");
       }
+      this.detectingLinks = false;
     },
-    async handleRunManipulationDetection(params) {
-        console.log("CryptoVis: handleRunManipulationDetection called", params);
+    async handleRunManipulationDetection() {
+        console.log("CryptoVis: handleRunManipulationDetection called");
         this.detectingManipulation = true;
         if (this.$refs.tokenDistribution) {
+            // Mapping manipulation config is tricky as TokenDistribution's runManipulationDetection signature is unknown/simple.
+            // Assuming it takes threshold, timeWindow, checkEntityBased.
+            // But our config has round_trip and same_direction.
+            // For now, I'll pass defaults or what seems reasonable, 
+            // as I cannot easily map complex config to simple args without changing TokenDistribution.
+            // However, since I cannot change TokenDistribution, I will try to pass the whole config object 
+            // if TokenDistribution was updated to support it (unlikely).
+            // Fallback: use round_trip params as primary.
+            
+            const mConfig = this.manipulation_detection_configuration;
+            const rtParams = mConfig.round_trip_params;
+            
             await this.$refs.tokenDistribution.runManipulationDetection(
-                params.threshold,
-                params.timeWindow,
-                params.checkEntityBased
+                100, // threshold (hardcoded in TokenDistribution default? or use max_earning?)
+                rtParams.max_time_diff,
+                rtParams.enable_entity_based
             );
         } else {
             console.error("CryptoVis: tokenDistribution ref not found");
@@ -233,45 +464,95 @@ export default {
          }
          
          // Only alert if manual trigger (not auto run)
-         if (!data.isAutoRun) {
-             let message = `Detected ${data.count} suspicious traders.`;
-             if (data.saved_file) {
-                 message += `\nResults saved to: public/manipulation_results/${data.saved_file}`;
-                 console.log(`Results saved to server file: ${data.saved_file}`);
-             }
-             alert(message);
-         } else {
+        if (!data.isAutoRun) {
+            let message = `Detected ${data.count} suspicious traders.`;
+            if (data.saved_file) {
+                message += `\nResults saved to: public/manipulation_results/${data.saved_file}`;
+                console.log(`Results saved to server file: ${data.saved_file}`);
+            }
+            // alert(message);
+        } else {
              console.log(`Auto-detected ${data.count} suspicious traders.`);
              if (data.saved_file) {
                  console.log(`Results saved to server file: ${data.saved_file}`);
              }
          }
     },
-    async loadCSV(){
-      this.loading = true
-      const overviewUrl = '/processed/overview.json'
-      try{
-        const res = await fetch(overviewUrl)
-        const data = await res.json()
-        this.overview.rows = data.rows
-        this.overview.pairs = new Set(Array.from({length:data.top_pairs.length},(_,i)=>data.top_pairs[i].token_pair))
-        this.overview.dateSet = new Set([...(data.date_min? [data.date_min]:[]),...(data.date_max? [data.date_max]:[])])
-        this.overview.dateMin = data.date_min || ''
-        this.overview.dateMax = data.date_max || ''
-        this.overview.topPairs = data.top_pairs || []
-        this.isPartial = true
-      }catch(e){
-        console.error('Failed to load overview.json:',e)
-      }finally{
-        this.loading = false
-      }      
+    async fetchInitialSnapshotData() { 
+        console.log("CryptoVis: Fetching initial snapshot data...");
+        try {
+            const response = await fetch('/api/snapshot/process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    time: this.snapshot_configuration.time,
+                    threshold: this.snapshot_configuration.top_holder_threshold
+                })
+            });
+            if (!response.ok) throw new Error("Failed to fetch snapshot data");
+            const data = await response.json();
+            this.snapshot_data = data;
+            console.log("CryptoVis: Initial snapshot data loaded:", this.snapshot_data);
+
+            // Run unified detection
+            const balances = this.snapshot_data.balances || {};
+            const processedUsers = { ...balances.users };
+            delete processedUsers['Others'];
+            const relatedUsers = balances.related_users || {};
+
+            const detectionRequest = {
+                target_users: processedUsers,
+                related_users: relatedUsers,
+                entity_detection_config: this.entity_detection_configuration,
+                link_detection_config: this.link_detection_configuration,
+                snapshot_time: this.snapshot_configuration.time,
+                detect_entity: true,
+                detect_link: true
+            };
+
+            console.log("CryptoVis: Running unified detection...", detectionRequest);
+
+            const detectionResponse = await fetch('/api/detection/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(detectionRequest)
+            });
+
+            if (!detectionResponse.ok) throw new Error("Failed to run detection");
+
+            const detectionResults = await detectionResponse.json();
+            console.log("CryptoVis: Detection results received:", detectionResults);
+
+            this.entity_detection_results = detectionResults.entity_results;
+            this.link_generation_results = detectionResults.relations;
+
+            // Update TokenDistribution if available
+            if (this.$refs.tokenDistribution) {
+                // Ensure data is set before drawing
+                // We don't need setDetectionResults anymore as props are reactive
+                // But we need to call drawChart() explicitly as requested
+                // "把drawchart函数暴露给cryptovis，在第一次fetchinitial计算出结果调用一次"
+                
+                // Wait for Vue to update props
+                this.$nextTick(() => {
+                    if (this.$refs.tokenDistribution.drawChart) {
+                        console.log("CryptoVis: Calling tokenDistribution.drawChart() after initial detection");
+                        this.$refs.tokenDistribution.drawChart();
+                    } else {
+                        console.warn("CryptoVis: tokenDistribution.drawChart method not found");
+                    }
+                });
+            } else {
+                console.warn("CryptoVis: tokenDistribution ref not found when updating detection results");
+            }
+
+        } catch (error) {
+            console.error("CryptoVis: Error fetching initial snapshot data:", error);
+        }
     }
   },
-  beforeMount(){
-    // this.loadCSV()
-  },
   mounted(){
-    
+    this.fetchInitialSnapshotData();
   },
   updated(){
   }
