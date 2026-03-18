@@ -536,11 +536,16 @@ export default {
             
             linkElements.append("title")
                 .text(d => {
-                    let info = `Source: ${d.source}\nTarget: ${d.target}\nTotal Weight: ${d.weight}`;
+                    let info = `Source: ${d.source.id || d.source}\nTarget: ${d.target.id || d.target}\nTotal Weight: ${d.weight}`;
                     if (d.originalLinks && d.originalLinks.length > 0) {
-                        // In new structure, relations are in d.originalLinks[i].relations
-                        // We can just show count
-                        info += `\nOriginal Links: ${d.originalLinks.length}`;
+                        info += `\nRelations (${d.originalLinks.length}):`;
+                        d.originalLinks.forEach(l => {
+                            if (l.description) {
+                                info += `\n- ${l.description}`;
+                            } else if (l.type) {
+                                info += `\n- Type: ${l.type}`;
+                            }
+                        });
                     }
                     return info;
                 });

@@ -226,9 +226,9 @@ export default {
             earning_similarity_threshold: 0.7, //0.5-1.0
           },
         },
-        enable_manipulation_based: false,
+        enable_manipulation_based: true,
         manipulation_based_params: {
-          max_manipulation_time_diff: 2, //max time difference between the first and last manipulation actions in the sequence
+          max_manipulation_time_diff: 120, //max time difference between the first and last manipulation actions in the sequence
         },
       },
       link_generation_results: {}, //current link detection results
@@ -274,6 +274,316 @@ export default {
   watch:{
   },
   methods:{
+      rebuildEntityResults() {
+          if (!this.link_generation_results) return;
+
+          const tt = this.link_generation_results.target_relations_for_entity || {};
+          const tr = this.link_generation_results.target_related_relations_for_entity || {};
+
+          const adj = {};
+          const addEdge = (u, v, rels) => {
+              if (!adj[u]) adj[u] = [];
+              if (!adj[v]) adj[v] = [];
+              adj[u].push({ neighbor: v, rels });
+              adj[v].push({ neighbor: u, rels });
+          };
+
+          const processMap = (map) => {
+              Object.keys(map).forEach(key => {
+                  const parts = key.split('-');
+                  if (parts.length >= 2) {
+                      addEdge(parts[0], parts[1], map[key]);
+                  }
+              });
+          };
+
+          processMap(tt);
+          processMap(tr);
+
+          const visited = new Set();
+          const entities = [];
+
+          Object.keys(adj).forEach(user => {
+              if (!visited.has(user)) {
+                  const componentUsers = new Set();
+                  const queue = [user];
+                  visited.add(user);
+                  componentUsers.add(user);
+
+                  while (queue.length > 0) {
+                      const curr = queue.shift();
+                      if (adj[curr]) {
+                          adj[curr].forEach(edge => {
+                              if (!visited.has(edge.neighbor)) {
+                                  visited.add(edge.neighbor);
+                                  componentUsers.add(edge.neighbor);
+                                  queue.push(edge.neighbor);
+                              }
+                          });
+                      }
+                  }
+
+                  // Collect unique relations for this component
+                  const compRels = [];
+                  const processedKeys = new Set();
+
+                  const checkMap = (map) => {
+                      Object.keys(map).forEach(key => {
+                          if (processedKeys.has(key)) return;
+                          const parts = key.split('-');
+                          if (parts.length >= 2) {
+                              if (componentUsers.has(parts[0]) && componentUsers.has(parts[1])) {
+                                  compRels.push(...map[key]);
+                                  processedKeys.add(key);
+                              }
+                          }
+                      });
+                  };
+
+                  checkMap(tt);
+                  checkMap(tr);
+
+                  entities.push({
+                      users: Array.from(componentUsers),
+                      relations: compRels
+                  });
+              }
+          });
+
+          this.entity_detection_results = entities;
+          console.log(`CryptoVis: Rebuilt entity results, total entities: ${entities.length}`);
+      },
+      processManipulationRelations() {
+          const enableEntity = this.entity_detection_configuration.enable_manipulation_based;
+          const enableLink = this.link_detection_configuration.enable_manipulation_based;
+          
+          if (!enableEntity && !enableLink) return;
+          if (!this.manipulation_detection_results || this.manipulation_detection_results.length === 0) return;
+
+          const timeDiffEntity = this.entity_detection_configuration.manipulation_based_params.max_manipulation_time_diff;
+          const timeDiffLink = this.link_detection_configuration.manipulation_based_params.max_manipulation_time_diff;
+
+          // Prepare User Sets for TT/TR classification
+          const balances = this.snapshot_data.balances || {};
+          const targetUsers = new Set(Object.keys(balances.users || {}).filter(u => u !== 'Others'));
+          const relatedUsers = new Set(Object.keys(balances.related_users || {}));
+
+          const classifyPair = (u1, u2) => {
+              const u1T = targetUsers.has(u1);
+              const u2T = targetUsers.has(u2);
+              const u1R = relatedUsers.has(u1);
+              const u2R = relatedUsers.has(u2);
+
+              if (u1T && u2T) return 'tt';
+              if ((u1T && u2R) || (u1R && u2T)) return 'tr';
+              return null;
+          };
+
+          let timedEvents = [];
+          let sameManipulationPairs = [];
+
+          this.manipulation_detection_results.forEach(result => {
+              // 1. Same manipulation pairs
+              if (result.participants && result.participants.length > 1) {
+                  for (let i = 0; i < result.participants.length; i++) {
+                      for (let j = i + 1; j < result.participants.length; j++) {
+                          sameManipulationPairs.push({
+                              u1: result.participants[i], 
+                              u2: result.participants[j],
+                              method: result.detection_method,
+                              time: result.manipulation_time
+                          });
+                      }
+                  }
+              }
+              
+              // 2. Collect events for time-based relations using manipulation_time
+              if (result.participants && result.manipulation_time && result.manipulation_time.length > 0) {
+                  const startStr = result.manipulation_time[0];
+                  const endStr = result.manipulation_time.length > 1 ? result.manipulation_time[1] : startStr;
+                  const startTs = new Date(startStr).getTime();
+                  const endTs = new Date(endStr).getTime();
+
+                  if (!isNaN(startTs) && !isNaN(endTs)) {
+                      result.participants.forEach(p => {
+                          timedEvents.push({
+                              trader: p,
+                              startTs: startTs,
+                              endTs: endTs,
+                              method: result.detection_method,
+                              timeRange: result.manipulation_time
+                          });
+                      });
+                  }
+              }
+          });
+
+          // Sort events by time ascending
+          timedEvents.sort((a, b) => a.startTs - b.startTs);
+
+          const getPairKey = (u1, u2) => [u1, u2].sort().join('-');
+          
+          // Buckets for new relations
+          const buckets = {
+              entity: { tt: {}, tr: {} },
+              link: { tt: {}, tr: {} }
+          };
+
+          const addRelation = (category, u1, u2, type, weight, details) => {
+              const pairType = classifyPair(u1, u2);
+              if (!pairType) return; // Ignore if not TT or TR
+
+              const key = getPairKey(u1, u2);
+              const bucket = buckets[category][pairType];
+              
+              if (!bucket[key]) bucket[key] = [];
+              bucket[key].push({ 
+                  source: u1, 
+                  target: u2, 
+                  type, 
+                  weight,
+                  details,
+                  description: details.description
+              });
+          };
+
+          // Sets to track unique relations per pair+type to avoid explosion
+          const processedEntityPairs = new Set();
+          const processedLinkPairs = new Set();
+          const getUniqueKey = (u1, u2, type) => `${getPairKey(u1, u2)}|${type}`;
+
+          // Process same manipulation pairs
+          sameManipulationPairs.forEach(item => {
+              const { u1, u2, method, time } = item;
+              const details = {
+                  description: `Participated in same manipulation group. Method: ${method || 'Unknown'}. Time: ${time ? time.join(' - ') : 'Unknown'}`,
+                  method,
+                  time
+              };
+              
+              const uKey = getUniqueKey(u1, u2, 'manipulation_same_group');
+
+              if (enableEntity && !processedEntityPairs.has(uKey)) {
+                   processedEntityPairs.add(uKey);
+                   addRelation('entity', u1, u2, 'manipulation_same_group', 1, details);
+              }
+              if (enableLink && !processedLinkPairs.has(uKey)) {
+                   processedLinkPairs.add(uKey);
+                   addRelation('link', u1, u2, 'manipulation_same_group', 1, details);
+              }
+          });
+
+          // Process time-based pairs
+          for (let i = 0; i < timedEvents.length; i++) {
+              for (let j = i + 1; j < timedEvents.length; j++) {
+                  let e1 = timedEvents[i];
+                  let e2 = timedEvents[j];
+                  
+                  let diffMs = Math.abs(e2.startTs - e1.startTs);
+                  let diffMinutes = diffMs / (1000 * 60);
+                  
+                  let maxThreshold = Math.max(timeDiffEntity, timeDiffLink);
+                  if (diffMinutes > maxThreshold) break;
+                  
+                  if (e1.trader !== e2.trader) {
+                      const isOverlap = (e1.startTs <= e2.endTs && e2.startTs <= e1.endTs);
+                      const overlapStr = isOverlap ? " (Overlap)" : "";
+                      
+                      const description = `Manipulation time proximity. Diff: ${diffMinutes.toFixed(2)}m${overlapStr}. Methods: ${e1.method}, ${e2.method}.`;
+                      const details = {
+                          description,
+                          diffMinutes,
+                          isOverlap,
+                          event1: { method: e1.method, time: e1.timeRange },
+                          event2: { method: e2.method, time: e2.timeRange }
+                      };
+
+                      const uKey = getUniqueKey(e1.trader, e2.trader, 'manipulation_time_proximity');
+
+                      if (enableEntity && diffMinutes <= timeDiffEntity && !processedEntityPairs.has(uKey)) {
+                          processedEntityPairs.add(uKey);
+                          addRelation('entity', e1.trader, e2.trader, 'manipulation_time_proximity', 1, details);
+                      }
+                      if (enableLink && diffMinutes <= timeDiffLink && !processedLinkPairs.has(uKey)) {
+                          processedLinkPairs.add(uKey);
+                          addRelation('link', e1.trader, e2.trader, 'manipulation_time_proximity', 1, details);
+                      }
+                  }
+              }
+          }
+
+          // Merge into link_generation_results
+          // Structure: target_relations_for_entity (TT), target_related_relations_for_entity (TR), etc.
+          let currentRelations = this.link_generation_results ? JSON.parse(JSON.stringify(this.link_generation_results)) : {};
+          
+          // Helper to remove existing manipulation relations
+          const cleanRelations = (relationsMap) => {
+              if (!relationsMap) return {};
+              const cleaned = {};
+              Object.keys(relationsMap).forEach(key => {
+                  const relations = relationsMap[key];
+                  if (Array.isArray(relations)) {
+                      // Filter out manipulation types
+                      const filtered = relations.filter(r => 
+                          r.type !== 'manipulation_same_group' && 
+                          r.type !== 'manipulation_time_proximity'
+                      );
+                      if (filtered.length > 0) {
+                          cleaned[key] = filtered;
+                      }
+                  }
+              });
+              return cleaned;
+          };
+
+          // Clean up old manipulation relations first to avoid duplicates
+          ['target_relations_for_entity', 'target_related_relations_for_entity', 
+           'target_relations_for_links', 'target_related_relations_for_links'].forEach(key => {
+               if (currentRelations[key]) {
+                   currentRelations[key] = cleanRelations(currentRelations[key]);
+               }
+           });
+          
+          const mergeMap = (targetMapName, sourceMap) => {
+              if (Object.keys(sourceMap).length === 0) return;
+              
+              if (!currentRelations[targetMapName]) {
+                  currentRelations[targetMapName] = {};
+              }
+              const targetMap = currentRelations[targetMapName];
+              
+              Object.keys(sourceMap).forEach(key => {
+                  if (targetMap[key]) {
+                      targetMap[key] = [...targetMap[key], ...sourceMap[key]];
+                  } else {
+                      targetMap[key] = sourceMap[key];
+                  }
+              });
+          };
+
+          if (enableEntity) {
+              mergeMap('target_relations_for_entity', buckets.entity.tt);
+              mergeMap('target_related_relations_for_entity', buckets.entity.tr);
+          }
+          
+          if (enableLink) {
+              mergeMap('target_relations_for_links', buckets.link.tt);
+              mergeMap('target_related_relations_for_links', buckets.link.tr);
+          }
+          
+          this.link_generation_results = currentRelations;
+          console.log("CryptoVis: Added manipulation based relations:", {
+              entityTT: Object.keys(buckets.entity.tt).length,
+              entityTR: Object.keys(buckets.entity.tr).length,
+              linkTT: Object.keys(buckets.link.tt).length,
+              linkTR: Object.keys(buckets.link.tr).length
+          });
+
+          // Rebuild entity results to merge connected entities based on new relations
+          if (enableEntity) {
+              this.rebuildEntityResults();
+          }
+      },
       async handleRunDetection(newEntityConfig) {
           console.log("CryptoVis: Running entity detection...", newEntityConfig);
           if (newEntityConfig) {
@@ -351,6 +661,9 @@ export default {
                   console.log("CryptoVis: Skipping manipulation detection (entity-based detection not enabled).");
               }
               
+              // Re-apply manipulation relations since link_generation_results might have been updated
+              this.processManipulationRelations();
+              
           } catch (error) {
               console.error("CryptoVis: Error during entity detection:", error);
           } finally {
@@ -387,6 +700,9 @@ export default {
                   const manipulationResults = await manipulationResponse.json();
                   this.manipulation_detection_results = manipulationResults.results;
                   console.log("CryptoVis: Manipulation detection results updated:", this.manipulation_detection_results);
+                  
+                  // Add manipulation relations
+                  this.processManipulationRelations();
               } else {
                   console.error("CryptoVis: Failed to run manipulation detection");
               }
@@ -469,6 +785,9 @@ export default {
                   const manipulationResults = await manipulationResponse.json();
                   this.manipulation_detection_results = manipulationResults.results;
                   console.log("CryptoVis: Manipulation detection results updated:", this.manipulation_detection_results);
+                  
+                  // Add manipulation relations
+                  this.processManipulationRelations();
               } else {
                   console.error("CryptoVis: Failed to run manipulation detection");
               }
@@ -518,6 +837,9 @@ export default {
 
               // Update link results only
               this.link_generation_results = detectionResults.relations;
+              
+              // Add manipulation relations back in
+              this.processManipulationRelations();
               
           } catch (error) {
               console.error("CryptoVis: Error during link detection:", error);
@@ -594,6 +916,9 @@ export default {
                     const manipulationResults = await manipulationResponse.json();
                     this.manipulation_detection_results = manipulationResults.results;
                     console.log("CryptoVis: Manipulation detection results received:", this.manipulation_detection_results);
+                    
+                    // Add manipulation relations
+                    this.processManipulationRelations();
                 } else {
                     console.error("CryptoVis: Failed to run manipulation detection", manipulationResponse.statusText);
                 }
