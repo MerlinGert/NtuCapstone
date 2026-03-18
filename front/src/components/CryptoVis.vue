@@ -29,7 +29,11 @@
                 :entityConfig="entity_detection_configuration"
                 :linkConfig="link_detection_configuration"
                 :manipulationConfig="manipulation_detection_configuration"
-              />
+                @run-detection="handleRunDetection"
+                @update-snapshot="handleUpdateSnapshot"
+                @request-manipulation-detection="handleRequestManipulationDetection"
+                @update-links="handleUpdateLinks"
+            />
         </n-card>
     </div>
 
@@ -269,17 +273,249 @@ export default {
   watch:{
   },
   methods:{
-      handleRunDetection() {
+      async handleRunDetection(newEntityConfig) {
+          console.log("CryptoVis: Running entity detection...", newEntityConfig);
+          if (newEntityConfig) {
+              this.entity_detection_configuration = { ...newEntityConfig };
+          }
+          this.loading = true;
+          try {
+              // Prepare detection request
+              const balances = this.snapshot_data.balances || {};
+              const processedUsers = { ...balances.users };
+              delete processedUsers['Others'];
+              const relatedUsers = balances.related_users || {};
+
+              const detectionRequest = {
+                  target_users: processedUsers,
+                  related_users: relatedUsers,
+                  entity_detection_config: this.entity_detection_configuration,
+                  link_detection_config: this.link_detection_configuration, // Keep it but we won't detect links
+                  snapshot_time: this.snapshot_configuration.time,
+                  detect_entity: true,
+                  detect_link: false // Disable link detection as requested
+              };
+
+              const detectionResponse = await fetch('/api/detection/run', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(detectionRequest)
+              });
+
+              if (!detectionResponse.ok) throw new Error("Failed to run entity detection");
+
+              const detectionResults = await detectionResponse.json();
+              console.log("CryptoVis: Entity detection results received:", detectionResults);
+
+              // Update entity results only
+              this.entity_detection_results = detectionResults.entity_results;
+              
+              // Check if we need to re-run manipulation detection
+              // Only if (round_trip is enabled AND round_trip.entity_based is enabled) OR (same_direction is enabled AND same_direction.entity_based is enabled)
+              const config = this.manipulation_detection_configuration;
+              const roundTripEntityEnabled = config.enable_round_trip_detection && config.round_trip_params?.enable_entity_based;
+              const sameDirectionEntityEnabled = config.enable_same_direction_detection && config.same_direction_params?.enable_entity_based;
+
+              if (roundTripEntityEnabled || sameDirectionEntityEnabled) {
+                  console.log("CryptoVis: Re-running manipulation detection with new entities...");
+                  const manipulationRequest = {
+                      target_users: processedUsers,
+                      related_users: relatedUsers,
+                      entity_results: this.entity_detection_results,
+                      manipulation_config: this.manipulation_detection_configuration
+                  };
+
+                  const manipulationResponse = await fetch('/api/manipulation_service/detect', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(manipulationRequest)
+                  });
+
+                  if (manipulationResponse.ok) {
+                      const manipulationResults = await manipulationResponse.json();
+                      this.manipulation_detection_results = manipulationResults.results;
+                      console.log("CryptoVis: Manipulation detection results updated:", this.manipulation_detection_results);
+                  } else {
+                      console.error("CryptoVis: Failed to update manipulation detection results");
+                  }
+              } else {
+                  console.log("CryptoVis: Skipping manipulation detection (entity-based detection not enabled).");
+              }
+              
+          } catch (error) {
+              console.error("CryptoVis: Error during entity detection:", error);
+          } finally {
+              this.loading = false;
+          }
       },
-      handleUpdateSnapshot() {
+      async handleRequestManipulationDetection(newManipulationConfig) {
+          console.log("CryptoVis: Running manipulation detection only...", newManipulationConfig);
+          if (newManipulationConfig) {
+              this.manipulation_detection_configuration = { ...newManipulationConfig };
+          }
+          this.detectingManipulation = true; // Assuming there's a loading state for manipulation or reuse 'loading'
           
+          try {
+              const balances = this.snapshot_data.balances || {};
+              const processedUsers = { ...balances.users };
+              delete processedUsers['Others'];
+              const relatedUsers = balances.related_users || {};
+
+              const manipulationRequest = {
+                  target_users: processedUsers,
+                  related_users: relatedUsers,
+                  entity_results: this.entity_detection_results,
+                  manipulation_config: this.manipulation_detection_configuration
+              };
+
+              const manipulationResponse = await fetch('/api/manipulation_service/detect', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(manipulationRequest)
+              });
+
+              if (manipulationResponse.ok) {
+                  const manipulationResults = await manipulationResponse.json();
+                  this.manipulation_detection_results = manipulationResults.results;
+                  console.log("CryptoVis: Manipulation detection results updated:", this.manipulation_detection_results);
+              } else {
+                  console.error("CryptoVis: Failed to run manipulation detection");
+              }
+          } catch (error) {
+              console.error("CryptoVis: Error during manipulation detection:", error);
+          } finally {
+              this.detectingManipulation = false;
+          }
+      },
+      async handleUpdateSnapshot(newSnapshotConfig) {
+          if (newSnapshotConfig) {
+              this.snapshot_configuration = { ...newSnapshotConfig };
+          }
+          this.loading = true;
+          try {
+              // 1. Fetch new snapshot data
+              console.log("CryptoVis: Fetching updated snapshot data...");
+              const response = await fetch('/api/snapshot/process', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      time: this.snapshot_configuration.time,
+                      threshold: this.snapshot_configuration.top_holder_threshold
+                  })
+              });
+              if (!response.ok) throw new Error("Failed to fetch snapshot data");
+              const data = await response.json();
+              this.snapshot_data = data;
+              this.snapshotTimes = data.all_times;
+              console.log("CryptoVis: Updated snapshot data loaded:", this.snapshot_data);
+
+              // 2. Run detection service
+              const balances = this.snapshot_data.balances || {};
+              const processedUsers = { ...balances.users };
+              delete processedUsers['Others'];
+              const relatedUsers = balances.related_users || {};
+
+              const detectionRequest = {
+                  target_users: processedUsers,
+                  related_users: relatedUsers,
+                  entity_detection_config: this.entity_detection_configuration,
+                  link_detection_config: this.link_detection_configuration,
+                  snapshot_time: this.snapshot_configuration.time,
+                  detect_entity: true,
+                  detect_link: true
+              };
+
+              console.log("CryptoVis: Running unified detection...", detectionRequest);
+
+              const detectionResponse = await fetch('/api/detection/run', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(detectionRequest)
+              });
+
+              if (!detectionResponse.ok) throw new Error("Failed to run detection");
+
+              const detectionResults = await detectionResponse.json();
+              console.log("CryptoVis: Detection results received:", detectionResults);
+
+              this.entity_detection_results = detectionResults.entity_results;
+              this.link_generation_results = detectionResults.relations;
+
+              // 3. Run manipulation detection
+              console.log("CryptoVis: Running manipulation detection...");
+              const manipulationRequest = {
+                  target_users: processedUsers,
+                  related_users: relatedUsers,
+                  entity_results: this.entity_detection_results,
+                  manipulation_config: this.manipulation_detection_configuration
+              };
+
+              const manipulationResponse = await fetch('/api/manipulation_service/detect', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(manipulationRequest)
+              });
+
+              if (manipulationResponse.ok) {
+                  const manipulationResults = await manipulationResponse.json();
+                  this.manipulation_detection_results = manipulationResults.results;
+                  console.log("CryptoVis: Manipulation detection results updated:", this.manipulation_detection_results);
+              } else {
+                  console.error("CryptoVis: Failed to run manipulation detection");
+              }
+          } catch (error) {
+              console.error("CryptoVis: Error during snapshot update and detection:", error);
+          } finally {
+              this.loading = false;
+          }
       },
     handleDetectionComplete(count) {
       this.detecting = false;
       this.lastDetectionCount = count;
     },
-    async handleUpdateLinks() {
-    },
+      async handleUpdateLinks(newLinkConfig) {
+          console.log("CryptoVis: Updating links...", newLinkConfig);
+          if (newLinkConfig) {
+              this.link_detection_configuration = { ...newLinkConfig };
+          }
+          this.detectingLinks = true; // Assuming 'detectingLinks' or 'loading' is used
+          
+          try {
+              const balances = this.snapshot_data.balances || {};
+              const processedUsers = { ...balances.users };
+              delete processedUsers['Others'];
+              const relatedUsers = balances.related_users || {};
+
+              const detectionRequest = {
+                  target_users: processedUsers,
+                  related_users: relatedUsers,
+                  entity_detection_config: this.entity_detection_configuration, // Keep it but we won't detect entities
+                  link_detection_config: this.link_detection_configuration,
+                  snapshot_time: this.snapshot_configuration.time,
+                  detect_entity: false, // Disable entity detection
+                  detect_link: true // Enable link detection
+              };
+
+              const detectionResponse = await fetch('/api/detection/run', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(detectionRequest)
+              });
+
+              if (!detectionResponse.ok) throw new Error("Failed to run link detection");
+
+              const detectionResults = await detectionResponse.json();
+              console.log("CryptoVis: Link detection results received:", detectionResults);
+
+              // Update link results only
+              this.link_generation_results = detectionResults.relations;
+              
+          } catch (error) {
+              console.error("CryptoVis: Error during link detection:", error);
+          } finally {
+              this.detectingLinks = false;
+          }
+      },
     async fetchInitialSnapshotData() { 
         console.log("CryptoVis: Fetching initial snapshot data...");
         try {

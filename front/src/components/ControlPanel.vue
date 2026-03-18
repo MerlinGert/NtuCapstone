@@ -18,8 +18,8 @@
                 <label style="font-size: 12px; font-weight: bold;">Related User Threshold</label>
                 <input type="number" v-model.number="snapshotConfig.related_user_threshold" step="0.01" min="0" max="1" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 80px;">
             </div>
-            <button @click="$emit('update-snapshot')" :disabled="loading" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; height: 36px;">
-                {{ loading ? 'Loading...' : 'Update View' }}
+            <button @click="$emit('update-snapshot', snapshotConfig)" :disabled="loading" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; height: 36px;">
+                {{ loading ? 'Loading...' : 'Update Snapshot' }}
             </button>
         </div>
 
@@ -27,7 +27,7 @@
         <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
             <div style="font-weight: bold;">Entity Detection</div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <button @click="$emit('run-detection')" :disabled="loading" style="padding: 5px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                <button @click="$emit('run-detection', entityConfig)" :disabled="loading" style="padding: 5px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
                     {{ loading ? 'Detecting...' : 'Run Detection' }}
                 </button>
                 <span v-if="lastResultCount !== null" style="color: #666; font-size: 12px;">
@@ -213,7 +213,7 @@
         <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
             <div style="font-weight: bold;">Manipulation Detection</div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <button @click="$emit('request-manipulation-detection')" :disabled="loadingManipulation" style="padding: 5px 15px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                <button @click="$emit('request-manipulation-detection', manipulationConfig)" :disabled="loadingManipulation" style="padding: 5px 15px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
                     {{ loadingManipulation ? 'Detecting...' : 'Run Detection' }}
                 </button>
             </div>
@@ -287,7 +287,7 @@
         <div style="border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
             <div style="font-weight: bold;">Link Configuration</div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <button @click="$emit('update-links')" :disabled="loadingLinks" style="padding: 5px 15px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
+                <button @click="$emit('update-links', linkConfig)" :disabled="loadingLinks" style="padding: 5px 15px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">
                     {{ loadingLinks ? 'Updating...' : 'Update Links' }}
                 </button>
             </div>
