@@ -11,6 +11,7 @@ import behavior_detection
 import manipulation_detection
 import fraudulent_activity_detection
 import detection_service
+import manipulation_detection_service
 
 # Add data_processing directory to path to import scripts if needed
 # BASE_DIR is the 'server' directory
@@ -29,6 +30,7 @@ app.include_router(behavior_detection.router)
 app.include_router(manipulation_detection.router)
 app.include_router(fraudulent_activity_detection.router)
 app.include_router(detection_service.router)
+app.include_router(manipulation_detection_service.router)
 
 @app.get("/")
 def read_root():
