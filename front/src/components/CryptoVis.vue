@@ -52,6 +52,7 @@
                 :snapshot-data="snapshot_data"
                 :entity-detection-results="entity_detection_results"
                 :link-detection-results="link_generation_results"
+                :manipulation-detection-results="manipulation_detection_results"
                 @detection-complete="handleDetectionComplete"
             />
         </n-card>
@@ -309,6 +310,14 @@ export default {
 
               // Update entity results only
               this.entity_detection_results = detectionResults.entity_results;
+              // Update link_generation_results to hold relations if needed by entity detection
+              // The backend returns relations even if detect_link is false (it returns entity relations)
+              if (detectionResults.relations) {
+                  this.link_generation_results = { 
+                      ...this.link_generation_results, 
+                      ...detectionResults.relations 
+                  };
+              }
               
               // Check if we need to re-run manipulation detection
               // Only if (round_trip is enabled AND round_trip.entity_based is enabled) OR (same_direction is enabled AND same_direction.entity_based is enabled)

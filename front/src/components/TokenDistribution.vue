@@ -66,6 +66,10 @@ export default {
         linkDetectionResults: {
             type: [Array, Object],
             default: () => []
+        },
+        manipulationDetectionResults: {
+            type: [Array, Object],
+            default: () => []
         }
     },
     watch: {
@@ -93,6 +97,13 @@ export default {
                 this.drawChart();
             },
             deep: true
+        },
+        manipulationDetectionResults: {
+            handler(newVal) {
+                console.log("TokenDistribution: manipulationDetectionResults changed", newVal ? newVal.length : 0);
+                this.processManipulationResults();
+            },
+            deep: true
         }
     },
     computed: {
@@ -115,6 +126,29 @@ export default {
         window.removeEventListener('resize', this.setSvg);
     },
     methods: {
+        processManipulationResults() {
+            if (!this.manipulationDetectionResults || this.manipulationDetectionResults.length === 0) {
+                this.suspiciousTraders = [];
+                this.highlightSuspiciousTraders([]);
+                return;
+            }
+            
+            const suspiciousMap = new Map();
+            this.manipulationDetectionResults.forEach(result => {
+                const method = result.detection_method;
+                if (result.participants && Array.isArray(result.participants)) {
+                    result.participants.forEach(addr => {
+                        if (!suspiciousMap.has(addr)) {
+                            suspiciousMap.set(addr, { trader_id: addr, reasons: [] });
+                        }
+                        suspiciousMap.get(addr).reasons.push(`Detected via: ${method}`);
+                    });
+                }
+            });
+            
+            this.suspiciousTraders = Array.from(suspiciousMap.values());
+            this.highlightSuspiciousTraders(this.suspiciousTraders);
+        },
         highlightSuspiciousTraders(suspiciousTraders) {
             console.log("TokenDistribution: highlightSuspiciousTraders", suspiciousTraders.length);
             
@@ -163,6 +197,7 @@ export default {
 
             // 1. Prepare base entries
             let entries = [];
+            let relatedEntries = [];
             let othersBalance = 0;
             if (balances && balances.users) {
                 othersBalance = balances.users['Others'] || 0;
@@ -172,18 +207,36 @@ export default {
                         id: owner,
                         name: owner, 
                         value: balance,
-                        r: 0 // Will be set after scale calculation
+                        r: 0, // Will be set after scale calculation
+                        isRelated: false
+                    }));
+            }
+            if (balances && balances.related_users) {
+                relatedEntries = Object.entries(balances.related_users)
+                    .filter(([owner, balance]) => balance > 0)
+                    .map(([owner, balance]) => ({ 
+                        id: owner,
+                        name: owner, 
+                        value: balance,
+                        r: 0,
+                        isRelated: true
                     }));
             }
 
-            this.userCount = entries.length;
-            const usersBalance = entries.reduce((sum, d) => sum + d.value, 0);
+            this.userCount = entries.length + relatedEntries.length;
+            const usersBalance = entries.reduce((sum, d) => sum + d.value, 0); // Scale based on target users or both? Let's use target users for scale consistency, or both.
+            const allNodesBalance = usersBalance + relatedEntries.reduce((sum, d) => sum + d.value, 0);
 
             // Mark suspicious traders
             if (this.suspiciousTraders && this.suspiciousTraders.length > 0) {
                 const suspiciousMap = new Map();
                 this.suspiciousTraders.forEach(t => suspiciousMap.set(t.trader_id, t));
                 entries.forEach(d => {
+                    if (suspiciousMap.has(d.id)) {
+                        d.suspicious = suspiciousMap.get(d.id);
+                    }
+                });
+                relatedEntries.forEach(d => {
                     if (suspiciousMap.has(d.id)) {
                         d.suspicious = suspiciousMap.get(d.id);
                     }
@@ -203,6 +256,9 @@ export default {
             
             // Assign radii
             entries.forEach(d => {
+                d.r = Math.sqrt(d.value) * radiusScale;
+            });
+            relatedEntries.forEach(d => {
                 d.r = Math.sqrt(d.value) * radiusScale;
             });
 
@@ -285,9 +341,16 @@ export default {
                 simulationNodes = [...independentNodes, ...finalGroupNodes];
             } else {
                 // No grouping
-                simulationNodes = entries;
-                finalNodes = entries;
+                simulationNodes = [...entries];
+                finalNodes = [...entries];
             }
+
+            // Append related users to simulationNodes
+            // We want to render them as single nodes, but keep them on the outer ring
+            relatedEntries.forEach(node => {
+                simulationNodes.push(node);
+                finalNodes.push(node);
+            });
 
             // 4. Setup SVG
             const svg = d3.select(this.$refs.chart_container).select("svg.tokenDistribution");
@@ -302,9 +365,12 @@ export default {
             const g = svg.append("g").attr("transform", `translate(${centerX},${centerY})`);
             
             // Draw "Others" Ring
-             if (othersBalance > 0) {
+            let relatedRingRadius = maxGroupRadius + 20; // Default if no others balance
+            if (othersBalance > 0) {
                 const targetRingArea = totalBalance > 0 ? targetTotalInkArea * (othersBalance / totalBalance) : 0;
                 const userGroupRadius = Math.sqrt(maxGroupRadius * maxGroupRadius - targetRingArea / Math.PI);
+                relatedRingRadius = (userGroupRadius + maxGroupRadius) / 2;
+                
                 const arc = d3.arc()
                     .innerRadius(userGroupRadius)
                     .outerRadius(maxGroupRadius)
@@ -321,7 +387,8 @@ export default {
             // Link group (ABOVE nodes)
             const linkGroup = g.append("g").attr("class", "links");
             
-            const color = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(entries, d => d.value)]);
+            const allEntries = [...entries, ...relatedEntries];
+            const color = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(allEntries, d => d.value)]);
 
             // Prepare Links for Simulation
             const simulationLinkMap = new Map();
@@ -338,6 +405,7 @@ export default {
             // Map user ID to member node for internal links
             const userToMemberNode = new Map();
             entries.forEach(d => userToMemberNode.set(d.id, d));
+            relatedEntries.forEach(d => userToMemberNode.set(d.id, d));
 
             // Process Links from linkDetectionResults
             // Expected format: array of relations (objects)
@@ -358,27 +426,60 @@ export default {
             // However, the user instruction says: "link根据linkresults里面的ttrelation去画"
             // So `linkDetectionResults` is likely the object containing `target_relations_for_links` (tt_relations).
             
-            // Let's extract TT relations
+            // Let's extract TT and TR relations
             let linksToDraw = [];
+            
+            // From linkDetectionResults
             if (this.linkDetectionResults) {
-                // If it's the object with keys
+                // target_relations_for_links
                 if (this.linkDetectionResults.target_relations_for_links) {
-                     // The value is a Dict[str, List[Relation]] where key is "u1-u2"
-                     // We need to flatten this to list of links
                      Object.entries(this.linkDetectionResults.target_relations_for_links).forEach(([key, relations]) => {
                          const parts = key.split('-');
                          if (parts.length >= 2) {
                              linksToDraw.push({
                                  source: parts[0],
                                  target: parts[1],
-                                 weight: relations.length, // Simple weight
-                                 relations: relations
+                                 weight: relations.length,
+                                 relations: relations,
+                                 type: 'link'
                              });
                          }
                      });
                 } else if (Array.isArray(this.linkDetectionResults)) {
-                    // Fallback if it is an array
-                    linksToDraw = this.linkDetectionResults;
+                    // Fallback
+                    linksToDraw = this.linkDetectionResults.map(l => ({ ...l, type: 'link' }));
+                }
+                
+                // target_related_relations_for_links
+                if (this.linkDetectionResults.target_related_relations_for_links) {
+                     Object.entries(this.linkDetectionResults.target_related_relations_for_links).forEach(([key, relations]) => {
+                         const parts = key.split('-');
+                         if (parts.length >= 2) {
+                             linksToDraw.push({
+                                 source: parts[0],
+                                 target: parts[1],
+                                 weight: relations.length,
+                                 relations: relations,
+                                 type: 'link'
+                             });
+                         }
+                     });
+                }
+
+                // target_related_relations_for_entity
+                if (this.linkDetectionResults.target_related_relations_for_entity) {
+                     Object.entries(this.linkDetectionResults.target_related_relations_for_entity).forEach(([key, relations]) => {
+                         const parts = key.split('-');
+                         if (parts.length >= 2) {
+                             linksToDraw.push({
+                                 source: parts[0],
+                                 target: parts[1],
+                                 weight: relations.length,
+                                 relations: relations,
+                                 type: 'entity'
+                             });
+                         }
+                     });
                 }
             }
 
@@ -390,13 +491,15 @@ export default {
                     if (sourceNode && targetNode) {
                         if (sourceNode !== targetNode) {
                             // Link between different simulation bodies (Group-Group, Group-Single, Single-Single)
-                            // Create key for link aggregation
-                            const key = `${sourceNode.id}-${targetNode.id}`;
+                            // Create key for link aggregation (include type to separate entity vs link relations)
+                            const linkType = link.type || 'link';
+                            const key = `${sourceNode.id}-${targetNode.id}-${linkType}`;
                             if (!simulationLinkMap.has(key)) {
                                 simulationLinkMap.set(key, { 
                                     source: sourceNode.id, 
                                     target: targetNode.id, 
                                     weight: 0,
+                                    type: linkType,
                                     originalLinks: []
                                 });
                             }
@@ -425,7 +528,8 @@ export default {
             const linkElements = linkGroup.selectAll("line")
                 .data(simulationLinks)
                 .join("line")
-                .attr("stroke", "#999")
+                .attr("stroke", d => d.type === 'entity' ? '#ff9800' : '#999') // Orange for entity, default #999 for links
+                .style("stroke-dasharray", d => d.type === 'entity' ? '5,5' : 'none')
                 .attr("stroke-opacity", 0.6)
                 .attr("stroke-width", 3);
                 // .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
@@ -445,12 +549,24 @@ export default {
             const drag = d3.drag()
                 .on("start", (event, d) => {
                     if (!event.active) this.simulation.alphaTarget(0.3).restart();
-                    d.fx = d.x;
-                    d.fy = d.y;
+                    if (!d.isRelated) {
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    } else {
+                        const angle = Math.atan2(d.y, d.x);
+                        d.fx = Math.cos(angle) * relatedRingRadius;
+                        d.fy = Math.sin(angle) * relatedRingRadius;
+                    }
                 })
                 .on("drag", (event, d) => {
-                    d.fx = event.x;
-                    d.fy = event.y;
+                    if (d.isRelated) {
+                        const angle = Math.atan2(event.y, event.x);
+                        d.fx = Math.cos(angle) * relatedRingRadius;
+                        d.fy = Math.sin(angle) * relatedRingRadius;
+                    } else {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    }
                 })
                 .on("end", (event, d) => {
                     if (!event.active) this.simulation.alphaTarget(0);
@@ -478,18 +594,20 @@ export default {
             const singles = bubbleGroup.selectAll(".single")
                 .data(simulationNodes.filter(n => !n.isGroup))
                 .enter().append("circle")
-                .attr("class", "bubble single")
+                .attr("class", d => `bubble single ${d.isRelated ? 'related' : ''}`)
                 .attr("transform", d => `translate(${d.x ?? 0},${d.y ?? 0})`)
                 .attr("r", d => d.r)
-                .style("fill", d => color(d.value))
+                .style("fill", d => color(d.value)) // Use identical color encoding for related users
                 .style("opacity", 0.6)
-                .style("stroke", d => d.suspicious ? "#ff0000" : "#5976ba")
+                .style("stroke", d => d.suspicious ? "#ff0000" : "#5976ba") // Same stroke color
+                .style("stroke-dasharray", "none") // Same solid border
                 .style("stroke-width", d => d.suspicious ? 3 : 2)
                 .call(drag) // Attach drag
                 .on("mouseover", (event, d) => {
                     d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#000");
                     const tooltip = this.$refs.tooltip;
                     let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
+                    if (d.isRelated) content += `<br><em>(Related User)</em>`;
                     if (d.suspicious) {
                         content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
                         if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
@@ -625,13 +743,22 @@ export default {
             if (this.simulation) this.simulation.stop();
 
             this.simulation = d3.forceSimulation(simulationNodes)
-                .force("charge", d3.forceManyBody().strength(d => d.isGroup ? -50 : -15)) 
+                .force("charge", d3.forceManyBody().strength(d => d.isGroup ? -50 : (d.isRelated ? -5 : -15))) 
                 .force("collide", d3.forceCollide().radius(d => d.r + 5).strength(1))
-                .force("r", d3.forceRadial(0, 0, 0).strength(0.15))
+                .force("r", d3.forceRadial(d => d.isRelated ? relatedRingRadius : 0, 0, 0).strength(d => d.isRelated ? 1 : 0.15))
                 .force("center", d3.forceCenter(0, 0).strength(0.1))
-                .force("link", d3.forceLink(simulationLinks).id(d => d.id).distance(20).strength(1));
+                .force("link", d3.forceLink(simulationLinks).id(d => d.id).distance(d => d.source.isRelated || d.target.isRelated ? relatedRingRadius * 0.5 : 20).strength(d => d.source.isRelated || d.target.isRelated ? 0.5 : 1));
 
             this.simulation.on("tick", () => {
+                // Force related users to strictly stay on the relatedRingRadius
+                simulationNodes.forEach(d => {
+                    if (d.isRelated) {
+                        const angle = Math.atan2(d.y, d.x);
+                        d.x = Math.cos(angle) * relatedRingRadius;
+                        d.y = Math.sin(angle) * relatedRingRadius;
+                    }
+                });
+
                 // Update Links
                 linkElements
                     .attr("x1", d => d.source.x)
