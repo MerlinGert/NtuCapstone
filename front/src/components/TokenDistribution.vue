@@ -364,6 +364,11 @@ export default {
             
             const g = svg.append("g").attr("transform", `translate(${centerX},${centerY})`);
             
+            // Create layer groups in specific order (bottom to top)
+            const ringGroup = g.append("g").attr("class", "ring-layer");
+            const linkGroup = g.append("g").attr("class", "link-layer");
+            const bubbleGroup = g.append("g").attr("class", "bubble-layer");
+
             // Draw "Others" Ring
             let relatedRingRadius = maxGroupRadius + 20; // Default if no others balance
             if (othersBalance > 0) {
@@ -376,16 +381,11 @@ export default {
                     .outerRadius(maxGroupRadius)
                     .startAngle(0)
                     .endAngle(2 * Math.PI);
-                g.append("path")
+                ringGroup.append("path")
                     .attr("d", arc)
                     .style("fill", "#e3f2fd")
                     .style("opacity", 0.5);
             }
-
-            const bubbleGroup = g.append("g");
-            
-            // Link group (ABOVE nodes)
-            const linkGroup = g.append("g").attr("class", "links");
             
             const allEntries = [...entries, ...relatedEntries];
             const color = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(allEntries, d => d.value)]);
@@ -531,8 +531,7 @@ export default {
                 .attr("stroke", d => d.type === 'entity' ? '#ff9800' : '#999') // Orange for entity, default #999 for links
                 .style("stroke-dasharray", d => d.type === 'entity' ? '5,5' : 'none')
                 .attr("stroke-opacity", 0.6)
-                .attr("stroke-width", 3);
-                // .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
+                .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
             
             linkElements.append("title")
                 .text(d => {
@@ -589,8 +588,8 @@ export default {
                 
             groups.append("circle")
                 .attr("r", d => d.r)
-                .style("fill", "white") // Add fill to capture drag events inside
-                .style("fill-opacity", 0.3)
+                .style("fill", "none") // Add white fill
+                .style("fill-opacity", 1) // Make it opaque white
                 .style("stroke", "#ff9800")
                 .style("stroke-width", 2)
                 .style("stroke-dasharray", "5,5");
@@ -755,12 +754,28 @@ export default {
                 .force("link", d3.forceLink(simulationLinks).id(d => d.id).distance(d => d.source.isRelated || d.target.isRelated ? relatedRingRadius * 0.5 : 20).strength(d => d.source.isRelated || d.target.isRelated ? 0.5 : 1));
 
             this.simulation.on("tick", () => {
+                // Determine inner boundary of the related ring.
+                // The ring has radius `relatedRingRadius` and stroke-width 40.
+                // So the inner edge is roughly at `relatedRingRadius - 20`.
+                // We add a little padding (e.g., node radius) so the node doesn't overlap the ring stroke.
+                const innerBoundary = relatedRingRadius - 20;
+
                 // Force related users to strictly stay on the relatedRingRadius
                 simulationNodes.forEach(d => {
                     if (d.isRelated) {
                         const angle = Math.atan2(d.y, d.x);
                         d.x = Math.cos(angle) * relatedRingRadius;
                         d.y = Math.sin(angle) * relatedRingRadius;
+                    } else {
+                        // Extra safety: Keep target users strictly inside the inner boundary 
+                        const dist = Math.sqrt(d.x*d.x + d.y*d.y);
+                        // Ensure the entire node (including its radius) stays inside the boundary
+                        const maxDist = innerBoundary - (d.r || 10) - 2; 
+                        
+                        if (dist > maxDist && maxDist > 0) {
+                            d.x = (d.x / dist) * maxDist;
+                            d.y = (d.y / dist) * maxDist;
+                        }
                     }
                 });
 
