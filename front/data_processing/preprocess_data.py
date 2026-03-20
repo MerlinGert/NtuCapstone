@@ -32,6 +32,8 @@ USER_EARNINGS_1MIN_PATH = os.path.join(PUBLIC_DIR, "data", "user_earnings_1min.j
 USER_EARNINGS_1H_PATH = os.path.join(PUBLIC_DIR, "data", "user_earnings_1h.json")
 USER_EARNINGS_1D_PATH = os.path.join(PUBLIC_DIR, "data", "user_earnings_1d.json")
 
+USER_BEHAVIOR_SEQUENCES_PATH = os.path.join(PUBLIC_DIR, "data", "user_behavior_sequences.json")
+
 def load_and_process_transfers():
     """Loads, sorts, and saves transfer data."""
     logger.info(f"Loading transfer data from {TRANSFER_CSV_PATH}...")
@@ -73,7 +75,7 @@ def load_and_process_transfers():
             df['to_owner_label'] = df['to_owner'].map(labels).fillna('')
             
             # Select columns
-            cols_to_keep = ['block_time', 'from_owner', 'from_owner_label', 'to_owner', 'to_owner_label', 'amount_display']
+            cols_to_keep = ['block_time', 'from_owner', 'from_owner_label', 'to_owner', 'to_owner_label', 'amount_display', 'tx_id']
             
             # Check if columns exist
             existing_cols = [c for c in cols_to_keep if c in df.columns]
@@ -767,6 +769,155 @@ def generate_user_earnings():
     except Exception as e:
         logger.error(f"Error generating user earnings: {e}")
 
+def generate_user_behavior_sequences():
+    """
+    Generates a file containing user behavior sequences from transfer and trade data.
+    Only includes non-contract and non-exchange users.
+    Structure:
+    {
+      user_address: [
+        {
+          timestamp: ts,
+          type: "transfer_in" | "transfer_out",
+          amount: val,
+          tx_id: val,
+          counterparty: val,
+          isTrade: true/false,
+          trade_info: {
+            action: "buy" | "sell",
+            amount: val,
+            price_usd: val,
+            total_usd: val
+          } (only if isTrade is true)
+        },
+        ...
+      ]
+    }
+    """
+    logger.info("Generating user behavior sequences...")
+    
+    if not os.path.exists(SORTED_TRANSFERS_PATH):
+        logger.warning(f"Sorted transfers not found at {SORTED_TRANSFERS_PATH}.")
+        return
+    if not os.path.exists(SORTED_TRADES_PATH):
+        logger.warning(f"Sorted trades not found at {SORTED_TRADES_PATH}.")
+        return
+        
+    try:
+        # Load simplified labels to filter out exchanges and contracts
+        labels = {}
+        if os.path.exists(SIMPLIFIED_LABELS_PATH):
+            with open(SIMPLIFIED_LABELS_PATH, 'r') as f:
+                labels = json.load(f)
+        
+        def is_valid_user(address):
+            if pd.isna(address) or address == "":
+                return False
+            label = labels.get(address, "").lower()
+            if "exchange" in label or "contract" in label or "pool" in label or "router" in label or "treasury" in label:
+                return False
+            return True
+            
+        # 1. Load Trades and index by tx_id for fast lookup
+        logger.info("Loading trades for behavior sequences...")
+        df_trades = pd.read_csv(SORTED_TRADES_PATH)
+        df_trades = df_trades.replace({np.nan: None})
+        # Assuming tx_id is unique enough or we group by tx_id
+        trade_dict = {}
+        for row in df_trades.itertuples(index=False):
+            # cols: timestamp, trader, amount, price, action_type, counterparty, tx_id, counterparty_address
+            if pd.isna(row.tx_id) or row.tx_id == "" or row.tx_id is None:
+                continue
+            
+            # Store trade info by tx_id. If a tx has multiple trades, we might need a list, 
+            # but usually one main action per tx for a user.
+            trade_dict[row.tx_id] = {
+                "action": row.action_type,
+                "amount": row.amount,
+                "price_usd": row.price,
+                "total_usd": getattr(row, 'amount_usd', row.amount * row.price) if getattr(row, 'amount_usd', None) is not None else (row.amount * row.price if row.amount is not None and row.price is not None else None)
+            }
+            
+        logger.info(f"Indexed {len(trade_dict)} unique trade transactions.")
+
+        # 2. Load Transfers and build sequences
+        logger.info("Loading transfers for behavior sequences...")
+        df_transfers = pd.read_csv(SORTED_TRANSFERS_PATH)
+        df_transfers = df_transfers.replace({np.nan: None})
+        
+        user_sequences = {}
+        count = 0
+        total = len(df_transfers)
+        
+        for row in df_transfers.itertuples(index=False):
+            # cols: timestamp, from_owner, from_owner_label, to_owner, to_owner_label, amount, tx_id
+            ts = row.timestamp
+            u_from = row.from_owner
+            u_to = row.to_owner
+            amt = row.amount
+            
+            # Use getattr for tx_id as it might be missing if SORTED_TRANSFERS wasn't regenerated
+            tx_id = getattr(row, 'tx_id', '') 
+            if tx_id is None:
+                tx_id = ''
+            if u_from is None:
+                u_from = ''
+            if u_to is None:
+                u_to = ''
+            
+            # Check if this tx is a trade
+            trade_info = trade_dict.get(tx_id)
+            is_trade = trade_info is not None
+
+            # Process 'from_owner' (transfer_out)
+            if is_valid_user(u_from):
+                if u_from not in user_sequences:
+                    user_sequences[u_from] = []
+                
+                event = {
+                    "timestamp": ts,
+                    "type": "transfer_out",
+                    "amount": amt,
+                    "tx_id": tx_id,
+                    "counterparty": u_to,
+                    "isTrade": is_trade
+                }
+                if is_trade:
+                    event["trade_info"] = trade_info
+                    
+                user_sequences[u_from].append(event)
+                
+            # Process 'to_owner' (transfer_in)
+            if is_valid_user(u_to):
+                if u_to not in user_sequences:
+                    user_sequences[u_to] = []
+                
+                event = {
+                    "timestamp": ts,
+                    "type": "transfer_in",
+                    "amount": amt,
+                    "tx_id": tx_id,
+                    "counterparty": u_from,
+                    "isTrade": is_trade
+                }
+                if is_trade:
+                    event["trade_info"] = trade_info
+                    
+                user_sequences[u_to].append(event)
+
+            count += 1
+            if count % 100000 == 0:
+                logger.info(f"Processed {count}/{total} transfers for behavior sequences...")
+
+        # Save to JSON
+        logger.info(f"Saving user behavior sequences to {USER_BEHAVIOR_SEQUENCES_PATH}...")
+        with open(USER_BEHAVIOR_SEQUENCES_PATH, 'w') as f:
+            json.dump(user_sequences, f, indent=2)
+            
+        logger.info(f"User behavior sequences generation complete. Found {len(user_sequences)} valid users.")
+        
+    except Exception as e:
+        logger.error(f"Error generating user behavior sequences: {e}")
 
 def main():
     logger.info("Starting data preprocessing...")
@@ -778,7 +929,7 @@ def main():
         load_owner_labels()
     
     # Process Transfers
-    process_transfers = False
+    process_transfers = True
     if process_transfers:
         load_and_process_transfers()
         
@@ -803,9 +954,14 @@ def main():
         generate_user_balances()
         
     # Generate User Earnings
-    generate_earnings = True
+    generate_earnings = False
     if generate_earnings:
         generate_user_earnings()
+        
+    # Generate User Behavior Sequences
+    generate_behavior_sequences = True
+    if generate_behavior_sequences:
+        generate_user_behavior_sequences()
     
     logger.info("Data preprocessing finished.")
 

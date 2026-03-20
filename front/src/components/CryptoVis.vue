@@ -8,7 +8,7 @@
         style="width:100%;height:100%;overflow:hidden"
         :content-style="{ display: 'flex', flexDirection: 'row', overflow: 'hidden', width: '100%', height: '100%', boxSizing: 'border-box' }"
       >
-<div style="flex: 4; min-width:0; overflow:hidden;">
+<div style="flex: 3; min-width:0; overflow:hidden;">
         <n-card
             size="small"
             style="width:100%;height:100%;"
@@ -16,9 +16,6 @@
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
-            <template #header>
-                <span class="card-header-text">Control Panel</span>
-            </template>
             <ControlPanel 
                 :loading="detecting"
                 :loadingLinks="detectingLinks"
@@ -45,15 +42,13 @@
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
-            <template #header>
-                <span class="card-header-text">Token Distribution</span>
-            </template>
             <TokenDistribution ref="tokenDistribution"
                 :snapshot-data="snapshot_data"
                 :entity-detection-results="entity_detection_results"
                 :link-detection-results="link_generation_results"
                 :manipulation-detection-results="manipulation_detection_results"
                 @detection-complete="handleDetectionComplete"
+                @user-selected="handleUserSelect"
             />
         </n-card>
         <n-card
@@ -63,10 +58,20 @@
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
-            <template #header>
-                <span class="card-header-text">Entity Details</span>
+            <template #header-extra v-if="selectedUser">
+                <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 15px; font-size: 14px; color: #4a5568; align-items: center; margin-right: 10px; white-space: nowrap;">
+                    <span style="background: #f7fafc; padding: 2px 8px; border-radius: 4px; border: 1px solid #e2e8f0; display: inline-block;">
+                        <strong>User:</strong> {{ selectedUser.length > 8 ? selectedUser.substring(0, 8) + '..' : selectedUser }}
+                    </span>
+                </div>
             </template>
-
+            <BehaviorDetails
+                :selected-user="selectedUser"
+                :behavior-data="behaviorDetailData"
+                :entity-info="selectedEntityInfo"
+                :snapshot-time="snapshot_configuration.time"
+                :manipulation-results="manipulation_detection_results"
+            />
         </n-card>
     </div>
 
@@ -79,9 +84,6 @@
           header-style="text-align:left;height:50px;font-size:1.4em;"
           :content-style="{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', overflow: 'visible' }"
         >
-          <template #header>
-            <span class="card-header-text">Manipulation Panel</span>
-          </template>
           <!-- 上 1/3：空白占位 -->
           <div style="flex:1;"></div>
           <!-- 中 1/3：K 线图 -->
@@ -109,9 +111,6 @@
             style="width:100%;height:40%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.4em;"
         >
-            <template #header>
-                <span class="card-header-text">Insight Panel</span>
-            </template>
         </n-card>
     </div>
       <!-- </n-layout> -->
@@ -132,9 +131,10 @@ import * as d3 from "d3"
 import TokenDistribution from "./TokenDistribution.vue"
 import ControlPanel from "./ControlPanel.vue"
 import CandlestickChart from "./CandlestickChart.vue"
+import BehaviorDetails from "./BehaviorDetails.vue"
 
 export default {
-  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, TokenDistribution, ControlPanel, CandlestickChart},
+  components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, TokenDistribution, ControlPanel, CandlestickChart, BehaviorDetails},
   data(){
     return {
       //new params
@@ -268,12 +268,73 @@ export default {
         topPairs:[]
       },
       loading: false,
-      isPartial: false
+      isPartial: false,
+      selectedUser: null,
+      behaviorDetailData: null,
+      selectedEntityInfo: null
     }
   },  
   watch:{
+      selectedUser(newVal) {
+          if (newVal) {
+              this.generateBehaviorDetailData();
+          } else {
+              this.behaviorDetailData = null;
+              this.selectedEntityInfo = null;
+          }
+      }
   },
   methods:{
+      generateBehaviorDetailData() {
+          if (!this.selectedUser) return;
+          const userSet = new Set([this.selectedUser]);
+          this.selectedEntityInfo = null;
+
+          // Expand via entity results
+          if (this.entity_detection_results) {
+              const targetEntity = this.entity_detection_results.find(entity => entity.users && entity.users.includes(this.selectedUser));
+              if (targetEntity && targetEntity.users) {
+                  this.selectedEntityInfo = targetEntity;
+                  targetEntity.users.forEach(member => userSet.add(member));
+              }
+          }
+
+          // Expand via link results
+          if (this.link_generation_results) {
+              const mapsToCheck = [
+                  this.link_generation_results.target_relations_for_links,
+                  this.link_generation_results.target_related_relations_for_links
+              ];
+              mapsToCheck.forEach(map => {
+                  if (map) {
+                      Object.keys(map).forEach(key => {
+                          const [u1, u2] = key.split('-');
+                          if (u1 === this.selectedUser) userSet.add(u2);
+                          if (u2 === this.selectedUser) userSet.add(u1);
+                      });
+                  }
+              });
+          }
+
+          // Fetch behavior sequences
+          fetch('/data/user_behavior_sequences.json')
+              .then(res => res.json())
+              .then(sequences => {
+                  const data = {};
+                  Array.from(userSet).forEach(user => {
+                      data[user] = sequences[user] || [];
+                  });
+                  this.behaviorDetailData = data;
+                  console.log("CryptoVis: behaviorDetailData generated for users", userSet, this.behaviorDetailData);
+              })
+              .catch(err => {
+                  console.error("CryptoVis: failed to fetch user behavior sequences", err);
+              });
+      },
+      handleUserSelect(userId) {
+          this.selectedUser = userId;
+          console.log("CryptoVis: selectedUser updated to", this.selectedUser);
+      },
       rebuildEntityResults() {
           if (!this.link_generation_results) return;
 

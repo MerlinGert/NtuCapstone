@@ -601,57 +601,45 @@ export default {
                 .attr("class", d => `bubble single ${d.isRelated ? 'related' : ''}`)
                 .attr("transform", d => `translate(${d.x ?? 0},${d.y ?? 0})`)
                 .attr("r", d => d.r)
-                .style("fill", d => color(d.value)) // Use identical color encoding for related users
-                .style("opacity", 0.6)
-                .style("stroke", d => d.suspicious ? "#ff0000" : "#5976ba") // Same stroke color
-                .style("stroke-dasharray", "none") // Same solid border
+                .style("fill", d => color(d.value))
+                .style("opacity", d => d.isRelated ? 0.3 : 0.6)
+                .style("stroke", d => d.suspicious ? "#ff0000" : "#5976ba")
                 .style("stroke-width", d => d.suspicious ? 3 : 2)
-                .call(drag) // Attach drag
                 .on("mouseover", (event, d) => {
-                    d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#000");
-                    const tooltip = this.$refs.tooltip;
-                    let content = `Address: ${d.name.substring(0,6)}...<br>Balance: ${d.value.toLocaleString()}`;
-                    if (d.isRelated) content += `<br><em>(Related User)</em>`;
-                    if (d.suspicious) {
-                        content += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
-                        if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
-                             content += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
-                             d.suspicious.reasons.forEach(r => {
-                                 content += `<li style="font-size: 10px;">${r}</li>`;
-                             });
-                             content += `</ul>`;
-                        } else {
-                             content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`;
-                        }
-                    }
-
+                    const tooltip = d3.select(this.$refs.tooltip);
+                    tooltip.transition().duration(200).style("opacity", .9);
+                    
+                    let htmlContent = `<strong>Address:</strong> ${d.id}<br/>`;
+                    htmlContent += `<strong>Balance:</strong> ${d.value.toFixed(2)}<br/>`;
+                    if (d.isRelated) htmlContent += `<strong>Type:</strong> Related User<br/>`;
+                    
                     if (d.detectionInfo) {
-                        content += `<br><strong style="color:orange">Entity Group Detected</strong>`;
-                        if (d.detectionInfo.relations && d.detectionInfo.relations.length > 0) {
-                             // Assuming relations have reasons or types
-                             content += `<br>Relations: ${d.detectionInfo.relations.length}`;
-                        }
+                         htmlContent += `<strong>Entity ID:</strong> ${d.detectionInfo.entityId}<br/>`;
                     }
-
-                    tooltip.innerHTML = content;
-                    tooltip.style.display = "block";
-                    tooltip.style.opacity = 1;
+                    
                     const [x, y] = d3.pointer(event, this.$refs.chart_container);
-                    tooltip.style.left = (x + 10) + "px";
-                    tooltip.style.top = (y - 10) + "px";
+                    tooltip.html(htmlContent)
+                        .style("left", (x + 10) + "px")
+                        .style("top", (y - 28) + "px");
                 })
                 .on("mousemove", (event) => {
-                    const tooltip = this.$refs.tooltip;
+                    const tooltip = d3.select(this.$refs.tooltip);
                     const [x, y] = d3.pointer(event, this.$refs.chart_container);
-                    tooltip.style.left = (x + 10) + "px";
-                    tooltip.style.top = (y - 10) + "px";
+                    tooltip
+                        .style("left", (x + 10) + "px")
+                        .style("top", (y - 28) + "px");
                 })
-                .on("mouseout", (event, d) => {
-                    d3.select(event.currentTarget).style("stroke", d.suspicious ? "#ff0000" : "#5976ba");
-                    this.$refs.tooltip.style.opacity = 0;
-                });
+                .on("mouseout", () => {
+                    d3.select(this.$refs.tooltip).transition().duration(500).style("opacity", 0);
+                })
+                .on("click", (event, d) => {
+                    event.stopPropagation();
+                    this.$emit('user-selected', d.id);
+                })
+                .call(drag);
 
             // Draw Group Members
+            const vm = this; // Store reference to vue instance
             groups.each(function(d) {
                 const groupG = d3.select(this);
 
@@ -666,7 +654,12 @@ export default {
                     .style("fill", child => color(child.value))
                     .style("opacity", 0.6)
                     .style("stroke", child => child.suspicious ? "#ff0000" : "#5976ba")
-                    .style("stroke-width", child => child.suspicious ? 3 : 2);
+                    .style("stroke-width", child => child.suspicious ? 3 : 2)
+                    .on("click", (event, child) => {
+                        // Stop event propagation so group drag or other events don't trigger
+                        event.stopPropagation();
+                        vm.$emit('user-selected', child.id);
+                    });
 
                 // Draw Internal Links on top
                 if (d.internalLinks && d.internalLinks.length > 0) {
@@ -758,19 +751,33 @@ export default {
                 // The ring has radius `relatedRingRadius` and stroke-width 40.
                 // So the inner edge is roughly at `relatedRingRadius - 20`.
                 // We add a little padding (e.g., node radius) so the node doesn't overlap the ring stroke.
-                const innerBoundary = relatedRingRadius - 20;
+                const innerBoundary = relatedRingRadius - 10;
 
-                // Force related users to strictly stay on the relatedRingRadius
+                // Apply radial boundaries
                 simulationNodes.forEach(d => {
+                    const dist = Math.sqrt(d.x * d.x + d.y * d.y);
                     if (d.isRelated) {
-                        const angle = Math.atan2(d.y, d.x);
-                        d.x = Math.cos(angle) * relatedRingRadius;
-                        d.y = Math.sin(angle) * relatedRingRadius;
+                        // Keep related users inside the outer ring, considering their radius
+                        const maxDist = maxGroupRadius - (d.r || 10) - 2; 
+                        // Keep them outside the inner ring, considering their radius
+                        const minDist = innerBoundary + (d.r || 10) + 2; 
+                        
+                        if (dist > maxDist && maxDist > 0) {
+                            d.x = (d.x / dist) * maxDist;
+                            d.y = (d.y / dist) * maxDist;
+                        } else if (dist < minDist && dist > 0) {
+                            d.x = (d.x / dist) * minDist;
+                            d.y = (d.y / dist) * minDist;
+                        }
                     } else {
-                        // Extra safety: Keep target users strictly inside the inner boundary 
-                        const dist = Math.sqrt(d.x*d.x + d.y*d.y);
-                        // Ensure the entire node (including its radius) stays inside the boundary
-                        const maxDist = innerBoundary - (d.r || 10) - 2; 
+                        // Keep main users inside the inner circle, considering their radius
+                        // Ensure the entire node (including its radius) stays inside the inner boundary
+                        let nodeRadius = d.r || 10;
+                        if (d.isGroup) {
+                            // If it's a group, we need to consider the enclosing circle's radius
+                            nodeRadius = d.enclose ? d.enclose.r : (d.r || 10);
+                        }
+                        const maxDist = innerBoundary - nodeRadius - 2; 
                         
                         if (dist > maxDist && maxDist > 0) {
                             d.x = (d.x / dist) * maxDist;
