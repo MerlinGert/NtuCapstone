@@ -5,10 +5,19 @@
     </div>
     <div v-else class="details-content">
       <div class="header">
-        <h3 class="user-id">User: {{ selectedUser }}</h3>
-        <div v-if="entityInfo" class="entity-info">
-          <span class="entity-badge">Part of Entity</span>
-          <span class="entity-members">Members: {{ entityInfo.users.length }}</span>
+        <div class="header-left">
+          <h3 class="user-id">User: {{ selectedUser }}</h3>
+          <div v-if="entityInfo" class="entity-info">
+            <span class="entity-badge">Part of Entity</span>
+            <span class="entity-members">Members: {{ entityInfo.users.length }}</span>
+          </div>
+        </div>
+        <div class="controls" v-if="manipulationResults && manipulationResults.length > 0">
+          <label class="toggle-switch">
+            <input type="checkbox" v-model="showManipulationBoxes" @change="drawChart">
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-text">Show Manipulation Boxes</span>
         </div>
       </div>
       
@@ -52,6 +61,11 @@ export default {
       type: Array,
       default: () => []
     }
+  },
+  data() {
+    return {
+      showManipulationBoxes: true
+    };
   },
   watch: {
     behaviorData: {
@@ -303,7 +317,7 @@ export default {
       const foregroundGroup = chartBody.append('g').attr('class', 'foreground-group');
 
       // Draw Manipulation Bounding Boxes
-      if (this.manipulationResults && this.manipulationResults.length > 0) {
+      if (this.showManipulationBoxes && this.manipulationResults && this.manipulationResults.length > 0) {
         this.manipulationResults.forEach(result => {
           if (!result.participants || !result.manipulation_time || result.manipulation_time.length === 0) return;
           
@@ -720,6 +734,12 @@ export default {
   border-bottom: 1px solid #e2e8f0;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .user-id {
   margin: 0;
   font-size: 14px;
@@ -745,6 +765,64 @@ export default {
 .entity-members {
   font-size: 12px;
   color: #718096;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e0;
+  transition: .3s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #fc8181; /* Soft red to match manipulation boxes */
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.toggle-text {
+  font-size: 12px;
+  color: #4a5568;
+  font-weight: 500;
+  user-select: none;
 }
 
 .data-view {
