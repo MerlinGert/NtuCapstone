@@ -84,26 +84,19 @@
           header-style="text-align:left;height:50px;font-size:1.4em;"
           :content-style="{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', overflow: 'visible' }"
         >
-          <!-- 上 1/3：空白占位 -->
-          <div style="flex:1;"></div>
-          <!-- 中 1/3：K 线图 -->
-          <div style="flex:1; border-top:1px solid #eef2f7; border-bottom:1px solid #eef2f7; display:flex; flex-direction:row; overflow:hidden;">
-            <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; background:#fff;">
-              <div style="flex-shrink:0;height:18px;padding-left:8px;font-size:11px;font-weight:600;color:#4a5568;line-height:18px;">ACT K-Line</div>
-              <div style="flex:1; min-height:0; overflow:hidden;">
-                <CandlestickChart :granularity="klineGranularity" style="width:100%;height:100%;" />
-              </div>
-            </div>
-            <div class="granularity-panel">
-              <div class="gran-title">Granularity</div>
-              <button v-for="g in klineGranularities" :key="g"
-                :class="['gran-btn', klineGranularity===g ? 'gran-btn--active' : '']"
-                @click="klineGranularity=g"
-              >{{ g }}</button>
+
+          <div style="flex:1; border-top:1px solid #eef2f7; border-bottom:1px solid #eef2f7; display:flex; flex-direction:column; overflow:hidden; background:#fff;">
+            <div style="flex:1; min-height:0; overflow:hidden;">
+              <CandlestickChart 
+                :manipulation-results="manipulation_detection_results"
+                :selected-user="selectedUser"
+                :entity-info="selectedEntityInfo"
+                style="width:100%;height:100%;"
+              />
             </div>
           </div>
-          <!-- 下 1/3：空白占位 -->
-          <div style="flex:1;"></div>
+
+
         </n-card>
         <n-card
             size="small"
@@ -253,8 +246,6 @@ export default {
       manipulation_detection_results: {}, //current manipulation detection results
 
       //old params
-      klineGranularity: '1D',
-      klineGranularities: ['1H','1D','3D','1W'],
       detecting: false,
       detectingLinks: false,
       detectingManipulation: false,
@@ -1054,56 +1045,6 @@ a {
   box-shadow: 0 1px 8px rgba(0,0,0,0.12) !important;
 }
 /* 粒度按钮面板 */
-.granularity-panel {
-  flex: 0 0 62px;
-  border-left: 1px solid #e2e8f0;
-  background: #f8fafc;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px 6px;
-  overflow: hidden;
-}
-.gran-title {
-  font-size: 9px;
-  color: #a0aec0;
-  text-align: center;
-  letter-spacing: 1px;
-  margin-bottom: 2px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.gran-btn {
-  display: block;
-  width: 100%;
-  padding: 4px 0;
-  border: 1px solid #e8edf3;
-  border-radius: 6px;
-  background: #fff;
-  color: #90a0b7;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  text-align: center;
-  white-space: nowrap;
-  transition: all 0.18s ease;
-  letter-spacing: 0.5px;
-  box-shadow: none;
-}
-.gran-btn:hover {
-  background: #f4f7fd;
-  color: #7090b8;
-  border-color: #d0ddef;
-}
-.gran-btn--active {
-  background: #edf3ff !important;
-  color: #7090c8 !important;
-  border-color: #d2e0f8 !important;
-  font-weight: 600 !important;
-  box-shadow: none !important;
-}
 .checkbox{
   --n-color-checked: #728efd !important;
   --n-border-checked:  #728efd !important;

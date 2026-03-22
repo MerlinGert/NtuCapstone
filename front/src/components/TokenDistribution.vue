@@ -1,14 +1,14 @@
 <template>
     <div style="height:100%;width:100%;background:#ffffff;display:flex;flex-direction:column">
         <!-- Info Header -->
-        <div style="padding: 10px; background: #f0f0f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid #ddd;">
-            <span style="font-weight: bold;">{{ displayTime }}</span>
-            <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="header-panel">
+            <div class="panel-title">{{ displayTime }}</div>
+            <div class="control-group">
                 <label>Scale:</label>
                 <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="drawChart">
                 <span>{{ scaleFactor }}</span>
+                <span style="margin-left: 10px;">Active Users: {{ userCount }}</span>
             </div>
-            <span>Active Users: {{ userCount }}</span>
         </div>
 
         <!-- Chart -->
@@ -866,5 +866,52 @@ export default {
 .tokenDistribution {
     width: 100%;
     height: 100%;
+}
+
+.header-panel {
+  flex-shrink: 0;
+  height: 32px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid #eef2f7;
+  background: #f8fafc;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #4a5568;
+}
+
+.control-group input[type=range] {
+  cursor: pointer;
+  height: 4px;
+  border-radius: 2px;
+  background: #e2e8f0;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.control-group input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #4a5568;
+  cursor: pointer;
 }
 </style>

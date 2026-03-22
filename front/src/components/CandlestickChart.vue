@@ -1,12 +1,20 @@
-﻿<template>
-  <div class="candlestick-wrap" ref="wrap">
-    <div class="chart-body" ref="chartBody">
-      <svg ref="svg" class="candle-svg"></svg>
-      <div v-if="loading" class="loading-mask">Loading...</div>
-      <div v-if="!loading && ohlc.length === 0" class="loading-mask">No data</div>
-      <span class="price-tag" v-if="lastClose !== null">
-        {{ lastClose.toExponential(4) }} USD
-      </span>
+<template>
+  <div class="candlestick-container">
+    <div class="header-panel">
+      <div class="panel-title">ACT K-Line</div>
+      <div class="granularity-panel">
+        <button v-for="g in granularities" :key="g.key"
+          :class="['gran-btn', currentGranularity===g.key ? 'gran-btn--active' : '']"
+          @click="currentGranularity=g.key"
+        >{{ g.label }}</button>
+      </div>
+    </div>
+    <div class="candlestick-wrap" ref="wrap">
+      <div class="chart-body" ref="chartBody">
+        <svg ref="svg" class="candle-svg"></svg>
+        <div v-if="loading" class="loading-mask">Loading...</div>
+        <div v-if="!loading && ohlc.length === 0" class="loading-mask">No data</div>
+      </div>
     </div>
   </div>
 </template>
@@ -31,21 +39,28 @@ const GRANULARITIES = [
 export default {
   name: 'CandlestickChart',
   props: {
-    granularity: { type: String, default: '1D' },
+    manipulationResults: {
+      type: Array,
+      default: () => []
+    }
   },
   data() {
     return {
+      granularities: GRANULARITIES,
+      currentGranularity: '1H',
       actOhlc: null,
       ohlc: [],
       loading: true,
-      lastClose: null,
       resizeObs: null,
     }
   },
   watch: {
-    granularity() {
+    currentGranularity() {
       this.refresh()
     },
+    manipulationResults() {
+      this.draw()
+    }
   },
   mounted() {
     this.loadData()
@@ -71,7 +86,7 @@ export default {
 
     refresh() {
       if (!this.actOhlc) { this.ohlc = []; return }
-      const raw = this.actOhlc[this.granularity] || []
+      const raw = this.actOhlc[this.currentGranularity] || []
       this.ohlc = raw.map(d => ({
         date:  new Date(d.t + ' UTC'),
         open:  d.o,
@@ -80,7 +95,6 @@ export default {
         close: d.c,
         vol:   d.v,
       }))
-      this.lastClose = this.ohlc.length ? this.ohlc[this.ohlc.length - 1].close : null
       this.$nextTick(() => this.draw())
     },
 
@@ -203,32 +217,81 @@ export default {
 </script>
 
 <style scoped>
-.candlestick-wrap {
-  width: 100%;
-  height: 100%;
-  background: #ffffff;
-  position: relative;
-  overflow: hidden;
+.candlestick-container {
   display: flex;
   flex-direction: column;
-}
-.chart-body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background: #ffffff;
+}
+
+.header-panel {
+  flex-shrink: 0;
+  height: 32px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid #eef2f7;
+  background: #f8fafc;
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+/* 粒度按钮面板 */
+.granularity-panel {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.gran-btn {
+  padding: 4px 10px;
+  border: 1px solid #e8edf3;
+  border-radius: 4px;
+  background: #fff;
+  color: #90a0b7;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+  letter-spacing: 0.5px;
+  box-shadow: none;
+}
+.gran-btn:hover {
+  background: #f4f7fd;
+  color: #7090b8;
+  border-color: #d0ddef;
+}
+.gran-btn--active {
+  background: #edf3ff !important;
+  color: #7090c8 !important;
+  border-color: #d2e0f8 !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+
+.candlestick-wrap {
+  flex: 1;
+  min-height: 0;
   position: relative;
+  width: 100%; height: 100%;
+}
+
+.chart-body {
+  position: absolute; inset: 0;
 }
 .candle-svg { display: block; width: 100%; height: 100%; }
-.price-tag {
-  position: absolute;
-  top: 4px; left: 8px;
-  font-size: 11px;
-  font-family: 'Courier New', monospace;
-  color: #26a69a;
-  font-weight: 700;
-  pointer-events: none;
-  z-index: 2;
-}
+
 .loading-mask {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
