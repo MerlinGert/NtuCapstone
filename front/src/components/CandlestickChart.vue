@@ -148,14 +148,20 @@ export default {
         '3D': d => d3.timeFormat('%m/%d')(d),
         '1W': d => d3.timeFormat('%m/%d')(d),
       }
-      const fmt  = fmtMap[this.granularity]
-      const step = Math.max(1, Math.ceil(data.length / Math.max(3, Math.floor(iW / 70))))
+      const fmt  = fmtMap[this.currentGranularity]
+      // 动态计算合适的间距，确保X轴文字不会重叠
+      const maxTicks = Math.max(2, Math.floor(iW / 90))
+      const step = Math.max(1, Math.ceil(data.length / maxTicks))
       const tickDates = data.filter((_, i) => i % step === 0).map(d => d.date)
 
       g.append('g').attr('transform', `translate(0,${iH})`)
         .call(d3.axisBottom(xScale).tickValues(tickDates).tickFormat(fmt))
         .call(ax => ax.select('.domain').remove())
-        .selectAll('text').style('fill', COLORS.axis).style('font-size', '9px').attr('dy', '1em')
+        .selectAll('text')
+        .style('fill', COLORS.axis)
+        .style('font-size', '8px')
+        .attr('dy', '1em')
+        .style('text-anchor', 'middle')
 
       // Candles
       const bw = xScale.bandwidth()
@@ -285,10 +291,15 @@ export default {
   min-height: 0;
   position: relative;
   width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chart-body {
-  position: absolute; inset: 0;
+  position: absolute;
+  height: 33.33%;
+  width: 100%;
 }
 .candle-svg { display: block; width: 100%; height: 100%; }
 

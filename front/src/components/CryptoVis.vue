@@ -82,11 +82,11 @@
           class="panel-card"
           style="width:100%;height:60%;flex-shrink:0;"
           header-style="text-align:left;height:50px;font-size:1.4em;"
-          :content-style="{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', overflow: 'visible' }"
+          :content-style="{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
         >
 
           <div style="flex:1; border-top:1px solid #eef2f7; border-bottom:1px solid #eef2f7; display:flex; flex-direction:column; overflow:hidden; background:#fff;">
-            <div style="flex:1; min-height:0; overflow:hidden;">
+            <div style="width:100%; height:100%; min-height:0; overflow:hidden;">
               <CandlestickChart 
                 :manipulation-results="manipulation_detection_results"
                 :selected-user="selectedUser"
