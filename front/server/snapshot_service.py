@@ -2,6 +2,7 @@ from networkx import read_multiline_adjlist
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
+import asyncio
 import json
 import os
 import time
@@ -211,4 +212,8 @@ async def process_snapshot(request: SnapshotRequest):
         }
     }
     
+    # Notify screenshot service (fire-and-forget) ezio
+    from screenshot_client import notify_screenshot
+    asyncio.ensure_future(notify_screenshot({"snapshotResponse": response}))
+
     return response

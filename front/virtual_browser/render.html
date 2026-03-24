@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #fff; }
+    svg { display: block; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+</head>
+<body>
+  <svg class="tokenDistribution"></svg>
+  <script>
+    // =========================================================
+    // Data transformation layer (from CryptoVis.vue)
+    // =========================================================
+
+    /**
+     * rebuildEntityResults — CryptoVis.vue L277-354
+     * Build entity groups from connected components in the entity relation graph.
+     */
+    function rebuildEntityResults(linkGenResults) {
+      if (!linkGenResults) return [];
+
+      const tt = linkGenResults.target_relations_for_entity || {};
+      const tr = linkGenResults.target_related_relations_for_entity || {};
+
+      const adj = {};
+      const addEdge = (u, v, rels) => {
+        if (!adj[u]) adj[u] = [];
+        if (!adj[v]) adj[v] = [];
+        adj[u].push({ neighbor: v, rels });
+        adj[v].push({ neighbor: u, rels });
+      };
+
+      const processMap = (map) => {
+        Object.keys(map).forEach(key => {
+          const parts = key.split('-');
+          if (parts.length >= 2) {
+            addEdge(parts[0], parts[1], map[key]);
+          }
+        });
+      };
+
+      processMap(tt);
+      processMap(tr);
+
+      const visited = new Set();
+      const entities = [];
+
+      Object.keys(adj).forEach(user => {
+        if (!visited.has(user)) {
+          const componentUsers = new Set();
+          const queue = [user];
+          visited.add(user);
+          componentUsers.add(user);
+
+          while (queue.length > 0) {
+            const curr = queue.shift();
+            if (adj[curr]) {
+              adj[curr].forEach(edge => {
+                if (!visited.has(edge.neighbor)) {
+                  visited.add(edge.neighbor);
+                  componentUsers.add(edge.neighbor);
+                  queue.push(edge.neighbor);
+                }
+              });
+            }
+          }
+
+          const compRels = [];
+          const processedKeys = new Set();
+          const checkMap = (map) => {
+            Object.keys(map).forEach(key => {
+              if (processedKeys.has(key)) return;
+              const parts = key.split('-');
+              if (parts.length >= 2) {
+                if (componentUsers.has(parts[0]) && componentUsers.has(parts[1])) {
+                  compRels.push(...map[key]);
+                  processedKeys.add(key);
+                }
+              }
+            });
+          };
+          checkMap(tt);
+          checkMap(tr);
+
+          entities.push({
+            users: Array.from(componentUsers),
+            relations: compRels
+          });
+        }
+      });
+
+      return entities;
+    }
+
+    /**
+     * processManipulationRelations — CryptoVis.vue L356-586
+     * Generate manipulation-based relations and merge into linkGenResults.
+     * Returns { linkResults, entityResults (or null) }.
+     */
+    function processManipulationRelations(manipResults, linkGenResults, snapshotData, entityConfig, linkConfig) {
+      const enableEntity = entityConfig && entityConfig.enable_manipulation_based;
+      const enableLink = linkConfig && linkConfig.enable_manipulation_based;
+
+      if (!enableEntity && !enableLink) return { linkResults: linkGenResults, entityResults: null };
+      if (!manipResults || manipResults.length === 0) return { linkResults: linkGenResults, entityResults: null };
+
+      const timeDiffEntity = (entityConfig && entityConfig.manipulation_based_params)
+        ? entityConfig.manipulation_based_params.max_manipulation_time_diff : 2;
+      const timeDiffLink = (linkConfig && linkConfig.manipulation_based_params)
+        ? linkConfig.manipulation_based_params.max_manipulation_time_diff : 120;
+
+      // Classify TT / TR
+      const balances = (snapshotData && snapshotData.balances) ? snapshotData.balances : {};
+      const targetUsers = new Set(
+        Object.keys(balances.users || {}).filter(u => u !== 'Others')
+      );
+      const relatedUsers = new Set(Object.keys(balances.related_users || {}));
+
+      const classifyPair = (u1, u2) => {
+        const u1T = targetUsers.has(u1);
+        const u2T = targetUsers.has(u2);
+        const u1R = relatedUsers.has(u1);
+        const u2R = relatedUsers.has(u2);
+        if (u1T && u2T) return 'tt';
+        if ((u1T && u2R) || (u1R && u2T)) return 'tr';
+        return null;
+      };
+
+      let timedEvents = [];
+      let sameManipulationPairs = [];
+
+      manipResults.forEach(result => {
+        if (result.participants && result.participants.length > 1) {
+          for (let i = 0; i < result.participants.length; i++) {
+            for (let j = i + 1; j < result.participants.length; j++) {
+              sameManipulationPairs.push({
+                u1: result.participants[i],
+                u2: result.participants[j],
+                method: result.detection_method,
+                time: result.manipulation_time
+              });
+            }
+          }
+        }
+        if (result.participants && result.manipulation_time && result.manipulation_time.length > 0) {
+          const startStr = result.manipulation_time[0];
+          const endStr = result.manipulation_time.length > 1 ? result.manipulation_time[1] : startStr;
+          const startTs = new Date(startStr).getTime();
+          const endTs = new Date(endStr).getTime();
+          if (!isNaN(startTs) && !isNaN(endTs)) {
+            result.participants.forEach(p => {
+              timedEvents.push({
+                trader: p,
+                startTs: startTs,
+                endTs: endTs,
+                method: result.detection_method,
+                timeRange: result.manipulation_time
+              });
+            });
+          }
+        }
+      });
+
+      timedEvents.sort((a, b) => a.startTs - b.startTs);
+
+      const getPairKey = (u1, u2) => [u1, u2].sort().join('-');
+
+      const buckets = {
+        entity: { tt: {}, tr: {} },
+        link: { tt: {}, tr: {} }
+      };
+
+      const addRelation = (category, u1, u2, type, weight, details) => {
+        const pairType = classifyPair(u1, u2);
+        if (!pairType) return;
+        const key = getPairKey(u1, u2);
+        const bucket = buckets[category][pairType];
+        if (!bucket[key]) bucket[key] = [];
+        bucket[key].push({
+          source: u1, target: u2, type, weight, details,
+          description: details.description
+        });
+      };
+
+      const processedEntityPairs = new Set();
+      const processedLinkPairs = new Set();
+      const getUniqueKey = (u1, u2, type) => `${getPairKey(u1, u2)}|${type}`;
+
+      // Same manipulation pairs
+      sameManipulationPairs.forEach(item => {
+        const { u1, u2, method, time } = item;
+        const details = {
+          description: `Participated in same manipulation group. Method: ${method || 'Unknown'}. Time: ${time ? time.join(' - ') : 'Unknown'}`,
+          method, time
+        };
+        const uKey = getUniqueKey(u1, u2, 'manipulation_same_group');
+        if (enableEntity && !processedEntityPairs.has(uKey)) {
+          processedEntityPairs.add(uKey);
+          addRelation('entity', u1, u2, 'manipulation_same_group', 1, details);
+        }
+        if (enableLink && !processedLinkPairs.has(uKey)) {
+          processedLinkPairs.add(uKey);
+          addRelation('link', u1, u2, 'manipulation_same_group', 1, details);
+        }
+      });
+
+      // Time-based pairs
+      for (let i = 0; i < timedEvents.length; i++) {
+        for (let j = i + 1; j < timedEvents.length; j++) {
+          let e1 = timedEvents[i];
+          let e2 = timedEvents[j];
+          let diffMs = Math.abs(e2.startTs - e1.startTs);
+          let diffMinutes = diffMs / (1000 * 60);
+          let maxThreshold = Math.max(timeDiffEntity, timeDiffLink);
+          if (diffMinutes > maxThreshold) break;
+
+          if (e1.trader !== e2.trader) {
+            const isOverlap = (e1.startTs <= e2.endTs && e2.startTs <= e1.endTs);
+            const overlapStr = isOverlap ? " (Overlap)" : "";
+            const description = `Manipulation time proximity. Diff: ${diffMinutes.toFixed(2)}m${overlapStr}. Methods: ${e1.method}, ${e2.method}.`;
+            const details = {
+              description, diffMinutes, isOverlap,
+              event1: { method: e1.method, time: e1.timeRange },
+              event2: { method: e2.method, time: e2.timeRange }
+            };
+            const uKey = getUniqueKey(e1.trader, e2.trader, 'manipulation_time_proximity');
+            if (enableEntity && diffMinutes <= timeDiffEntity && !processedEntityPairs.has(uKey)) {
+              processedEntityPairs.add(uKey);
+              addRelation('entity', e1.trader, e2.trader, 'manipulation_time_proximity', 1, details);
+            }
+            if (enableLink && diffMinutes <= timeDiffLink && !processedLinkPairs.has(uKey)) {
+              processedLinkPairs.add(uKey);
+              addRelation('link', e1.trader, e2.trader, 'manipulation_time_proximity', 1, details);
+            }
+          }
+        }
+      }
+
+      // Merge into linkGenResults
+      let currentRelations = JSON.parse(JSON.stringify(linkGenResults || {}));
+
+      const cleanRelations = (relationsMap) => {
+        if (!relationsMap) return {};
+        const cleaned = {};
+        Object.keys(relationsMap).forEach(key => {
+          const relations = relationsMap[key];
+          if (Array.isArray(relations)) {
+            const filtered = relations.filter(r =>
+              r.type !== 'manipulation_same_group' &&
+              r.type !== 'manipulation_time_proximity'
+            );
+            if (filtered.length > 0) cleaned[key] = filtered;
+          }
+        });
+        return cleaned;
+      };
+
+      ['target_relations_for_entity', 'target_related_relations_for_entity',
+       'target_relations_for_links', 'target_related_relations_for_links'].forEach(key => {
+        if (currentRelations[key]) {
+          currentRelations[key] = cleanRelations(currentRelations[key]);
+        }
+      });
+
+      const mergeMap = (targetMapName, sourceMap) => {
+        if (Object.keys(sourceMap).length === 0) return;
+        if (!currentRelations[targetMapName]) currentRelations[targetMapName] = {};
+        const targetMap = currentRelations[targetMapName];
+        Object.keys(sourceMap).forEach(key => {
+          if (targetMap[key]) {
+            targetMap[key] = [...targetMap[key], ...sourceMap[key]];
+          } else {
+            targetMap[key] = sourceMap[key];
+          }
+        });
+      };
+
+      if (enableEntity) {
+        mergeMap('target_relations_for_entity', buckets.entity.tt);
+        mergeMap('target_related_relations_for_entity', buckets.entity.tr);
+      }
+      if (enableLink) {
+        mergeMap('target_relations_for_links', buckets.link.tt);
+        mergeMap('target_related_relations_for_links', buckets.link.tr);
+      }
+
+      let entityResults = null;
+      if (enableEntity) {
+        entityResults = rebuildEntityResults(currentRelations);
+      }
+
+      return { linkResults: currentRelations, entityResults };
+    }
+
+    /**
+     * computeSuspiciousTraders — TokenDistribution.vue L142-163
+     */
+    function computeSuspiciousTraders(manipResults) {
+      const traders = [];
+      if (!manipResults || !Array.isArray(manipResults)) return traders;
+      const suspiciousMap = new Map();
+      manipResults.forEach(result => {
+        const method = result.detection_method;
+        if (result.participants && Array.isArray(result.participants)) {
+          result.participants.forEach(addr => {
+            if (!suspiciousMap.has(addr)) {
+              suspiciousMap.set(addr, { trader_id: addr, reasons: [] });
+            }
+            suspiciousMap.get(addr).reasons.push('Detected via: ' + method);
+          });
+        }
+      });
+      traders.push(...suspiciousMap.values());
+      return traders;
+    }
+
+    // =========================================================
+    // Rendering layer (from TokenDistribution.vue drawChart L270-873)
+    // =========================================================
+
+    function drawChart(snapshotData, entityDetectionResults, linkDetectionResults, suspiciousTraders, svgElement, width, height) {
+      if (!snapshotData) { window.__SIMULATION_SETTLED = true; return; }
+
+      const balances = snapshotData.balances;
+
+      // 1. Prepare base entries
+      let entries = [];
+      let relatedEntries = [];
+      let othersBalance = 0;
+      if (balances && balances.users) {
+        othersBalance = balances.users['Others'] || 0;
+        entries = Object.entries(balances.users)
+          .filter(([owner, balance]) => owner !== 'Others' && balance > 0)
+          .map(([owner, balance]) => ({
+            id: owner, name: owner, value: balance, r: 0, isRelated: false
+          }));
+      }
+      if (balances && balances.related_users) {
+        relatedEntries = Object.entries(balances.related_users)
+          .filter(([owner, balance]) => balance > 0)
+          .map(([owner, balance]) => ({
+            id: owner, name: owner, value: balance, r: 0, isRelated: true
+          }));
+      }
+
+      const usersBalance = entries.reduce((sum, d) => sum + d.value, 0);
+
+      // Mark suspicious traders
+      if (suspiciousTraders && suspiciousTraders.length > 0) {
+        const suspiciousMap = new Map();
+        suspiciousTraders.forEach(t => suspiciousMap.set(t.trader_id, t));
+        entries.forEach(d => {
+          if (suspiciousMap.has(d.id)) d.suspicious = suspiciousMap.get(d.id);
+        });
+        relatedEntries.forEach(d => {
+          if (suspiciousMap.has(d.id)) d.suspicious = suspiciousMap.get(d.id);
+        });
+      }
+
+      // 2. Calculate scale for bubbles
+      const scaleFactor = 0.6;
+      const minDim = Math.min(width, height);
+      const margin = 20;
+      const maxGroupRadius = (minDim / 2) - margin;
+      const totalBalance = usersBalance + othersBalance;
+      const totalAvailableArea = Math.PI * maxGroupRadius * maxGroupRadius;
+      const targetTotalInkArea = totalAvailableArea * scaleFactor;
+      const targetBubbleArea = totalBalance > 0 ? targetTotalInkArea * (usersBalance / totalBalance) : 0;
+      const radiusScale = usersBalance > 0 ? Math.sqrt(targetBubbleArea / (Math.PI * usersBalance)) : 1;
+
+      entries.forEach(d => { d.r = Math.sqrt(d.value) * radiusScale; });
+      relatedEntries.forEach(d => { d.r = Math.sqrt(d.value) * radiusScale; });
+
+      // 3. Handle Grouping (Hierarchical Packing)
+      let simulationNodes = [];
+      let finalNodes = [];
+
+      if (entityDetectionResults && Array.isArray(entityDetectionResults) && entityDetectionResults.length > 0) {
+        const userGroupMap = new Map();
+        entityDetectionResults.forEach((entity, index) => {
+          const entityId = 'entity_' + index;
+          entity.id = entityId;
+          if (entity.users && entity.users.length > 1) {
+            entity.users.forEach(userId => { userGroupMap.set(userId, entity); });
+          }
+        });
+
+        const groupMap = new Map();
+        const independentNodes = [];
+
+        entries.forEach(node => {
+          if (userGroupMap.has(node.id)) {
+            const entity = userGroupMap.get(node.id);
+            node.detectionInfo = { entityId: entity.id, relations: entity.relations };
+            if (!groupMap.has(entity.id)) groupMap.set(entity.id, []);
+            groupMap.get(entity.id).push(node);
+          } else {
+            independentNodes.push(node);
+            finalNodes.push(node);
+          }
+        });
+
+        const finalGroupNodes = [];
+        groupMap.forEach((members, entityId) => {
+          if (members.length > 1) {
+            d3.packSiblings(members);
+            const enclose = d3.packEnclose(members);
+            const groupNode = {
+              id: entityId, isGroup: true,
+              r: enclose.r + 5,
+              value: members.reduce((sum, m) => sum + m.value, 0),
+              children: members, enclose: enclose
+            };
+            finalGroupNodes.push(groupNode);
+          } else {
+            members.forEach(m => {
+              m.detectionInfo = null;
+              independentNodes.push(m);
+              finalNodes.push(m);
+            });
+          }
+        });
+
+        simulationNodes = [...independentNodes, ...finalGroupNodes];
+      } else {
+        simulationNodes = [...entries];
+        finalNodes = [...entries];
+      }
+
+      relatedEntries.forEach(node => {
+        simulationNodes.push(node);
+        finalNodes.push(node);
+      });
+
+      // 4. Setup SVG
+      const svg = d3.select(svgElement);
+      svg.attr("width", width).attr("height", height);
+      svg.selectAll("*").remove();
+
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const g = svg.append("g").attr("transform", "translate(" + centerX + "," + centerY + ")");
+
+      const ringGroup = g.append("g").attr("class", "ring-layer");
+      const linkGroup = g.append("g").attr("class", "link-layer");
+      const bubbleGroup = g.append("g").attr("class", "bubble-layer");
+
+      // Draw "Others" Ring
+      let relatedRingRadius = maxGroupRadius + 20;
+      if (othersBalance > 0) {
+        const targetRingArea = totalBalance > 0 ? targetTotalInkArea * (othersBalance / totalBalance) : 0;
+        const userGroupRadius = Math.sqrt(maxGroupRadius * maxGroupRadius - targetRingArea / Math.PI);
+        relatedRingRadius = (userGroupRadius + maxGroupRadius) / 2;
+
+        const arc = d3.arc()
+          .innerRadius(userGroupRadius)
+          .outerRadius(maxGroupRadius)
+          .startAngle(0)
+          .endAngle(2 * Math.PI);
+        ringGroup.append("path")
+          .attr("d", arc)
+          .style("fill", "#e3f2fd")
+          .style("opacity", 0.5);
+      }
+
+      const allEntries = [...entries, ...relatedEntries];
+      const color = d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(allEntries, d => d.value)]);
+
+      // Prepare Links for Simulation
+      const simulationLinkMap = new Map();
+      const userToSimNode = new Map();
+      simulationNodes.filter(n => !n.isGroup).forEach(n => userToSimNode.set(n.id, n));
+      simulationNodes.filter(n => n.isGroup).forEach(gn => {
+        gn.children.forEach(c => userToSimNode.set(c.id, gn));
+      });
+
+      const userToMemberNode = new Map();
+      entries.forEach(d => userToMemberNode.set(d.id, d));
+      relatedEntries.forEach(d => userToMemberNode.set(d.id, d));
+
+      // Process Links from linkDetectionResults
+      let linksToDraw = [];
+      if (linkDetectionResults) {
+        if (linkDetectionResults.target_relations_for_links) {
+          Object.entries(linkDetectionResults.target_relations_for_links).forEach(([key, relations]) => {
+            const parts = key.split('-');
+            if (parts.length >= 2) {
+              linksToDraw.push({
+                source: parts[0], target: parts[1],
+                weight: relations.length, relations: relations, type: 'link'
+              });
+            }
+          });
+        } else if (Array.isArray(linkDetectionResults)) {
+          linksToDraw = linkDetectionResults.map(l => ({ ...l, type: 'link' }));
+        }
+
+        if (linkDetectionResults.target_related_relations_for_links) {
+          Object.entries(linkDetectionResults.target_related_relations_for_links).forEach(([key, relations]) => {
+            const parts = key.split('-');
+            if (parts.length >= 2) {
+              linksToDraw.push({
+                source: parts[0], target: parts[1],
+                weight: relations.length, relations: relations, type: 'link'
+              });
+            }
+          });
+        }
+
+        if (linkDetectionResults.target_related_relations_for_entity) {
+          Object.entries(linkDetectionResults.target_related_relations_for_entity).forEach(([key, relations]) => {
+            const parts = key.split('-');
+            if (parts.length >= 2) {
+              linksToDraw.push({
+                source: parts[0], target: parts[1],
+                weight: relations.length, relations: relations, type: 'entity'
+              });
+            }
+          });
+        }
+      }
+
+      if (linksToDraw.length > 0) {
+        linksToDraw.forEach(link => {
+          const sourceNode = userToSimNode.get(link.source);
+          const targetNode = userToSimNode.get(link.target);
+          if (sourceNode && targetNode) {
+            if (sourceNode !== targetNode) {
+              const linkType = link.type || 'link';
+              const key = sourceNode.id + '-' + targetNode.id + '-' + linkType;
+              if (!simulationLinkMap.has(key)) {
+                simulationLinkMap.set(key, {
+                  source: sourceNode.id, target: targetNode.id,
+                  weight: 0, type: linkType, originalLinks: []
+                });
+              }
+              const simLink = simulationLinkMap.get(key);
+              simLink.weight += (link.weight || 1);
+              simLink.originalLinks.push(link);
+            } else if (sourceNode.isGroup) {
+              if (!sourceNode.internalLinks) sourceNode.internalLinks = [];
+              sourceNode.internalLinks.push({
+                source: userToMemberNode.get(link.source),
+                target: userToMemberNode.get(link.target),
+                ...link
+              });
+            }
+          }
+        });
+      }
+
+      const simulationLinks = Array.from(simulationLinkMap.values());
+
+      // Draw Links
+      const linkElements = linkGroup.selectAll("line")
+        .data(simulationLinks)
+        .join("line")
+        .attr("stroke", d => d.type === 'entity' ? '#ff9800' : '#999')
+        .style("stroke-dasharray", d => d.type === 'entity' ? '5,5' : 'none')
+        .attr("stroke-opacity", 0.6)
+        .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
+
+      // Draw Group Boundaries
+      const groups = bubbleGroup.selectAll(".group")
+        .data(simulationNodes.filter(n => n.isGroup))
+        .enter().append("g")
+        .attr("class", "group")
+        .attr("transform", d => "translate(" + (d.x || 0) + "," + (d.y || 0) + ")");
+
+      groups.append("circle")
+        .attr("r", d => d.r)
+        .style("fill", "none")
+        .style("fill-opacity", 1)
+        .style("stroke", "#ff9800")
+        .style("stroke-width", 2)
+        .style("stroke-dasharray", "5,5");
+
+      // Draw Independent Nodes
+      const singles = bubbleGroup.selectAll(".single")
+        .data(simulationNodes.filter(n => !n.isGroup))
+        .enter().append("circle")
+        .attr("class", d => "bubble single " + (d.isRelated ? 'related' : ''))
+        .attr("transform", d => "translate(" + (d.x || 0) + "," + (d.y || 0) + ")")
+        .attr("r", d => d.r)
+        .style("fill", d => color(d.value))
+        .style("opacity", 0.6)
+        .style("stroke", d => d.suspicious ? "#ff0000" : "#5976ba")
+        .style("stroke-dasharray", "none")
+        .style("stroke-width", d => d.suspicious ? 3 : 2);
+
+      // Draw Group Members
+      groups.each(function(d) {
+        const groupG = d3.select(this);
+
+        groupG.selectAll(".member")
+          .data(d.children)
+          .enter().append("circle")
+          .attr("class", "bubble member")
+          .attr("cx", child => child.x - d.enclose.x)
+          .attr("cy", child => child.y - d.enclose.y)
+          .attr("r", child => child.r)
+          .style("fill", child => color(child.value))
+          .style("opacity", 0.6)
+          .style("stroke", child => child.suspicious ? "#ff0000" : "#5976ba")
+          .style("stroke-width", child => child.suspicious ? 3 : 2);
+
+        // Draw Internal Links
+        if (d.internalLinks && d.internalLinks.length > 0) {
+          groupG.selectAll(".internal-link")
+            .data(d.internalLinks)
+            .enter().append("line")
+            .attr("class", "internal-link")
+            .attr("x1", l => l.source.x - d.enclose.x)
+            .attr("y1", l => l.source.y - d.enclose.y)
+            .attr("x2", l => l.target.x - d.enclose.x)
+            .attr("y2", l => l.target.y - d.enclose.y)
+            .attr("stroke", "#555")
+            .attr("stroke-width", 1.5)
+            .attr("stroke-opacity", 0.6);
+        }
+      });
+
+      // 5. Run Simulation synchronously (no animation needed for screenshots)
+      const simulation = d3.forceSimulation(simulationNodes)
+        .force("charge", d3.forceManyBody().strength(d => d.isGroup ? -50 : (d.isRelated ? -5 : -15)))
+        .force("collide", d3.forceCollide().radius(d => d.r + 5).strength(1))
+        .force("r", d3.forceRadial(d => d.isRelated ? relatedRingRadius : 0, 0, 0).strength(d => d.isRelated ? 1 : 0.15))
+        .force("center", d3.forceCenter(0, 0).strength(0.1))
+        .force("link", d3.forceLink(simulationLinks).id(d => d.id)
+          .distance(d => d.source.isRelated || d.target.isRelated ? relatedRingRadius * 0.5 : 20)
+          .strength(d => d.source.isRelated || d.target.isRelated ? 0.5 : 1))
+        .stop();  // Prevent automatic ticking
+
+      // Run all iterations synchronously (~300 ticks, same as default alphaDecay)
+      const innerBoundary = relatedRingRadius - 20;
+      for (let i = 0; i < 300; i++) {
+        simulation.tick();
+        // Apply position constraints each tick (same logic as frontend)
+        simulationNodes.forEach(d => {
+          if (d.isRelated) {
+            const angle = Math.atan2(d.y, d.x);
+            d.x = Math.cos(angle) * relatedRingRadius;
+            d.y = Math.sin(angle) * relatedRingRadius;
+          } else {
+            const dist = Math.sqrt(d.x * d.x + d.y * d.y);
+            const maxDist = innerBoundary - (d.r || 10) - 2;
+            if (dist > maxDist && maxDist > 0) {
+              d.x = (d.x / dist) * maxDist;
+              d.y = (d.y / dist) * maxDist;
+            }
+          }
+        });
+      }
+
+      // One-time DOM update with final positions
+      linkElements
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      groups.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+      singles.attr("transform", d => "translate(" + d.x + "," + d.y + ")");
+
+      window.__SIMULATION_SETTLED = true;
+    }
+
+    // =========================================================
+    // Default configs (from CryptoVis.vue data())
+    // =========================================================
+    const DEFAULT_ENTITY_DETECTION_CONFIG = {
+      enable_manipulation_based: false,
+      manipulation_based_params: { max_manipulation_time_diff: 2 }
+    };
+    const DEFAULT_LINK_DETECTION_CONFIG = {
+      enable_manipulation_based: true,
+      manipulation_based_params: { max_manipulation_time_diff: 120 }
+    };
+
+    // =========================================================
+    // Render with data (callable from Playwright via page.evaluate)
+    // =========================================================
+    window.renderWithData = function(data) {
+      window.__SIMULATION_SETTLED = false;
+
+      try {
+        // 1. Extract fields (like CryptoVis.vue does)
+        const snapshotData = data.snapshotResponse;
+        let entityResults = (data.detectionResponse && Array.isArray(data.detectionResponse.entity_results))
+          ? data.detectionResponse.entity_results : [];
+        let linkResults = (data.detectionResponse && data.detectionResponse.relations)
+          ? JSON.parse(JSON.stringify(data.detectionResponse.relations)) : {};
+        const manipResults = (data.manipulationResponse && Array.isArray(data.manipulationResponse.results))
+          ? data.manipulationResponse.results : [];
+
+        // 2. processManipulationRelations (may modify linkResults and rebuild entityResults)
+        const entityConfig = data.entityDetectionConfig || DEFAULT_ENTITY_DETECTION_CONFIG;
+        const linkConfig = data.linkDetectionConfig || DEFAULT_LINK_DETECTION_CONFIG;
+        const processed = processManipulationRelations(
+          manipResults, linkResults, snapshotData, entityConfig, linkConfig
+        );
+        linkResults = processed.linkResults;
+        if (processed.entityResults) entityResults = processed.entityResults;
+
+        // 3. Compute suspicious traders
+        const suspiciousTraders = computeSuspiciousTraders(manipResults);
+
+        // 4. Draw chart
+        const svgEl = document.querySelector('svg.tokenDistribution');
+        drawChart(snapshotData, entityResults, linkResults, suspiciousTraders, svgEl, window.innerWidth, window.innerHeight);
+
+      } catch (e) {
+        console.error('Failed to render:', e);
+        window.__SIMULATION_SETTLED = true;
+      }
+
+      // Fallback timeout
+      if (window.__fallbackTimer) clearTimeout(window.__fallbackTimer);
+      window.__fallbackTimer = setTimeout(() => { window.__SIMULATION_SETTLED = true; }, 5000);
+    };
+
+    // =========================================================
+    // Main entry point: page is pre-loaded for reuse via renderWithData()
+    // =========================================================
+    window.__SIMULATION_SETTLED = true;
+  </script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Dict, List, Any, Optional, Set
 import pandas as pd
@@ -44,6 +45,15 @@ async def run_detection(request: DetectionRequest):
             request.detect_entity,
             request.detect_link
         )
+
+        # Notify screenshot service (fire-and-forget) ezio
+        from screenshot_client import notify_screenshot
+        asyncio.ensure_future(notify_screenshot({
+            "detectionResponse": results,
+            "entityDetectionConfig": request.entity_detection_config,
+            "linkDetectionConfig": request.link_detection_config,
+        }))
+
         return results
     except Exception as e:
         logger.error(f"Error in detection process: {e}")

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import pandas as pd
 from typing import List, Dict, Any, Optional
@@ -506,7 +507,15 @@ async def detect_manipulation(request: ManipulationRequest):
             unified_results.extend(validated_results)
 
             
-        return UnifiedResponse(results=unified_results)
+        response = UnifiedResponse(results=unified_results)
+
+        # Notify screenshot service (fire-and-forget) ezio
+        from screenshot_client import notify_screenshot
+        asyncio.ensure_future(notify_screenshot({
+            "manipulationResponse": response.dict(),
+        }))
+
+        return response
 
     except Exception as e:
         logger.error(f"Error in manipulation detection service: {e}")

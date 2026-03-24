@@ -9,15 +9,16 @@
                 <span>{{ scaleFactor }}</span>
             </div>
             <span>Active Users: {{ userCount }}</span>
-            
-            <!-- used by ezio -->
+            <!-- ezio -->
             <button @click="openSnapshot" style="padding: 3px 6px; cursor: pointer; background-color: #4caf50; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px;">Snapshot</button>
         </div>
 
+        <!-- Snapshot Modal -->
         <div v-if="showSnapshot" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
             <TokenSnapshot :snapshot-data="snapshotPayload" @close="showSnapshot = false" />
         </div>
 
+        <!-- ezio -->
         <!-- Chart -->
         <div style="flex:1;position:relative;overflow:hidden;height:0;min-height:0;" ref="chart_container">
             <svg class="tokenDistribution"></svg>
@@ -60,7 +61,7 @@ export default {
             centerX: 0,
             centerY: 0,
             topPercent: 50,
-            suspiciousTraders: []
+            suspiciousTraders: [],
             // used by ezio
             showSnapshot: false,
             snapshotPayload: null,
@@ -249,7 +250,7 @@ export default {
 
             return {
                 nodes,
-                links: this.currentLinks ? this.currentLinks.map(l => ({
+                links: Array.isArray(this.currentLinks) ? this.currentLinks.map(l => ({
                     source: l.source.id || l.source,
                     target: l.target.id || l.target,
                     weight: l.weight
