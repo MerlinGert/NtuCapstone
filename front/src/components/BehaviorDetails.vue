@@ -78,6 +78,14 @@ export default {
       },
       deep: true
     },
+    entityInfo: {
+      handler() {
+        this.$nextTick(() => {
+          this.drawChart();
+        });
+      },
+      deep: true
+    },
     manipulationResults: {
       handler() {
         this.$nextTick(() => {
@@ -280,8 +288,10 @@ export default {
         .attr('class', 'x-axis')
         .call(xAxis);
 
-      // Define padding for event elements (half the height of a red box)
-      const eventBoxPadding = 6;
+      // Define padding for event elements
+      // If there are few users, we can make the dots row larger
+      const isFewUsers = sortedUsers.length <= 5;
+      const eventBoxPadding = isFewUsers ? 10 : 6;
 
       // Create a group for background elements (baselines, area charts, earning bars)
       const backgroundGroup = chartBody.append('g').attr('class', 'background-group');
@@ -496,9 +506,10 @@ export default {
         });
 
         // We want the area chart to fit within the row height (distance between user lines)
-        // Set maximum area height to 1/2 of the row spacing
+        // If there are few users, we reduce the proportion of balance/earning height to make more room for the dots
         const rowHeight = yScale.step();
-        const maxAreaHeight = rowHeight * 0.5;
+        const heightProportion = isFewUsers ? 0.3 : 0.5;
+        const maxAreaHeight = rowHeight * heightProportion;
 
         balanceScale = d3.scaleLinear()
           .domain([0, maxBalance || 1])
@@ -632,10 +643,14 @@ export default {
               tooltipText = `${isTransferIn ? 'Transfer In' : 'Transfer Out'}: ${event.amount}`;
             }
 
+            const circleRadius = isFewUsers ? 4 : 2;
             eventGroup.append('circle')
-              .attr('r', 2)
+              .attr('r', circleRadius)
               .attr('cy', 0)
               .attr('fill', circleColor)
+              .attr('opacity', 0.6)
+              .attr('stroke', d3.color(circleColor).darker(0.8))
+              .attr('stroke-width', 0.5)
               .append('title')
               .text(tooltipText);
           });

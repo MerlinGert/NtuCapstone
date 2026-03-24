@@ -235,8 +235,13 @@ export default {
     currentGranularity() {
       this.refresh()
     },
-    manipulationResults() {
-      this.draw()
+    manipulationResults: {
+      deep: true,
+      handler() {
+        // Need to recalculate binData roundTripCount/sameDirectionCount 
+        // when manipulation results change, so we call refresh() instead of just draw()
+        this.refresh()
+      }
     }
   },
   mounted() {
@@ -570,7 +575,7 @@ export default {
           })
 
           // Adjusted interaction distance
-          const interactionDist = bw * 1.5
+          const interactionDist = Math.max(bw * 1.5, 10)
 
           if (closestData && closestDist < interactionDist) {
             const d = closestData
@@ -591,15 +596,53 @@ export default {
             const upDown = d.close >= d.open ? '▲' : '▼'
             const color = d.close >= d.open ? COLORS.bull : COLORS.bear
             
+            const [wrapX, wrapY] = d3.pointer(e, this.$refs.wrap)
+            
+            // Adjust position to prevent right-edge clipping
+            const wrapWidth = this.$refs.wrap.clientWidth || W;
+            let leftPos = wrapX + 15
+            if (wrapX > wrapWidth - 150) {
+              leftPos = wrapX - 140
+            }
+
+            // Helper to format values avoiding scientific notation
+            const formatVal = (val) => {
+              if (val === 0) return "0";
+              
+              // For extremely small values (< 0.000001), format with 8 decimal places 
+              if (Math.abs(val) < 0.000001) {
+                return Number(val).toFixed(8).replace(/\.?0+$/, '');
+              }
+              
+              // For small values (< 1), format with up to 6 decimal places
+              if (Math.abs(val) < 1) {
+                return Number(val).toFixed(6).replace(/\.?0+$/, '');
+              }
+              
+              // For larger values, use unit suffixes
+              if (Math.abs(val) >= 1e9) {
+                return (val / 1e9).toFixed(2).replace(/\.?0+$/, '') + 'B';
+              }
+              if (Math.abs(val) >= 1e6) {
+                return (val / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
+              }
+              if (Math.abs(val) >= 1e3) {
+                return (val / 1e3).toFixed(2).replace(/\.?0+$/, '') + 'K';
+              }
+              
+              // For normal values, max 2 decimal places
+              return Number(val).toFixed(2).replace(/\.?0+$/, '');
+            };
+
             tooltip.style('display', 'block')
-              .style('left', (e.pageX + 10) + 'px')
-              .style('top', (e.pageY + 10) + 'px')
+              .style('left', leftPos + 'px')
+              .style('top', (wrapY + 15) + 'px')
               .html(`
                 <div style="color:${color};font-weight:bold;">${upDown} ${fmt(d.date)}</div>
-                <div>O: ${d.open.toExponential(4)}</div>
-                <div>H: ${d.high.toExponential(4)}</div>
-                <div>L: ${d.low.toExponential(4)}</div>
-                <div>C: <b>${d.close.toExponential(4)}</b></div>
+                <div>O: $${formatVal(d.open)}</div>
+                <div>H: $${formatVal(d.high)}</div>
+                <div>L: $${formatVal(d.low)}</div>
+                <div>C: <b>$${formatVal(d.close)}</b></div>
                 <div style="color:#a0aec0;">Txns: ${d.vol}</div>
                 ${d.roundTripCount > 0 ? `<div style="color:#e53e3e; margin-top:4px;">Round Trip: ${d.roundTripCount}</div>` : ''}
                 ${d.sameDirectionCount > 0 ? `<div style="color:#e53e3e;">Same Dir: ${d.sameDirectionCount}</div>` : ''}
