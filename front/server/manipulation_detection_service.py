@@ -122,9 +122,12 @@ def detect_round_trip_for_user(participant_id: str, user_trades: pd.DataFrame, m
             
             # We need at least 2 trades to form a round trip
             if len(sequence_trades) >= 2:
-                # Check conditions: net position change < max_position_diff AND earning < max_earning_usd
-                if abs(current_position) <= max_position_diff and current_earning_usd <= max_earning_usd:
-                    trade_records = sequence_trades.copy()
+                # Check if there is at least one buy and one sell in the sequence
+                actions_in_seq = set(t.get('action_type', 'buy').lower() for t in sequence_trades)
+                if 'buy' in actions_in_seq and 'sell' in actions_in_seq:
+                    # Check conditions: net position change < max_position_diff AND earning < max_earning_usd
+                    if abs(current_position) <= max_position_diff and current_earning_usd <= max_earning_usd:
+                        trade_records = sequence_trades.copy()
                     # Convert trades to dict for JSON serialization
                     transactions = []
                     # Keep track of actual participants involved in this specific sequence
@@ -158,7 +161,7 @@ def detect_round_trip_for_user(participant_id: str, user_trades: pd.DataFrame, m
                     found_round_trip = True
                     # Jump to the next trade after this round trip to avoid overlapping sub-sequences
                     i = j + 1
-                    break 
+                    break
                     
         if not found_round_trip:
             i += 1

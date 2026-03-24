@@ -18,9 +18,8 @@
       <div class="manipulation-cards-container scroll-x top-cards scroll-top" @scroll="drawBands" ref="topCardsContainer">
         <div class="manipulation-card top-card" v-for="(card, i) in topCards" :key="'top-'+i" :title="card.tooltip">
           <div class="card-time">{{ card.timeLabel }}</div>
-          <div class="card-method">{{ card.method }} <span style="color:#e53e3e; margin-left: 4px;">x{{ card.count }}</span></div>
-          <div class="card-users">{{ card.users }}</div>
-          <svg :ref="'svg-top-'+i" class="card-svg" width="100%" height="40"></svg>
+          <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
+          <svg :ref="'svg-top-'+i" class="card-svg" width="100%" height="100%"></svg>
         </div>
         <div v-if="topCards.length === 0" class="empty-cards">No Round Trip manipulations</div>
       </div>
@@ -38,9 +37,8 @@
       <div class="manipulation-cards-container scroll-x bottom-cards" @scroll="drawBands" ref="bottomCardsContainer">
         <div class="manipulation-card" v-for="(card, i) in bottomCards" :key="'bottom-'+i" :title="card.tooltip">
           <div class="card-time">{{ card.timeLabel }}</div>
-          <div class="card-method">{{ card.method }} <span style="color:#e53e3e; margin-left: 4px;">x{{ card.count }}</span></div>
-          <div class="card-users">{{ card.users }}</div>
-          <svg :ref="'svg-bottom-'+i" class="card-svg" width="100%" height="40"></svg>
+          <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
+          <svg :ref="'svg-bottom-'+i" class="card-svg" width="100%" height="100%"></svg>
         </div>
         <div v-if="bottomCards.length === 0" class="empty-cards">No Same Direction manipulations</div>
       </div>
@@ -52,10 +50,11 @@
 import * as d3 from 'd3'
 
 const COLORS = {
-  bull: '#26a69a',
-  bear: '#ef5350',
+  bull: '#26a69a', // Green (欧美习惯：阳线涨为绿)
+  bear: '#ef5350', // Red   (欧美习惯：阴线跌为红)
   grid: '#eef2f7',
   axis: '#718096',
+  volume: '#78909c' // Darker Gray for bar chart
 }
 
 const GRANULARITIES = [
@@ -100,6 +99,48 @@ export default {
       };
       const fmt = fmtMap[this.currentGranularity];
 
+      const computeStats = (rawManipulations) => {
+        let minTs = Infinity;
+        let maxTs = -Infinity;
+        let totalAmount = 0;
+        rawManipulations.forEach(m => {
+          if (m.transactions) {
+            m.transactions.forEach(tx => {
+              const tsStr = tx.timestamp || tx.time;
+              if (tsStr) {
+                const ts = new Date(tsStr + (tsStr.includes('UTC') ? '' : ' UTC')).getTime();
+                if (ts < minTs) minTs = ts;
+                if (ts > maxTs) maxTs = ts;
+              }
+              totalAmount += parseFloat(tx.amount || tx.quantity) || 0;
+            });
+          }
+        });
+        
+        let timeRangeStr = '';
+        if (minTs !== Infinity && maxTs !== -Infinity) {
+          const timePad = Math.max((maxTs - minTs) * 0.05, 60000);
+          const startTs = minTs - timePad;
+          const endTs = maxTs + timePad;
+          
+          const timeFmt = d3.timeFormat('%m/%d %H:%M:%S');
+          timeRangeStr = `${timeFmt(new Date(startTs))} - ${timeFmt(new Date(endTs))}`;
+        } else {
+          timeRangeStr = 'N/A';
+        }
+        
+        let amountStr = '';
+        if (totalAmount >= 1000000) {
+          amountStr = (totalAmount / 1000000).toFixed(2) + 'M';
+        } else if (totalAmount >= 1000) {
+          amountStr = (totalAmount / 1000).toFixed(2) + 'K';
+        } else {
+          amountStr = totalAmount.toFixed(2);
+        }
+        
+        return { timeSpan: timeRangeStr, totalAmount: amountStr };
+      };
+
       const bins = {};
 
       this.manipulationResults.forEach(res => {
@@ -141,26 +182,38 @@ export default {
         if (bin.roundTrip.length > 0) {
           const uniqueUsers = new Set();
           bin.roundTrip.forEach(r => (r.participants || []).forEach(u => uniqueUsers.add(u)));
+          const stats = computeStats(bin.roundTrip);
           roundTripCards.push({
             timeLabel: timeLabel,
+            timeSpan: stats.timeSpan,
+            totalAmount: stats.totalAmount,
             method: 'Round Trip',
             count: bin.roundTrip.length,
             users: uniqueUsers.size + ' Users',
-            tooltip: `${bin.roundTrip.length} manipulations\nUsers: ${Array.from(uniqueUsers).join(', ')}`,
-            ts: bin.date.getTime()
+            tooltip: `${bin.roundTrip.length} manipulations\nUsers: ${Array.from(uniqueUsers).join(', ')}\nTime Range: ${stats.timeSpan}\nAmount: ${stats.totalAmount}`,
+            ts: bin.date.getTime(),
+            rawManipulations: bin.roundTrip,
+            uniqueUsers: Array.from(uniqueUsers),
+            binDate: bin.date
           });
         }
         
         if (bin.sameDirection.length > 0) {
           const uniqueUsers = new Set();
           bin.sameDirection.forEach(r => (r.participants || []).forEach(u => uniqueUsers.add(u)));
+          const stats = computeStats(bin.sameDirection);
           sameDirectionCards.push({
             timeLabel: timeLabel,
+            timeSpan: stats.timeSpan,
+            totalAmount: stats.totalAmount,
             method: 'Same Direction',
             count: bin.sameDirection.length,
             users: uniqueUsers.size + ' Users',
-            tooltip: `${bin.sameDirection.length} manipulations\nUsers: ${Array.from(uniqueUsers).join(', ')}`,
-            ts: bin.date.getTime()
+            tooltip: `${bin.sameDirection.length} manipulations\nUsers: ${Array.from(uniqueUsers).join(', ')}\nTime Range: ${stats.timeSpan}\nAmount: ${stats.totalAmount}`,
+            ts: bin.date.getTime(),
+            rawManipulations: bin.sameDirection,
+            uniqueUsers: Array.from(uniqueUsers),
+            binDate: bin.date
           });
         }
       });
@@ -201,8 +254,8 @@ export default {
         const res = await fetch('/ACT_OHLC.json')
         this.actOhlc = await res.json()
       } catch (e) {
-        console.error('CandlestickChart: failed to load ACT_OHLC.json', e)
-        this.actOhlc = {}
+        console.error('CandlestickChart: failed to load data', e)
+        this.actOhlc = this.actOhlc || {}
       }
       this.loading = false
       this.refresh()
@@ -407,12 +460,12 @@ export default {
       // Create x-axis group
       const xAxisGroup = g.append('g').attr('transform', `translate(0,${iH})`)
       
-      xAxisGroup.call(d3.axisBottom(xScale).tickValues(tickDates).tickFormat(fmt))
+      xAxisGroup.call(d3.axisBottom(xScale).tickValues(tickDates).tickFormat(fmt).tickSizeInner(0).tickSizeOuter(0))
         .call(ax => ax.select('.domain').remove())
         .selectAll('text')
         .style('fill', COLORS.axis)
         .style('font-size', '8px')
-        .attr('dy', '1em')
+        .attr('dy', '-5px')
         .style('text-anchor', 'middle')
 
       // Candles
@@ -458,7 +511,7 @@ export default {
         .attr('y', d => -yTopBarScale(d.roundTripCount)) // Align with 0 position
         .attr('width', bw)
         .attr('height', d => yTopBarScale(d.roundTripCount))
-        .attr('fill', '#e53e3e')
+        .attr('fill', COLORS.volume)
         .attr('rx', 1)
 
       // Bottom Bar Chart (Same Direction)
@@ -470,7 +523,7 @@ export default {
         .attr('y', iH) // Align with 0 position
         .attr('width', bw)
         .attr('height', d => yBottomBarScale(d.sameDirectionCount))
-        .attr('fill', '#e53e3e')
+        .attr('fill', COLORS.volume)
         .attr('rx', 1)
 
       // Tooltip
@@ -563,6 +616,7 @@ export default {
         this.$nextTick(() => {
           this.syncCardScroll();
           this.drawBands();
+          this.drawCardBehaviors();
         });
     },
     syncCardScroll() {
@@ -589,6 +643,145 @@ export default {
 
       scrollToCard('topCardsContainer', this.topCards);
       scrollToCard('bottomCardsContainer', this.bottomCards);
+    },
+    drawCardBehaviors() {
+      const drawCard = (cardData, isTop, index) => {
+        const refName = `svg-${isTop ? 'top' : 'bottom'}-${index}`;
+        const svgEls = this.$refs[refName];
+        if (!svgEls || !svgEls[0]) return;
+        const svgNode = svgEls[0];
+        
+        const W = svgNode.clientWidth || 200;
+        const H = svgNode.clientHeight || 70; // fixed height based on flex layout
+        d3.select(svgNode).attr('height', H);
+        
+        const svg = d3.select(svgNode);
+        svg.selectAll('*').remove();
+        
+        // Find time range for this card based on all transactions and collect all users
+        let minTs = Infinity;
+        let maxTs = -Infinity;
+        const localUniqueUsers = new Set(cardData.uniqueUsers);
+        
+        cardData.rawManipulations.forEach(m => {
+          if (m.transactions) {
+            m.transactions.forEach(tx => {
+              const tsStr = tx.timestamp || tx.time;
+              if (tsStr) {
+                const ts = new Date(tsStr + (tsStr.includes('UTC') ? '' : ' UTC')).getTime();
+                if (ts < minTs) minTs = ts;
+                if (ts > maxTs) maxTs = ts;
+              }
+              const user = tx.trader || tx.user;
+              if (user) {
+                localUniqueUsers.add(user);
+              }
+            });
+          }
+        });
+        
+        const allUsersList = Array.from(localUniqueUsers);
+        if (allUsersList.length === 0) return;
+        
+        // Add a little padding to the time scale
+        const timePad = Math.max((maxTs - minTs) * 0.05, 60000);
+        
+        const mLeft = 40;
+        const mRight = 10;
+        
+        const xScale = d3.scaleTime()
+          .domain([new Date(minTs - timePad), new Date(maxTs + timePad)])
+          .range([mLeft, W - mRight]);
+          
+        const yScale = d3.scalePoint()
+          .domain(allUsersList)
+          .range([10, H - 10])
+          .padding(0.5);
+          
+        // Draw user lines
+        svg.selectAll('.user-line')
+          .data(allUsersList)
+          .enter().append('line')
+          .attr('class', 'user-line')
+          .attr('x1', mLeft)
+          .attr('x2', W - mRight)
+          .attr('y1', d => yScale(d))
+          .attr('y2', d => yScale(d))
+          .attr('stroke', '#e2e8f0')
+          .attr('stroke-width', 1);
+          
+        // Draw user labels
+        svg.selectAll('.user-label')
+          .data(allUsersList)
+          .enter().append('text')
+          .attr('class', 'user-label')
+          .attr('x', mLeft - 5)
+          .attr('y', d => yScale(d))
+          .attr('dy', '0.32em')
+          .attr('text-anchor', 'end')
+          .attr('fill', '#718096')
+          .style('font-size', '9px')
+          .text(d => d.substring(0, 3) + '..')
+          .append('title').text(d => d);
+          
+        // Draw events
+        let allEvents = [];
+        let maxAmount = 0;
+        
+        cardData.rawManipulations.forEach(m => {
+          if (m.transactions) {
+            m.transactions.forEach(tx => {
+              const tsStr = tx.timestamp || tx.time;
+              if (!tsStr) return;
+              const evTs = new Date(tsStr + (tsStr.includes('UTC') ? '' : ' UTC')).getTime();
+              const user = tx.trader || tx.user;
+              if (user && allUsersList.includes(user) && evTs >= minTs - timePad && evTs <= maxTs + timePad) {
+                const amount = parseFloat(tx.amount || tx.quantity) || 0;
+                if (amount > maxAmount) maxAmount = amount;
+                allEvents.push({
+                  user: user,
+                  ts: evTs,
+                  amount: amount,
+                  action: tx.action_type || tx.action,
+                  rawTime: tsStr
+                });
+              }
+            });
+          }
+        });
+        
+        // Calculate max radius based on row height to avoid overflow
+        const yPadding = 10;
+        const availableH = H - yPadding * 2;
+        const userCount = allUsersList.length;
+        const rowHeight = userCount > 1 ? availableH / (userCount - 1) : availableH;
+        
+        // Max radius should be small enough to fit within row spacing, but at least 1.5, max 6
+        const maxRadius = Math.min(6, Math.max(1.5, (rowHeight / 2) - 0.5));
+        const minRadius = Math.min(2, maxRadius * 0.3);
+        
+        const rScale = d3.scaleSqrt()
+          .domain([0, maxAmount || 1])
+          .range([minRadius, maxRadius]);
+          
+        svg.selectAll('.event-point')
+          .data(allEvents)
+          .enter().append('circle')
+          .attr('class', 'event-point')
+          .attr('cx', d => xScale(d.ts))
+          .attr('cy', d => yScale(d.user))
+          .attr('r', d => rScale(d.amount))
+          .attr('fill', d => d.action === 'buy' ? '#4299e1' : '#ed64a6') // blue for buy, pink for sell
+          .attr('opacity', 0.5)
+          .attr('stroke', d => d.action === 'buy' ? '#2b6cb0' : '#d53f8c')
+          .attr('stroke-width', 1)
+          .append('title')
+          .text(d => `${d.action === 'buy' ? 'Buy' : 'Sell'}: ${d.amount}\nTime: ${d.rawTime}`);
+          
+      };
+
+      this.topCards.forEach((card, i) => drawCard(card, true, i));
+      this.bottomCards.forEach((card, i) => drawCard(card, false, i));
     },
     drawBands() {
         if (!this.chartState || !this.ohlc.length || !this.$refs.bandsOverlay) return;
@@ -753,7 +946,7 @@ export default {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 5;
+  z-index: 0;
 }
 
 .manipulation-cards-container {
@@ -765,10 +958,10 @@ export default {
   align-items: center;
   padding: 8px 12px;
   box-sizing: border-box;
-  min-height: 120px;
+  height: 220px;
 }
 .manipulation-cards-container.top-cards {
-  min-height: 110px;
+  height: 220px;
 }
 .scroll-x {
   overflow-x: auto;
@@ -802,13 +995,14 @@ export default {
   border-radius: 6px;
   padding: 8px;
   margin-right: 12px;
-  min-width: 180px;
-  min-height: 100px;
+  min-width: 250px;
+  height: 180px; /* Fixed height for all cards */
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   cursor: default;
+  overflow: hidden; /* Ensure SVG doesn't overflow */
 }
 .manipulation-card.top-card {
-  min-height: 90px;
+  height: 180px;
 }
 .manipulation-card:hover {
   border-color: #cbd5e1;
@@ -818,21 +1012,19 @@ export default {
 .card-time {
   font-size: 11px;
   color: #718096;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
 }
-.card-method {
-  font-size: 13px;
-  font-weight: 600;
-  color: #2d3748;
-}
-.card-users {
-  font-size: 11px;
-  color: #4a5568;
-  margin-top: 4px;
+.card-stats {
+  font-size: 10px;
+  color: #a0aec0;
   margin-bottom: 4px;
+  flex-shrink: 0;
 }
 .card-svg {
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
 .empty-cards {
