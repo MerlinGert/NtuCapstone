@@ -38,7 +38,7 @@ export default {
             svgWidth: 0,
             svgHeight: 0,
             userCount: 0,
-            scaleFactor: 0.6, // Default scale parameter
+            scaleFactor: 0.4, // Default scale parameter
             lastDetectionCount: null,
             lastDetectionThreshold: 2,
             lastDetectionVolumeThreshold: 0,

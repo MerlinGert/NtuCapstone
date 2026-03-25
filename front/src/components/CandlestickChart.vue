@@ -1001,10 +1001,10 @@ export default {
   align-items: center;
   padding: 8px 12px;
   box-sizing: border-box;
-  height: 220px;
+  height: 160px;
 }
 .manipulation-cards-container.top-cards {
-  height: 220px;
+  height: 160px;
 }
 .scroll-x {
   overflow-x: auto;
@@ -1039,13 +1039,13 @@ export default {
   padding: 8px;
   margin-right: 12px;
   min-width: 250px;
-  height: 180px; /* Fixed height for all cards */
+  height: 120px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   cursor: default;
   overflow: hidden; /* Ensure SVG doesn't overflow */
 }
 .manipulation-card.top-card {
-  height: 180px;
+  height: 120px;
 }
 .manipulation-card:hover {
   border-color: #cbd5e1;
