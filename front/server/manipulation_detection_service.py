@@ -126,43 +126,38 @@ def detect_round_trip_for_user(participant_id: str, user_trades: pd.DataFrame, m
                 # Check if there is at least one buy and one sell in the sequence
                 actions_in_seq = set(t.get('action_type', 'buy').lower() for t in sequence_trades)
                 if 'buy' in actions_in_seq and 'sell' in actions_in_seq:
-                    # Check conditions: net position change < max_position_diff AND earning < max_earning_usd
                     if abs(current_position) <= max_position_diff and current_earning_usd <= max_earning_usd:
                         trade_records = sequence_trades.copy()
-                    # Convert trades to dict for JSON serialization
-                    transactions = []
-                    # Keep track of actual participants involved in this specific sequence
-                    involved_users = set()
-                    for t in trade_records:
-                        t_dict = t.to_dict()
-                        if 'timestamp' in t_dict:
-                            t_dict['timestamp'] = t_dict['timestamp'].strftime("%Y-%m-%d %H:%M:%S")
-                        if 'trader' in t_dict:
-                            involved_users.add(t_dict['trader'])
-                        transactions.append(t_dict)
-                        
-                    results.append(
-                        ManipulationResult(
-                            suspicious_users=[participant_id], # The identifier (user or entity)
-                            manipulation_time=[
-                                trade_records[0]['timestamp'].strftime("%Y-%m-%d %H:%M:%S"), 
-                                trade_records[-1]['timestamp'].strftime("%Y-%m-%d %H:%M:%S")
-                            ],
-                            participants=list(involved_users), # The actual specific traders in these transactions
-                            features={
-                                "net_position_change": abs(current_position),
-                                "earning_usd": current_earning_usd,
-                                "trade_count": len(trade_records),
-                                "time_diff_min": time_diff
-                            },
-                            transactions=transactions,
-                            detection_method="round_trip"
+                        transactions = []
+                        involved_users = set()
+                        for t in trade_records:
+                            t_dict = t.to_dict()
+                            if 'timestamp' in t_dict:
+                                t_dict['timestamp'] = t_dict['timestamp'].strftime("%Y-%m-%d %H:%M:%S")
+                            if 'trader' in t_dict:
+                                involved_users.add(t_dict['trader'])
+                            transactions.append(t_dict)
+                        results.append(
+                            ManipulationResult(
+                                suspicious_users=[participant_id],
+                                manipulation_time=[
+                                    trade_records[0]['timestamp'].strftime("%Y-%m-%d %H:%M:%S"),
+                                    trade_records[-1]['timestamp'].strftime("%Y-%m-%d %H:%M:%S")
+                                ],
+                                participants=list(involved_users),
+                                features={
+                                    "net_position_change": abs(current_position),
+                                    "earning_usd": current_earning_usd,
+                                    "trade_count": len(trade_records),
+                                    "time_diff_min": time_diff
+                                },
+                                transactions=transactions,
+                                detection_method="round_trip"
+                            )
                         )
-                    )
-                    found_round_trip = True
-                    # Jump to the next trade after this round trip to avoid overlapping sub-sequences
-                    i = j + 1
-                    break
+                        found_round_trip = True
+                        i = j + 1
+                        break
                     
         if not found_round_trip:
             i += 1
