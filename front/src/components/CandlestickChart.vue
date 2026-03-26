@@ -256,7 +256,7 @@ export default {
     async loadData() {
       this.loading = true
       try {
-        const res = await fetch('/ACT_OHLC.json')
+        const res = await fetch('data/ACT_OHLC.json')
         this.actOhlc = await res.json()
       } catch (e) {
         console.error('CandlestickChart: failed to load data', e)
