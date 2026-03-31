@@ -17,6 +17,8 @@
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
             <ControlPanel 
+                :currentToken="current_token"
+                :availableTokens="availableTokens"
                 :loading="detecting"
                 :loadingLinks="detectingLinks"
                 :loadingManipulation="detectingManipulation"
@@ -26,6 +28,7 @@
                 :entityConfig="entity_detection_configuration"
                 :linkConfig="link_detection_configuration"
                 :manipulationConfig="manipulation_detection_configuration"
+                @change-token="handleTokenChange"
                 @run-detection="handleRunDetection"
                 @update-snapshot="handleUpdateSnapshot"
                 @request-manipulation-detection="handleRequestManipulationDetection"
@@ -43,7 +46,7 @@
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
             <TokenDistribution ref="tokenDistribution"
-                :snapshot-data="snapshot_data"
+                :snapshot-data="displaySnapshotData"
                 :entity-detection-results="entity_detection_results"
                 :link-detection-results="link_generation_results"
                 :manipulation-detection-results="manipulation_detection_results"
@@ -88,6 +91,7 @@
           <div style="flex:1; border-top:1px solid #eef2f7; border-bottom:1px solid #eef2f7; display:flex; flex-direction:column; overflow:hidden; background:#fff;">
             <div style="width:100%; height:100%; min-height:0; overflow:hidden;">
               <CandlestickChart 
+                :token="current_token"
                 :manipulation-results="manipulation_detection_results"
                 :selected-user="selectedUser"
                 :entity-info="selectedEntityInfo"
@@ -130,6 +134,11 @@ export default {
   components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, TokenDistribution, ControlPanel, CandlestickChart, BehaviorDetails},
   data(){
     return {
+      //token switching
+      current_token: "ACT",
+      availableTokens: ["ACT", "PNUT"],
+      _abortController: null, // for cancelling stale requests
+
       //new params
       //snapshot configuration
       snapshot_configuration:{
@@ -139,6 +148,7 @@ export default {
       },
       snapshotTimes: [],
       snapshot_data:{}, //current snapshot data
+      filtered_related_users: {}, // related users filtered by detection results (for display only)
 
       //entity detection configuration
       entity_detection_configuration: {
@@ -243,7 +253,7 @@ export default {
           enable_entity_based: true, //whether to enable entity based same direction detection
         },
       },
-      manipulation_detection_results: {}, //current manipulation detection results
+      manipulation_detection_results: [], //current manipulation detection results
 
       //old params
       detecting: false,
@@ -275,7 +285,40 @@ export default {
           }
       }
   },
+  computed: {
+      displaySnapshotData() {
+          if (!this.snapshot_data || !this.snapshot_data.balances) return this.snapshot_data;
+          // Replace related_users with filtered version for display
+          return {
+              ...this.snapshot_data,
+              balances: {
+                  ...this.snapshot_data.balances,
+                  related_users: this.filtered_related_users
+              }
+          };
+      }
+  },
   methods:{
+      async handleTokenChange(newToken) {
+          console.log("CryptoVis: Switching token to", newToken);
+          // Cancel any pending requests from previous token
+          if (this._abortController) {
+              this._abortController.abort();
+          }
+          this.current_token = newToken;
+          // Reset all detection results
+          this.entity_detection_results = {};
+          this.link_generation_results = {};
+          this.manipulation_detection_results = [];
+          this.filtered_related_users = {};
+          this.snapshot_data = {};
+          this.snapshotTimes = [];
+          this.selectedUser = null;
+          this.behaviorDetailData = null;
+          this.selectedEntityInfo = null;
+          // Re-fetch with new token
+          await this.fetchInitialSnapshotData();
+      },
       generateBehaviorDetailData() {
           if (!this.selectedUser) return;
           const userSet = new Set([this.selectedUser]);
@@ -307,14 +350,14 @@ export default {
               });
           }
 
-          // Fetch behavior sequences
-          fetch('/data/user_behavior_sequences.json')
+          // Fetch behavior sequences via backend API (file too large for browser)
+          fetch('/api/user_behavior/sequences', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ users: Array.from(userSet), token: this.current_token })
+          })
               .then(res => res.json())
-              .then(sequences => {
-                  const data = {};
-                  Array.from(userSet).forEach(user => {
-                      data[user] = sequences[user] || [];
-                  });
+              .then(data => {
                   this.behaviorDetailData = data;
                   console.log("CryptoVis: behaviorDetailData generated for users", userSet, this.behaviorDetailData);
               })
@@ -404,6 +447,63 @@ export default {
 
           this.entity_detection_results = entities;
           console.log(`CryptoVis: Rebuilt entity results, total entities: ${entities.length}`);
+      },
+      filterRelatedUsersByDetection() {
+          // Only keep related users that appear in detection results (entity, link, or manipulation)
+          const relatedUsers = this.snapshot_data?.balances?.related_users;
+          if (!relatedUsers || Object.keys(relatedUsers).length === 0) {
+              this.filtered_related_users = {};
+              return;
+          }
+
+          const detectedUsers = new Set();
+
+          // 1. From entity detection results
+          if (this.entity_detection_results) {
+              this.entity_detection_results.forEach(entity => {
+                  if (entity.users) entity.users.forEach(u => detectedUsers.add(u));
+              });
+          }
+
+          // 2. From link/relation results (relation keys are "u1-u2")
+          if (this.link_generation_results) {
+              const extractUsersFromMap = (map) => {
+                  if (!map) return;
+                  Object.keys(map).forEach(key => {
+                      const parts = key.split('-');
+                      if (parts.length >= 2) {
+                          detectedUsers.add(parts[0]);
+                          detectedUsers.add(parts[1]);
+                      }
+                  });
+              };
+              extractUsersFromMap(this.link_generation_results.target_relations_for_entity);
+              extractUsersFromMap(this.link_generation_results.target_relations_for_links);
+              extractUsersFromMap(this.link_generation_results.target_related_relations_for_entity);
+              extractUsersFromMap(this.link_generation_results.target_related_relations_for_links);
+          }
+
+          // 3. From manipulation detection results
+          if (this.manipulation_detection_results && Array.isArray(this.manipulation_detection_results)) {
+              this.manipulation_detection_results.forEach(result => {
+                  if (result.participants) result.participants.forEach(p => detectedUsers.add(p));
+              });
+          }
+
+          // Filter related_users to only keep detected ones
+          const filtered = {};
+          let kept = 0, removed = 0;
+          for (const [user, balance] of Object.entries(relatedUsers)) {
+              if (detectedUsers.has(user)) {
+                  filtered[user] = balance;
+                  kept++;
+              } else {
+                  removed++;
+              }
+          }
+
+          this.filtered_related_users = filtered;
+          console.log(`CryptoVis: Filtered related users for display - kept ${kept}, removed ${removed} (no detection results)`);
       },
       processManipulationRelations() {
           const enableEntity = this.entity_detection_configuration.enable_manipulation_based;
@@ -656,7 +756,8 @@ export default {
                   link_detection_config: this.link_detection_configuration, // Keep it but we won't detect links
                   snapshot_time: this.snapshot_configuration.time,
                   detect_entity: true,
-                  detect_link: false // Disable link detection as requested
+                  detect_link: false, // Disable link detection as requested
+                  token: this.current_token
               };
 
               const detectionResponse = await fetch('/api/detection/run', {
@@ -693,7 +794,8 @@ export default {
                       target_users: processedUsers,
                       related_users: relatedUsers,
                       entity_results: this.entity_detection_results,
-                      manipulation_config: this.manipulation_detection_configuration
+                      manipulation_config: this.manipulation_detection_configuration,
+                      token: this.current_token
                   };
 
                   const manipulationResponse = await fetch('/api/manipulation_service/detect', {
@@ -715,6 +817,9 @@ export default {
               
               // Re-apply manipulation relations since link_generation_results might have been updated
               this.processManipulationRelations();
+              
+              // Re-filter related users for display
+              this.filterRelatedUsersByDetection();
               
           } catch (error) {
               console.error("CryptoVis: Error during entity detection:", error);
@@ -739,7 +844,8 @@ export default {
                   target_users: processedUsers,
                   related_users: relatedUsers,
                   entity_results: this.entity_detection_results,
-                  manipulation_config: this.manipulation_detection_configuration
+                  manipulation_config: this.manipulation_detection_configuration,
+                  token: this.current_token
               };
 
               const manipulationResponse = await fetch('/api/manipulation_service/detect', {
@@ -758,6 +864,9 @@ export default {
               } else {
                   console.error("CryptoVis: Failed to run manipulation detection");
               }
+              
+              // Re-filter related users for display
+              this.filterRelatedUsersByDetection();
           } catch (error) {
               console.error("CryptoVis: Error during manipulation detection:", error);
           } finally {
@@ -777,7 +886,9 @@ export default {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                       time: this.snapshot_configuration.time,
-                      threshold: this.snapshot_configuration.top_holder_threshold
+                      threshold: this.snapshot_configuration.top_holder_threshold,
+                      related_user_threshold: this.snapshot_configuration.related_user_threshold,
+                      token: this.current_token
                   })
               });
               if (!response.ok) throw new Error("Failed to fetch snapshot data");
@@ -799,7 +910,8 @@ export default {
                   link_detection_config: this.link_detection_configuration,
                   snapshot_time: this.snapshot_configuration.time,
                   detect_entity: true,
-                  detect_link: true
+                  detect_link: true,
+                  token: this.current_token
               };
 
               console.log("CryptoVis: Running unified detection...", detectionRequest);
@@ -824,7 +936,8 @@ export default {
                   target_users: processedUsers,
                   related_users: relatedUsers,
                   entity_results: this.entity_detection_results,
-                  manipulation_config: this.manipulation_detection_configuration
+                  manipulation_config: this.manipulation_detection_configuration,
+                  token: this.current_token
               };
 
               const manipulationResponse = await fetch('/api/manipulation_service/detect', {
@@ -843,6 +956,9 @@ export default {
               } else {
                   console.error("CryptoVis: Failed to run manipulation detection");
               }
+              
+              // Filter related users to only show those with detection results
+              this.filterRelatedUsersByDetection();
           } catch (error) {
               console.error("CryptoVis: Error during snapshot update and detection:", error);
           } finally {
@@ -873,7 +989,8 @@ export default {
                   link_detection_config: this.link_detection_configuration,
                   snapshot_time: this.snapshot_configuration.time,
                   detect_entity: false, // Disable entity detection
-                  detect_link: true // Enable link detection
+                  detect_link: true, // Enable link detection
+                  token: this.current_token
               };
 
               const detectionResponse = await fetch('/api/detection/run', {
@@ -893,6 +1010,9 @@ export default {
               // Add manipulation relations back in
               this.processManipulationRelations();
               
+              // Re-filter related users for display
+              this.filterRelatedUsersByDetection();
+              
           } catch (error) {
               console.error("CryptoVis: Error during link detection:", error);
           } finally {
@@ -901,14 +1021,24 @@ export default {
       },
     async fetchInitialSnapshotData() { 
         console.log("CryptoVis: Fetching initial snapshot data...");
+        // Create AbortController for this request chain
+        if (this._abortController) {
+            this._abortController.abort();
+        }
+        this._abortController = new AbortController();
+        const signal = this._abortController.signal;
+        this.loading = true;
         try {
             const response = await fetch('/api/snapshot/process', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     time: this.snapshot_configuration.time,
-                    threshold: this.snapshot_configuration.top_holder_threshold
-                })
+                    threshold: this.snapshot_configuration.top_holder_threshold,
+                    related_user_threshold: this.snapshot_configuration.related_user_threshold,
+                    token: this.current_token
+                }),
+                signal
             });
             if (!response.ok) throw new Error("Failed to fetch snapshot data");
             const data = await response.json();
@@ -929,7 +1059,8 @@ export default {
                 link_detection_config: this.link_detection_configuration,
                 snapshot_time: this.snapshot_configuration.time,
                 detect_entity: true,
-                detect_link: true
+                detect_link: true,
+                token: this.current_token
             };
 
             console.log("CryptoVis: Running unified detection...", detectionRequest);
@@ -937,7 +1068,8 @@ export default {
             const detectionResponse = await fetch('/api/detection/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(detectionRequest)
+                body: JSON.stringify(detectionRequest),
+                signal
             });
 
             if (!detectionResponse.ok) throw new Error("Failed to run detection");
@@ -954,14 +1086,16 @@ export default {
                 target_users: processedUsers,
                 related_users: relatedUsers,
                 entity_results: this.entity_detection_results,
-                manipulation_config: this.manipulation_detection_configuration
+                manipulation_config: this.manipulation_detection_configuration,
+                token: this.current_token
             };
 
             try {
                 const manipulationResponse = await fetch('/api/manipulation_service/detect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(manipulationRequest)
+                    body: JSON.stringify(manipulationRequest),
+                    signal
                 });
 
                 if (manipulationResponse.ok) {
@@ -975,8 +1109,15 @@ export default {
                     console.error("CryptoVis: Failed to run manipulation detection", manipulationResponse.statusText);
                 }
             } catch (manError) {
+                if (manError.name === 'AbortError') {
+                    console.log("CryptoVis: Manipulation detection aborted (token switch or new request)");
+                    return;
+                }
                 console.error("CryptoVis: Error running manipulation detection:", manError);
             }
+
+            // Filter related users to only show those with detection results
+            this.filterRelatedUsersByDetection();
 
             // Update TokenDistribution if available
             if (this.$refs.tokenDistribution) {
@@ -999,7 +1140,13 @@ export default {
             }
 
         } catch (error) {
+            if (error.name === 'AbortError') {
+                console.log("CryptoVis: Fetch aborted (token switch or new request)");
+                return;
+            }
             console.error("CryptoVis: Error fetching initial snapshot data:", error);
+        } finally {
+            this.loading = false;
         }
     }
   },

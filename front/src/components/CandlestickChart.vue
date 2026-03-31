@@ -1,7 +1,7 @@
 <template>
   <div class="candlestick-container">
     <div class="header-panel">
-      <div class="panel-title">ACT K-Line</div>
+      <div class="panel-title">{{ token }} K-Line</div>
       <div class="granularity-panel">
         <button v-for="g in granularities" :key="g.key"
           :class="['gran-btn', currentGranularity===g.key ? 'gran-btn--active' : '']"
@@ -58,6 +58,9 @@ const COLORS = {
 }
 
 const GRANULARITIES = [
+  { key: '5M', label: '5M' },
+  { key: '15M', label: '15M' },
+  { key: '30M', label: '30M' },
   { key: '1H', label: '1H' },
   { key: '1D', label: '1D' },
   { key: '3D', label: '3D' },
@@ -67,6 +70,10 @@ const GRANULARITIES = [
 export default {
   name: 'CandlestickChart',
   props: {
+    token: {
+      type: String,
+      default: 'ACT'
+    },
     manipulationResults: {
       type: Array,
       default: () => []
@@ -92,6 +99,9 @@ export default {
       if (!this.manipulationResults || this.ohlc.length === 0) return { roundTrip: [], sameDirection: [] };
       
       const fmtMap = {
+        '5M': d => d3.timeFormat('%m/%d %H:%M')(d),
+        '15M': d => d3.timeFormat('%m/%d %H:%M')(d),
+        '30M': d => d3.timeFormat('%m/%d %H:%M')(d),
         '1H': d => d3.timeFormat('%m/%d %H:%M')(d),
         '1D': d => d3.timeFormat('%m/%d')(d),
         '3D': d => d3.timeFormat('%m/%d')(d),
@@ -235,6 +245,9 @@ export default {
     currentGranularity() {
       this.refresh()
     },
+    token() {
+      this.loadData()
+    },
     manipulationResults: {
       deep: true,
       handler() {
@@ -256,7 +269,9 @@ export default {
     async loadData() {
       this.loading = true
       try {
-        const res = await fetch('data/ACT_OHLC.json')
+        const ohlcMap = { 'ACT': 'ACT_OHLC.json', 'PNUT': 'tokens/PNUT/OHLC.json' }
+        const ohlcUrl = ohlcMap[this.token] || 'ACT_OHLC.json'
+        const res = await fetch(ohlcUrl)
         this.actOhlc = await res.json()
       } catch (e) {
         console.error('CandlestickChart: failed to load data', e)
@@ -450,6 +465,9 @@ export default {
 
       // X axis
       const fmtMap = {
+        '5M': d => d3.timeFormat('%m/%d %H:%M')(d),
+        '15M': d => d3.timeFormat('%m/%d %H:%M')(d),
+        '30M': d => d3.timeFormat('%m/%d %H:%M')(d),
         '1H': d => d3.timeFormat('%m/%d %H:%M')(d),
         '1D': d => d3.timeFormat('%m/%d')(d),
         '3D': d => d3.timeFormat('%m/%d')(d),
