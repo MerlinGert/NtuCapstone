@@ -929,7 +929,7 @@ def main():
         load_owner_labels()
     
     # Process Transfers
-    process_transfers = True
+    process_transfers = False
     if process_transfers:
         load_and_process_transfers()
         
@@ -944,12 +944,12 @@ def main():
         generate_user_relations()
         
     # Generate User Actions
-    generate_actions = False
+    generate_actions = True
     if generate_actions:
         generate_user_actions()
         
     # Generate User Balances
-    generate_balances = False
+    generate_balances = True
     if generate_balances:
         generate_user_balances()
         
@@ -959,7 +959,7 @@ def main():
         generate_user_earnings()
         
     # Generate User Behavior Sequences
-    generate_behavior_sequences = True
+    generate_behavior_sequences = False
     if generate_behavior_sequences:
         generate_user_behavior_sequences()
     

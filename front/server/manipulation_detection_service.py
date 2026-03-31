@@ -8,7 +8,7 @@ from datetime import datetime
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TRADES_PATH = os.path.join(BASE_DIR, "public", "data", "sorted_trades.csv")
+import token_config
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +26,7 @@ class ManipulationRequest(BaseModel):
     related_users: Dict[str, float] # user_id -> balance/score
     entity_results: List[Dict[str, Any]] # List of entities detected
     manipulation_config: Dict[str, Any] # Configuration for detection methods
+    token: str = "ACT"
 
 # Response Model (Unified Result)
 class ManipulationResult(BaseModel):
@@ -39,27 +40,26 @@ class ManipulationResult(BaseModel):
 class UnifiedResponse(BaseModel):
     results: List[ManipulationResult]
 
-# Global DataFrame cache (simple version)
-_trades_df = None
+# Global DataFrame cache (token-keyed)
+_trades_cache = {}
 
-def load_trading_data():
-    global _trades_df
-    if _trades_df is None:
-        if os.path.exists(TRADES_PATH):
-            logger.info(f"Loading trading data from {TRADES_PATH}")
+def load_trading_data(token: str = "ACT"):
+    global _trades_cache
+    if token not in _trades_cache:
+        trades_path = token_config.get_data_path(token, "sorted_trades.csv")
+        if os.path.exists(trades_path):
+            logger.info(f"Loading trading data from {trades_path}")
             try:
-                # Usecols optimization if file is large, but we might need all columns for features
-                _trades_df = pd.read_csv(TRADES_PATH)
-                # Ensure date column is datetime
-                if 'timestamp' in _trades_df.columns:
-                     _trades_df['timestamp'] = pd.to_datetime(_trades_df['timestamp'])
+                _trades_cache[token] = pd.read_csv(trades_path)
+                if 'timestamp' in _trades_cache[token].columns:
+                     _trades_cache[token]['timestamp'] = pd.to_datetime(_trades_cache[token]['timestamp'])
             except Exception as e:
                 logger.error(f"Failed to load trading data: {e}")
-                _trades_df = pd.DataFrame()
+                _trades_cache[token] = pd.DataFrame()
         else:
-            logger.warning(f"Trading data file not found at {TRADES_PATH}")
-            _trades_df = pd.DataFrame()
-    return _trades_df
+            logger.warning(f"Trading data file not found at {trades_path}")
+            _trades_cache[token] = pd.DataFrame()
+    return _trades_cache[token]
 
 # --- Detection Methods (Placeholders) ---
 def detect_round_trip_for_user(participant_id: str, user_trades: pd.DataFrame, max_time_diff_min: float, max_position_diff: float, max_earning_usd: float) -> List[ManipulationResult]:
@@ -430,7 +430,7 @@ def detect_same_direction(df: pd.DataFrame, users: List[str], config: Dict[str, 
 async def detect_manipulation(request: ManipulationRequest):
     try:
         # 1. Load Data
-        df = load_trading_data()
+        df = load_trading_data(request.token)
         if df.empty:
             logger.warning("Trading data is empty")
             return UnifiedResponse(results=[])

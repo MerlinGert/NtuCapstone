@@ -21,6 +21,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PROCESSING_DIR = os.path.join(os.path.dirname(BASE_DIR), 'data_processing')
 sys.path.append(DATA_PROCESSING_DIR)
 
+import token_config
+
 app = FastAPI()
 
 # Include routers
@@ -37,6 +39,10 @@ app.include_router(user_behavior_service.router)
 @app.get("/")
 def read_root():
     return {"message": "CryptoVis Backend is running!"}
+
+@app.get("/api/tokens")
+def get_available_tokens():
+    return {"tokens": token_config.get_available_tokens(), "default": token_config.DEFAULT_TOKEN}
 
 if __name__ == "__main__":
     import uvicorn

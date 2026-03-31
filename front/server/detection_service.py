@@ -13,9 +13,52 @@ logger = logging.getLogger(__name__)
 
 # --- Configuration ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ACCOUNT_LABELS_PATH = os.path.join(BASE_DIR, "public", "data", "simplified_owner_labels.json")
-SORTED_TRANSFERS_PATH = os.path.join(BASE_DIR, "public", "data", "sorted_transfers.csv")
-USER_RELATIONS_PATH = os.path.join(BASE_DIR, "public", "data", "user_relations.json")
+import token_config
+
+# --- Data Caches (token-keyed) ---
+_user_actions_cache = {}      # { token: dict }
+_balance_data_cache = {}      # { (token, granularity): dict }
+_earning_data_cache = {}      # { (token, granularity): dict }
+
+def _load_user_actions(token: str) -> dict:
+    if token not in _user_actions_cache:
+        path = token_config.get_data_path(token, "user_actions.json")
+        if os.path.exists(path):
+            logger.info(f"Loading and caching user_actions.json for {token} from {path}")
+            with open(path, 'r') as f:
+                _user_actions_cache[token] = json.load(f)
+        else:
+            logger.warning(f"user_actions.json not found at {path}")
+            _user_actions_cache[token] = {}
+    return _user_actions_cache[token]
+
+def _load_balance_data(token: str, granularity: str) -> dict:
+    key = (token, granularity)
+    if key not in _balance_data_cache:
+        filename = f"user_balance_{granularity}.json"
+        path = token_config.get_data_path(token, filename)
+        if os.path.exists(path):
+            logger.info(f"Loading and caching {filename} for {token} from {path}")
+            with open(path, 'r') as f:
+                _balance_data_cache[key] = json.load(f)
+        else:
+            logger.warning(f"{filename} not found at {path}")
+            _balance_data_cache[key] = {}
+    return _balance_data_cache[key]
+
+def _load_earning_data(token: str, granularity: str) -> dict:
+    key = (token, granularity)
+    if key not in _earning_data_cache:
+        filename = f"user_earnings_{granularity}.json"
+        path = token_config.get_data_path(token, filename)
+        if os.path.exists(path):
+            logger.info(f"Loading and caching {filename} for {token} from {path}")
+            with open(path, 'r') as f:
+                _earning_data_cache[key] = json.load(f)
+        else:
+            logger.warning(f"{filename} not found at {path}")
+            _earning_data_cache[key] = {}
+    return _earning_data_cache[key]
 
 router = APIRouter(
     prefix="/api/detection",
@@ -31,6 +74,7 @@ class DetectionRequest(BaseModel):
     snapshot_time: str = None
     detect_entity: bool = True
     detect_link: bool = True
+    token: str = "ACT"
 
 @router.post("/run")
 async def run_detection(request: DetectionRequest):
@@ -42,7 +86,8 @@ async def run_detection(request: DetectionRequest):
             request.link_detection_config,
             request.snapshot_time,
             request.detect_entity,
-            request.detect_link
+            request.detect_link,
+            request.token
         )
         return results
     except Exception as e:
@@ -56,7 +101,8 @@ def process_detection(
     link_detection_config: Dict[str, Any],
     snapshot_time: Optional[str] = None,
     detect_entity: bool = True,
-    detect_link: bool = True
+    detect_link: bool = True,
+    token: str = "ACT"
 ) -> Dict[str, Any]:
     """
     Main entry point for processing both entity and link detection.
@@ -74,6 +120,13 @@ def process_detection(
         Dictionary containing detection results
     """
     logger.info(f"Starting detection process (Entity: {detect_entity}, Link: {detect_link})...")
+    
+    # Limit target users to top N by balance to keep O(n²) pairwise detection manageable
+    MAX_DETECTION_USERS = 30
+    if len(target_users) > MAX_DETECTION_USERS:
+        sorted_targets = sorted(target_users.items(), key=lambda x: x[1], reverse=True)[:MAX_DETECTION_USERS]
+        logger.info(f"Limiting target users from {len(target_users)} to top {MAX_DETECTION_USERS} by balance for detection")
+        target_users = dict(sorted_targets)
     
     # 0. Load Data
     # Initialize relation dictionaries
@@ -106,9 +159,10 @@ def process_detection(
     if need_network_detection:
         try:
             df_transfers = None
-            if os.path.exists(SORTED_TRANSFERS_PATH):
+            sorted_transfers_path = token_config.get_data_path(token, "sorted_transfers.csv")
+            if os.path.exists(sorted_transfers_path):
                 # 0. Load Pre-sorted Data
-                df_transfers = pd.read_csv(SORTED_TRANSFERS_PATH)
+                df_transfers = pd.read_csv(sorted_transfers_path)
                 
                 # preprocess_data.py: timestamp, from_owner, from_owner_label, to_owner, to_owner_label, amount
                 # existing: block_time, from_owner, to_owner, amount_display
@@ -122,7 +176,7 @@ def process_detection(
                     except Exception as e:
                         logger.warning(f"Time filtering failed: {e}")
             else:
-                logger.warning(f"Transfer CSV not found at {SORTED_TRANSFERS_PATH}")
+                logger.warning(f"Transfer CSV not found at {sorted_transfers_path}")
             
             # Check if direct transfer is needed
             need_direct_transfer = (
@@ -267,9 +321,10 @@ def process_detection(
                 funding_senders = {}
                 recipients = {}
 
-                if os.path.exists(USER_RELATIONS_PATH):
+                user_relations_path = token_config.get_data_path(token, "user_relations.json")
+                if os.path.exists(user_relations_path):
                     try:
-                        with open(USER_RELATIONS_PATH, 'r') as f:
+                        with open(user_relations_path, 'r') as f:
                             user_relations = json.load(f)
                         
                         json_senders = user_relations.get("senders", {})
@@ -320,7 +375,7 @@ def process_detection(
                     except Exception as e:
                         logger.error(f"Error loading user relations: {e}")
                 else:
-                    logger.warning(f"User relations file not found at {USER_RELATIONS_PATH}")
+                    logger.warning(f"User relations file not found at {user_relations_path}")
 
                 # Prepare temporary result containers
                 funding_tt = {}
@@ -501,7 +556,7 @@ def process_detection(
         need_balance_sequence = (detect_entity and entity_detection_config.get("enable_similarity_based", False) and entity_similarity_params.get("enable_balance_sequence", False)) or (detect_link and link_detection_config.get("enable_similarity_based", False) and link_similarity_params.get("enable_balance_sequence", False))
         need_earning_sequence = (detect_entity and entity_detection_config.get("enable_similarity_based", False) and entity_similarity_params.get("enable_earning_sequence", False)) or (detect_link and link_detection_config.get("enable_similarity_based", False) and link_similarity_params.get("enable_earning_sequence", False))
         
-        USER_ACTIONS_PATH = os.path.join(BASE_DIR, "public", "data", "user_actions.json")
+        USER_ACTIONS_PATH = token_config.get_data_path(token, "user_actions.json")
 
         # Helper to merge detection results
         def merge_detection_results(base_map, new_results, rel_type="trading_action_sequence"):
@@ -515,14 +570,8 @@ def process_detection(
                 })
 
         if need_action_sequence:
-            # Load user actions
-            user_actions = {}
-            if os.path.exists(USER_ACTIONS_PATH):
-                try:
-                    with open(USER_ACTIONS_PATH, 'r') as f:
-                        user_actions = json.load(f)
-                except Exception as e:
-                    logger.error(f"Error loading user actions: {e}")
+            # Load user actions (cached)
+            user_actions = _load_user_actions(token)
 
             if user_actions:
                 # Filter for relevant users
@@ -550,7 +599,7 @@ def process_detection(
             if detect_entity and entity_detection_config.get("enable_similarity_based", False):
                 params = entity_detection_config.get("similarity_based_params", {})
                 if params.get("enable_balance_sequence", False):
-                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, token)
                     merge_detection_results(target_relations_for_entity, matches['tt'], "balance_sequence")
                     merge_detection_results(target_related_relations_for_entity, matches['tr'], "balance_sequence")
 
@@ -558,7 +607,7 @@ def process_detection(
             if detect_link and link_detection_config.get("enable_similarity_based", False):
                 params = link_detection_config.get("similarity_based_params", {})
                 if params.get("enable_balance_sequence", False):
-                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, token)
                     merge_detection_results(target_relations_for_links, matches['tt'], "balance_sequence")
                     merge_detection_results(target_related_relations_for_links, matches['tr'], "balance_sequence")
 
@@ -567,7 +616,7 @@ def process_detection(
             if detect_entity and entity_detection_config.get("enable_similarity_based", False):
                 params = entity_detection_config.get("similarity_based_params", {})
                 if params.get("enable_earning_sequence", False):
-                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, token)
                     merge_detection_results(target_relations_for_entity, matches['tt'], "earning_sequence")
                     merge_detection_results(target_related_relations_for_entity, matches['tr'], "earning_sequence")
 
@@ -575,7 +624,7 @@ def process_detection(
             if detect_link and link_detection_config.get("enable_similarity_based", False):
                 params = link_detection_config.get("similarity_based_params", {})
                 if params.get("enable_earning_sequence", False):
-                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, token)
                     merge_detection_results(target_relations_for_links, matches['tt'], "earning_sequence")
                     merge_detection_results(target_related_relations_for_links, matches['tr'], "earning_sequence")
     
@@ -982,7 +1031,7 @@ def calculate_sequence_correlation(seq1, seq2, freq_str, value_col='balance', sn
         logger.error(f"Error calculating correlation: {e}", exc_info=True)
         return 0.0
 
-def detect_balance_sequence(target_users_list, related_users_list, params, snapshot_time=None):
+def detect_balance_sequence(target_users_list, related_users_list, params, snapshot_time=None, token="ACT"):
     # Extract params
     config = params.get("balance_sequence_params", params)
     granularity = config.get("balance_granularity", "1d").lower()
@@ -995,20 +1044,11 @@ def detect_balance_sequence(target_users_list, related_users_list, params, snaps
         "1d": "1d"
     }
     suffix = granularity_map.get(granularity, "1d")
-    filename = f"user_balance_{suffix}.json"
-    filepath = os.path.join(BASE_DIR, "public", "data", filename)
     
-    if not os.path.exists(filepath):
-        logger.warning(f"Balance sequence file not found: {filepath}")
-        return {'tt': {}, 'tr': {}}
-        
-    logger.info(f"Loading balance data from {filename} for granularity {granularity}")
+    logger.info(f"Loading balance data from user_balance_{suffix}.json for granularity {granularity}")
     
-    try:
-        with open(filepath, 'r') as f:
-            all_balances = json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading balance data: {e}")
+    all_balances = _load_balance_data(token, suffix)
+    if not all_balances:
         return {'tt': {}, 'tr': {}}
 
     # Filter relevant users
@@ -1055,7 +1095,7 @@ def detect_balance_sequence(target_users_list, related_users_list, params, snaps
     logger.info(f"Found {len(results['tt'])} TT balance matches and {len(results['tr'])} TR balance matches")
     return results
 
-def detect_earning_sequence(target_users_list, related_users_list, params, snapshot_time=None):
+def detect_earning_sequence(target_users_list, related_users_list, params, snapshot_time=None, token="ACT"):
     # Extract params
     config = params.get("earning_sequence_params", params)
     granularity = config.get("earning_granularity", "1d").lower()
@@ -1068,20 +1108,11 @@ def detect_earning_sequence(target_users_list, related_users_list, params, snaps
         "1d": "1d"
     }
     suffix = granularity_map.get(granularity, "1d")
-    filename = f"user_earnings_{suffix}.json"
-    filepath = os.path.join(BASE_DIR, "public", "data", filename)
     
-    if not os.path.exists(filepath):
-        logger.warning(f"Earning sequence file not found: {filepath}")
-        return {'tt': {}, 'tr': {}}
-        
-    logger.info(f"Loading earning data from {filename} for granularity {granularity}")
+    logger.info(f"Loading earning data from user_earnings_{suffix}.json for granularity {granularity}")
     
-    try:
-        with open(filepath, 'r') as f:
-            all_earnings = json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading earning data: {e}")
+    all_earnings = _load_earning_data(token, suffix)
+    if not all_earnings:
         return {'tt': {}, 'tr': {}}
 
     # Filter relevant users

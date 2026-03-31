@@ -508,14 +508,18 @@ export default {
                             simLink.originalLinks.push(link);
                         } else if (sourceNode.isGroup) {
                             // Internal link within a group
-                            if (!sourceNode.internalLinks) {
-                                sourceNode.internalLinks = [];
+                            const srcMember = userToMemberNode.get(link.source);
+                            const tgtMember = userToMemberNode.get(link.target);
+                            if (srcMember && tgtMember) {
+                                if (!sourceNode.internalLinks) {
+                                    sourceNode.internalLinks = [];
+                                }
+                                sourceNode.internalLinks.push({
+                                    source: srcMember,
+                                    target: tgtMember,
+                                    ...link
+                                });
                             }
-                            sourceNode.internalLinks.push({
-                                source: userToMemberNode.get(link.source),
-                                target: userToMemberNode.get(link.target),
-                                ...link
-                            });
                         }
                     }
                 });
@@ -665,13 +669,13 @@ export default {
                 if (d.internalLinks && d.internalLinks.length > 0) {
                     console.log(`Group ${d.id} has ${d.internalLinks.length} internal links.`);
                     groupG.selectAll(".internal-link")
-                        .data(d.internalLinks)
+                        .data(d.internalLinks.filter(l => l.source && l.target && l.source.x != null && l.target.x != null))
                         .enter().append("line")
                         .attr("class", "internal-link")
-                        .attr("x1", l => l.source.x - d.enclose.x)
-                        .attr("y1", l => l.source.y - d.enclose.y)
-                        .attr("x2", l => l.target.x - d.enclose.x)
-                        .attr("y2", l => l.target.y - d.enclose.y)
+                        .attr("x1", l => (l.source.x || 0) - d.enclose.x)
+                        .attr("y1", l => (l.source.y || 0) - d.enclose.y)
+                        .attr("x2", l => (l.target.x || 0) - d.enclose.x)
+                        .attr("y2", l => (l.target.y || 0) - d.enclose.y)
                         .attr("stroke", "#555") 
                         .attr("stroke-width", 1.5)
                         .attr("stroke-opacity", 0.6)
