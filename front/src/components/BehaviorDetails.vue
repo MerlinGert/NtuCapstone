@@ -151,30 +151,42 @@ export default {
       const sortedUsers = [...topHalf, this.selectedUser, ...bottomHalf];
 
       // Filter behavior data based on snapshot time
-      const snapshotDate = this.snapshotTime ? new Date(this.snapshotTime) : new Date();
+      const parseDateSafe = (dateStr) => {
+        if (!dateStr) return new Date(NaN);
+        let d = new Date(dateStr);
+        if (isNaN(d.getTime()) && typeof dateStr === 'string') {
+           // Try removing ' UTC' and replacing space with 'T' for Safari/iOS
+           let cleaned = dateStr.replace(' UTC', 'Z').replace(' ', 'T');
+           d = new Date(cleaned);
+        }
+        return d;
+      };
+
+      const snapshotDate = this.snapshotTime ? parseDateSafe(this.snapshotTime) : new Date();
       let earliestDate = snapshotDate;
       let hasData = false;
 
       const filteredData = {};
       const sequenceData = {}; // Store continuous balance and earning_usd sequences
+      const MAX_EVENTS_PER_USER = 1500; // Limit rendering to prevent browser freeze
 
       sortedUsers.forEach(user => {
         const events = this.behaviorData[user] || [];
-        const validEvents = events.filter(event => {
+        let validEvents = events.filter(event => {
           if (!event.timestamp) return false;
-          const eventDate = new Date(event.timestamp);
+          const eventDate = parseDateSafe(event.timestamp);
+          if (isNaN(eventDate.getTime())) return false;
           return eventDate <= snapshotDate;
         });
-        
-        filteredData[user] = validEvents;
         
         let currentBalance = 0;
         let avgBuyPrice = 0;
         const seq = [];
         const earningEvents = []; // Store discrete earning events for selling
         
+        // We must calculate the balance sequence using ALL valid events first to ensure accuracy
         validEvents.forEach(event => {
-          const eventDate = new Date(event.timestamp);
+          const eventDate = parseDateSafe(event.timestamp);
           if (eventDate < earliestDate) {
             earliestDate = eventDate;
           }
@@ -191,6 +203,7 @@ export default {
           }
           
           event._currentBalance = currentBalance;
+          event._eventDate = eventDate; // Cache the parsed date
           
           if (event.isTrade && event.trade_info) {
             const isBuy = event.trade_info.action === 'buy';
@@ -233,7 +246,23 @@ export default {
             });
         }
         
-        sequenceData[user] = { seq, earningEvents };
+        // Now apply downsampling for SVG rendering (circles, lines) if too many events
+        if (validEvents.length > MAX_EVENTS_PER_USER) {
+            console.warn(`Downsampling events for user ${user} from ${validEvents.length} to ${MAX_EVENTS_PER_USER}`);
+            const step = Math.max(1, Math.floor(validEvents.length / MAX_EVENTS_PER_USER));
+            validEvents = validEvents.filter((_, index) => index % step === 0);
+        }
+
+        filteredData[user] = validEvents;
+        
+        // We can also downsample the area chart points slightly if they are massive
+        let finalSeq = seq;
+        if (seq.length > MAX_EVENTS_PER_USER * 2) {
+            const seqStep = Math.max(1, Math.floor(seq.length / (MAX_EVENTS_PER_USER * 2)));
+            finalSeq = seq.filter((_, index) => index % seqStep === 0 || index === seq.length - 1);
+        }
+        
+        sequenceData[user] = { seq: finalSeq, earningEvents };
       });
 
       // Set up dimensions
@@ -582,7 +611,7 @@ export default {
           }
             
           events.forEach(event => {
-            const eventDate = new Date(event.timestamp);
+            const eventDate = parseDateSafe(event.timestamp);
             const cx = xScale(eventDate);
             
             if (!event.isTrade) {

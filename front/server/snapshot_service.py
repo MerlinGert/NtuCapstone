@@ -16,59 +16,65 @@ import pandas as pd
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SNAPSHOTS_FILE = os.path.join(BASE_DIR, "public", "processed", "transfers", "hourly_balance_snapshots.json")
-TRANSFER_STATS_PATH = os.path.join(BASE_DIR, "public", "transfer_network_stats.csv")
 
 # Global Cache
-SNAPSHOTS_DATA = None
-TRANSFER_STATS_DF = None
+SNAPSHOTS_DATA = {}
+TRANSFER_STATS_DF = {}
 
-def load_transfer_stats():
+def get_data_dir(coin: str) -> str:
+    if coin == 'PNUT':
+        return os.path.join(BASE_DIR, "public", "data2")
+    return os.path.join(BASE_DIR, "public", "data")
+
+def load_transfer_stats(coin: str):
     global TRANSFER_STATS_DF
-    if TRANSFER_STATS_DF is None:
-        if os.path.exists(TRANSFER_STATS_PATH):
-             print(f"Loading transfer stats from {TRANSFER_STATS_PATH}...")
+    if coin not in TRANSFER_STATS_DF:
+        stats_path = os.path.join(get_data_dir(coin), "transfer_network_stats.csv")
+        if os.path.exists(stats_path):
+             print(f"Loading transfer stats from {stats_path}...")
              try:
-                 TRANSFER_STATS_DF = pd.read_csv(TRANSFER_STATS_PATH)
-                 print(f"Loaded transfer stats with {len(TRANSFER_STATS_DF)} rows.")
+                 TRANSFER_STATS_DF[coin] = pd.read_csv(stats_path)
+                 print(f"Loaded transfer stats with {len(TRANSFER_STATS_DF[coin])} rows.")
              except Exception as e:
                  print(f"Error loading transfer stats: {e}")
-                 TRANSFER_STATS_DF = pd.DataFrame()
+                 TRANSFER_STATS_DF[coin] = pd.DataFrame()
         else:
-            print(f"Warning: Transfer stats file not found at {TRANSFER_STATS_PATH}")
-            TRANSFER_STATS_DF = pd.DataFrame()
-    return TRANSFER_STATS_DF
+            print(f"Warning: Transfer stats file not found at {stats_path}")
+            TRANSFER_STATS_DF[coin] = pd.DataFrame()
+    return TRANSFER_STATS_DF[coin]
 
-def load_snapshots():
+def load_snapshots(coin: str):
     global SNAPSHOTS_DATA
-    if SNAPSHOTS_DATA is None:
-        if not os.path.exists(SNAPSHOTS_FILE):
-            print(f"Error: Snapshot file not found at {SNAPSHOTS_FILE}")
+    if coin not in SNAPSHOTS_DATA:
+        snapshots_file = os.path.join(get_data_dir(coin), "hourly_balance_snapshots.json")
+        if not os.path.exists(snapshots_file):
+            print(f"Error: Snapshot file not found at {snapshots_file}")
             return []
-        print(f"Loading snapshots from {SNAPSHOTS_FILE}...")
+        print(f"Loading snapshots from {snapshots_file}...")
         try:
-            with open(SNAPSHOTS_FILE, 'r') as f:
-                SNAPSHOTS_DATA = json.load(f)
-            print(f"Loaded {len(SNAPSHOTS_DATA)} snapshots.")
+            with open(snapshots_file, 'r') as f:
+                SNAPSHOTS_DATA[coin] = json.load(f)
+            print(f"Loaded {len(SNAPSHOTS_DATA[coin])} snapshots.")
         except Exception as e:
             print(f"Error loading snapshots: {e}")
-            SNAPSHOTS_DATA = []
-    return SNAPSHOTS_DATA
+            SNAPSHOTS_DATA[coin] = []
+    return SNAPSHOTS_DATA[coin]
 
 class SnapshotRequest(BaseModel):
     time: Optional[str] = None
     threshold: float = 0.5 # 0.0 to 1.0
     related_user_threshold: float = 0.2 # Threshold factor for related users (relative to min processed balance)
+    coin: str = 'ACT'
 
 @router.get("/times")
-async def get_snapshot_times():
-    data = load_snapshots()
+async def get_snapshot_times(coin: str = 'ACT'):
+    data = load_snapshots(coin)
     times = [s.get("time") for s in data]
     return {"times": times}
 
 @router.post("/process")
 async def process_snapshot(request: SnapshotRequest):
-    data = load_snapshots()
+    data = load_snapshots(request.coin)
     if not data:
         raise HTTPException(status_code=500, detail="Snapshot data not available")
 
@@ -138,7 +144,7 @@ async def process_snapshot(request: SnapshotRequest):
     if "Others" in processed_user_set:
         processed_user_set.remove("Others")
         
-    df = load_transfer_stats()
+    df = load_transfer_stats(request.coin)
     
     if not df.empty and processed_user_set:
         # Filter transfers involving processed users

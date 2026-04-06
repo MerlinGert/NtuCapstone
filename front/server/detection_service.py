@@ -13,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 # --- Configuration ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ACCOUNT_LABELS_PATH = os.path.join(BASE_DIR, "public", "data", "simplified_owner_labels.json")
-SORTED_TRANSFERS_PATH = os.path.join(BASE_DIR, "public", "data", "sorted_transfers.csv")
-USER_RELATIONS_PATH = os.path.join(BASE_DIR, "public", "data", "user_relations.json")
+# ACCOUNT_LABELS_PATH = os.path.join(BASE_DIR, "public", "data", "simplified_owner_labels.json")
+# SORTED_TRANSFERS_PATH = os.path.join(BASE_DIR, "public", "data", "sorted_transfers.csv")
+# USER_RELATIONS_PATH = os.path.join(BASE_DIR, "public", "data", "user_relations.json")
 
 router = APIRouter(
     prefix="/api/detection",
@@ -31,6 +31,12 @@ class DetectionRequest(BaseModel):
     snapshot_time: str = None
     detect_entity: bool = True
     detect_link: bool = True
+    coin: str = 'ACT'
+
+def get_data_dir(coin: str) -> str:
+    if coin == 'PNUT':
+        return os.path.join(BASE_DIR, "public", "data2")
+    return os.path.join(BASE_DIR, "public", "data")
 
 @router.post("/run")
 async def run_detection(request: DetectionRequest):
@@ -42,7 +48,8 @@ async def run_detection(request: DetectionRequest):
             request.link_detection_config,
             request.snapshot_time,
             request.detect_entity,
-            request.detect_link
+            request.detect_link,
+            request.coin
         )
         return results
     except Exception as e:
@@ -56,7 +63,8 @@ def process_detection(
     link_detection_config: Dict[str, Any],
     snapshot_time: Optional[str] = None,
     detect_entity: bool = True,
-    detect_link: bool = True
+    detect_link: bool = True,
+    coin: str = 'ACT'
 ) -> Dict[str, Any]:
     """
     Main entry point for processing both entity and link detection.
@@ -106,9 +114,10 @@ def process_detection(
     if need_network_detection:
         try:
             df_transfers = None
-            if os.path.exists(SORTED_TRANSFERS_PATH):
+            sorted_transfers_path = os.path.join(get_data_dir(coin), "sorted_transfers.csv")
+            if os.path.exists(sorted_transfers_path):
                 # 0. Load Pre-sorted Data
-                df_transfers = pd.read_csv(SORTED_TRANSFERS_PATH)
+                df_transfers = pd.read_csv(sorted_transfers_path)
                 
                 # preprocess_data.py: timestamp, from_owner, from_owner_label, to_owner, to_owner_label, amount
                 # existing: block_time, from_owner, to_owner, amount_display
@@ -122,7 +131,7 @@ def process_detection(
                     except Exception as e:
                         logger.warning(f"Time filtering failed: {e}")
             else:
-                logger.warning(f"Transfer CSV not found at {SORTED_TRANSFERS_PATH}")
+                logger.warning(f"Transfer CSV not found at {sorted_transfers_path}")
             
             # Check if direct transfer is needed
             need_direct_transfer = (
@@ -501,7 +510,7 @@ def process_detection(
         need_balance_sequence = (detect_entity and entity_detection_config.get("enable_similarity_based", False) and entity_similarity_params.get("enable_balance_sequence", False)) or (detect_link and link_detection_config.get("enable_similarity_based", False) and link_similarity_params.get("enable_balance_sequence", False))
         need_earning_sequence = (detect_entity and entity_detection_config.get("enable_similarity_based", False) and entity_similarity_params.get("enable_earning_sequence", False)) or (detect_link and link_detection_config.get("enable_similarity_based", False) and link_similarity_params.get("enable_earning_sequence", False))
         
-        USER_ACTIONS_PATH = os.path.join(BASE_DIR, "public", "data", "user_actions.json")
+        USER_ACTIONS_PATH = os.path.join(get_data_dir(coin), "user_actions.json")
 
         # Helper to merge detection results
         def merge_detection_results(base_map, new_results, rel_type="trading_action_sequence"):

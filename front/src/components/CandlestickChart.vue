@@ -1,7 +1,7 @@
 <template>
   <div class="candlestick-container">
     <div class="header-panel">
-      <div class="panel-title">ACT K-Line</div>
+      <div class="panel-title">{{ currentCoin }} K-Line</div>
       <div class="granularity-panel">
         <button v-for="g in granularities" :key="g.key"
           :class="['gran-btn', currentGranularity===g.key ? 'gran-btn--active' : '']"
@@ -70,6 +70,10 @@ export default {
     manipulationResults: {
       type: Array,
       default: () => []
+    },
+    currentCoin: {
+      type: String,
+      default: 'ACT'
     }
   },
   data() {
@@ -242,6 +246,9 @@ export default {
         // when manipulation results change, so we call refresh() instead of just draw()
         this.refresh()
       }
+    },
+    currentCoin() {
+      this.loadData();
     }
   },
   mounted() {
@@ -256,11 +263,13 @@ export default {
     async loadData() {
       this.loading = true
       try {
-        const res = await fetch('data/ACT_OHLC.json')
+        const dataDir = this.currentCoin === 'PNUT' ? 'data2' : 'data'
+        const fileName = this.currentCoin === 'PNUT' ? 'OHLC.json' : 'ACT_OHLC.json'
+        const res = await fetch(`/${dataDir}/${fileName}`)
         this.actOhlc = await res.json()
       } catch (e) {
         console.error('CandlestickChart: failed to load data', e)
-        this.actOhlc = this.actOhlc || {}
+        this.actOhlc = {}
       }
       this.loading = false
       this.refresh()

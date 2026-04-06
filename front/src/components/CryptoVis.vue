@@ -1,8 +1,21 @@
 <template>
 <n-layout class="h-screen max-h-screen" :content-style="{ display: 'flex', flexDirection: 'column'}">
   <n-layout-header>
-      <div class="techname font-bold" style="padding-left: 20px;" >ManiScope</div>
-</n-layout-header>
+      <div class="techname font-bold" style="display: flex; align-items: center; justify-content: space-between; padding-right: 20px;">
+        <span style="padding-left: 20px;">ManiScope</span>
+        <div style="font-size: 14px; font-weight: normal; display: flex; align-items: center; gap: 10px; z-index: 1000;">
+          <span style="color: #4a5568;">Coin:</span>
+          <div style="display: flex; gap: 5px;">
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <input type="radio" v-model="currentCoin" value="ACT" @change="handleCoinChange" /> ACT
+            </label>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 10px;">
+              <input type="radio" v-model="currentCoin" value="PNUT" @change="handleCoinChange" /> PNUT
+            </label>
+          </div>
+        </div>
+      </div>
+  </n-layout-header>
 <n-layout-content class="flex-1" style="width:100%;height:100%" >
   <n-layout
         style="width:100%;height:100%;overflow:hidden"
@@ -17,6 +30,7 @@
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
             <ControlPanel 
+                :key="`control-panel-${currentCoin}`"
                 :loading="detecting"
                 :loadingLinks="detectingLinks"
                 :loadingManipulation="detectingManipulation"
@@ -91,6 +105,7 @@
                 :manipulation-results="manipulation_detection_results"
                 :selected-user="selectedUser"
                 :entity-info="selectedEntityInfo"
+                :current-coin="currentCoin"
                 style="width:100%;height:100%;"
               />
             </div>
@@ -130,6 +145,7 @@ export default {
   components:{ NSelect, NCheckbox, NCard, NLayout, NSwitch, NSpace, NLayoutHeader, NLayoutFooter, NLayoutContent, TokenDistribution, ControlPanel, CandlestickChart, BehaviorDetails},
   data(){
     return {
+      currentCoin: 'ACT', // Can be 'ACT' or 'PNUT'
       //new params
       //snapshot configuration
       snapshot_configuration:{
@@ -276,6 +292,41 @@ export default {
       }
   },
   methods:{
+      resetViewState() {
+          this.selectedUser = null;
+          this.behaviorDetailData = null;
+          this.selectedEntityInfo = null;
+          this.entity_detection_results = null;
+          this.link_generation_results = null;
+          this.manipulation_detection_results = null;
+          this.snapshot_data = {};
+          this.overview = {
+            rows: 0,
+            pairs: new Set(),
+            dateSet: new Set(),
+            dateMin: '',
+            dateMax: '',
+            topPairs: []
+          };
+      },
+      async loadSnapshotTimesForCurrentCoin() {
+          const response = await fetch(`/api/snapshot/times?coin=${encodeURIComponent(this.currentCoin)}`);
+          if (!response.ok) throw new Error("Failed to fetch snapshot times");
+          const data = await response.json();
+          const times = Array.isArray(data.times) ? data.times : [];
+          this.snapshotTimes = times;
+
+          if (times.length > 0) {
+              // 每次切换币种重新加载时间时，强制选中最新（最后一个）时间
+              this.snapshot_configuration.time = times[times.length - 1];
+          } else {
+              this.snapshot_configuration.time = "";
+          }
+      },
+      async initializeForCurrentCoin() {
+          await this.loadSnapshotTimesForCurrentCoin();
+          await this.handleUpdateSnapshot({ ...this.snapshot_configuration });
+      },
       generateBehaviorDetailData() {
           if (!this.selectedUser) return;
           const userSet = new Set([this.selectedUser]);
@@ -308,23 +359,46 @@ export default {
           }
 
           // Fetch behavior sequences
-          fetch('/data/user_behavior_sequences.json')
-              .then(res => res.json())
-              .then(sequences => {
-                  const data = {};
-                  Array.from(userSet).forEach(user => {
-                      data[user] = sequences[user] || [];
-                  });
-                  this.behaviorDetailData = data;
-                  console.log("CryptoVis: behaviorDetailData generated for users", userSet, this.behaviorDetailData);
+          fetch('/api/user_behavior/sequences', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  users: Array.from(userSet),
+                  coin: this.currentCoin
               })
-              .catch(err => {
-                  console.error("CryptoVis: failed to fetch user behavior sequences", err);
+          })
+          .then(res => {
+              if (!res.ok) throw new Error("Network response was not ok");
+              return res.json();
+          })
+          .then(sequences => {
+              const data = {};
+              Array.from(userSet).forEach(user => {
+                  data[user] = sequences[user] || [];
               });
+              // Use Object.freeze to prevent Vue from making this massive dataset deeply reactive
+              // Deep reactivity on 70,000+ objects freezes the main thread.
+              this.behaviorDetailData = Object.freeze(data);
+              console.log("CryptoVis: behaviorDetailData generated for users", userSet, this.behaviorDetailData);
+          })
+          .catch(err => {
+              console.error("CryptoVis: failed to fetch user behavior sequences", err);
+          });
+      },
+      async handleCoinChange() {
+          console.log("CryptoVis: coin changed to", this.currentCoin);
+          this.resetViewState();
+          try {
+              // 强制清空一下旧的时间列表，让它有重置的感觉
+              this.snapshotTimes = [];
+              await this.initializeForCurrentCoin();
+          } catch (error) {
+              console.error("CryptoVis: Error switching coin:", error);
+          }
       },
       handleUserSelect(userId) {
           this.selectedUser = userId;
-          console.log("CryptoVis: selectedUser updated to", this.selectedUser);
+          console.log("CryptoVis: selectedUser updated to", userId);
       },
       rebuildEntityResults() {
           if (!this.link_generation_results) return;
@@ -378,6 +452,7 @@ export default {
                   // Collect unique relations for this component
                   const compRels = [];
                   const processedKeys = new Set();
+                  let hasNonManipulationRels = false;
 
                   const checkMap = (map) => {
                       Object.keys(map).forEach(key => {
@@ -385,7 +460,12 @@ export default {
                           const parts = key.split('-');
                           if (parts.length >= 2) {
                               if (componentUsers.has(parts[0]) && componentUsers.has(parts[1])) {
-                                  compRels.push(...map[key]);
+                                  map[key].forEach(rel => {
+                                      compRels.push(rel);
+                                      if (rel.type !== 'manipulation_same_group' && rel.type !== 'manipulation_time_proximity') {
+                                          hasNonManipulationRels = true;
+                                      }
+                                  });
                                   processedKeys.add(key);
                               }
                           }
@@ -395,15 +475,18 @@ export default {
                   checkMap(tt);
                   checkMap(tr);
 
-                  entities.push({
-                      users: Array.from(componentUsers),
-                      relations: compRels
-                  });
+                  // Only create an entity if it has at least one real (non-manipulation) relation
+                  if (hasNonManipulationRels) {
+                      entities.push({
+                          users: Array.from(componentUsers),
+                          relations: compRels
+                      });
+                  }
               }
           });
 
           this.entity_detection_results = entities;
-          console.log(`CryptoVis: Rebuilt entity results, total entities: ${entities.length}`);
+          console.log(`CryptoVis: Rebuilt entity results, total valid entities: ${entities.length}`);
       },
       processManipulationRelations() {
           const enableEntity = this.entity_detection_configuration.enable_manipulation_based;
@@ -656,7 +739,8 @@ export default {
                   link_detection_config: this.link_detection_configuration, // Keep it but we won't detect links
                   snapshot_time: this.snapshot_configuration.time,
                   detect_entity: true,
-                  detect_link: false // Disable link detection as requested
+                  detect_link: false, // Disable link detection as requested
+                  coin: this.currentCoin
               };
 
               const detectionResponse = await fetch('/api/detection/run', {
@@ -693,7 +777,8 @@ export default {
                       target_users: processedUsers,
                       related_users: relatedUsers,
                       entity_results: this.entity_detection_results,
-                      manipulation_config: this.manipulation_detection_configuration
+                      manipulation_config: this.manipulation_detection_configuration,
+                      coin: this.currentCoin
                   };
 
                   const manipulationResponse = await fetch('/api/manipulation_service/detect', {
@@ -739,7 +824,8 @@ export default {
                   target_users: processedUsers,
                   related_users: relatedUsers,
                   entity_results: this.entity_detection_results,
-                  manipulation_config: this.manipulation_detection_configuration
+                  manipulation_config: this.manipulation_detection_configuration,
+                  coin: this.currentCoin
               };
 
               const manipulationResponse = await fetch('/api/manipulation_service/detect', {
@@ -777,13 +863,17 @@ export default {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                       time: this.snapshot_configuration.time,
-                      threshold: this.snapshot_configuration.top_holder_threshold
+                      threshold: this.snapshot_configuration.top_holder_threshold,
+                      coin: this.currentCoin
                   })
               });
               if (!response.ok) throw new Error("Failed to fetch snapshot data");
               const data = await response.json();
               this.snapshot_data = data;
               this.snapshotTimes = data.all_times;
+              if (data.time) {
+                  this.snapshot_configuration.time = data.time;
+              }
               console.log("CryptoVis: Updated snapshot data loaded:", this.snapshot_data);
 
               // 2. Run detection service
@@ -799,7 +889,8 @@ export default {
                   link_detection_config: this.link_detection_configuration,
                   snapshot_time: this.snapshot_configuration.time,
                   detect_entity: true,
-                  detect_link: true
+                  detect_link: true,
+                  coin: this.currentCoin
               };
 
               console.log("CryptoVis: Running unified detection...", detectionRequest);
@@ -824,7 +915,8 @@ export default {
                   target_users: processedUsers,
                   related_users: relatedUsers,
                   entity_results: this.entity_detection_results,
-                  manipulation_config: this.manipulation_detection_configuration
+                  manipulation_config: this.manipulation_detection_configuration,
+                  coin: this.currentCoin
               };
 
               const manipulationResponse = await fetch('/api/manipulation_service/detect', {
@@ -873,7 +965,8 @@ export default {
                   link_detection_config: this.link_detection_configuration,
                   snapshot_time: this.snapshot_configuration.time,
                   detect_entity: false, // Disable entity detection
-                  detect_link: true // Enable link detection
+                  detect_link: true, // Enable link detection
+                  coin: this.currentCoin
               };
 
               const detectionResponse = await fetch('/api/detection/run', {
@@ -907,7 +1000,8 @@ export default {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     time: this.snapshot_configuration.time,
-                    threshold: this.snapshot_configuration.top_holder_threshold
+                    threshold: this.snapshot_configuration.top_holder_threshold,
+                    coin: this.currentCoin
                 })
             });
             if (!response.ok) throw new Error("Failed to fetch snapshot data");
@@ -929,7 +1023,8 @@ export default {
                 link_detection_config: this.link_detection_configuration,
                 snapshot_time: this.snapshot_configuration.time,
                 detect_entity: true,
-                detect_link: true
+                detect_link: true,
+                coin: this.currentCoin
             };
 
             console.log("CryptoVis: Running unified detection...", detectionRequest);
@@ -954,7 +1049,8 @@ export default {
                 target_users: processedUsers,
                 related_users: relatedUsers,
                 entity_results: this.entity_detection_results,
-                manipulation_config: this.manipulation_detection_configuration
+                manipulation_config: this.manipulation_detection_configuration,
+                coin: this.currentCoin
             };
 
             try {
@@ -1003,8 +1099,12 @@ export default {
         }
     }
   },
-  mounted(){
-    this.fetchInitialSnapshotData();
+  async mounted(){
+    try {
+      await this.initializeForCurrentCoin();
+    } catch (error) {
+      console.error("CryptoVis: Error during initial load:", error);
+    }
   },
   updated(){
   }
@@ -1020,7 +1120,6 @@ a {
   background: #ffffff;
   color: #2d3748;
   font-size: 2.0em;
-  padding-left: 20px;
   padding-top: 7px;
   height: 50px;
   letter-spacing: 2px;
