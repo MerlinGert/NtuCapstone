@@ -6,3 +6,7 @@ front/src/assets/user_behavior_sequences.json
 
 # Editor config
 .vscode/
+
+# Python
+__pycache__/
+*.pyc
