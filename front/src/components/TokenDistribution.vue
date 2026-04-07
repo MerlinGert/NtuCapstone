@@ -530,8 +530,8 @@ export default {
                 .join("line")
                 .attr("stroke", d => d.type === 'entity' ? '#ff9800' : '#999') // Orange for entity, default #999 for links
                 .style("stroke-dasharray", d => d.type === 'entity' ? '5,5' : 'none')
-                .attr("stroke-opacity", 0.6)
-                .attr("stroke-width", d => Math.max(1, Math.min(Math.sqrt(d.weight), 5)));
+                .attr("stroke-opacity", 0.4) // Increased transparency
+                .attr("stroke-width", d => Math.max(2, Math.min(Math.sqrt(d.weight) * 1.5, 7))); // Made lines thicker
             
             linkElements.append("title")
                 .text(d => {

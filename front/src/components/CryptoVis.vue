@@ -864,6 +864,7 @@ export default {
                   body: JSON.stringify({
                       time: this.snapshot_configuration.time,
                       threshold: this.snapshot_configuration.top_holder_threshold,
+                      related_user_threshold: this.snapshot_configuration.related_user_threshold,
                       coin: this.currentCoin
                   })
               });
@@ -1001,6 +1002,7 @@ export default {
                 body: JSON.stringify({
                     time: this.snapshot_configuration.time,
                     threshold: this.snapshot_configuration.top_holder_threshold,
+                    related_user_threshold: this.snapshot_configuration.related_user_threshold,
                     coin: this.currentCoin
                 })
             });
