@@ -1,2 +1,8 @@
 /front/public
 front/src/assets/user_behavior_sequences.json
+
+# OS files
+.DS_Store
+
+# Editor config
+.vscode/
