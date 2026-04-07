@@ -221,7 +221,7 @@ def process_detection(
                     if is_tt or is_tr:
                         try:
                             vol = float(row.get("amount", 0) or 0)
-                        except:
+                        except (TypeError, ValueError):
                             vol = 0.0
 
                         k = get_key(u, v)
@@ -247,7 +247,6 @@ def process_detection(
                     enable_count = direct_params.get("enable_min_count", True)
                     enable_volume = direct_params.get("enable_min_volume", True)
 
-                    passed = False
                     reason_desc = []
 
                     # Logic:
@@ -351,7 +350,7 @@ def process_detection(
                         if snapshot_time:
                             try:
                                 snap_dt = pd.to_datetime(snapshot_time)
-                            except:
+                            except (ValueError, TypeError):
                                 pass
 
                         for u in all_tracked_users:
@@ -366,7 +365,7 @@ def process_detection(
                                                 valid_s.append(r["address"])
                                             else:
                                                 break  # Sorted by time
-                                        except:
+                                        except (ValueError, TypeError, KeyError):
                                             pass
                                     if valid_s:
                                         funding_senders[u] = valid_s
@@ -384,7 +383,7 @@ def process_detection(
                                                 valid_r.append(r["address"])
                                             else:
                                                 break
-                                        except:
+                                        except (ValueError, TypeError, KeyError):
                                             pass
                                     if valid_r:
                                         recipients[u] = valid_r
@@ -823,7 +822,6 @@ def process_detection(
                             queue.append(neighbor)
 
             # Re-traverse to collect unique edges for this component
-            comp_users_list = list(component_users)
             comp_rels = []
 
             # Use a set to avoid duplicates if we process keys
@@ -911,7 +909,7 @@ def detect_trading_action_sequence(target_users_sequences, related_users_sequenc
                     return False
 
             return True
-        except:
+        except Exception:
             return False
 
     # Helper to parse timestamps
@@ -922,7 +920,7 @@ def detect_trading_action_sequence(target_users_sequences, related_users_sequenc
                 # Parse timestamp to epoch seconds for easy comparison
                 ts = pd.to_datetime(item["timestamp"]).timestamp()
                 parsed.append({**item, "_ts": ts})
-            except:
+            except (ValueError, TypeError, KeyError):
                 pass
         return parsed
 

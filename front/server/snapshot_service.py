@@ -2,6 +2,7 @@ import json
 import os
 from typing import Optional
 
+import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -10,8 +11,6 @@ router = APIRouter(
     tags=["snapshot"],
     responses={404: {"description": "Not found"}},
 )
-
-import pandas as pd
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

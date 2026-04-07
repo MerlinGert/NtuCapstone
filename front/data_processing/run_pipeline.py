@@ -41,7 +41,7 @@ print("\n" + "=" * 60)
 print("STEP 1: generate_balance_snapshots → balance_snapshots.csv")
 print("=" * 60)
 
-from generate_balance_snapshots import generate_balance_snapshots
+from generate_balance_snapshots import generate_balance_snapshots  # noqa: E402
 
 generate_balance_snapshots(TRADE_CSV, TRANSFER_CSV, BAL_SNAP_CSV)
 
@@ -52,7 +52,7 @@ print("\n" + "=" * 60)
 print("STEP 2: generate_hourly_snapshots → hourly_balance_snapshots.json")
 print("=" * 60)
 
-from generate_hourly_snapshots import generate_hourly_snapshots
+from generate_hourly_snapshots import generate_hourly_snapshots  # noqa: E402
 
 generate_hourly_snapshots(BAL_SNAP_CSV, HOURLY_JSON, LABELS_JSON)
 
@@ -63,7 +63,7 @@ print("\n" + "=" * 60)
 print("STEP 3: precompute_transfer_stats → transfer_network_stats.csv")
 print("=" * 60)
 
-from precompute_transfer_stats import precompute_transfer_stats
+from precompute_transfer_stats import precompute_transfer_stats  # noqa: E402
 
 precompute_transfer_stats(TRANSFER_CSV, STATS_CSV)
 

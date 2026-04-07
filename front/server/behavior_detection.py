@@ -263,7 +263,7 @@ def _build_trading_sequences(
 
         try:
             ts = parse_time(time_str).timestamp()
-        except:
+        except Exception:
             ts = 0.0
 
         # Determine action: buy ACT or sell ACT

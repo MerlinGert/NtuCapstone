@@ -49,7 +49,6 @@ def aggregate_hours(ticks, hours):
     buckets = defaultdict(list)
     for tk in ticks:
         t = datetime.fromisoformat(tk["t"])
-        bucket_start = floor_hour(t)
         # Align to N-hour boundary since epoch
         total_hours = int(t.timestamp() // 3600)
         aligned = (total_hours // hours) * hours * 3600

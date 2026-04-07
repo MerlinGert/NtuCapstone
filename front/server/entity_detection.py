@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from typing import Any, Dict, List, Optional
@@ -21,8 +22,6 @@ router = APIRouter(
     tags=["entity_detection"],
     responses={404: {"description": "Not found"}},
 )
-
-import json
 
 # --- Configuration ---
 # Define path to the transfer CSV file
@@ -457,8 +456,6 @@ def build_entity_graph(request: DetectionRequest) -> nx.Graph:
     """
     Builds the master graph based on all enabled rules in the request.
     """
-    start_time = time.time()
-
     # Main graph for merging
     G_master = nx.Graph()
 

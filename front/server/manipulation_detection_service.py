@@ -210,7 +210,6 @@ def detect_round_trip(
     )
 
     results = []
-    processed_users = set()
 
     # 1. Process Individual Users (Check individual first)
     logger.info("Starting individual round trip detection...")
