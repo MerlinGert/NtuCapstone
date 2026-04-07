@@ -173,7 +173,9 @@ export default {
         .select(this.$refs.chart_container)
         .select('svg.tokenDistribution')
       const suspiciousMap = new Map()
-      suspiciousTraders.forEach((t) => suspiciousMap.set(t.trader_id, t))
+      suspiciousTraders.forEach((t) => {
+        suspiciousMap.set(t.trader_id, t)
+      })
 
       // Update Singles
       svg.selectAll('.single').each(function (d) {
@@ -255,7 +257,9 @@ export default {
       // Mark suspicious traders
       if (this.suspiciousTraders && this.suspiciousTraders.length > 0) {
         const suspiciousMap = new Map()
-        this.suspiciousTraders.forEach((t) => suspiciousMap.set(t.trader_id, t))
+        this.suspiciousTraders.forEach((t) => {
+          suspiciousMap.set(t.trader_id, t)
+        })
         entries.forEach((d) => {
           if (suspiciousMap.has(d.id)) {
             d.suspicious = suspiciousMap.get(d.id)
@@ -444,19 +448,27 @@ export default {
       // Map independent nodes
       simulationNodes
         .filter((n) => !n.isGroup)
-        .forEach((n) => userToSimNode.set(n.id, n))
+        .forEach((n) => {
+          userToSimNode.set(n.id, n)
+        })
 
       // Map group members
       simulationNodes
         .filter((n) => n.isGroup)
         .forEach((g) => {
-          g.children.forEach((c) => userToSimNode.set(c.id, g)) // Map member to GROUP
+          g.children.forEach((c) => {
+            userToSimNode.set(c.id, g) // Map member to GROUP
+          })
         })
 
       // Map user ID to member node for internal links
       const userToMemberNode = new Map()
-      entries.forEach((d) => userToMemberNode.set(d.id, d))
-      relatedEntries.forEach((d) => userToMemberNode.set(d.id, d))
+      entries.forEach((d) => {
+        userToMemberNode.set(d.id, d)
+      })
+      relatedEntries.forEach((d) => {
+        userToMemberNode.set(d.id, d)
+      })
 
       // Process Links from linkDetectionResults
       // Expected format: array of relations (objects)
@@ -684,7 +696,7 @@ export default {
           let htmlContent = `<strong>Address:</strong> ${d.id}<br/>`
           htmlContent += `<strong>Balance:</strong> ${d.value.toFixed(2)}<br/>`
           if (d.isRelated)
-            htmlContent += `<strong>Type:</strong> Related User<br/>`
+            htmlContent += '<strong>Type:</strong> Related User<br/>'
 
           if (d.detectionInfo) {
             htmlContent += `<strong>Entity ID:</strong> ${d.detectionInfo.entityId}<br/>`
@@ -785,7 +797,7 @@ export default {
               d.suspicious.reasons.forEach((r) => {
                 content += `<li style="font-size: 10px;">${r}</li>`
               })
-              content += `</ul>`
+              content += '</ul>'
             } else {
               content += `<br>Diff: ${d.suspicious.diff.toFixed(2)}`
             }
@@ -798,7 +810,7 @@ export default {
               d.detectionInfo.reason.forEach((r) => {
                 content += `<li style="font-size: 10px;">${r}</li>`
               })
-              content += `</ul>`
+              content += '</ul>'
             }
           }
 

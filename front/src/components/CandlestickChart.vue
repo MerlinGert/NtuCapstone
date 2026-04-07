@@ -136,9 +136,9 @@ export default {
 
         let amountStr = ''
         if (totalAmount >= 1000000) {
-          amountStr = (totalAmount / 1000000).toFixed(2) + 'M'
+          amountStr = `${(totalAmount / 1000000).toFixed(2)}M`
         } else if (totalAmount >= 1000) {
-          amountStr = (totalAmount / 1000).toFixed(2) + 'K'
+          amountStr = `${(totalAmount / 1000).toFixed(2)}K`
         } else {
           amountStr = totalAmount.toFixed(2)
         }
@@ -172,9 +172,9 @@ export default {
           }
         }
 
-        const isRoundTrip =
-          res.detection_method &&
-          res.detection_method.toLowerCase().includes('round_trip')
+        const isRoundTrip = res.detection_method
+          ?.toLowerCase()
+          .includes('round_trip')
         if (isRoundTrip) {
           bins[binIdx].roundTrip.push(res)
         } else {
@@ -192,9 +192,11 @@ export default {
 
         if (bin.roundTrip.length > 0) {
           const uniqueUsers = new Set()
-          bin.roundTrip.forEach((r) =>
-            (r.participants || []).forEach((u) => uniqueUsers.add(u)),
-          )
+          bin.roundTrip.forEach((r) => {
+            ;(r.participants || []).forEach((u) => {
+              uniqueUsers.add(u)
+            })
+          })
           const stats = computeStats(bin.roundTrip)
           roundTripCards.push({
             timeLabel: timeLabel,
@@ -202,7 +204,7 @@ export default {
             totalAmount: stats.totalAmount,
             method: 'Round Trip',
             count: bin.roundTrip.length,
-            users: uniqueUsers.size + ' Users',
+            users: `${uniqueUsers.size} Users`,
             tooltip: `${bin.roundTrip.length} manipulations\nUsers: ${Array.from(uniqueUsers).join(', ')}\nTime Range: ${stats.timeSpan}\nAmount: ${stats.totalAmount}`,
             ts: bin.date.getTime(),
             rawManipulations: bin.roundTrip,
@@ -213,9 +215,11 @@ export default {
 
         if (bin.sameDirection.length > 0) {
           const uniqueUsers = new Set()
-          bin.sameDirection.forEach((r) =>
-            (r.participants || []).forEach((u) => uniqueUsers.add(u)),
-          )
+          bin.sameDirection.forEach((r) => {
+            ;(r.participants || []).forEach((u) => {
+              uniqueUsers.add(u)
+            })
+          })
           const stats = computeStats(bin.sameDirection)
           sameDirectionCards.push({
             timeLabel: timeLabel,
@@ -223,7 +227,7 @@ export default {
             totalAmount: stats.totalAmount,
             method: 'Same Direction',
             count: bin.sameDirection.length,
-            users: uniqueUsers.size + ' Users',
+            users: `${uniqueUsers.size} Users`,
             tooltip: `${bin.sameDirection.length} manipulations\nUsers: ${Array.from(uniqueUsers).join(', ')}\nTime Range: ${stats.timeSpan}\nAmount: ${stats.totalAmount}`,
             ts: bin.date.getTime(),
             rawManipulations: bin.sameDirection,
@@ -275,7 +279,7 @@ export default {
     // Normalize to ISO 8601 ("YYYY-MM-DDTHH:MM:SSZ") so all browsers parse it.
     parseUtcDate(s) {
       if (!s) return new Date(NaN)
-      const iso = String(s).replace(' UTC', '').replace(' ', 'T') + 'Z'
+      const iso = `${String(s).replace(' UTC', '').replace(' ', 'T')}Z`
       return new Date(iso)
     },
 
@@ -330,9 +334,9 @@ export default {
             }
           }
 
-          const isRoundTrip =
-            res.detection_method &&
-            res.detection_method.toLowerCase().includes('round_trip')
+          const isRoundTrip = res.detection_method
+            ?.toLowerCase()
+            .includes('round_trip')
           if (isRoundTrip) {
             binData[binIdx].roundTripCount++
           } else {
@@ -663,7 +667,7 @@ export default {
       // Update hover interactions to use hoverRect
       hoverRect
         .on('mousemove', (e) => {
-          const [mx, my] = d3.pointer(e, hoverRect.node())
+          const [mx] = d3.pointer(e, hoverRect.node())
 
           // Find closest candle based on x position
           let closestDist = Infinity
@@ -729,13 +733,13 @@ export default {
 
               // For larger values, use unit suffixes
               if (Math.abs(val) >= 1e9) {
-                return (val / 1e9).toFixed(2).replace(/\.?0+$/, '') + 'B'
+                return `${(val / 1e9).toFixed(2).replace(/\.?0+$/, '')}B`
               }
               if (Math.abs(val) >= 1e6) {
-                return (val / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M'
+                return `${(val / 1e6).toFixed(2).replace(/\.?0+$/, '')}M`
               }
               if (Math.abs(val) >= 1e3) {
-                return (val / 1e3).toFixed(2).replace(/\.?0+$/, '') + 'K'
+                return `${(val / 1e3).toFixed(2).replace(/\.?0+$/, '')}K`
               }
 
               // For normal values, max 2 decimal places
@@ -746,8 +750,8 @@ export default {
 
             tooltip
               .style('display', 'block')
-              .style('left', leftPos + 'px')
-              .style('top', wrapY + 15 + 'px')
+              .style('left', `${leftPos}px`)
+              .style('top', `${wrapY + 15}px`)
               .html(`
                 <div style="color:${color};font-weight:bold;">${upDown} ${fmt(d.date)}</div>
                 <div>O: $${formatVal(d.open)}</div>
@@ -775,12 +779,7 @@ export default {
       })
     },
     syncCardScroll() {
-      if (
-        !this.chartState ||
-        !this.chartState.visibleData ||
-        !this.chartState.visibleData.length
-      )
-        return
+      if (!this.chartState?.visibleData?.length) return
 
       const visibleStartTs = this.chartState.visibleData[0].date.getTime()
 
@@ -808,7 +807,7 @@ export default {
       const drawCard = (cardData, isTop, index) => {
         const refName = `svg-${isTop ? 'top' : 'bottom'}-${index}`
         const svgEls = this.$refs[refName]
-        if (!svgEls || !svgEls[0]) return
+        if (!svgEls?.[0]) return
         const svgNode = svgEls[0]
 
         const W = svgNode.clientWidth || 200
@@ -887,7 +886,7 @@ export default {
           .attr('text-anchor', 'end')
           .attr('fill', '#718096')
           .style('font-size', '9px')
-          .text((d) => d.substring(0, 3) + '..')
+          .text((d) => `${d.substring(0, 3)}..`)
           .append('title')
           .text((d) => d)
 
@@ -958,13 +957,17 @@ export default {
           )
       }
 
-      this.topCards.forEach((card, i) => drawCard(card, true, i))
-      this.bottomCards.forEach((card, i) => drawCard(card, false, i))
+      this.topCards.forEach((card, i) => {
+        drawCard(card, true, i)
+      })
+      this.bottomCards.forEach((card, i) => {
+        drawCard(card, false, i)
+      })
     },
     drawBands() {
       if (!this.chartState || !this.ohlc.length || !this.$refs.bandsOverlay)
         return
-      const { xScale, m, H, baseIndexScale, visibleData } = this.chartState
+      const { xScale, m, H, baseIndexScale } = this.chartState
 
       const overlay = d3.select(this.$refs.bandsOverlay)
 

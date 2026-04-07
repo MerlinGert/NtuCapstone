@@ -364,7 +364,9 @@ export default {
         )
         if (targetEntity?.users) {
           this.selectedEntityInfo = targetEntity
-          targetEntity.users.forEach((member) => userSet.add(member))
+          targetEntity.users.forEach((member) => {
+            userSet.add(member)
+          })
         }
       }
 
