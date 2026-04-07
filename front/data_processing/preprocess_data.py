@@ -929,7 +929,7 @@ def main():
         load_owner_labels()
     
     # Process Transfers
-    process_transfers = True
+    process_transfers = False
     if process_transfers:
         load_and_process_transfers()
         

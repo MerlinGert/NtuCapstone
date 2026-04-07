@@ -276,6 +276,7 @@ def process_detection(
                 funding_senders = {}
                 recipients = {}
 
+                USER_RELATIONS_PATH = os.path.join(get_data_dir(coin), "user_relations.json")
                 if os.path.exists(USER_RELATIONS_PATH):
                     try:
                         with open(USER_RELATIONS_PATH, 'r') as f:
@@ -559,7 +560,7 @@ def process_detection(
             if detect_entity and entity_detection_config.get("enable_similarity_based", False):
                 params = entity_detection_config.get("similarity_based_params", {})
                 if params.get("enable_balance_sequence", False):
-                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, coin)
                     merge_detection_results(target_relations_for_entity, matches['tt'], "balance_sequence")
                     merge_detection_results(target_related_relations_for_entity, matches['tr'], "balance_sequence")
 
@@ -567,7 +568,7 @@ def process_detection(
             if detect_link and link_detection_config.get("enable_similarity_based", False):
                 params = link_detection_config.get("similarity_based_params", {})
                 if params.get("enable_balance_sequence", False):
-                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_balance_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, coin)
                     merge_detection_results(target_relations_for_links, matches['tt'], "balance_sequence")
                     merge_detection_results(target_related_relations_for_links, matches['tr'], "balance_sequence")
 
@@ -576,7 +577,7 @@ def process_detection(
             if detect_entity and entity_detection_config.get("enable_similarity_based", False):
                 params = entity_detection_config.get("similarity_based_params", {})
                 if params.get("enable_earning_sequence", False):
-                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, coin)
                     merge_detection_results(target_relations_for_entity, matches['tt'], "earning_sequence")
                     merge_detection_results(target_related_relations_for_entity, matches['tr'], "earning_sequence")
 
@@ -584,7 +585,7 @@ def process_detection(
             if detect_link and link_detection_config.get("enable_similarity_based", False):
                 params = link_detection_config.get("similarity_based_params", {})
                 if params.get("enable_earning_sequence", False):
-                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time)
+                    matches = detect_earning_sequence(list(target_users.keys()), list(related_users.keys()), params, snapshot_time, coin)
                     merge_detection_results(target_relations_for_links, matches['tt'], "earning_sequence")
                     merge_detection_results(target_related_relations_for_links, matches['tr'], "earning_sequence")
     
@@ -991,7 +992,7 @@ def calculate_sequence_correlation(seq1, seq2, freq_str, value_col='balance', sn
         logger.error(f"Error calculating correlation: {e}", exc_info=True)
         return 0.0
 
-def detect_balance_sequence(target_users_list, related_users_list, params, snapshot_time=None):
+def detect_balance_sequence(target_users_list, related_users_list, params, snapshot_time=None, coin='ACT'):
     # Extract params
     config = params.get("balance_sequence_params", params)
     granularity = config.get("balance_granularity", "1d").lower()
@@ -1005,7 +1006,7 @@ def detect_balance_sequence(target_users_list, related_users_list, params, snaps
     }
     suffix = granularity_map.get(granularity, "1d")
     filename = f"user_balance_{suffix}.json"
-    filepath = os.path.join(BASE_DIR, "public", "data", filename)
+    filepath = os.path.join(get_data_dir(coin), filename)
     
     if not os.path.exists(filepath):
         logger.warning(f"Balance sequence file not found: {filepath}")
@@ -1064,7 +1065,7 @@ def detect_balance_sequence(target_users_list, related_users_list, params, snaps
     logger.info(f"Found {len(results['tt'])} TT balance matches and {len(results['tr'])} TR balance matches")
     return results
 
-def detect_earning_sequence(target_users_list, related_users_list, params, snapshot_time=None):
+def detect_earning_sequence(target_users_list, related_users_list, params, snapshot_time=None, coin='ACT'):
     # Extract params
     config = params.get("earning_sequence_params", params)
     granularity = config.get("earning_granularity", "1d").lower()
@@ -1078,7 +1079,7 @@ def detect_earning_sequence(target_users_list, related_users_list, params, snaps
     }
     suffix = granularity_map.get(granularity, "1d")
     filename = f"user_earnings_{suffix}.json"
-    filepath = os.path.join(BASE_DIR, "public", "data", filename)
+    filepath = os.path.join(get_data_dir(coin), filename)
     
     if not os.path.exists(filepath):
         logger.warning(f"Earning sequence file not found: {filepath}")
