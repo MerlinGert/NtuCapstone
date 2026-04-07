@@ -471,63 +471,64 @@
 
 <script>
 export default {
-    name: "ControlPanel",
-    props: {
-        loading: {
-            type: Boolean,
-            default: false
-        },
-        loadingLinks: {
-            type: Boolean,
-            default: false
-        },
-        loadingManipulation: {
-            type: Boolean,
-            default: false
-        },
-        lastResultCount: {
-            type: Number,
-            default: null
-        },
-        snapshotTimes: {
-            type: Array,
-            default: () => []
-        },
-        snapshotConfig: {
-            type: Object,
-            required: true
-        },
-        entityConfig: {
-            type: Object,
-            required: true
-        },
-        linkConfig: {
-            type: Object,
-            required: true
-        },
-        manipulationConfig: {
-            type: Object,
-            required: true
-        }
+  name: 'ControlPanel',
+  props: {
+    loading: {
+      type: Boolean,
+      default: false,
     },
-    data() {
-        return {
-            // UI State
-            activeSection: 'entity_network', 
-            activeManipulationSection: 'round_trip',
-            activeLinkSection: 'link_network',
-        }
+    loadingLinks: {
+      type: Boolean,
+      default: false,
     },
-    methods: {
-        toggleSection(section) {
-            this.activeSection = this.activeSection === section ? '' : section;
-        },
-        toggleManipulationSection(section) {
-            this.activeManipulationSection = this.activeManipulationSection === section ? '' : section;
-        },
-        toggleLinkSection(section) {
-            this.activeLinkSection = this.activeLinkSection === section ? '' : section;
-        }
+    loadingManipulation: {
+      type: Boolean,
+      default: false,
+    },
+    lastResultCount: {
+      type: Number,
+      default: null,
+    },
+    snapshotTimes: {
+      type: Array,
+      default: () => [],
+    },
+    snapshotConfig: {
+      type: Object,
+      required: true,
+    },
+    entityConfig: {
+      type: Object,
+      required: true,
+    },
+    linkConfig: {
+      type: Object,
+      required: true,
+    },
+    manipulationConfig: {
+      type: Object,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      // UI State
+      activeSection: 'entity_network',
+      activeManipulationSection: 'round_trip',
+      activeLinkSection: 'link_network',
     }
+  },
+  methods: {
+    toggleSection(section) {
+      this.activeSection = this.activeSection === section ? '' : section
+    },
+    toggleManipulationSection(section) {
+      this.activeManipulationSection =
+        this.activeManipulationSection === section ? '' : section
+    },
+    toggleLinkSection(section) {
+      this.activeLinkSection = this.activeLinkSection === section ? '' : section
+    },
+  },
 }
 </script>
