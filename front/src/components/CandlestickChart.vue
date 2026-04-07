@@ -112,7 +112,7 @@ export default {
             m.transactions.forEach(tx => {
               const tsStr = tx.timestamp || tx.time;
               if (tsStr) {
-                const ts = new Date(tsStr + (tsStr.includes('UTC') ? '' : ' UTC')).getTime();
+                const ts = this.parseUtcDate(tsStr).getTime();
                 if (ts < minTs) minTs = ts;
                 if (ts > maxTs) maxTs = ts;
               }
@@ -151,7 +151,7 @@ export default {
         if (!res.manipulation_time || res.manipulation_time.length === 0) return;
         // Use the end time (last element in manipulation_time) for grouping
         const endStr = res.manipulation_time[res.manipulation_time.length - 1];
-        const endTs = new Date(endStr + (endStr.includes('UTC') ? '' : ' UTC')).getTime();
+        const endTs = this.parseUtcDate(endStr).getTime();
         
         // Find the matching time bin in OHLC
         let binIdx = 0;
@@ -260,6 +260,14 @@ export default {
     if (this.resizeObs) this.resizeObs.disconnect()
   },
   methods: {
+    // Safari/iOS rejects "YYYY-MM-DD HH:MM:SS" and "... UTC" date strings.
+    // Normalize to ISO 8601 ("YYYY-MM-DDTHH:MM:SSZ") so all browsers parse it.
+    parseUtcDate(s) {
+      if (!s) return new Date(NaN)
+      const iso = String(s).replace(' UTC', '').replace(' ', 'T') + 'Z'
+      return new Date(iso)
+    },
+
     async loadData() {
       this.loading = true
       try {
@@ -281,7 +289,7 @@ export default {
       
       // Calculate manipulation counts per bin directly in ohlc data
       const binData = raw.map(d => ({
-        date:  new Date(d.t + ' UTC'),
+        date:  this.parseUtcDate(d.t),
         open:  d.o,
         high:  d.h,
         low:   d.l,
@@ -295,7 +303,7 @@ export default {
         this.manipulationResults.forEach(res => {
           if (!res.manipulation_time || res.manipulation_time.length === 0) return;
           const endStr = res.manipulation_time[res.manipulation_time.length - 1];
-          const endTs = new Date(endStr + (endStr.includes('UTC') ? '' : ' UTC')).getTime();
+          const endTs = this.parseUtcDate(endStr).getTime();
           
           let binIdx = 0;
           for (let i = 0; i < binData.length; i++) {
@@ -720,7 +728,7 @@ export default {
             m.transactions.forEach(tx => {
               const tsStr = tx.timestamp || tx.time;
               if (tsStr) {
-                const ts = new Date(tsStr + (tsStr.includes('UTC') ? '' : ' UTC')).getTime();
+                const ts = this.parseUtcDate(tsStr).getTime();
                 if (ts < minTs) minTs = ts;
                 if (ts > maxTs) maxTs = ts;
               }
@@ -785,7 +793,7 @@ export default {
             m.transactions.forEach(tx => {
               const tsStr = tx.timestamp || tx.time;
               if (!tsStr) return;
-              const evTs = new Date(tsStr + (tsStr.includes('UTC') ? '' : ' UTC')).getTime();
+              const evTs = this.parseUtcDate(tsStr).getTime();
               const user = tx.trader || tx.user;
               if (user && allUsersList.includes(user) && evTs >= minTs - timePad && evTs <= maxTs + timePad) {
                 const amount = parseFloat(tx.amount || tx.quantity) || 0;
