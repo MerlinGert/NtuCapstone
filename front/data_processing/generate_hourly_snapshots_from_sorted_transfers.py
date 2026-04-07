@@ -4,7 +4,6 @@ import json
 import os
 from datetime import datetime, timedelta
 
-
 csv.field_size_limit(2**31 - 1)
 
 
@@ -44,11 +43,7 @@ def classify_owner(owner, inline_label, labels_map):
 
 
 def snapshot_balances(current_balances, current_labels):
-    snapshot = {
-        "users": {},
-        "contracts": {},
-        "exchanges": {}
-    }
+    snapshot = {"users": {}, "contracts": {}, "exchanges": {}}
     for owner, balance in current_balances.items():
         if not owner or balance <= 0:
             continue
@@ -83,7 +78,9 @@ def apply_transfer(row, current_balances, current_labels, labels_map):
         current_labels[to_owner] = classify_owner(to_owner, to_label, labels_map)
 
 
-def generate_hourly_snapshots_from_sorted_transfers(input_csv_path, output_json_path, labels_json_path=None):
+def generate_hourly_snapshots_from_sorted_transfers(
+    input_csv_path, output_json_path, labels_json_path=None
+):
     labels_map = load_labels(labels_json_path)
     current_balances = {}
     current_labels = {}
@@ -98,7 +95,9 @@ def generate_hourly_snapshots_from_sorted_transfers(input_csv_path, output_json_
 
         time_column = "timestamp" if "timestamp" in first_row else "time"
         current_time = parse_timestamp(first_row[time_column])
-        next_snapshot_time = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        next_snapshot_time = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(
+            hours=1
+        )
 
         apply_transfer(first_row, current_balances, current_labels, labels_map)
         row_count = 1
@@ -110,10 +109,12 @@ def generate_hourly_snapshots_from_sorted_transfers(input_csv_path, output_json_
                 continue
 
             while row_time >= next_snapshot_time:
-                snapshots.append({
-                    "time": next_snapshot_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
-                    "balances": snapshot_balances(current_balances, current_labels)
-                })
+                snapshots.append(
+                    {
+                        "time": next_snapshot_time.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                        "balances": snapshot_balances(current_balances, current_labels),
+                    }
+                )
                 next_snapshot_time += timedelta(hours=1)
 
             apply_transfer(row, current_balances, current_labels, labels_map)
@@ -142,25 +143,25 @@ def main():
     parser.add_argument(
         "--data-dir",
         default=os.path.join(base_dir, "public", "data2"),
-        help="Target data directory, e.g. public/data or public/data2"
+        help="Target data directory, e.g. public/data or public/data2",
     )
     parser.add_argument(
         "--input",
         dest="input_csv",
         default=None,
-        help="Optional explicit sorted_transfers.csv path"
+        help="Optional explicit sorted_transfers.csv path",
     )
     parser.add_argument(
         "--labels",
         dest="labels_json",
         default=None,
-        help="Optional explicit simplified_owner_labels.json path"
+        help="Optional explicit simplified_owner_labels.json path",
     )
     parser.add_argument(
         "--output",
         dest="output_json",
         default=None,
-        help="Optional explicit hourly_balance_snapshots.json path"
+        help="Optional explicit hourly_balance_snapshots.json path",
     )
     args = parser.parse_args()
 

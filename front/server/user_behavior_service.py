@@ -1,23 +1,23 @@
 import json
 import os
+from typing import List
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
 
-router = APIRouter(
-    prefix="/api/user_behavior",
-    tags=["user_behavior"]
-)
+router = APIRouter(prefix="/api/user_behavior", tags=["user_behavior"])
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # In-memory cache: dict[coin] -> data
 _user_behavior_cache = {}
 
+
 def get_data_dir(coin: str):
-    if coin == 'PNUT':
+    if coin == "PNUT":
         return os.path.join(BASE_DIR, "public", "data2")
     return os.path.join(BASE_DIR, "public", "data")
+
 
 def get_user_behavior_data(coin: str):
     global _user_behavior_cache
@@ -28,16 +28,18 @@ def get_user_behavior_data(coin: str):
             _user_behavior_cache[coin] = {}
         else:
             try:
-                with open(data_path, 'r') as f:
+                with open(data_path, "r") as f:
                     _user_behavior_cache[coin] = json.load(f)
             except Exception as e:
                 print(f"Error loading user behavior sequences for {coin}: {e}")
                 _user_behavior_cache[coin] = {}
     return _user_behavior_cache[coin]
 
+
 class UserBehaviorRequest(BaseModel):
     users: List[str]
     coin: str = "ACT"
+
 
 @router.post("/sequences")
 def get_sequences(request: UserBehaviorRequest):

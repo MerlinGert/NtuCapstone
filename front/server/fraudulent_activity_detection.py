@@ -46,57 +46,72 @@ csv.field_size_limit(2**31 - 1)
 # Pydantic Models
 # ---------------------------------------------------------------------------
 
+
 class WashTradingCollusionParams(BaseModel):
     """Wash Trading in the Same Colluding Group"""
+
     enable: bool = True
     time_window: float = Field(
-        default=168.0, gt=0,
+        default=168.0,
+        gt=0,
         description="Overall detection time window in hours",
     )
     time_span: float = Field(
-        default=48.0, gt=0,
+        default=48.0,
+        gt=0,
         description="Max time span (hours) from first tx to last tx in a loop",
     )
     loop_size: int = Field(
-        default=2, ge=2,
+        default=2,
+        ge=2,
         description="Min cycle size (number of distinct nodes in the loop)",
     )
     require_temporal_order: bool = Field(
         default=False,
         description="True: edges in cycle must be temporally increasing; "
-                    "False: just need cycle in the graph",
+        "False: just need cycle in the graph",
     )
     net_position_abs: float = Field(
-        default=1000.0, ge=0,
+        default=1000.0,
+        ge=0,
         description="Max |In(v) - Out(v)| for each node in the loop",
     )
     amount_similarity: float = Field(
-        default=0.5, ge=0, le=1,
-        description="Min similarity of transfer amounts within the loop "
-                    "(min_amount / max_amount)",
+        default=0.5,
+        ge=0,
+        le=1,
+        description="Min similarity of transfer amounts within the loop (min_amount / max_amount)",
     )
     tx_frequency: float = Field(
-        default=0.0, ge=0, le=1,
+        default=0.0,
+        ge=0,
+        le=1,
         description="Min fraction of a node's total txs that go to next node "
-                    "in loop: num(a,b)/num(a)",
+        "in loop: num(a,b)/num(a)",
     )
     net_position_score: float = Field(
-        default=0.3, ge=0, le=1,
+        default=0.3,
+        ge=0,
+        le=1,
         description="Max |In(v)-Out(v)| / (In(v)+Out(v)) for each node",
     )
     speed_score: float = Field(
-        default=0.0, ge=0, le=1,
+        default=0.0,
+        ge=0,
+        le=1,
         description="Min speed score: 1 - (time_span / time_window). "
-                    "Higher = faster loop completion.",
+        "Higher = faster loop completion.",
     )
 
 
 class FraudulentActivityRequest(BaseModel):
     target_users: Optional[List[str]] = Field(
-        None, description="Addresses to analyse. None = all.",
+        None,
+        description="Addresses to analyse. None = all.",
     )
     time_range: Optional[Dict[str, str]] = Field(
-        None, description="{'start': ..., 'end': ...}",
+        None,
+        description="{'start': ..., 'end': ...}",
     )
     wash_trading_collusion: Optional[WashTradingCollusionParams] = None
 
@@ -166,9 +181,16 @@ def _load_trades() -> pd.DataFrame:
     if not os.path.exists(TRADE_CSV):
         raise HTTPException(status_code=500, detail=f"Trade file not found: {TRADE_CSV}")
 
-    usecols = ["trader_id", "block_time", "token_bought_symbol",
-               "token_sold_symbol", "token_bought_amount",
-               "token_sold_amount", "amount_usd", "tx_id"]
+    usecols = [
+        "trader_id",
+        "block_time",
+        "token_bought_symbol",
+        "token_sold_symbol",
+        "token_bought_amount",
+        "token_sold_amount",
+        "amount_usd",
+        "tx_id",
+    ]
     df = pd.read_csv(TRADE_CSV, usecols=usecols)
     df["block_time"] = pd.to_datetime(df["block_time"], utc=True, errors="coerce")
     df = df.dropna(subset=["block_time"])
@@ -177,10 +199,10 @@ def _load_trades() -> pd.DataFrame:
     return df
 
 
-
 # ---------------------------------------------------------------------------
 # Graph Building
 # ---------------------------------------------------------------------------
+
 
 def _build_transfer_graph(
     df: pd.DataFrame,
@@ -210,10 +232,7 @@ def _build_transfer_graph(
 
     # ---- target user filter ----
     if target_users:
-        sub = sub[
-            sub["from_owner"].isin(target_users)
-            | sub["to_owner"].isin(target_users)
-        ]
+        sub = sub[sub["from_owner"].isin(target_users) | sub["to_owner"].isin(target_users)]
 
     if sub.empty:
         return nx.DiGraph(), {}
@@ -232,7 +251,8 @@ def _build_transfer_graph(
         ]
         total_amt = grp["amount_display"].sum()
         G.add_edge(
-            u, v,
+            u,
+            v,
             transactions=tx_list,
             total_amount=total_amt,
             tx_count=len(tx_list),
@@ -246,6 +266,7 @@ def _build_transfer_graph(
 # ---------------------------------------------------------------------------
 # Cycle Analysis Helpers
 # ---------------------------------------------------------------------------
+
 
 def _cycle_edges(cycle: List[str], G: nx.DiGraph) -> List[dict]:
     """Return the edge data dicts for consecutive nodes in *cycle* (wrapping)."""
@@ -274,7 +295,8 @@ def _compute_time_span_hours(edges: List[dict]) -> float:
 
 
 def _compute_net_positions(
-    cycle: List[str], edges: List[dict],
+    cycle: List[str],
+    edges: List[dict],
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
     """
     For each node v in *cycle*, compute:
@@ -314,7 +336,9 @@ def _compute_amount_similarity(edges: List[dict]) -> float:
 
 
 def _compute_tx_frequency(
-    cycle: List[str], edges: List[dict], out_count: Dict[str, int],
+    cycle: List[str],
+    edges: List[dict],
+    out_count: Dict[str, int],
 ) -> float:
     """Min of num(a,b)/num(a) across edges (a→b) in the cycle."""
     freqs = []
@@ -330,6 +354,7 @@ def _compute_tx_frequency(
 # ---------------------------------------------------------------------------
 # Main Processing
 # ---------------------------------------------------------------------------
+
 
 def process_wash_trading_collusion(
     params: WashTradingCollusionParams,
@@ -361,8 +386,10 @@ def process_wash_trading_collusion(
         time_start = window_start
 
     G, out_count = _build_transfer_graph(df, target_users, time_start, time_end)
-    print(f"[fraudulent] Graph built: {G.number_of_nodes()} nodes, "
-          f"{G.number_of_edges()} edges  ({_time.time() - t0:.2f}s)")
+    print(
+        f"[fraudulent] Graph built: {G.number_of_nodes()} nodes, "
+        f"{G.number_of_edges()} edges  ({_time.time() - t0:.2f}s)"
+    )
 
     if G.number_of_nodes() == 0:
         return []
@@ -462,8 +489,10 @@ def process_wash_trading_collusion(
         hits.append(hit)
 
     elapsed = _time.time() - t1
-    print(f"[fraudulent] Cycle search done: checked {checked} cycles, "
-          f"found {len(hits)} collusion loops  ({elapsed:.2f}s)")
+    print(
+        f"[fraudulent] Cycle search done: checked {checked} cycles, "
+        f"found {len(hits)} collusion loops  ({elapsed:.2f}s)"
+    )
 
     # Sort by total_volume descending (most suspicious first)
     hits.sort(key=lambda h: h.total_volume, reverse=True)
@@ -473,6 +502,7 @@ def process_wash_trading_collusion(
 # ---------------------------------------------------------------------------
 # API Endpoint
 # ---------------------------------------------------------------------------
+
 
 @router.post("/detect", response_model=FraudulentActivityResponse)
 async def detect_fraudulent_activity(request: FraudulentActivityRequest):
@@ -517,8 +547,7 @@ async def detect_fraudulent_activity(request: FraudulentActivityRequest):
         )
 
     elapsed = _time.time() - t_start
-    print(f"[fraudulent] Total elapsed: {elapsed:.2f}s  "
-          f"loops={len(collusion_loops)}")
+    print(f"[fraudulent] Total elapsed: {elapsed:.2f}s  loops={len(collusion_loops)}")
 
     # Gather unique members across all loops
     all_members: Set[str] = set()
