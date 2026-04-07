@@ -1,4 +1,5 @@
 <script setup>
+import CryptoVis from './components/CryptoVis.vue'
 </script>
 
 <template>
