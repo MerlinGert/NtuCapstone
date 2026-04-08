@@ -52,7 +52,7 @@
         <n-card
             size="small"
             class="panel-card"
-            style="width:100%;height:60%;flex-shrink:0;"
+            style="width:100%;height:100%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
@@ -63,28 +63,6 @@
                 :manipulation-detection-results="manipulation_detection_results"
                 @detection-complete="handleDetectionComplete"
                 @user-selected="handleUserSelect"
-            />
-        </n-card>
-        <n-card
-            size="small"
-            class="panel-card"
-            style="width:100%;height:40%;flex-shrink:0;"
-            header-style="text-align:left;height:50px;font-size:1.4em;"
-            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
-        >
-            <template #header-extra v-if="selectedUser">
-                <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 15px; font-size: 14px; color: #4a5568; align-items: center; margin-right: 10px; white-space: nowrap;">
-                    <span style="background: #f7fafc; padding: 2px 8px; border-radius: 4px; border: 1px solid #e2e8f0; display: inline-block;">
-                        <strong>User:</strong> {{ selectedUser.length > 8 ? selectedUser.substring(0, 8) + '..' : selectedUser }}
-                    </span>
-                </div>
-            </template>
-            <BehaviorDetails
-                :selected-user="selectedUser"
-                :behavior-data="behaviorDetailData"
-                :entity-info="selectedEntityInfo"
-                :snapshot-time="snapshot_configuration.time"
-                :manipulation-results="manipulation_detection_results"
             />
         </n-card>
     </div>
@@ -118,7 +96,22 @@
             class="panel-card"
             style="width:100%;height:40%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.4em;"
+            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
+            <template #header-extra v-if="selectedUser">
+                <div style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 15px; font-size: 14px; color: #4a5568; align-items: center; margin-right: 10px; white-space: nowrap;">
+                    <span style="background: #f7fafc; padding: 2px 8px; border-radius: 4px; border: 1px solid #e2e8f0; display: inline-block;">
+                        <strong>User:</strong> {{ selectedUser.length > 8 ? selectedUser.substring(0, 8) + '..' : selectedUser }}
+                    </span>
+                </div>
+            </template>
+            <BehaviorDetails
+                :selected-user="selectedUser"
+                :behavior-data="behaviorDetailData"
+                :entity-info="selectedEntityInfo"
+                :snapshot-time="snapshot_configuration.time"
+                :manipulation-results="manipulation_detection_results"
+            />
         </n-card>
     </div>
       <!-- </n-layout> -->

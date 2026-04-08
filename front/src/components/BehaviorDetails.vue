@@ -306,12 +306,11 @@ export default {
         .attr('width', innerWidth)
         .attr('height', innerHeight)
 
-      // We append a background rect to capture zoom events
-      const zoomRect = rootSvg
+      // We append a background rect to capture zoom events across the whole SVG
+      rootSvg
         .append('rect')
-        .attr('width', innerWidth)
-        .attr('height', innerHeight)
-        .attr('transform', `translate(${margin.left},${margin.top})`)
+        .attr('width', width)
+        .attr('height', height)
         .style('fill', 'none')
         .style('pointer-events', 'all')
 
@@ -764,11 +763,11 @@ export default {
         .scaleExtent([1, 50])
         .translateExtent([
           [0, 0],
-          [innerWidth, innerHeight],
+          [width, height],
         ])
         .extent([
           [0, 0],
-          [innerWidth, innerHeight],
+          [width, height],
         ])
         .on('zoom', (event) => {
           const newXScale = event.transform.rescaleX(xScale)
@@ -820,7 +819,7 @@ export default {
           }
         })
 
-      zoomRect.call(zoom)
+      rootSvg.call(zoom)
     },
   },
 }
