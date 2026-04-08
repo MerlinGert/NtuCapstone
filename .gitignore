@@ -10,3 +10,4 @@ front/src/assets/user_behavior_sequences.json
 # Python
 __pycache__/
 *.pyc
+/front/server/__pycache__
