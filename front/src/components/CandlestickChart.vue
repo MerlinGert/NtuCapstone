@@ -28,7 +28,7 @@
 
       <!-- Upper manipulation cards (Round Trip) -->
       <div class="manipulation-cards-container scroll-x top-cards scroll-top" @scroll="drawBands" ref="topCardsContainer">
-        <div class="manipulation-card top-card" v-for="(card, i) in topCards" :key="'top-'+i" :title="card.tooltip">
+        <div class="manipulation-card top-card" v-for="(card, i) in topCards" :key="'top-'+i" :title="card.tooltip" @click="$emit('card-click', card.uniqueUsers)" style="cursor: pointer;">
           <div class="card-time">{{ card.timeLabel }}</div>
           <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
           <svg :ref="'svg-top-'+i" class="card-svg" width="100%" height="100%"></svg>
@@ -47,7 +47,7 @@
 
       <!-- Lower manipulation cards (Same Direction) -->
       <div class="manipulation-cards-container scroll-x bottom-cards" @scroll="drawBands" ref="bottomCardsContainer">
-        <div class="manipulation-card" v-for="(card, i) in bottomCards" :key="'bottom-'+i" :title="card.tooltip">
+        <div class="manipulation-card" v-for="(card, i) in bottomCards" :key="'bottom-'+i" :title="card.tooltip" @click="$emit('card-click', card.uniqueUsers)" style="cursor: pointer;">
           <div class="card-time">{{ card.timeLabel }}</div>
           <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
           <svg :ref="'svg-bottom-'+i" class="card-svg" width="100%" height="100%"></svg>

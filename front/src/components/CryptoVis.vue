@@ -86,6 +86,7 @@
                 :current-coin="currentCoin"
                 :sync-target-time-window="behaviorTimeWindow"
                 @time-window-changed="klineTimeWindow = $event"
+                @card-click="handleManipulationCardClick"
                 style="width:100%;height:100%;"
               />
             </div>
@@ -109,6 +110,7 @@
             </template>
             <BehaviorDetails
                 :selected-user="selectedUser"
+                :selected-users-list="selectedCardUsers"
                 :behavior-data="behaviorDetailData"
                 :entity-info="selectedEntityInfo"
                 :snapshot-time="snapshot_configuration.time"
@@ -301,6 +303,7 @@ export default {
       selectedEntityInfo: null,
       klineTimeWindow: null,
       behaviorTimeWindow: null,
+      selectedCardUsers: [],
     }
   },
   watch: {
@@ -316,6 +319,7 @@ export default {
   methods: {
     resetViewState() {
       this.selectedUser = null
+      this.selectedCardUsers = []
       this.behaviorDetailData = null
       this.selectedEntityInfo = null
       this.entity_detection_results = null
@@ -432,8 +436,50 @@ export default {
       }
     },
     handleUserSelect(userId) {
+      this.selectedCardUsers = [] // clear card mode
       this.selectedUser = userId
       console.log('CryptoVis: selectedUser updated to', userId)
+    },
+    handleManipulationCardClick(users) {
+      this.selectedUser = null
+      this.selectedEntityInfo = null // clear entity info when card is clicked
+      this.selectedCardUsers = users || []
+      if (this.selectedCardUsers.length > 0) {
+        const userSet = new Set(this.selectedCardUsers)
+        
+        fetch('/api/user_behavior/sequences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            users: Array.from(userSet),
+            coin: this.currentCoin,
+          }),
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error('Network response was not ok')
+            return res.json()
+          })
+          .then((sequences) => {
+            const data = {}
+            Array.from(userSet).forEach((user) => {
+              data[user] = sequences[user] || []
+            })
+            this.behaviorDetailData = Object.freeze(data)
+            console.log(
+              'CryptoVis: behaviorDetailData generated for card users',
+              userSet,
+              this.behaviorDetailData,
+            )
+          })
+          .catch((err) => {
+            console.error(
+              'CryptoVis: failed to fetch card user behavior sequences',
+              err,
+            )
+          })
+      } else {
+        this.behaviorDetailData = null
+      }
     },
     rebuildEntityResults() {
       if (!this.link_generation_results) return

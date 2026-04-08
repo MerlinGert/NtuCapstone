@@ -1,13 +1,16 @@
 <template>
   <div class="behavior-details-container" ref="container">
-    <div v-if="!selectedUser" class="empty-state">
-      Please select a user node to view behavior details.
+    <div v-if="!selectedUser && (!selectedUsersList || selectedUsersList.length === 0)" class="empty-state">
+      Please select a user node or a manipulation card to view behavior details.
     </div>
     <div v-else class="details-content">
       <div class="header">
         <div class="header-left">
-          <h3 class="user-id">User: {{ selectedUser }}</h3>
-          <div v-if="entityInfo" class="entity-info">
+          <h3 class="user-id" v-if="selectedUsersList && selectedUsersList.length > 0">
+            Card Users ({{ selectedUsersList.length }})
+          </h3>
+          <h3 class="user-id" v-else>User: {{ selectedUser }}</h3>
+          <div v-if="entityInfo && (!selectedUsersList || selectedUsersList.length === 0)" class="entity-info">
             <span class="entity-badge">Part of Entity</span>
             <span class="entity-members">Members: {{ entityInfo.users.length }}</span>
           </div>
@@ -23,6 +26,15 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
             Sync Time
           </button>
+          
+          <div v-if="!selectedUsersList || selectedUsersList.length === 0" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="showRelatedUsers" @change="drawChart">
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-text">Show Related Users</span>
+          </div>
+
           <div v-if="manipulationResults && manipulationResults.length > 0" style="display: flex; align-items: center; gap: 8px;">
             <label class="toggle-switch">
               <input type="checkbox" v-model="showManipulationBoxes" @change="drawChart">
@@ -57,6 +69,10 @@ export default {
       type: String,
       default: null,
     },
+    selectedUsersList: {
+      type: Array,
+      default: () => [],
+    },
     behaviorData: {
       type: Object,
       default: () => null,
@@ -81,6 +97,7 @@ export default {
   data() {
     return {
       showManipulationBoxes: true,
+      showRelatedUsers: false,
     }
   },
   watch: {
@@ -133,15 +150,23 @@ export default {
       // Clear previous chart (only remove svg, keep the tooltip div)
       d3.select(container).selectAll('svg').remove()
 
-      // Sort users: selectedUser in the middle, entity users adjacent, then other users
-      const users = Object.keys(this.behaviorData)
+      let usersToDraw = Object.keys(this.behaviorData || {})
 
+      if (this.selectedUsersList && this.selectedUsersList.length > 0) {
+        // Card mode: use users from card (which should be exactly what's in behaviorData)
+        usersToDraw = [...this.selectedUsersList].filter(u => this.behaviorData[u])
+      } else if (!this.showRelatedUsers && this.selectedUser) {
+        // User mode, single user only
+        usersToDraw = [this.selectedUser].filter(u => this.behaviorData[u])
+      }
+
+      // Sort users: selectedUser in the middle, entity users adjacent, then other users
       const entityUsers = this.entityInfo
         ? this.entityInfo.users.filter(
-            (u) => u !== this.selectedUser && users.includes(u),
+            (u) => u !== this.selectedUser && usersToDraw.includes(u),
           )
         : []
-      const otherUsers = users.filter(
+      const otherUsers = usersToDraw.filter(
         (u) => u !== this.selectedUser && !entityUsers.includes(u),
       )
 
@@ -170,7 +195,15 @@ export default {
       // Reverse topHalf so the first elements added (entity users) are closest to the middle
       topHalf.reverse()
 
-      const sortedUsers = [...topHalf, this.selectedUser, ...bottomHalf]
+      let sortedUsers = []
+      if (this.selectedUsersList && this.selectedUsersList.length > 0) {
+        // In card mode, there is no single "selectedUser" in the middle, just list them all
+        sortedUsers = usersToDraw
+      } else {
+        sortedUsers = this.selectedUser && usersToDraw.includes(this.selectedUser) 
+          ? [...topHalf, this.selectedUser, ...bottomHalf]
+          : [...topHalf, ...bottomHalf]
+      }
 
       // Filter behavior data based on snapshot time
       const parseDateSafe = (dateStr) => {
