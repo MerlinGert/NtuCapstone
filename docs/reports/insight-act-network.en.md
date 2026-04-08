@@ -6,13 +6,13 @@ This report walks through how I used the ManiScope dashboard to identify what lo
 
 ## Step 1. First glance at the network graph
 
-I opened the dashboard at `localhost:3000`. The default snapshot was 2024-11-09 23:00:00 UTC, with a Top Holder Threshold of 0.3, both the entity detection and the manipulation detection already run on initial load. The first thing I noticed when looking at the TokenDistribution panel in the top-center was that almost every circle had a red border rather than a blue one. To quantify this, I queried the computed style of every circle in the SVG and counted the borders. Out of 49 top holders rendered in the graph, 36 have a red stroke, which means they appear as a participant in at least one detected manipulation event. That is 74 percent. The remaining 13 wallets have the normal blue stroke. Three small clusters are wrapped in orange dashed circles, which mark the entity boundaries.
+I opened the dashboard at `localhost:3000`. The default snapshot was 2024-11-09 23:00:00 UTC, with a Top Holder Threshold of 0.3, both the entity detection and the manipulation detection already run on initial load. The first thing I noticed when looking at the Token Distribution View in the top-center was that almost every circle had a red border rather than a blue one. To quantify this, I queried the computed style of every circle in the SVG and counted the borders. Out of 49 top holders rendered in the graph, 36 have a red stroke, which means they appear as a participant in at least one detected manipulation event. That is 74 percent. The remaining 13 wallets have the normal blue stroke. Three small clusters are wrapped in orange dashed circles, which mark the entity boundaries.
 
 The visual gestalt is unusual. In a healthy market you would expect a small minority of suspicious actors mixed into a majority of clean traders. Here it is the inverse. Three quarters of the wallets that hold a meaningful amount of ACT are flagged for some kind of price manipulation. This is the cue that pushed me to investigate further rather than to dismiss the page as a noisy detector with a low precision threshold.
 
 ## Step 2. Confirming the impression with the K-line
 
-If 74 percent of top holders are genuinely manipulating, the price chart should look artificial rather than organic. I switched my attention to the CandlestickChart panel on the right.
+If 74 percent of top holders are genuinely manipulating, the price chart should look artificial rather than organic. I switched my attention to the Manipulation View on the right.
 
 The dataset spans 2024-10-19 to 2024-11-10, which is roughly three weeks. The starting price on the morning of October 19 is about 0.000292 dollars. By October 25 the price has reached its all-time high of about 0.045 dollars. By the end of the dataset on November 10 it has retraced to about 0.021 dollars. That is a roughly 155-fold rapid pump to peak followed by a 50 percent decline. Even by Solana memecoin standards this profile is suggestive of orchestrated activity rather than gradual organic adoption.
 
@@ -22,7 +22,7 @@ So far the hypothesis from Step 1, that ACT is a heavily manipulated token, was 
 
 ## Step 3. Looking at the entity highlights
 
-The dashboard had clustered the top holders into three small entities, each visible in the TokenDistribution graph as a group of bubbles inside an orange dashed circle. By inspecting the TokenDistribution component's props directly, I could see the entity members and the rule that linked them.
+The dashboard had clustered the top holders into three small entities, each visible in the Token Distribution View as a group of bubbles inside an orange dashed circle. By inspecting the Token Distribution Vue component's props directly, I could see the entity members and the rule that linked them.
 
 | Entity | Members | Linking rule |
 |---|---|---|
@@ -34,7 +34,7 @@ Eight wallets across three clusters, all of them grouped because their hourly ba
 
 ## Step 4. Clicking DmJ and discovering the hidden network
 
-I clicked on the largest bubble in Entity 0, which corresponds to the address `DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH`, abbreviated DmJ. The moment I clicked, the BehaviorDetails panel below the graph populated with a multi-row timeline. I expected to see three rows for the three entity members. Instead I saw 19 rows, labeled with three role tags: one row labeled "Selected User" for DmJ, two labeled "Entity Member" for BgB and 5YP, and 16 labeled "Related User".
+I clicked on the largest bubble in Entity 0, which corresponds to the address `DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH`, abbreviated DmJ. The moment I clicked, the Behavior Detail View below the Token Distribution View populated with a multi-row timeline. I expected to see three rows for the three entity members. Instead I saw 19 rows, labeled with three role tags: one row labeled "Selected User" for DmJ, two labeled "Entity Member" for BgB and 5YP, and 16 labeled "Related User".
 
 These 16 related users are not in DmJ's entity by balance correlation, but they have direct transfer relationships to the wallets in DmJ's entity within the snapshot window. In other words, clicking one entity member exposes a much larger 2nd-degree neighborhood in the transfer graph.
 
