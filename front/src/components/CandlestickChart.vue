@@ -58,6 +58,10 @@ const COLORS = {
 }
 
 const GRANULARITIES = [
+  { key: '1min', label: '1m' },
+  { key: '5min', label: '5m' },
+  { key: '15min', label: '15m' },
+  { key: '30min', label: '30m' },
   { key: '1H', label: '1H' },
   { key: '1D', label: '1D' },
   { key: '3D', label: '3D' },
@@ -97,6 +101,10 @@ export default {
         return { roundTrip: [], sameDirection: [] }
 
       const fmtMap = {
+        '1min': (d) => d3.timeFormat('%H:%M:%S')(d),
+        '5min': (d) => d3.timeFormat('%H:%M')(d),
+        '15min': (d) => d3.timeFormat('%H:%M')(d),
+        '30min': (d) => d3.timeFormat('%H:%M')(d),
         '1H': (d) => d3.timeFormat('%m/%d %H:%M')(d),
         '1D': (d) => d3.timeFormat('%m/%d')(d),
         '3D': (d) => d3.timeFormat('%m/%d')(d),
@@ -288,7 +296,7 @@ export default {
       try {
         const dataDir = this.currentCoin === 'PNUT' ? 'data2' : 'data'
         const fileName =
-          this.currentCoin === 'PNUT' ? 'OHLC.json' : 'ACT_OHLC.json'
+          this.currentCoin === 'PNUT' ? 'PNUT_OHLC.json' : 'ACT_OHLC.json'
         const res = await fetch(`/${dataDir}/${fileName}`)
         this.actOhlc = await res.json()
       } catch (e) {
@@ -526,6 +534,10 @@ export default {
 
       // X axis
       const fmtMap = {
+        '1min': (d) => d3.timeFormat('%H:%M:%S')(d),
+        '5min': (d) => d3.timeFormat('%H:%M')(d),
+        '15min': (d) => d3.timeFormat('%H:%M')(d),
+        '30min': (d) => d3.timeFormat('%H:%M')(d),
         '1H': (d) => d3.timeFormat('%m/%d %H:%M')(d),
         '1D': (d) => d3.timeFormat('%m/%d')(d),
         '3D': (d) => d3.timeFormat('%m/%d')(d),
