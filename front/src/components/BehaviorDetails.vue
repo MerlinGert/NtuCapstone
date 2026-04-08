@@ -12,12 +12,24 @@
             <span class="entity-members">Members: {{ entityInfo.users.length }}</span>
           </div>
         </div>
-        <div class="controls" v-if="manipulationResults && manipulationResults.length > 0">
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="showManipulationBoxes" @change="drawChart">
-            <span class="slider"></span>
-          </label>
-          <span class="toggle-text">Show Manipulation Boxes</span>
+        <div class="controls">
+          <button 
+            v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
+            class="sync-btn" 
+            @click="syncTimeWindow"
+            title="Sync time window to K-Line view"
+            style="font-size: 12px; font-weight: normal; padding: 2px 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; color: #4a5568;"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+            Sync Time
+          </button>
+          <div v-if="manipulationResults && manipulationResults.length > 0" style="display: flex; align-items: center; gap: 8px;">
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="showManipulationBoxes" @change="drawChart">
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-text">Show Manipulation Boxes</span>
+          </div>
         </div>
       </div>
       
@@ -60,6 +72,10 @@ export default {
     manipulationResults: {
       type: Array,
       default: () => [],
+    },
+    syncTargetTimeWindow: {
+      type: Array,
+      default: () => null,
     },
   },
   data() {
@@ -286,7 +302,7 @@ export default {
       // Set up dimensions
       const width = container.clientWidth || 800
       const height = container.clientHeight || 400
-      const margin = { top: 30, right: 20, bottom: 10, left: 40 } // Adjusted top margin for top axis
+      const margin = { top: 30, right: 20, bottom: 20, left: 40 } // Adjusted bottom margin for time axis alignment
       const innerWidth = width - margin.left - margin.right
       const innerHeight = height - margin.top - margin.bottom
 
@@ -333,9 +349,9 @@ export default {
         .domain([earliestDate, snapshotDate])
         .range([0, innerWidth])
 
-      // X Axis
-      const xAxis = d3.axisTop(xScale)
-      const xAxisGroup = svg.append('g').attr('class', 'x-axis').call(xAxis)
+      // X Axis (Bottom)
+      const xAxis = d3.axisBottom(xScale)
+      const xAxisGroup = svg.append('g').attr('class', 'x-axis').attr('transform', `translate(0, ${innerHeight})`).call(xAxis)
 
       // Define padding for event elements
       // If there are few users, we can make the dots row larger
@@ -771,6 +787,12 @@ export default {
         ])
         .on('zoom', (event) => {
           const newXScale = event.transform.rescaleX(xScale)
+          
+          const domain = newXScale.domain()
+          // Only emit to parent if the zoom was initiated by a user event to prevent infinite sync loops
+          if (event.sourceEvent) {
+            this.$emit('time-window-changed', [domain[0], domain[1]])
+          }
 
           // Update X Axis
           xAxisGroup.call(xAxis.scale(newXScale))
@@ -820,7 +842,49 @@ export default {
         })
 
       rootSvg.call(zoom)
+      
+      this._chartState = {
+        earliestDate,
+        snapshotDate,
+        xScale,
+        zoom,
+        rootSvg
+      }
     },
+    syncTimeWindow() {
+      if (!this.syncTargetTimeWindow || this.syncTargetTimeWindow.length !== 2) return
+      if (!this._chartState) return
+      
+      const { earliestDate, snapshotDate, xScale, zoom, rootSvg } = this._chartState
+      const [targetMinDate, targetMaxDate] = this.syncTargetTimeWindow
+      
+      const targetMinTs = targetMinDate.getTime()
+      const targetMaxTs = targetMaxDate.getTime()
+      const origMinTs = earliestDate.getTime()
+      const origMaxTs = snapshotDate.getTime()
+      
+      const origSpan = origMaxTs - origMinTs
+      const targetSpan = targetMaxTs - targetMinTs
+      
+      if (targetSpan <= 0 || origSpan <= 0) return
+
+      let k = origSpan / targetSpan
+      if (k > 50) k = 50
+      if (k < 1) k = 1
+
+      // When scaled by k, the range maps [origMinTs, origMaxTs] to [0, width * k]
+      // We want targetMinTs to map to x=0.
+      // In original scale, targetMinTs is at xScale(targetMinDate).
+      // Under zoom identity translated by tx and scaled by k:
+      // newX = k * origX + tx. We want newX = 0 when origX = xScale(targetMinDate).
+      // So tx = -k * xScale(targetMinDate)
+      const tx = -k * xScale(new Date(targetMinTs))
+
+      const transform = d3.zoomIdentity.translate(tx, 0).scale(k)
+      
+      rootSvg.transition().duration(750)
+        .call(zoom.transform, transform)
+    }
   },
 }
 </script>

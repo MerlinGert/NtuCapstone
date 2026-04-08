@@ -1,7 +1,19 @@
 <template>
   <div class="candlestick-container">
     <div class="header-panel">
-      <div class="panel-title">{{ currentCoin }} K-Line</div>
+      <div class="panel-title" style="display: flex; align-items: center; gap: 10px;">
+        {{ currentCoin }} K-Line
+        <button 
+          v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
+          class="sync-btn" 
+          @click="syncTimeWindow"
+          title="Sync time window to Behavior Details view"
+          style="font-size: 12px; font-weight: normal; padding: 2px 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; color: #4a5568;"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+          Sync Time
+        </button>
+      </div>
       <div class="granularity-panel">
         <button v-for="g in granularities" :key="g.key"
           :class="['gran-btn', currentGranularity===g.key ? 'gran-btn--active' : '']"
@@ -78,6 +90,10 @@ export default {
     currentCoin: {
       type: String,
       default: 'ACT',
+    },
+    syncTargetTimeWindow: {
+      type: Array,
+      default: () => null,
     },
   },
   data() {
@@ -365,7 +381,9 @@ export default {
       const W = el.clientWidth || 400
       this.panelWidth = this.$refs.wrap ? this.$refs.wrap.clientWidth : W
       const H = el.clientHeight || 200
-      const m = { top: 40, right: 80, bottom: 40, left: 8 }
+      
+      // Match m.left/m.right roughly with BehaviorDetails margin for visual alignment
+      const m = { top: 40, right: 20, bottom: 40, left: 40 }
       const iW = W - m.left - m.right
       const iH = H - m.top - m.bottom
 
@@ -377,9 +395,14 @@ export default {
         .zoom()
         .scaleExtent([1, Math.max(1, this.ohlc.length / 10)]) // Allow zooming until ~10 candles are visible
         .on('zoom', (event) => {
-          if (!event.sourceEvent) return // Prevent infinite loop when setting zoom programmatically
+          if (!event.sourceEvent && !event.isProgrammatic) return // Prevent infinite loop when setting zoom programmatically
           this.zoomTransform = event.transform
           this.draw()
+          
+          if (event.sourceEvent && this.chartState && this.chartState.visibleData.length > 0) {
+            const vd = this.chartState.visibleData
+            this.$emit('time-window-changed', [vd[0].date, vd[vd.length - 1].date])
+          }
           // syncCardScroll and drawBands are called via $nextTick inside draw()
         })
 
@@ -454,6 +477,8 @@ export default {
         baseIndexScale,
         visibleData,
         dataLength: data.length,
+        zoom,
+        svg
       }
 
       // Y scale for K-line (dynamically scaled to visible window for better UX)
@@ -516,15 +541,14 @@ export default {
         .attr('stroke-width', 1)
         .attr('stroke-dasharray', '4,2')
 
-      // Y axis (right)
+      // Y axis (left now, to match margin changes)
       g.append('g')
-        .attr('transform', `translate(${iW},0)`)
-        .call(d3.axisRight(yScale).ticks(5))
+        .call(d3.axisLeft(yScale).ticks(5))
         .call((ax) => ax.select('.domain').remove())
         .call((ax) =>
           ax
             .selectAll('.tick line')
-            .attr('x2', -iW)
+            .attr('x2', iW)
             .attr('stroke', '#e2e8f0')
             .attr('stroke-dasharray', '2,2'),
         )
@@ -976,6 +1000,41 @@ export default {
         drawCard(card, false, i)
       })
     },
+    syncTimeWindow() {
+      if (!this.syncTargetTimeWindow || !this.chartState || !this.ohlc.length) return
+      
+      const [start, end] = this.syncTargetTimeWindow
+      
+      let startIdx = this.ohlc.findIndex((d) => d.date >= start)
+      if (startIdx === -1) startIdx = 0
+      
+      // For endIdx, find the last element that is <= end
+      let endIdx = this.ohlc.length - 1
+      for (let i = this.ohlc.length - 1; i >= 0; i--) {
+        if (this.ohlc[i].date <= end) {
+          endIdx = i
+          break
+        }
+      }
+      
+      if (startIdx > endIdx) return
+
+      const { baseIndexScale, iW, zoom, svg } = this.chartState
+      const dataLength = this.ohlc.length
+      
+      let k = (dataLength - 1) / Math.max(1, endIdx - startIdx)
+      const maxK = Math.max(1, dataLength / 10)
+      if (k > maxK) k = maxK
+      
+      const tx = -k * baseIndexScale(startIdx)
+
+      const transform = d3.zoomIdentity.translate(tx, 0).scale(k)
+
+      // Skip D3 zoom handler to avoid infinite loops, update state and redraw directly
+      this.zoomTransform = transform
+      this.draw()
+    },
+
     drawBands() {
       if (!this.chartState || !this.ohlc.length || !this.$refs.bandsOverlay)
         return

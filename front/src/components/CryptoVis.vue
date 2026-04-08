@@ -52,7 +52,7 @@
         <n-card
             size="small"
             class="panel-card"
-            style="width:100%;height:100%;flex-shrink:0;"
+            style="width:100%;height:60%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
@@ -68,11 +68,11 @@
     </div>
 
 
-    <div style="flex: 9; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+    <div style="flex: 9; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
         <n-card
           size="small"
           class="panel-card"
-          style="width:100%;height:60%;flex-shrink:0;"
+          style="width:100%;height:60%;flex-shrink:0; margin-bottom: 5px;"
           header-style="text-align:left;height:50px;font-size:1.4em;"
           :content-style="{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
         >
@@ -84,6 +84,8 @@
                 :selected-user="selectedUser"
                 :entity-info="selectedEntityInfo"
                 :current-coin="currentCoin"
+                :sync-target-time-window="behaviorTimeWindow"
+                @time-window-changed="klineTimeWindow = $event"
                 style="width:100%;height:100%;"
               />
             </div>
@@ -111,6 +113,8 @@
                 :entity-info="selectedEntityInfo"
                 :snapshot-time="snapshot_configuration.time"
                 :manipulation-results="manipulation_detection_results"
+                :sync-target-time-window="klineTimeWindow"
+                @time-window-changed="behaviorTimeWindow = $event"
             />
         </n-card>
     </div>
@@ -295,6 +299,8 @@ export default {
       selectedUser: null,
       behaviorDetailData: null,
       selectedEntityInfo: null,
+      klineTimeWindow: null,
+      behaviorTimeWindow: null,
     }
   },
   watch: {
