@@ -44,6 +44,7 @@
                 @update-snapshot="handleUpdateSnapshot"
                 @request-manipulation-detection="handleRequestManipulationDetection"
                 @update-links="handleUpdateLinks"
+                @log-action="logUserAction"
             />
         </n-card>
     </div>
@@ -63,6 +64,7 @@
                 :manipulation-detection-results="manipulation_detection_results"
                 @detection-complete="handleDetectionComplete"
                 @user-selected="handleUserSelect"
+                @log-action="logUserAction"
             />
         </n-card>
     </div>
@@ -85,8 +87,9 @@
                 :entity-info="selectedEntityInfo"
                 :current-coin="currentCoin"
                 :sync-target-time-window="behaviorTimeWindow"
-                @time-window-changed="klineTimeWindow = $event"
+                @time-window-changed="handleKlineTimeWindowChanged"
                 @card-click="handleManipulationCardClick"
+                @log-action="logUserAction"
                 style="width:100%;height:100%;"
               />
             </div>
@@ -117,8 +120,9 @@
                 :snapshot-time="snapshot_configuration.time"
                 :manipulation-results="manipulation_detection_results"
                 :sync-target-time-window="klineTimeWindow"
-                @time-window-changed="behaviorTimeWindow = $event"
+                @time-window-changed="handleBehaviorTimeWindowChanged"
                 @user-selected="handleBehaviorDetailUserSelect"
+                @log-action="logUserAction"
             />
         </n-card>
     </div>
@@ -306,6 +310,7 @@ export default {
       klineTimeWindow: null,
       behaviorTimeWindow: null,
       selectedCardUsers: [],
+      userActionSequence: [], // Array to store user actions
     }
   },
   watch: {
@@ -319,6 +324,60 @@ export default {
     },
   },
   methods: {
+    logUserAction(actionType, actionInfo = {}, userId = null) {
+      const currentTimestamp = new Date().toISOString()
+      
+      // If it's a zoom action, try to merge with the previous action if it's also a zoom action of the same type
+      // and occurred recently (e.g., within 2 seconds)
+      if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart') {
+        const lastAction = this.userActionSequence[this.userActionSequence.length - 1]
+        
+        if (lastAction && lastAction.actionType === actionType) {
+          const lastTime = new Date(lastAction.timestamp).getTime()
+          const currentTime = new Date(currentTimestamp).getTime()
+          
+          if (currentTime - lastTime < 2000) {
+            // Merge by updating the last action's info and timestamp instead of pushing a new one
+            lastAction.timestamp = currentTimestamp
+            lastAction.actionInfo = actionInfo
+            // Update the view state as well
+            lastAction.relatedViewWithViewState.klineTimeWindow = this.klineTimeWindow
+            lastAction.relatedViewWithViewState.behaviorTimeWindow = this.behaviorTimeWindow
+            return
+          }
+        }
+      }
+      
+      // Determine the current view state
+      const currentViewState = {
+        coin: this.currentCoin,
+        snapshotTime: this.snapshot_configuration.time,
+        selectedUser: this.selectedUser,
+        selectedCardUsers: this.selectedCardUsers,
+        klineTimeWindow: this.klineTimeWindow,
+        behaviorTimeWindow: this.behaviorTimeWindow,
+        hasEntityResults: !!(this.entity_detection_results && this.entity_detection_results.length > 0),
+        hasManipulationResults: !!(this.manipulation_detection_results && this.manipulation_detection_results.length > 0)
+      }
+
+      // Record the effect of the action (we record the state BEFORE the action fully processes)
+      // If we want the state AFTER, we might need to defer this or capture it differently.
+      // For now, we capture what caused the action.
+      const actionRecord = {
+        timestamp: currentTimestamp,
+        userId: userId || this.selectedUser || 'system',
+        actionType: actionType,
+        actionInfo: actionInfo,
+        relatedViewWithViewState: currentViewState,
+        actionEffect: `Triggered ${actionType}`
+      }
+
+      this.userActionSequence.push(actionRecord)
+      console.log('User Action Logged:', actionRecord)
+      
+      // Optional: Send to backend
+      // fetch('/api/log_action', { method: 'POST', body: JSON.stringify(actionRecord) })
+    },
     resetViewState() {
       this.selectedUser = null
       this.selectedCardUsers = []
@@ -426,8 +485,17 @@ export default {
           )
         })
     },
+    handleKlineTimeWindowChanged(event) {
+      this.klineTimeWindow = event
+      this.logUserAction('zoom_kline_chart', { timeWindow: event }, this.selectedUser)
+    },
+    handleBehaviorTimeWindowChanged(event) {
+      this.behaviorTimeWindow = event
+      this.logUserAction('zoom_behavior_chart', { timeWindow: event }, this.selectedUser)
+    },
     async handleCoinChange() {
       console.log('CryptoVis: coin changed to', this.currentCoin)
+      this.logUserAction('change_coin', { coin: this.currentCoin })
       this.resetViewState()
       try {
         // 强制清空一下旧的时间列表，让它有重置的感觉
@@ -441,6 +509,7 @@ export default {
       this.selectedCardUsers = [] // clear card mode
       this.selectedUser = userId
       console.log('CryptoVis: selectedUser updated to', userId)
+      this.logUserAction('select_user_from_network', { targetUserId: userId }, userId)
     },
     handleBehaviorDetailUserSelect(userId) {
       this.selectedCardUsers = [] // clear card mode
@@ -459,11 +528,15 @@ export default {
       }
       
       console.log('CryptoVis: BehaviorDetails user selected, updated to', userId)
+      this.logUserAction('select_user_from_behavior_details', { targetUserId: userId }, userId)
     },
     handleManipulationCardClick(users) {
       this.selectedUser = null
       this.selectedEntityInfo = null // clear entity info when card is clicked
       this.selectedCardUsers = users || []
+      
+      this.logUserAction('click_manipulation_card', { cardUsers: users })
+      
       if (this.selectedCardUsers.length > 0) {
         const userSet = new Set(this.selectedCardUsers)
         
@@ -886,6 +959,7 @@ export default {
       if (newEntityConfig) {
         this.entity_detection_configuration = { ...newEntityConfig }
       }
+      this.logUserAction('run_entity_detection', { config: this.entity_detection_configuration })
       this.loading = true
       try {
         // Prepare detection request
@@ -996,6 +1070,7 @@ export default {
       if (newManipulationConfig) {
         this.manipulation_detection_configuration = { ...newManipulationConfig }
       }
+      this.logUserAction('run_manipulation_detection', { config: this.manipulation_detection_configuration })
       this.detectingManipulation = true // Assuming there's a loading state for manipulation or reuse 'loading'
 
       try {
@@ -1044,6 +1119,7 @@ export default {
       if (newSnapshotConfig) {
         this.snapshot_configuration = { ...newSnapshotConfig }
       }
+      this.logUserAction('update_snapshot', { config: this.snapshot_configuration })
       this.loading = true
       try {
         // 1. Fetch new snapshot data
@@ -1154,6 +1230,7 @@ export default {
       if (newLinkConfig) {
         this.link_detection_configuration = { ...newLinkConfig }
       }
+      this.logUserAction('update_link_detection', { config: this.link_detection_configuration })
       this.detectingLinks = true // Assuming 'detectingLinks' or 'loading' is used
 
       try {
