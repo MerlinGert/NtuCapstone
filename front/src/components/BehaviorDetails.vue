@@ -518,7 +518,7 @@ export default {
               .attr('rx', 4)
               .attr('ry', 4)
               .style('pointer-events', 'all')
-              .on('mouseover', function (event) {
+              .on('mouseover mouseenter pointerover', function (event) {
                 d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.15)')
                 const tooltip = self.$refs.tooltip
                 tooltip.innerHTML = tooltipHtml
@@ -527,25 +527,25 @@ export default {
 
                 // Position relative to chart container
                 const [mx, my] = d3.pointer(event, self.$refs.chartContainer)
-                tooltip.style.left = `${mx + 15}px`
-                tooltip.style.top = `${my + 15}px`
+                tooltip.style.left = `${(mx || 0) + 15}px`
+                tooltip.style.top = `${(my || 0) + 15}px`
               })
-              .on('mousemove', (event) => {
+              .on('mousemove pointermove', (event) => {
                 const tooltip = self.$refs.tooltip
                 const [mx, my] = d3.pointer(event, self.$refs.chartContainer)
 
                 // Adjust position to prevent tooltip from going off-screen
                 const containerWidth = self.$refs.chartContainer.clientWidth
                 const tooltipWidth = tooltip.offsetWidth
-                let left = mx + 15
+                let left = (mx || 0) + 15
                 if (left + tooltipWidth > containerWidth) {
-                  left = mx - tooltipWidth - 10
+                  left = (mx || 0) - tooltipWidth - 10
                 }
 
                 tooltip.style.left = `${left}px`
-                tooltip.style.top = `${my + 15}px`
+                tooltip.style.top = `${(my || 0) + 15}px`
               })
-              .on('mouseout', function () {
+              .on('mouseout mouseleave pointerout', function () {
                 d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.05)')
                 const tooltip = self.$refs.tooltip
                 tooltip.style.opacity = 0
@@ -602,17 +602,45 @@ export default {
           d === this.selectedUser ? 'bold' : 'normal',
         )
         .attr('font-size', '11px')
+        .style('cursor', 'pointer')
         .text((d) => `${d.substring(0, 3)}..`)
+        .on('click', (event, d) => {
+          this.$emit('user-selected', d)
+        })
+        .on('mouseover mouseenter pointerover', (event, d) => {
+          d3.select(event.currentTarget).attr('font-weight', 'bold')
+          
+          const tooltip = d3.select(this.$refs.tooltip)
+          tooltip.transition().duration(200).style('opacity', 0.9)
 
-      // Add tooltip for full addresses
-      svg
-        .selectAll('.user-label')
-        .append('title')
-        .text((d) => {
           let type = 'Related User'
           if (d === this.selectedUser) type = 'Selected User'
           else if (entityUsers.includes(d)) type = 'Entity Member'
-          return `${type}: ${d}`
+          
+          let htmlContent = `<strong>${type}:</strong><br/>${d}`
+
+          const [x, y] = d3.pointer(event, this.$refs.chartContainer)
+          tooltip
+            .html(htmlContent)
+            .style('display', 'block')
+            .style('left', `${(x || 0) + 10}px`)
+            .style('top', `${(y || 0) - 28}px`)
+        })
+        .on('mousemove pointermove', (event) => {
+          const tooltip = d3.select(this.$refs.tooltip)
+          const [x, y] = d3.pointer(event, this.$refs.chartContainer)
+          tooltip.style('left', `${(x || 0) + 10}px`).style('top', `${(y || 0) - 28}px`)
+        })
+        .on('mouseout mouseleave pointerout', (event, d) => {
+          d3.select(event.currentTarget).attr('font-weight', d === this.selectedUser ? 'bold' : 'normal')
+          
+          d3.select(this.$refs.tooltip)
+            .transition()
+            .duration(500)
+            .style('opacity', 0)
+            .on('end', function() {
+              d3.select(this).style('display', 'none')
+            })
         })
 
       // Draw behavior points and area charts

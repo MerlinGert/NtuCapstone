@@ -109,6 +109,7 @@
                 </div>
             </template>
             <BehaviorDetails
+                ref="behaviorDetails"
                 :selected-user="selectedUser"
                 :selected-users-list="selectedCardUsers"
                 :behavior-data="behaviorDetailData"
@@ -117,6 +118,7 @@
                 :manipulation-results="manipulation_detection_results"
                 :sync-target-time-window="klineTimeWindow"
                 @time-window-changed="behaviorTimeWindow = $event"
+                @user-selected="handleBehaviorDetailUserSelect"
             />
         </n-card>
     </div>
@@ -439,6 +441,24 @@ export default {
       this.selectedCardUsers = [] // clear card mode
       this.selectedUser = userId
       console.log('CryptoVis: selectedUser updated to', userId)
+    },
+    handleBehaviorDetailUserSelect(userId) {
+      this.selectedCardUsers = [] // clear card mode
+      this.selectedUser = userId
+      
+      // Call a method on the ref to disable 'Show Related Users' if it exists
+      // But we don't have a ref. We can pass it as a prop or rely on the component's reactivity
+      // Actually, when selectedUser changes, BehaviorDetails will redraw.
+      // If we want to force 'showRelatedUsers' to false, we can either:
+      // 1. Give BehaviorDetails a ref and call a method
+      // 2. Add a key to force re-render (bad for performance)
+      // Let's add a ref to BehaviorDetails and set the property directly
+      if (this.$refs.behaviorDetails) {
+        this.$refs.behaviorDetails.showRelatedUsers = false;
+        // The drawChart method will be called via watch on selectedUser
+      }
+      
+      console.log('CryptoVis: BehaviorDetails user selected, updated to', userId)
     },
     handleManipulationCardClick(users) {
       this.selectedUser = null

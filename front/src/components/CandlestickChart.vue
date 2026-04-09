@@ -803,6 +803,27 @@ export default {
             tooltip.style('display', 'none')
           }
         })
+        .on('click', (e) => {
+          const [mx] = d3.pointer(e, hoverRect.node())
+
+          let closestDist = Infinity
+          let closestData = null
+
+          visibleData.forEach((d) => {
+            const cx = xScale(d.date) + bw / 2
+            const dist = Math.abs(mx - cx)
+            if (dist < closestDist) {
+              closestDist = dist
+              closestData = d
+            }
+          })
+
+          const interactionDist = Math.max(bw * 1.5, 10)
+
+          if (closestData && closestDist < interactionDist) {
+            this.scrollToCardForDate(closestData.date)
+          }
+        })
         .on('mouseleave', () => {
           g.selectAll('.crosshair').remove()
           tooltip.style('display', 'none')
@@ -1123,6 +1144,49 @@ export default {
 
       drawPolygons('topCardsContainer', this.topCards, true)
       drawPolygons('bottomCardsContainer', this.bottomCards, false)
+    },
+    scrollToCardForDate(date) {
+      if (!date || !this.chartState || !this.chartState.xScale) return
+      
+      const targetTs = date.getTime()
+      
+      // Calculate K-line position relative to the container
+      const xPos = this.chartState.xScale(date)
+      if (xPos === undefined) return
+      
+      // Chart body wrapper has same width as candlestick-wrap (flex layout)
+      // The x coordinate of the K-line center relative to the container is:
+      // m.left + xPos + bandwidth / 2
+      const bw = this.chartState.xScale.bandwidth()
+      const targetX = this.chartState.m.left + xPos + bw / 2
+
+      const alignCard = (containerRef, cardsData) => {
+        const container = this.$refs[containerRef]
+        if (!container) return
+        
+        const targetIndex = cardsData.findIndex(c => c.ts === targetTs)
+        if (targetIndex !== -1) {
+          const cardEls = container.querySelectorAll('.manipulation-card')
+          if (cardEls[targetIndex]) {
+            const targetEl = cardEls[targetIndex]
+            
+            // targetEl.offsetLeft gives the left position relative to the scrolling container
+            // targetEl.offsetWidth is the card's width
+            // We want targetEl.offsetLeft + targetEl.offsetWidth / 2 - container.scrollLeft to be equal to targetX
+            // So: container.scrollLeft = targetEl.offsetLeft + targetEl.offsetWidth / 2 - targetX
+            
+            const scrollLeft = targetEl.offsetLeft + targetEl.offsetWidth / 2 - targetX
+            
+            container.scrollTo({
+              left: scrollLeft,
+              behavior: 'smooth'
+            })
+          }
+        }
+      }
+
+      alignCard('topCardsContainer', this.topCards)
+      alignCard('bottomCardsContainer', this.bottomCards)
     },
   },
 }

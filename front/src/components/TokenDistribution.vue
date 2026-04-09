@@ -689,7 +689,7 @@ export default {
         .style('opacity', (d) => (d.isRelated ? 0.3 : 0.6))
         .style('stroke', (d) => (d.suspicious ? '#ff0000' : '#5976ba'))
         .style('stroke-width', (d) => (d.suspicious ? 3 : 2))
-        .on('mouseover', (event, d) => {
+        .on('mouseover mouseenter pointerover', (event, d) => {
           const tooltip = d3.select(this.$refs.tooltip)
           tooltip.transition().duration(200).style('opacity', 0.9)
 
@@ -705,15 +705,15 @@ export default {
           const [x, y] = d3.pointer(event, this.$refs.chart_container)
           tooltip
             .html(htmlContent)
-            .style('left', `${x + 10}px`)
-            .style('top', `${y - 28}px`)
+            .style('left', `${(x || 0) + 10}px`)
+            .style('top', `${(y || 0) - 28}px`)
         })
-        .on('mousemove', (event) => {
+        .on('mousemove pointermove', (event) => {
           const tooltip = d3.select(this.$refs.tooltip)
           const [x, y] = d3.pointer(event, this.$refs.chart_container)
-          tooltip.style('left', `${x + 10}px`).style('top', `${y - 28}px`)
+          tooltip.style('left', `${(x || 0) + 10}px`).style('top', `${(y || 0) - 28}px`)
         })
-        .on('mouseout', () => {
+        .on('mouseout mouseleave pointerout', () => {
           d3.select(this.$refs.tooltip)
             .transition()
             .duration(500)
@@ -786,7 +786,7 @@ export default {
       const self = this
       groups
         .selectAll('.member')
-        .on('mouseover', function (event, d) {
+        .on('mouseover mouseenter pointerover', function (event, d) {
           d3.select(this).style('stroke', d.suspicious ? '#ff0000' : '#000')
           const tooltip = self.$refs.tooltip
           let content = `Address: ${d.name.substring(0, 6)}...<br>Balance: ${d.value.toLocaleString()}`
@@ -818,16 +818,16 @@ export default {
           tooltip.style.display = 'block'
           tooltip.style.opacity = 1
           const [x, y] = d3.pointer(event, self.$refs.chart_container)
-          tooltip.style.left = `${x + 10}px`
-          tooltip.style.top = `${y - 10}px`
+          tooltip.style.left = `${(x || 0) + 10}px`
+          tooltip.style.top = `${(y || 0) - 10}px`
         })
-        .on('mousemove', (event) => {
+        .on('mousemove pointermove', (event) => {
           const tooltip = self.$refs.tooltip
           const [x, y] = d3.pointer(event, self.$refs.chart_container)
-          tooltip.style.left = `${x + 10}px`
-          tooltip.style.top = `${y - 10}px`
+          tooltip.style.left = `${(x || 0) + 10}px`
+          tooltip.style.top = `${(y || 0) - 10}px`
         })
-        .on('mouseout', function (_event, d) {
+        .on('mouseout mouseleave pointerout', function (_event, d) {
           d3.select(this).style('stroke', d.suspicious ? '#ff0000' : '#5976ba')
           self.$refs.tooltip.style.opacity = 0
         })
