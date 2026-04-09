@@ -36,6 +36,16 @@
                 <span class="detail-value user-id" :title="action.userId">{{ truncateId(action.userId) }}</span>
               </div>
               
+              <div v-if="action.sourceView" class="action-detail">
+                <span class="detail-label">Source View:</span>
+                <span class="detail-value">{{ formatViewName(action.sourceView) }}</span>
+              </div>
+              
+              <div v-if="action.targetView && action.targetView !== action.sourceView" class="action-detail">
+                <span class="detail-label">Target View:</span>
+                <span class="detail-value">{{ formatViewName(action.targetView) }}</span>
+              </div>
+              
               <div v-if="action.actionInfo" class="action-detail info-detail">
                 <span class="detail-value">{{ formatActionInfo(action.actionType, action.actionInfo) }}</span>
               </div>
@@ -77,10 +87,14 @@ export default {
   watch: {
     actions: {
       handler(newVal, oldVal) {
-        // Only scroll if a new action was added, not if we just expanded/collapsed
-        if (newVal.length > (oldVal ? oldVal.length : 0)) {
+        // Because `actions` is often modified by pushing or by modifying the last element,
+        // we always trigger a scroll if there are items, but only delay slightly for rendering.
+        // We use requestAnimationFrame combined with nextTick to ensure the DOM has updated.
+        if (newVal && newVal.length > 0) {
           this.$nextTick(() => {
-            this.scrollToBottom()
+            requestAnimationFrame(() => {
+              this.scrollToBottom()
+            })
           })
         }
       },
@@ -125,6 +139,10 @@ export default {
     formatActionType(type) {
       if (!type) return 'Unknown'
       return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+    },
+    formatViewName(view) {
+      if (!view) return 'Unknown'
+      return view.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
     },
     getActionClass(type) {
       if (!type) return 'default'
@@ -180,6 +198,9 @@ export default {
         }
         if (type === 'toggle_show_manipulation_boxes') {
           return `${summaryInfo.enabled ? 'Enabled' : 'Disabled'} "Show Manipulation Boxes"`
+        }
+        if (type === 'sync_time_window') {
+          return `Synchronized time window from ${summaryInfo.source === 'kline_chart' ? 'K-line Chart' : 'Behavior Details'}`
         }
         
         // Fallback for unknown info

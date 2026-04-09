@@ -6,7 +6,10 @@
         <button 
           v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
           class="sync-btn" 
-          @click="syncTimeWindow"
+          @click="() => {
+            syncTimeWindow();
+            $emit('log-action', 'sync_time_window', { source: 'kline_chart' });
+          }"
           title="Sync time window to Behavior Details view"
           style="font-size: 12px; font-weight: normal; padding: 2px 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; color: #4a5568;"
         >

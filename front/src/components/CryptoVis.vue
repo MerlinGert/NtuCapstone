@@ -326,6 +326,8 @@ export default {
       selectedCardUsers: [],
       userActionSequence: [], // Array to store user actions
       hoverTimers: {}, // Store timers for delayed hover logging
+      isZooming: false, // Track if a zoom operation is actively happening
+      zoomEndTimer: null, // Timer to clear the zooming state
     }
   },
   watch: {
@@ -340,7 +342,50 @@ export default {
   },
   methods: {
     logUserAction(actionType, actionInfo = {}, userId = null) {
-      const currentTimestamp = new Date().toISOString()
+      // Mark as zooming when a zoom action starts to suppress hovers
+      if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart') {
+        this.isZooming = true;
+        if (this.zoomEndTimer) {
+          clearTimeout(this.zoomEndTimer);
+        }
+        // Assume zooming is finished if no new zoom event arrives for 500ms
+        this.zoomEndTimer = setTimeout(() => {
+          this.isZooming = false;
+        }, 500);
+      }
+
+      // For hover actions, implement a delay to avoid recording accidental fast fly-overs
+      // Also, if the user is currently zooming (or recently zoomed), ignore hovers to prevent zoom misclicks
+      if (actionType.startsWith('hover_')) {
+        if (this.isZooming) {
+          return; // Ignore hovers entirely during zoom operations
+        }
+
+        // Clear any existing timer for this specific hover type
+        if (this.hoverTimers[actionType]) {
+          clearTimeout(this.hoverTimers[actionType])
+        }
+        
+        // We capture the timestamp at the moment the hover started
+        const hoverStartTime = new Date().toISOString()
+        
+        // Set a new timer. Only log if the user hovers for more than 500ms
+        this.hoverTimers[actionType] = setTimeout(() => {
+          // Double check zooming state just in case it started while we were waiting
+          if (!this.isZooming) {
+            this._executeLogAction(actionType, actionInfo, userId, hoverStartTime)
+          }
+        }, 500)
+        
+        return; // Exit early, the actual logging happens in the timeout
+      }
+      
+      // For non-hover actions, execute immediately
+      this._executeLogAction(actionType, actionInfo, userId)
+    },
+    
+    _executeLogAction(actionType, actionInfo = {}, userId = null, customTimestamp = null) {
+      const currentTimestamp = customTimestamp || new Date().toISOString()
       
       // If it's a zoom action or hover action, try to merge with the previous action if it's also the same type
       // and occurred recently (e.g., within 2 seconds for zoom, 3 seconds for hover)
@@ -386,13 +431,38 @@ export default {
         hasManipulationResults: !!(this.manipulation_detection_results && this.manipulation_detection_results.length > 0)
       }
 
-      // Record the effect of the action (we record the state BEFORE the action fully processes)
-      // If we want the state AFTER, we might need to defer this or capture it differently.
-      // For now, we capture what caused the action.
+      // Record the effect of the action
+      // For cross-component interactions, check actionType or actionInfo for source and target
+      let sourceView = 'system';
+      let targetView = 'system';
+      
+      // Infer source and target views based on action types
+      if (actionType.includes('kline_chart') || actionType === 'click_manipulation_card' || actionType === 'hover_manipulation_card') {
+        sourceView = 'kline_chart';
+        targetView = actionType.includes('zoom') ? 'kline_chart' : (actionType.includes('click') ? 'behavior_details' : 'kline_chart');
+      } else if (actionType.includes('behavior_chart') || actionType.includes('behavior_user_label') || actionType.includes('behavior_manipulation_box') || actionType.includes('toggle_show')) {
+        sourceView = 'behavior_details';
+        targetView = 'behavior_details';
+      } else if (actionType.includes('token_distribution') || actionType === 'select_user_from_network') {
+        sourceView = 'token_distribution';
+        targetView = actionType.includes('select') ? 'behavior_details' : 'token_distribution';
+      } else if (actionType.includes('snapshot') || actionType.includes('detection')) {
+        sourceView = 'control_panel';
+        targetView = 'all_views';
+      } else if (actionType === 'change_coin') {
+        sourceView = 'header_panel';
+        targetView = 'all_views';
+      } else if (actionType === 'sync_time_window') {
+        sourceView = actionInfo.source;
+        targetView = actionInfo.source === 'kline_chart' ? 'behavior_details' : 'kline_chart';
+      }
+
       const actionRecord = {
         timestamp: currentTimestamp,
         userId: userId || this.selectedUser || 'system',
         actionType: actionType,
+        sourceView: sourceView,
+        targetView: targetView,
         actionInfo: actionInfo,
         relatedViewWithViewState: currentViewState,
         actionEffect: `Triggered ${actionType}`
