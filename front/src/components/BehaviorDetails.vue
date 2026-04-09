@@ -519,6 +519,11 @@ export default {
               .attr('ry', 4)
               .style('pointer-events', 'all')
               .on('mouseover mouseenter pointerover', function (event) {
+                self.$emit('log-action', 'hover_behavior_manipulation_box', { 
+                  method: result.detection_method, 
+                  time: `${startStr} - ${endStr}`,
+                  usersCount: involvedUsers.length
+                })
                 d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.15)')
                 const tooltip = self.$refs.tooltip
                 tooltip.innerHTML = tooltipHtml
@@ -608,6 +613,7 @@ export default {
           this.$emit('user-selected', d)
         })
         .on('mouseover mouseenter pointerover', (event, d) => {
+          this.$emit('log-action', 'hover_behavior_user_label', { hoveredUserId: d })
           d3.select(event.currentTarget).attr('font-weight', 'bold')
           
           const tooltip = d3.select(this.$refs.tooltip)

@@ -28,7 +28,10 @@
 
       <!-- Upper manipulation cards (Round Trip) -->
       <div class="manipulation-cards-container scroll-x top-cards scroll-top" @scroll="drawBands" ref="topCardsContainer">
-        <div class="manipulation-card top-card" v-for="(card, i) in topCards" :key="'top-'+i" :title="card.tooltip" @click="$emit('card-click', card.uniqueUsers)" style="cursor: pointer;">
+        <div class="manipulation-card top-card" v-for="(card, i) in topCards" :key="'top-'+i" :title="card.tooltip" 
+             @click="$emit('card-click', card.uniqueUsers)" 
+             @mouseenter="$emit('log-action', 'hover_manipulation_card', { type: 'round_trip', time: card.timeLabel, usersCount: card.uniqueUsers.length })"
+             style="cursor: pointer;">
           <div class="card-time">{{ card.timeLabel }}</div>
           <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
           <svg :ref="'svg-top-'+i" class="card-svg" width="100%" height="100%"></svg>
@@ -47,7 +50,10 @@
 
       <!-- Lower manipulation cards (Same Direction) -->
       <div class="manipulation-cards-container scroll-x bottom-cards" @scroll="drawBands" ref="bottomCardsContainer">
-        <div class="manipulation-card" v-for="(card, i) in bottomCards" :key="'bottom-'+i" :title="card.tooltip" @click="$emit('card-click', card.uniqueUsers)" style="cursor: pointer;">
+        <div class="manipulation-card" v-for="(card, i) in bottomCards" :key="'bottom-'+i" :title="card.tooltip" 
+             @click="$emit('card-click', card.uniqueUsers)" 
+             @mouseenter="$emit('log-action', 'hover_manipulation_card', { type: 'same_direction', time: card.timeLabel, usersCount: card.uniqueUsers.length })"
+             style="cursor: pointer;">
           <div class="card-time">{{ card.timeLabel }}</div>
           <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
           <svg :ref="'svg-bottom-'+i" class="card-svg" width="100%" height="100%"></svg>
@@ -723,6 +729,17 @@ export default {
 
           if (closestData && closestDist < interactionDist) {
             const d = closestData
+            
+            // Avoid logging hover for the exact same candle consecutively
+            if (!this.lastHoveredCandleDate || this.lastHoveredCandleDate !== d.date.getTime()) {
+              this.$emit('log-action', 'hover_kline', { 
+                time: d.date.toISOString(), 
+                open: d.open, close: d.close, 
+                high: d.high, low: d.low 
+              });
+              this.lastHoveredCandleDate = d.date.getTime();
+            }
+
             let screenCx = xScale(d.date) + bw / 2
 
             // Draw crosshair

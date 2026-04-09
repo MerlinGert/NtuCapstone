@@ -53,7 +53,7 @@
         <n-card
             size="small"
             class="panel-card"
-            style="width:100%;height:60%;flex-shrink:0;"
+            style="width:100%;height:60%;flex-shrink:0; margin-bottom: 5px;"
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
         >
@@ -65,6 +65,18 @@
                 @detection-complete="handleDetectionComplete"
                 @user-selected="handleUserSelect"
                 @log-action="logUserAction"
+            />
+        </n-card>
+        
+        <n-card
+            size="small"
+            class="panel-card"
+            style="width:100%;height:40%;flex-shrink:0;"
+            header-style="text-align:left;height:50px;font-size:1.4em;"
+            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
+        >
+            <UserActionTimeline
+                :actions="userActionSequence"
             />
         </n-card>
     </div>
@@ -154,6 +166,7 @@ import BehaviorDetails from './BehaviorDetails.vue'
 import CandlestickChart from './CandlestickChart.vue'
 import ControlPanel from './ControlPanel.vue'
 import TokenDistribution from './TokenDistribution.vue'
+import UserActionTimeline from './UserActionTimeline.vue'
 
 export default {
   components: {
@@ -170,6 +183,7 @@ export default {
     ControlPanel,
     CandlestickChart,
     BehaviorDetails,
+    UserActionTimeline,
   },
   data() {
     return {
@@ -327,16 +341,18 @@ export default {
     logUserAction(actionType, actionInfo = {}, userId = null) {
       const currentTimestamp = new Date().toISOString()
       
-      // If it's a zoom action, try to merge with the previous action if it's also a zoom action of the same type
-      // and occurred recently (e.g., within 2 seconds)
-      if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart') {
+      // If it's a zoom action or hover action, try to merge with the previous action if it's also the same type
+      // and occurred recently (e.g., within 2 seconds for zoom, 3 seconds for hover)
+      if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart' || actionType.startsWith('hover_')) {
         const lastAction = this.userActionSequence[this.userActionSequence.length - 1]
         
         if (lastAction && lastAction.actionType === actionType) {
           const lastTime = new Date(lastAction.timestamp).getTime()
           const currentTime = new Date(currentTimestamp).getTime()
           
-          if (currentTime - lastTime < 2000) {
+          const timeLimit = actionType.startsWith('hover_') ? 3000 : 2000;
+          
+          if (currentTime - lastTime < timeLimit) {
             // Merge by updating the last action's info and timestamp instead of pushing a new one
             lastAction.timestamp = currentTimestamp
             lastAction.actionInfo = actionInfo

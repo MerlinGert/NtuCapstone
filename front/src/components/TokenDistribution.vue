@@ -690,6 +690,8 @@ export default {
         .style('stroke', (d) => (d.suspicious ? '#ff0000' : '#5976ba'))
         .style('stroke-width', (d) => (d.suspicious ? 3 : 2))
         .on('mouseover mouseenter pointerover', (event, d) => {
+          this.$emit('log-action', 'hover_token_distribution_user', { targetUserId: d.id, balance: d.value, isRelated: d.isRelated })
+          
           const tooltip = d3.select(this.$refs.tooltip)
           tooltip.transition().duration(200).style('opacity', 0.9)
 
@@ -787,6 +789,8 @@ export default {
       groups
         .selectAll('.member')
         .on('mouseover mouseenter pointerover', function (event, d) {
+          self.$emit('log-action', 'hover_token_distribution_user', { targetUserId: d.id, balance: d.value, isRelated: d.isRelated, inGroup: true })
+          
           d3.select(this).style('stroke', d.suspicious ? '#ff0000' : '#000')
           const tooltip = self.$refs.tooltip
           let content = `Address: ${d.name.substring(0, 6)}...<br>Balance: ${d.value.toLocaleString()}`
