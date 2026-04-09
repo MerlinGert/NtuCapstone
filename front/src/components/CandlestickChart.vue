@@ -17,7 +17,10 @@
       <div class="granularity-panel">
         <button v-for="g in granularities" :key="g.key"
           :class="['gran-btn', currentGranularity===g.key ? 'gran-btn--active' : '']"
-          @click="currentGranularity=g.key"
+          @click="() => {
+            currentGranularity = g.key;
+            $emit('log-action', 'change_kline_granularity', { granularity: g.key, label: g.label });
+          }"
         >{{ g.label }}</button>
       </div>
     </div>
@@ -838,6 +841,11 @@ export default {
           const interactionDist = Math.max(bw * 1.5, 10)
 
           if (closestData && closestDist < interactionDist) {
+            this.$emit('log-action', 'click_kline_align_cards', { 
+              time: closestData.date.toISOString(), 
+              roundTripCount: closestData.roundTripCount,
+              sameDirectionCount: closestData.sameDirectionCount
+            });
             this.scrollToCardForDate(closestData.date)
           }
         })

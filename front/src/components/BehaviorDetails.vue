@@ -29,7 +29,10 @@
           
           <div v-if="!selectedUsersList || selectedUsersList.length === 0" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
             <label class="toggle-switch">
-              <input type="checkbox" v-model="showRelatedUsers" @change="drawChart">
+              <input type="checkbox" v-model="showRelatedUsers" @change="() => {
+                $emit('log-action', 'toggle_show_related_users', { enabled: showRelatedUsers });
+                drawChart();
+              }">
               <span class="slider"></span>
             </label>
             <span class="toggle-text">Show Related Users</span>
@@ -37,7 +40,10 @@
 
           <div v-if="manipulationResults && manipulationResults.length > 0" style="display: flex; align-items: center; gap: 8px;">
             <label class="toggle-switch">
-              <input type="checkbox" v-model="showManipulationBoxes" @change="drawChart">
+              <input type="checkbox" v-model="showManipulationBoxes" @change="() => {
+                $emit('log-action', 'toggle_show_manipulation_boxes', { enabled: showManipulationBoxes });
+                drawChart();
+              }">
               <span class="slider"></span>
             </label>
             <span class="toggle-text">Show Manipulation Boxes</span>

@@ -135,21 +135,29 @@ export default {
       return 'default'
     },
     formatActionInfo(type, info) {
-      if (!info || Object.keys(info).length === 0) return ''
+      if (!info) return ''
+      
+      // Handle the case where info was merged into an array of continuous actions
+      const isMergedArray = Array.isArray(info)
+      const count = isMergedArray ? info.length : 1
+      const countStr = count > 1 ? ` (${count} continuous events)` : ''
+      
+      // Get the most relevant single item to summarize
+      const summaryInfo = isMergedArray ? info[info.length - 1].data : info
       
       try {
         if (type === 'zoom_kline_chart' || type === 'zoom_behavior_chart') {
-          return 'Adjusted view time window'
+          return `Adjusted view time window${countStr}`
         }
         if (type === 'change_coin') {
-          return `Changed to ${info.coin}`
+          return `Changed to ${summaryInfo.coin}`
         }
         if (type === 'select_user_from_network' || type === 'select_user_from_behavior_details') {
-          return 'Selected for detailed view'
+          return `Selected for detailed view${countStr}`
         }
         if (type === 'click_manipulation_card') {
-          const count = info.cardUsers ? info.cardUsers.length : 0
-          return `Viewed manipulation group (${count} users)`
+          const userCount = summaryInfo.cardUsers ? summaryInfo.cardUsers.length : 0
+          return `Viewed manipulation group (${userCount} users)`
         }
         if (type === 'update_snapshot') {
           return 'Updated snapshot configuration'
@@ -157,12 +165,28 @@ export default {
         if (type.includes('detection')) {
           return 'Ran detection process'
         }
+        if (type.startsWith('hover_')) {
+          return `Hovered elements${countStr}`
+        }
+        
+        if (type === 'click_kline_align_cards') {
+          return `Clicked K-line to align manipulation cards`
+        }
+        if (type === 'change_kline_granularity') {
+          return `Changed K-line granularity to ${summaryInfo.label || summaryInfo.granularity}`
+        }
+        if (type === 'toggle_show_related_users') {
+          return `${summaryInfo.enabled ? 'Enabled' : 'Disabled'} "Show Related Users"`
+        }
+        if (type === 'toggle_show_manipulation_boxes') {
+          return `${summaryInfo.enabled ? 'Enabled' : 'Disabled'} "Show Manipulation Boxes"`
+        }
         
         // Fallback for unknown info
-        const str = JSON.stringify(info)
+        const str = JSON.stringify(summaryInfo)
         return str.length > 40 ? str.substring(0, 40) + '...' : str
       } catch (e) {
-        return 'Details available'
+        return `Details available${countStr}`
       }
     }
   }

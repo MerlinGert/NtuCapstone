@@ -325,6 +325,7 @@ export default {
       behaviorTimeWindow: null,
       selectedCardUsers: [],
       userActionSequence: [], // Array to store user actions
+      hoverTimers: {}, // Store timers for delayed hover logging
     }
   },
   watch: {
@@ -353,9 +354,18 @@ export default {
           const timeLimit = actionType.startsWith('hover_') ? 3000 : 2000;
           
           if (currentTime - lastTime < timeLimit) {
-            // Merge by updating the last action's info and timestamp instead of pushing a new one
+            // Merge by accumulating the action's info and updating timestamp instead of pushing a new one
             lastAction.timestamp = currentTimestamp
-            lastAction.actionInfo = actionInfo
+            
+            // Convert actionInfo to an array to store continuous intermediate steps if it isn't already
+            if (!Array.isArray(lastAction.actionInfo)) {
+              lastAction.actionInfo = [lastAction.actionInfo]
+            }
+            lastAction.actionInfo.push({
+              time: currentTimestamp,
+              data: actionInfo
+            })
+            
             // Update the view state as well
             lastAction.relatedViewWithViewState.klineTimeWindow = this.klineTimeWindow
             lastAction.relatedViewWithViewState.behaviorTimeWindow = this.behaviorTimeWindow
