@@ -146,7 +146,7 @@ export default {
     },
     getActionClass(type) {
       if (!type) return 'default'
-      if (type.includes('zoom')) return 'zoom'
+      if (type.includes('zoom') || type.includes('scroll')) return 'zoom'
       if (type.startsWith('hover_')) return 'hover'
       if (type.includes('select') || type.includes('click')) return 'interaction'
       if (type.includes('run') || type.includes('update')) return 'system'
@@ -166,6 +166,10 @@ export default {
       try {
         if (type === 'zoom_kline_chart' || type === 'zoom_behavior_chart') {
           return `Adjusted view time window${countStr}`
+        }
+        if (type === 'scroll_manipulation_cards') {
+          const cardsCount = summaryInfo.visibleCards ? summaryInfo.visibleCards.length : 0
+          return `Scrolled ${summaryInfo.type === 'round_trip' ? 'Top' : 'Bottom'} Manipulation Cards (Viewing ${cardsCount} cards)${countStr}`
         }
         if (type === 'change_coin') {
           return `Changed to ${summaryInfo.coin}`

@@ -560,6 +560,7 @@ export default {
                 tooltip.style.top = `${(my || 0) + 15}px`
               })
               .on('mouseout mouseleave pointerout', function () {
+                self.$emit('log-action', 'cancel_hover', { hoverType: 'hover_behavior_manipulation_box' })
                 d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.05)')
                 const tooltip = self.$refs.tooltip
                 tooltip.style.opacity = 0
@@ -647,6 +648,7 @@ export default {
           tooltip.style('left', `${(x || 0) + 10}px`).style('top', `${(y || 0) - 28}px`)
         })
         .on('mouseout mouseleave pointerout', (event, d) => {
+          this.$emit('log-action', 'cancel_hover', { hoverType: 'hover_behavior_user_label' })
           d3.select(event.currentTarget).attr('font-weight', d === this.selectedUser ? 'bold' : 'normal')
           
           d3.select(this.$refs.tooltip)

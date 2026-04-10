@@ -42,6 +42,7 @@ When merged, the `actionInfo` becomes an **Array** of objects: `[{ time: "ISOStr
 | :--- | :--- | :--- | :--- | :--- |
 | `zoom_kline_chart` | `K-line Chart` | `K-line Chart` | `{ timeWindow: [startTime, endTime] }` | User panned or zoomed the candlestick chart. |
 | `zoom_behavior_chart` | `Behavior Details` | `Behavior Details`| `{ timeWindow: [startTime, endTime] }` | User panned or zoomed the behavior sequence chart. |
+| `scroll_manipulation_cards` | `K-line Chart` | `K-line Chart` | `{ type: "round_trip" \| "same_direction", visibleCards: ["time_label1", "time_label2"] }` | User horizontally scrolled the manipulation card container, bringing new cards into view. |
 
 ## 5. Hover Exploration Actions (Merged)
 Like navigation actions, hovers are merged into an array if they occur sequentially. The system also employs a 500ms debounce delay to filter out accidental, rapid mouse fly-overs. If a user is actively zooming/panning (`isZooming = true`), hover logging is completely suppressed to prevent misclicks.

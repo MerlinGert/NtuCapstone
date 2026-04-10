@@ -715,7 +715,8 @@ export default {
           const [x, y] = d3.pointer(event, this.$refs.chart_container)
           tooltip.style('left', `${(x || 0) + 10}px`).style('top', `${(y || 0) - 28}px`)
         })
-        .on('mouseout mouseleave pointerout', () => {
+        .on('mouseout mouseleave pointerout', (event, d) => {
+          this.$emit('log-action', 'cancel_hover', { hoverType: 'hover_token_distribution_user' })
           d3.select(this.$refs.tooltip)
             .transition()
             .duration(500)
@@ -832,6 +833,7 @@ export default {
           tooltip.style.top = `${(y || 0) - 10}px`
         })
         .on('mouseout mouseleave pointerout', function (_event, d) {
+          self.$emit('log-action', 'cancel_hover', { hoverType: 'hover_token_distribution_user' })
           d3.select(this).style('stroke', d.suspicious ? '#ff0000' : '#5976ba')
           self.$refs.tooltip.style.opacity = 0
         })
