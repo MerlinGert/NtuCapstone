@@ -6,10 +6,17 @@
             <button class="close-btn" @click="$emit('close')">×</button>
         </div>
 
-        <!-- 可视化区域：固定高度 -->
+        <!-- ezio: 可视化区域 + 浮动工具栏 -->
         <div class="vis-area" ref="svgContainer">
             <svg ref="snapshotSvg"></svg>
-            <canvas ref="lassoCanvas" class="lasso-overlay"></canvas>
+            <canvas ref="lassoCanvas" class="lasso-overlay"
+                :class="'cursor-' + activeTool"></canvas>
+            <!-- ezio: toolbar component -->
+            <SnapshotToolbar class="floating-toolbar"
+                :tool="activeTool" :color="penColor"
+                @update:tool="activeTool = $event"
+                @update:color="penColor = $event"
+                @clear="clearSketches" />
         </div>
 
         <!-- 选中节点详情：可折叠 -->
@@ -19,8 +26,9 @@
                 <span class="details-count" v-if="selectedNodes.length > 0">({{ selectedNodes.length }})</span>
             </div>
             <div v-if="detailsOpen" class="details-body">
+                <!-- ezio: mode-aware help text -->
                 <div v-if="selectedNodes.length === 0" class="details-empty">
-                    Use lasso to select nodes in the visualization above.
+                    Use lasso or click to select nodes in the visualization above.
                 </div>
                 <table v-else class="details-table">
                     <thead>
@@ -60,9 +68,12 @@
 
 <script>
 import * as d3 from "d3"
+// ezio: toolbar component
+import SnapshotToolbar from "./SnapshotToolbar.vue"
 
 export default {
     name: "TokenSnapshot",
+    components: { SnapshotToolbar },
     props: {
         snapshotData: { type: Object, required: true }
     },
@@ -71,8 +82,18 @@ export default {
             selectedCount: 0,
             selectedNodes: [],
             detailsOpen: true,
-            inputText: ""
+            inputText: "",
+            // ezio: toolbar state
+            activeTool: 'select',    // 'select' | 'pen' | 'eraser'
+            penColor: 'rgba(255,60,60,0.7)',
+            sketchStrokes: []        // [{points, color, width}, ...]
         };
+    },
+    // ezio: redraw canvas when switching modes
+    watch: {
+        activeTool() {
+            this.redrawCanvas();
+        }
     },
     mounted() {
         this.$nextTick(() => {
@@ -83,9 +104,16 @@ export default {
     methods: {
         handleInput() {
             if (!this.inputText.trim()) return;
+            // ezio: include sketch data in emission
+            const canvas = this.$refs.lassoCanvas;
+            let sketchDataUrl = null;
+            if (canvas && this.sketchStrokes.length > 0) {
+                sketchDataUrl = canvas.toDataURL();
+            }
             this.$emit('snapshot-input', {
                 text: this.inputText,
-                selectedIds: this.selectedNodes.map(n => n.id)
+                selectedIds: this.selectedNodes.map(n => n.id),
+                sketchDataUrl
             });
             this.inputText = "";
         },
@@ -167,9 +195,10 @@ export default {
                 data.links.forEach(l => {
                     const sId = userToNodeId.get(l.source);
                     const tId = userToNodeId.get(l.target);
+                    const linkType = l.type || 'link';
                     if (sId && tId && sId !== tId) {
-                        const key = `${sId}-${tId}`;
-                        if (!aggLinks.has(key)) aggLinks.set(key, { source: sId, target: tId, weight: 0 });
+                        const key = `${sId}-${tId}-${linkType}`;
+                        if (!aggLinks.has(key)) aggLinks.set(key, { source: sId, target: tId, weight: 0, type: linkType });
                         aggLinks.get(key).weight += l.weight;
                     }
                 });
@@ -178,11 +207,14 @@ export default {
                     const tp = nodePositions.get(link.target);
                     if (sp && tp) {
                         linkGroup.append("line")
+                            .datum(link)
+                            .attr("class", "snapshot-link")
                             .attr("x1", sp.x).attr("y1", sp.y)
                             .attr("x2", tp.x).attr("y2", tp.y)
-                            .attr("stroke", "#999")
+                            .attr("stroke", link.type === 'entity' ? '#ff9800' : '#999')
+                            .style("stroke-dasharray", link.type === 'entity' ? '5,5' : 'none')
                             .attr("stroke-opacity", 0.6)
-                            .attr("stroke-width", 3);
+                            .attr("stroke-width", Math.max(1, Math.min(Math.sqrt(link.weight), 5)));
                     }
                 });
             }
@@ -254,6 +286,34 @@ export default {
             });
         },
 
+        // ezio: clear all sketch strokes
+        clearSketches() {
+            this.sketchStrokes = [];
+            this.redrawCanvas();
+        },
+
+        // ezio: redraw persistent sketch strokes on canvas
+        redrawCanvas() {
+            const canvas = this.$refs.lassoCanvas;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            this.sketchStrokes.forEach(stroke => {
+                if (stroke.points.length < 2) return;
+                ctx.beginPath();
+                ctx.moveTo(stroke.points[0][0], stroke.points[0][1]);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    ctx.lineTo(stroke.points[i][0], stroke.points[i][1]);
+                }
+                ctx.strokeStyle = stroke.color;
+                ctx.lineWidth = stroke.width;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.setLineDash([]);
+                ctx.stroke();
+            });
+        },
+
         setupLasso() {
             const canvas = this.$refs.lassoCanvas;
             const container = this.$refs.svgContainer;
@@ -286,6 +346,15 @@ export default {
                                 .style("stroke-width", d.suspicious ? 3 : 2);
                         }
                     });
+                    // Links: highlight if both endpoints are selected, dim otherwise
+                    svg.selectAll(".snapshot-link").each(function(d) {
+                        if (!d) return;
+                        if (selectedSet.has(d.source) && selectedSet.has(d.target)) {
+                            d3.select(this).attr("stroke-opacity", 1.0);
+                        } else {
+                            d3.select(this).attr("stroke-opacity", 0.15);
+                        }
+                    });
                 } else {
                     // 没有选中节点时恢复默认样式
                     svg.selectAll(".bubble")
@@ -297,6 +366,8 @@ export default {
                                     .style("stroke-width", d.suspicious ? 3 : 2);
                             }
                         });
+                    svg.selectAll(".snapshot-link")
+                        .attr("stroke-opacity", 0.6);
                 }
                 // 同步 Vue 状态
                 this.selectedNodes = this._selectableNodes.filter(n => selectedSet.has(n.id));
@@ -321,12 +392,28 @@ export default {
                 return (closest && minDist < 30) ? closest : null;
             };
 
+            // ezio: capture vm for use in event listeners
+            const vm = this;
+
+            // ezio: eraser hit-test helper — returns true if (x,y) is near any point in a stroke
+            const ERASER_RADIUS = 10;
+            const isNearStroke = (stroke, x, y) => {
+                return stroke.points.some(([px, py]) => Math.hypot(px - x, py - y) < ERASER_RADIUS);
+            };
+
             canvas.addEventListener("mousedown", (e) => {
                 isDrawing = true;
                 hasMoved = false;
                 const rect = canvas.getBoundingClientRect();
-                points = [[e.clientX - rect.left, e.clientY - rect.top]];
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                points = [[x, y]];
+
+                // ezio: eraser immediately erases on mousedown
+                if (vm.activeTool === 'eraser') {
+                    vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y));
+                }
+                vm.redrawCanvas();
             });
 
             canvas.addEventListener("mousemove", (e) => {
@@ -337,51 +424,90 @@ export default {
                 const y = e.clientY - rect.top;
                 points.push([x, y]);
 
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.beginPath();
-                ctx.moveTo(points[0][0], points[0][1]);
-                for (let i = 1; i < points.length; i++) {
-                    ctx.lineTo(points[i][0], points[i][1]);
+                // ezio: branch on active tool
+                if (vm.activeTool === 'pen') {
+                    vm.redrawCanvas();
+                    if (points.length >= 2) {
+                        ctx.beginPath();
+                        ctx.moveTo(points[0][0], points[0][1]);
+                        for (let i = 1; i < points.length; i++) {
+                            ctx.lineTo(points[i][0], points[i][1]);
+                        }
+                        ctx.strokeStyle = vm.penColor;
+                        ctx.lineWidth = 2;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        ctx.setLineDash([]);
+                        ctx.stroke();
+                    }
+                } else if (vm.activeTool === 'eraser') {
+                    // ezio: erase strokes touched by the eraser path
+                    vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y));
+                    vm.redrawCanvas();
+                } else {
+                    // select mode: draw lasso polygon
+                    vm.redrawCanvas();
+                    ctx.beginPath();
+                    ctx.moveTo(points[0][0], points[0][1]);
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(points[i][0], points[i][1]);
+                    }
+                    ctx.closePath();
+                    ctx.fillStyle = "rgba(255, 235, 59, 0.2)";
+                    ctx.fill();
+                    ctx.strokeStyle = "#fbc02d";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 4]);
+                    ctx.stroke();
                 }
-                ctx.closePath();
-                ctx.fillStyle = "rgba(255, 235, 59, 0.2)";
-                ctx.fill();
-                ctx.strokeStyle = "#fbc02d";
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 4]);
-                ctx.stroke();
             });
 
             canvas.addEventListener("mouseup", (e) => {
                 if (!isDrawing) return;
                 isDrawing = false;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                if (!hasMoved || points.length < 3) {
-                    // 点击模式：toggle 最近的节点
-                    const rect = canvas.getBoundingClientRect();
-                    const cx = e.clientX - rect.left;
-                    const cy = e.clientY - rect.top;
-                    const node = findClickedNode(cx, cy);
-                    if (node) {
-                        if (selectedSet.has(node.id)) {
-                            selectedSet.delete(node.id);
-                        } else {
-                            selectedSet.add(node.id);
+                // ezio: branch on active tool
+                if (vm.activeTool === 'pen') {
+                    if (hasMoved && points.length >= 2) {
+                        vm.sketchStrokes.push({
+                            points: points.slice(),
+                            color: vm.penColor,
+                            width: 2
+                        });
+                    }
+                    vm.redrawCanvas();
+                } else if (vm.activeTool === 'eraser') {
+                    vm.redrawCanvas();
+                } else {
+                    // select mode
+                    vm.redrawCanvas();
+
+                    if (!hasMoved || points.length < 3) {
+                        // 点击模式：toggle 最近的节点
+                        const rect = canvas.getBoundingClientRect();
+                        const cx = e.clientX - rect.left;
+                        const cy = e.clientY - rect.top;
+                        const node = findClickedNode(cx, cy);
+                        if (node) {
+                            if (selectedSet.has(node.id)) {
+                                selectedSet.delete(node.id);
+                            } else {
+                                selectedSet.add(node.id);
+                            }
+                            updateHighlight();
                         }
-                        updateHighlight();
+                        return;
                     }
-                    return;
-                }
 
-                // Lasso 模式：选中框内所有节点（替换当前选择）
-                selectedSet.clear();
-                this._selectableNodes.forEach(n => {
-                    if (d3.polygonContains(points, [n.screenX, n.screenY])) {
-                        selectedSet.add(n.id);
-                    }
-                });
-                updateHighlight();
+                    // ezio: Lasso 模式：选中框内所有节点（追加到当前选择）
+                    vm._selectableNodes.forEach(n => {
+                        if (d3.polygonContains(points, [n.screenX, n.screenY])) {
+                            selectedSet.add(n.id);
+                        }
+                    });
+                    updateHighlight();
+                }
+                points = [];
             });
         }
     }
@@ -438,6 +564,19 @@ export default {
     color: #000;
 }
 
+/* ezio: floating toolbar positioning */
+.floating-toolbar {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    z-index: 2;
+}
+
+/* ezio: cursor per tool */
+.lasso-overlay.cursor-select { cursor: crosshair; }
+.lasso-overlay.cursor-pen    { cursor: crosshair; }
+.lasso-overlay.cursor-eraser { cursor: pointer; }
+
 /* 可视化区域：固定高度 */
 .vis-area {
     height: 400px;
@@ -462,7 +601,6 @@ export default {
     left: 0;
     width: 100%;
     height: 100%;
-    cursor: crosshair;
     z-index: 1;
 }
 

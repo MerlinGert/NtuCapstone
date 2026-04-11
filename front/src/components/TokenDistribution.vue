@@ -251,11 +251,29 @@ export default {
 
             return {
                 nodes,
-                links: Array.isArray(this.currentLinks) ? this.currentLinks.map(l => ({
-                    source: l.source.id || l.source,
-                    target: l.target.id || l.target,
-                    weight: l.weight
-                })) : [],
+                links: (() => {
+                    const links = [];
+                    if (this.linkDetectionResults && typeof this.linkDetectionResults === 'object' && !Array.isArray(this.linkDetectionResults)) {
+                        const extractLinks = (relationsMap, type) => {
+                            if (!relationsMap) return;
+                            Object.entries(relationsMap).forEach(([key, relations]) => {
+                                const parts = key.split('-');
+                                if (parts.length >= 2) {
+                                    links.push({
+                                        source: parts[0],
+                                        target: parts[1],
+                                        weight: relations.length,
+                                        type: type
+                                    });
+                                }
+                            });
+                        };
+                        extractLinks(this.linkDetectionResults.target_relations_for_links, 'link');
+                        extractLinks(this.linkDetectionResults.target_related_relations_for_links, 'link');
+                        extractLinks(this.linkDetectionResults.target_related_relations_for_entity, 'entity');
+                    }
+                    return links;
+                })(),
                 width: this.svgWidth,
                 height: this.svgHeight,
                 centerX: this.centerX,
