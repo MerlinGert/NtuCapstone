@@ -8,6 +8,10 @@ This is a FastAPI backend for processing data and serving API requests.
     ```bash
     pip install -r requirements.txt
     ```
+    Or use uv:
+    ```bash
+    uv sync
+    ```
 
 ## Running the Server
 

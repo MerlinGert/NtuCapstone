@@ -1,13 +1,5 @@
 <template>
     <div style="padding: 15px; height: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto;">
-        <!-- Token Selection -->
-        <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 2px solid #ddd;">
-            <label style="font-weight: bold; font-size: 14px;">Token:</label>
-            <select :value="currentToken" @change="$emit('change-token', $event.target.value)" style="padding: 6px 12px; border: 2px solid #2196F3; border-radius: 4px; font-weight: bold; font-size: 14px; min-width: 120px; cursor: pointer;">
-                <option v-for="t in availableTokens" :key="t" :value="t">{{ t }}</option>
-            </select>
-        </div>
-
         <!-- Snapshot Configuration -->
         <div style="font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px;">Snapshot Configuration</div>
         <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
@@ -479,71 +471,64 @@
 
 <script>
 export default {
-    name: "ControlPanel",
-    props: {
-        currentToken: {
-            type: String,
-            default: 'ACT'
-        },
-        availableTokens: {
-            type: Array,
-            default: () => ['ACT', 'PNUT']
-        },
-        loading: {
-            type: Boolean,
-            default: false
-        },
-        loadingLinks: {
-            type: Boolean,
-            default: false
-        },
-        loadingManipulation: {
-            type: Boolean,
-            default: false
-        },
-        lastResultCount: {
-            type: Number,
-            default: null
-        },
-        snapshotTimes: {
-            type: Array,
-            default: () => []
-        },
-        snapshotConfig: {
-            type: Object,
-            required: true
-        },
-        entityConfig: {
-            type: Object,
-            required: true
-        },
-        linkConfig: {
-            type: Object,
-            required: true
-        },
-        manipulationConfig: {
-            type: Object,
-            required: true
-        }
+  name: 'ControlPanel',
+  props: {
+    loading: {
+      type: Boolean,
+      default: false,
     },
-    data() {
-        return {
-            // UI State
-            activeSection: 'entity_network', 
-            activeManipulationSection: 'round_trip',
-            activeLinkSection: 'link_network',
-        }
+    loadingLinks: {
+      type: Boolean,
+      default: false,
     },
-    methods: {
-        toggleSection(section) {
-            this.activeSection = this.activeSection === section ? '' : section;
-        },
-        toggleManipulationSection(section) {
-            this.activeManipulationSection = this.activeManipulationSection === section ? '' : section;
-        },
-        toggleLinkSection(section) {
-            this.activeLinkSection = this.activeLinkSection === section ? '' : section;
-        }
+    loadingManipulation: {
+      type: Boolean,
+      default: false,
+    },
+    lastResultCount: {
+      type: Number,
+      default: null,
+    },
+    snapshotTimes: {
+      type: Array,
+      default: () => [],
+    },
+    snapshotConfig: {
+      type: Object,
+      required: true,
+    },
+    entityConfig: {
+      type: Object,
+      required: true,
+    },
+    linkConfig: {
+      type: Object,
+      required: true,
+    },
+    manipulationConfig: {
+      type: Object,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      // UI State
+      activeSection: 'entity_network',
+      activeManipulationSection: 'round_trip',
+      activeLinkSection: 'link_network',
     }
+  },
+  methods: {
+    toggleSection(section) {
+      this.activeSection = this.activeSection === section ? '' : section
+    },
+    toggleManipulationSection(section) {
+      this.activeManipulationSection =
+        this.activeManipulationSection === section ? '' : section
+    },
+    toggleLinkSection(section) {
+      this.activeLinkSection = this.activeLinkSection === section ? '' : section
+    },
+  },
 }
 </script>

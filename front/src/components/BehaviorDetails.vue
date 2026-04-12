@@ -1,23 +1,56 @@
 <template>
   <div class="behavior-details-container" ref="container">
-    <div v-if="!selectedUser" class="empty-state">
-      Please select a user node to view behavior details.
+    <div v-if="!selectedUser && (!selectedUsersList || selectedUsersList.length === 0)" class="empty-state">
+      Please select a user node or a manipulation card to view behavior details.
     </div>
     <div v-else class="details-content">
       <div class="header">
         <div class="header-left">
-          <h3 class="user-id">User: {{ selectedUser }}</h3>
-          <div v-if="entityInfo" class="entity-info">
+          <h3 class="user-id" v-if="selectedUsersList && selectedUsersList.length > 0">
+            Card Users ({{ selectedUsersList.length }})
+          </h3>
+          <h3 class="user-id" v-else>User: {{ selectedUser }}</h3>
+          <div v-if="entityInfo && (!selectedUsersList || selectedUsersList.length === 0)" class="entity-info">
             <span class="entity-badge">Part of Entity</span>
             <span class="entity-members">Members: {{ entityInfo.users.length }}</span>
           </div>
         </div>
-        <div class="controls" v-if="manipulationResults && manipulationResults.length > 0">
-          <label class="toggle-switch">
-            <input type="checkbox" v-model="showManipulationBoxes" @change="drawChart">
-            <span class="slider"></span>
-          </label>
-          <span class="toggle-text">Show Manipulation Boxes</span>
+        <div class="controls">
+          <button 
+            v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
+            class="sync-btn" 
+            @click="() => {
+              syncTimeWindow();
+              $emit('log-action', 'sync_time_window', { source: 'behavior_details' });
+            }"
+            title="Sync time window to K-Line view"
+            style="font-size: 12px; font-weight: normal; padding: 2px 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; color: #4a5568;"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
+            Sync Time
+          </button>
+          
+          <div v-if="!selectedUsersList || selectedUsersList.length === 0" style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="showRelatedUsers" @change="() => {
+                $emit('log-action', 'toggle_show_related_users', { enabled: showRelatedUsers });
+                drawChart();
+              }">
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-text">Show Related Users</span>
+          </div>
+
+          <div v-if="manipulationResults && manipulationResults.length > 0" style="display: flex; align-items: center; gap: 8px;">
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="showManipulationBoxes" @change="() => {
+                $emit('log-action', 'toggle_show_manipulation_boxes', { enabled: showManipulationBoxes });
+                drawChart();
+              }">
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-text">Show Manipulation Boxes</span>
+          </div>
         </div>
       </div>
       
@@ -36,357 +69,452 @@
 </template>
 
 <script>
-import * as d3 from 'd3';
+import * as d3 from 'd3'
 
 export default {
   name: 'BehaviorDetails',
   props: {
     selectedUser: {
       type: String,
-      default: null
+      default: null,
+    },
+    selectedUsersList: {
+      type: Array,
+      default: () => [],
     },
     behaviorData: {
       type: Object,
-      default: () => null
+      default: () => null,
     },
     entityInfo: {
       type: Object,
-      default: () => null
+      default: () => null,
     },
     snapshotTime: {
       type: String,
-      default: null
+      default: null,
     },
     manipulationResults: {
       type: Array,
-      default: () => []
-    }
+      default: () => [],
+    },
+    syncTargetTimeWindow: {
+      type: Array,
+      default: () => null,
+    },
   },
   data() {
     return {
-      showManipulationBoxes: true
-    };
+      showManipulationBoxes: true,
+      showRelatedUsers: false,
+    }
   },
   watch: {
     behaviorData: {
       handler(newVal) {
         if (newVal && Object.keys(newVal).length > 0) {
           this.$nextTick(() => {
-            this.drawChart();
-          });
+            this.drawChart()
+          })
         }
       },
-      deep: true
+      deep: true,
     },
     entityInfo: {
       handler() {
         this.$nextTick(() => {
-          this.drawChart();
-        });
+          this.drawChart()
+        })
       },
-      deep: true
+      deep: true,
     },
     manipulationResults: {
       handler() {
         this.$nextTick(() => {
-          this.drawChart();
-        });
+          this.drawChart()
+        })
       },
-      deep: true
-    }
+      deep: true,
+    },
   },
   mounted() {
-    window.addEventListener('resize', this.handleResize);
+    window.addEventListener('resize', this.handleResize)
     if (this.behaviorData && Object.keys(this.behaviorData).length > 0) {
-      this.drawChart();
+      this.drawChart()
     }
   },
   beforeUnmount() {
-    window.removeEventListener('resize', this.handleResize);
+    window.removeEventListener('resize', this.handleResize)
   },
   methods: {
     handleResize() {
       if (this.behaviorData && Object.keys(this.behaviorData).length > 0) {
-        this.drawChart();
+        this.drawChart()
       }
     },
     drawChart() {
-      const container = this.$refs.chartContainer;
-      if (!container) return;
+      const container = this.$refs.chartContainer
+      if (!container) return
 
       // Clear previous chart (only remove svg, keep the tooltip div)
-      d3.select(container).selectAll('svg').remove();
+      d3.select(container).selectAll('svg').remove()
+
+      let usersToDraw = Object.keys(this.behaviorData || {})
+
+      if (this.selectedUsersList && this.selectedUsersList.length > 0) {
+        // Card mode: use users from card (which should be exactly what's in behaviorData)
+        usersToDraw = [...this.selectedUsersList].filter(u => this.behaviorData[u])
+      } else if (!this.showRelatedUsers && this.selectedUser) {
+        // User mode, single user only
+        usersToDraw = [this.selectedUser].filter(u => this.behaviorData[u])
+      }
 
       // Sort users: selectedUser in the middle, entity users adjacent, then other users
-      const users = Object.keys(this.behaviorData);
-      
-      const entityUsers = this.entityInfo ? this.entityInfo.users.filter(u => u !== this.selectedUser && users.includes(u)) : [];
-      const otherUsers = users.filter(u => u !== this.selectedUser && !entityUsers.includes(u));
-      
+      const entityUsers = this.entityInfo
+        ? this.entityInfo.users.filter(
+            (u) => u !== this.selectedUser && usersToDraw.includes(u),
+          )
+        : []
+      const otherUsers = usersToDraw.filter(
+        (u) => u !== this.selectedUser && !entityUsers.includes(u),
+      )
+
       // Balance users to keep selectedUser in the center
-      let topHalf = [];
-      let bottomHalf = [];
-      
+      let topHalf = []
+      let bottomHalf = []
+
       // Distribute entity users closely around the selected user
-      entityUsers.forEach(u => {
+      entityUsers.forEach((u) => {
         if (topHalf.length <= bottomHalf.length) {
-          topHalf.push(u); // Add to end of topHalf (will be closest to center after reversal)
+          topHalf.push(u) // Add to end of topHalf (will be closest to center after reversal)
         } else {
-          bottomHalf.push(u); // Add to start of bottomHalf (closest to center)
+          bottomHalf.push(u) // Add to start of bottomHalf (closest to center)
         }
-      });
-      
+      })
+
       // Distribute other users further outwards
-      otherUsers.forEach(u => {
+      otherUsers.forEach((u) => {
         if (topHalf.length <= bottomHalf.length) {
-          topHalf.push(u);
+          topHalf.push(u)
         } else {
-          bottomHalf.push(u);
+          bottomHalf.push(u)
         }
-      });
-      
+      })
+
       // Reverse topHalf so the first elements added (entity users) are closest to the middle
-      topHalf.reverse();
-      
-      const sortedUsers = [...topHalf, this.selectedUser, ...bottomHalf];
+      topHalf.reverse()
+
+      let sortedUsers = []
+      if (this.selectedUsersList && this.selectedUsersList.length > 0) {
+        // In card mode, there is no single "selectedUser" in the middle, just list them all
+        sortedUsers = usersToDraw
+      } else {
+        sortedUsers = this.selectedUser && usersToDraw.includes(this.selectedUser) 
+          ? [...topHalf, this.selectedUser, ...bottomHalf]
+          : [...topHalf, ...bottomHalf]
+      }
 
       // Filter behavior data based on snapshot time
-      const snapshotDate = this.snapshotTime ? new Date(this.snapshotTime) : new Date();
-      let earliestDate = snapshotDate;
-      let hasData = false;
+      const parseDateSafe = (dateStr) => {
+        if (!dateStr) return new Date(NaN)
+        let d = new Date(dateStr)
+        if (Number.isNaN(d.getTime()) && typeof dateStr === 'string') {
+          // Try removing ' UTC' and replacing space with 'T' for Safari/iOS
+          let cleaned = dateStr.replace(' UTC', 'Z').replace(' ', 'T')
+          d = new Date(cleaned)
+        }
+        return d
+      }
 
-      const filteredData = {};
-      const sequenceData = {}; // Store continuous balance and earning_usd sequences
+      const snapshotDate = this.snapshotTime
+        ? parseDateSafe(this.snapshotTime)
+        : new Date()
+      let earliestDate = snapshotDate
+      let hasData = false
 
-      sortedUsers.forEach(user => {
-        const events = this.behaviorData[user] || [];
-        const validEvents = events.filter(event => {
-          if (!event.timestamp) return false;
-          const eventDate = new Date(event.timestamp);
-          return eventDate <= snapshotDate;
-        });
-        
-        filteredData[user] = validEvents;
-        
-        let currentBalance = 0;
-        let avgBuyPrice = 0;
-        const seq = [];
-        const earningEvents = []; // Store discrete earning events for selling
-        
-        validEvents.forEach(event => {
-          const eventDate = new Date(event.timestamp);
+      const filteredData = {}
+      const sequenceData = {} // Store continuous balance and earning_usd sequences
+      const MAX_EVENTS_PER_USER = 1500 // Limit rendering to prevent browser freeze
+
+      sortedUsers.forEach((user) => {
+        const events = this.behaviorData[user] || []
+        let validEvents = events.filter((event) => {
+          if (!event.timestamp) return false
+          const eventDate = parseDateSafe(event.timestamp)
+          if (Number.isNaN(eventDate.getTime())) return false
+          return eventDate <= snapshotDate
+        })
+
+        let currentBalance = 0
+        let avgBuyPrice = 0
+        const seq = []
+        const earningEvents = [] // Store discrete earning events for selling
+
+        // We must calculate the balance sequence using ALL valid events first to ensure accuracy
+        validEvents.forEach((event) => {
+          const eventDate = parseDateSafe(event.timestamp)
           if (eventDate < earliestDate) {
-            earliestDate = eventDate;
+            earliestDate = eventDate
           }
-          hasData = true;
-          
-          let earningChange = 0;
-          event._prevBalance = currentBalance;
+          hasData = true
+
+          let earningChange = 0
+          event._prevBalance = currentBalance
 
           // Update balance based on event type
           if (event.type === 'transfer_in') {
-            currentBalance += parseFloat(event.amount) || 0;
+            currentBalance += parseFloat(event.amount) || 0
           } else if (event.type === 'transfer_out') {
-            currentBalance -= parseFloat(event.amount) || 0;
+            currentBalance -= parseFloat(event.amount) || 0
           }
-          
-          event._currentBalance = currentBalance;
-          
+
+          event._currentBalance = currentBalance
+          event._eventDate = eventDate // Cache the parsed date
+
           if (event.isTrade && event.trade_info) {
-            const isBuy = event.trade_info.action === 'buy';
-            const amt = parseFloat(event.amount) || 0;
-            const price = parseFloat(event.trade_info.price_usd) || 0;
-            
+            const isBuy = event.trade_info.action === 'buy'
+            const amt = parseFloat(event.amount) || 0
+            const price = parseFloat(event.trade_info.price_usd) || 0
+
             if (isBuy) {
               // Update Weighted Average Buy Price (WABP)
               if (currentBalance < 0) {
-                avgBuyPrice = price;
+                avgBuyPrice = price
               } else {
-                const totalCost = (currentBalance * avgBuyPrice) + (amt * price);
+                const totalCost = currentBalance * avgBuyPrice + amt * price
                 if (currentBalance + amt > 0) {
-                  avgBuyPrice = totalCost / (currentBalance + amt);
+                  avgBuyPrice = totalCost / (currentBalance + amt)
                 }
               }
             } else {
               // Calculate Earning on Sell: (Sell Price - WABP) * Sell Amount
-              earningChange = (price - avgBuyPrice) * amt;
+              earningChange = (price - avgBuyPrice) * amt
               if (earningChange !== 0) {
                 earningEvents.push({
                   date: eventDate,
-                  earning: earningChange
-                });
+                  earning: earningChange,
+                })
               }
             }
           }
-          
+
           seq.push({
             date: eventDate,
             balance: currentBalance,
-          });
-        });
-        
+          })
+        })
+
         // Add a final point at snapshotDate to extend the area chart to the right edge
         if (seq.length > 0) {
-            seq.push({
-                date: snapshotDate,
-                balance: currentBalance,
-            });
+          seq.push({
+            date: snapshotDate,
+            balance: currentBalance,
+          })
         }
-        
-        sequenceData[user] = { seq, earningEvents };
-      });
+
+        // Now apply downsampling for SVG rendering (circles, lines) if too many events
+        if (validEvents.length > MAX_EVENTS_PER_USER) {
+          console.warn(
+            `Downsampling events for user ${user} from ${validEvents.length} to ${MAX_EVENTS_PER_USER}`,
+          )
+          const step = Math.max(
+            1,
+            Math.floor(validEvents.length / MAX_EVENTS_PER_USER),
+          )
+          validEvents = validEvents.filter((_, index) => index % step === 0)
+        }
+
+        filteredData[user] = validEvents
+
+        // We can also downsample the area chart points slightly if they are massive
+        let finalSeq = seq
+        if (seq.length > MAX_EVENTS_PER_USER * 2) {
+          const seqStep = Math.max(
+            1,
+            Math.floor(seq.length / (MAX_EVENTS_PER_USER * 2)),
+          )
+          finalSeq = seq.filter(
+            (_, index) => index % seqStep === 0 || index === seq.length - 1,
+          )
+        }
+
+        sequenceData[user] = { seq: finalSeq, earningEvents }
+      })
 
       // Set up dimensions
-      const width = container.clientWidth || 800;
-      const height = container.clientHeight || 400;
-      const margin = { top: 30, right: 20, bottom: 10, left: 40 }; // Adjusted top margin for top axis
-      const innerWidth = width - margin.left - margin.right;
-      const innerHeight = height - margin.top - margin.bottom;
+      const width = container.clientWidth || 800
+      const height = container.clientHeight || 400
+      const margin = { top: 30, right: 20, bottom: 20, left: 40 } // Adjusted bottom margin for time axis alignment
+      const innerWidth = width - margin.left - margin.right
+      const innerHeight = height - margin.top - margin.bottom
 
       // Create SVG
-      const rootSvg = d3.select(container)
+      const rootSvg = d3
+        .select(container)
         .append('svg')
         .attr('width', width)
-        .attr('height', height);
+        .attr('height', height)
 
       // Define clip path
-      const defs = rootSvg.append('defs');
-      defs.append('clipPath')
+      const defs = rootSvg.append('defs')
+      defs
+        .append('clipPath')
         .attr('id', 'chart-clip')
         .append('rect')
         .attr('width', innerWidth)
-        .attr('height', innerHeight);
-
-      // We append a background rect to capture zoom events
-      const zoomRect = rootSvg.append('rect')
-        .attr('width', innerWidth)
         .attr('height', innerHeight)
-        .attr('transform', `translate(${margin.left},${margin.top})`)
-        .style('fill', 'none')
-        .style('pointer-events', 'all');
 
-      const svg = rootSvg.append('g')
-        .attr('transform', `translate(${margin.left},${margin.top})`);
-        
-      const chartBody = svg.append('g')
-        .attr('clip-path', 'url(#chart-clip)');
+      // We append a background rect to capture zoom events across the whole SVG
+      rootSvg
+        .append('rect')
+        .attr('width', width)
+        .attr('height', height)
+        .style('fill', 'none')
+        .style('pointer-events', 'all')
+
+      const svg = rootSvg
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`)
+
+      const chartBody = svg.append('g').attr('clip-path', 'url(#chart-clip)')
 
       // Y Scale for users (evenly distributed)
-      const yScale = d3.scalePoint()
+      const yScale = d3
+        .scalePoint()
         .domain(sortedUsers)
         .range([0, innerHeight])
-        .padding(0.5);
+        .padding(0.5)
 
       // X Scale for time
-      const xScale = d3.scaleTime()
+      const xScale = d3
+        .scaleTime()
         .domain([earliestDate, snapshotDate])
-        .range([0, innerWidth]);
+        .range([0, innerWidth])
 
-      // X Axis
-      const xAxis = d3.axisTop(xScale);
-      const xAxisGroup = svg.append('g')
-        .attr('class', 'x-axis')
-        .call(xAxis);
+      // X Axis (Bottom)
+      const xAxis = d3.axisBottom(xScale)
+      const xAxisGroup = svg.append('g').attr('class', 'x-axis').attr('transform', `translate(0, ${innerHeight})`).call(xAxis)
 
       // Define padding for event elements
       // If there are few users, we can make the dots row larger
-      const isFewUsers = sortedUsers.length <= 5;
-      const eventBoxPadding = isFewUsers ? 10 : 6;
+      const isFewUsers = sortedUsers.length <= 5
+      const eventBoxPadding = isFewUsers ? 10 : 6
 
       // Create a group for background elements (baselines, area charts, earning bars)
-      const backgroundGroup = chartBody.append('g').attr('class', 'background-group');
+      const backgroundGroup = chartBody
+        .append('g')
+        .attr('class', 'background-group')
 
       // Draw horizontal baselines for each user
       // Balance baseline (bottom boundary of balance)
-      backgroundGroup.selectAll('.balance-baseline')
+      backgroundGroup
+        .selectAll('.balance-baseline')
         .data(sortedUsers)
         .enter()
         .append('line')
         .attr('class', 'balance-baseline')
         .attr('x1', 0)
         .attr('x2', innerWidth)
-        .attr('y1', d => yScale(d) - eventBoxPadding)
-        .attr('y2', d => yScale(d) - eventBoxPadding)
+        .attr('y1', (d) => yScale(d) - eventBoxPadding)
+        .attr('y2', (d) => yScale(d) - eventBoxPadding)
         .attr('stroke', '#e2e8f0')
-        .attr('stroke-width', 1);
+        .attr('stroke-width', 1)
 
       // Earning baseline (top boundary of earning)
-      backgroundGroup.selectAll('.earning-baseline')
+      backgroundGroup
+        .selectAll('.earning-baseline')
         .data(sortedUsers)
         .enter()
         .append('line')
         .attr('class', 'earning-baseline')
         .attr('x1', 0)
         .attr('x2', innerWidth)
-        .attr('y1', d => yScale(d) + eventBoxPadding)
-        .attr('y2', d => yScale(d) + eventBoxPadding)
+        .attr('y1', (d) => yScale(d) + eventBoxPadding)
+        .attr('y2', (d) => yScale(d) + eventBoxPadding)
         .attr('stroke', '#e2e8f0')
-        .attr('stroke-width', 1);
+        .attr('stroke-width', 1)
 
       // Create a group for foreground elements (manipulation boxes, points, transfer lines)
-      const foregroundGroup = chartBody.append('g').attr('class', 'foreground-group');
+      const foregroundGroup = chartBody
+        .append('g')
+        .attr('class', 'foreground-group')
 
       // Draw Manipulation Bounding Boxes
-      if (this.showManipulationBoxes && this.manipulationResults && this.manipulationResults.length > 0) {
-        this.manipulationResults.forEach(result => {
-          if (!result.participants || !result.manipulation_time || result.manipulation_time.length === 0) return;
-          
-          const involvedUsers = sortedUsers.filter(u => result.participants.includes(u));
-          if (involvedUsers.length === 0) return;
-          
+      if (
+        this.showManipulationBoxes &&
+        this.manipulationResults &&
+        this.manipulationResults.length > 0
+      ) {
+        this.manipulationResults.forEach((result) => {
+          if (
+            !result.participants ||
+            !result.manipulation_time ||
+            result.manipulation_time.length === 0
+          )
+            return
+
+          const involvedUsers = sortedUsers.filter((u) =>
+            result.participants.includes(u),
+          )
+          if (involvedUsers.length === 0) return
+
           // Find time window
-          let startStr = result.manipulation_time[0];
-          let endStr = result.manipulation_time.length > 1 ? result.manipulation_time[1] : startStr;
-          
+          let startStr = result.manipulation_time[0]
+          let endStr =
+            result.manipulation_time.length > 1
+              ? result.manipulation_time[1]
+              : startStr
+
           // Ensure time strings have UTC to match other timestamps
-          if (!startStr.endsWith('UTC')) startStr += ' UTC';
-          if (!endStr.endsWith('UTC')) endStr += ' UTC';
-          
-          let startTs = new Date(startStr);
-          let endTs = new Date(endStr);
-          
-          if (isNaN(startTs) || isNaN(endTs)) return;
-          
-          let x1 = xScale(startTs);
-          let x2 = xScale(endTs);
-          
+          if (!startStr.endsWith('UTC')) startStr += ' UTC'
+          if (!endStr.endsWith('UTC')) endStr += ' UTC'
+
+          let startTs = new Date(startStr)
+          let endTs = new Date(endStr)
+
+          if (Number.isNaN(startTs) || Number.isNaN(endTs)) return
+
+          let x1 = xScale(startTs)
+          let x2 = xScale(endTs)
+
           // Ensure min width if it's a single point or very short
           if (x2 - x1 < 10) {
-             const center = (x1 + x2) / 2;
-             x1 = center - 5;
-             x2 = center + 5;
+            const center = (x1 + x2) / 2
+            x1 = center - 5
+            x2 = center + 5
           }
-          
+
           // Format tooltip details
-          let tooltipHtml = `<strong>Method:</strong> ${result.detection_method}<br>`;
+          let tooltipHtml = `<strong>Method:</strong> ${result.detection_method}<br>`
           if (result.participants && result.participants.length > 1) {
-            tooltipHtml += `<strong>Type:</strong> Entity-based (across ${result.participants.length} users)<br>`;
+            tooltipHtml += `<strong>Type:</strong> Entity-based (across ${result.participants.length} users)<br>`
           }
-          tooltipHtml += `<strong>Time:</strong> ${startStr} - ${endStr}<br>`;
-          
+          tooltipHtml += `<strong>Time:</strong> ${startStr} - ${endStr}<br>`
+
           if (result.features) {
-            tooltipHtml += `<ul style="margin: 4px 0; padding-left: 16px;">`;
+            tooltipHtml += `<ul style="margin: 4px 0; padding-left: 16px;">`
             Object.entries(result.features).forEach(([key, value]) => {
               if (typeof value === 'number') {
-                tooltipHtml += `<li><strong>${key}:</strong> ${value.toFixed(2)}</li>`;
+                tooltipHtml += `<li><strong>${key}:</strong> ${value.toFixed(2)}</li>`
               } else {
-                tooltipHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+                tooltipHtml += `<li><strong>${key}:</strong> ${value}</li>`
               }
-            });
-            tooltipHtml += `</ul>`;
+            })
+            tooltipHtml += `</ul>`
           }
           if (result.transactions) {
-            tooltipHtml += `<strong>Transactions count:</strong> ${result.transactions.length}`;
+            tooltipHtml += `<strong>Transactions count:</strong> ${result.transactions.length}`
           }
 
-          const self = this;
+          const self = this
 
           // Draw separate boxes for each involved user
-          involvedUsers.forEach(user => {
-            const height = eventBoxPadding * 2;
-            const y = yScale(user) - eventBoxPadding;
+          involvedUsers.forEach((user) => {
+            const height = eventBoxPadding * 2
+            const y = yScale(user) - eventBoxPadding
 
-            foregroundGroup.append('rect')
+            foregroundGroup
+              .append('rect')
               .datum({ startTs, endTs })
               .attr('class', 'manipulation-box')
               .attr('x', x1)
@@ -399,134 +527,180 @@ export default {
               .attr('rx', 4)
               .attr('ry', 4)
               .style('pointer-events', 'all')
-              .on('mouseover', function(event) {
-                  d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.15)');
-                  const tooltip = self.$refs.tooltip;
-                  tooltip.innerHTML = tooltipHtml;
-                  tooltip.style.display = "block";
-                  tooltip.style.opacity = 1;
-                  
-                  // Position relative to chart container
-                  const [mx, my] = d3.pointer(event, self.$refs.chartContainer);
-                  tooltip.style.left = (mx + 15) + "px";
-                  tooltip.style.top = (my + 15) + "px";
+              .on('mouseover mouseenter pointerover', function (event) {
+                self.$emit('log-action', 'hover_behavior_manipulation_box', { 
+                  method: result.detection_method, 
+                  time: `${startStr} - ${endStr}`,
+                  usersCount: involvedUsers.length
+                })
+                d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.15)')
+                const tooltip = self.$refs.tooltip
+                tooltip.innerHTML = tooltipHtml
+                tooltip.style.display = 'block'
+                tooltip.style.opacity = 1
+
+                // Position relative to chart container
+                const [mx, my] = d3.pointer(event, self.$refs.chartContainer)
+                tooltip.style.left = `${(mx || 0) + 15}px`
+                tooltip.style.top = `${(my || 0) + 15}px`
               })
-              .on('mousemove', function(event) {
-                  const tooltip = self.$refs.tooltip;
-                  const [mx, my] = d3.pointer(event, self.$refs.chartContainer);
-                  
-                  // Adjust position to prevent tooltip from going off-screen
-                  const containerWidth = self.$refs.chartContainer.clientWidth;
-                  const tooltipWidth = tooltip.offsetWidth;
-                  let left = mx + 15;
-                  if (left + tooltipWidth > containerWidth) {
-                      left = mx - tooltipWidth - 10;
-                  }
-                  
-                  tooltip.style.left = left + "px";
-                  tooltip.style.top = (my + 15) + "px";
+              .on('mousemove pointermove', (event) => {
+                const tooltip = self.$refs.tooltip
+                const [mx, my] = d3.pointer(event, self.$refs.chartContainer)
+
+                // Adjust position to prevent tooltip from going off-screen
+                const containerWidth = self.$refs.chartContainer.clientWidth
+                const tooltipWidth = tooltip.offsetWidth
+                let left = (mx || 0) + 15
+                if (left + tooltipWidth > containerWidth) {
+                  left = (mx || 0) - tooltipWidth - 10
+                }
+
+                tooltip.style.left = `${left}px`
+                tooltip.style.top = `${(my || 0) + 15}px`
               })
-              .on('mouseout', function() {
-                  d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.05)');
-                  const tooltip = self.$refs.tooltip;
-                  tooltip.style.opacity = 0;
-                  tooltip.style.display = "none";
-              });
-          });
-        });
+              .on('mouseout mouseleave pointerout', function () {
+                d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.05)')
+                const tooltip = self.$refs.tooltip
+                tooltip.style.opacity = 0
+                tooltip.style.display = 'none'
+              })
+          })
+        })
       }
 
       // Draw Entity Bounding Box if applicable
-        if (this.entityInfo && this.entityInfo.users && this.entityInfo.users.length > 0) {
-          const entityUsersInView = sortedUsers.filter(u => this.entityInfo.users.includes(u));
-          if (entityUsersInView.length > 0) {
-            const yPositions = entityUsersInView.map(u => yScale(u));
-            const minY = Math.min(...yPositions);
-            const maxY = Math.max(...yPositions);
-            const boxPadding = 12; // padding around the text
-            const boxWidth = 32; // approximate width of the truncated text
-            
-            svg.append('rect')
-              .attr('x', -margin.left + 5) // Shifted right slightly
-              .attr('y', minY - boxPadding)
-              .attr('width', boxWidth)
-              .attr('height', maxY - minY + (boxPadding * 2))
-              .attr('fill', 'none')
-              .attr('stroke', '#ff9800')
-              .attr('stroke-width', 2)
-              .attr('stroke-dasharray', '5,5')
-              .attr('rx', 4)
-              .attr('ry', 4);
-          }
-        }
+      if (this.entityInfo?.users && this.entityInfo.users.length > 0) {
+        const entityUsersInView = sortedUsers.filter((u) =>
+          this.entityInfo.users.includes(u),
+        )
+        if (entityUsersInView.length > 0) {
+          const yPositions = entityUsersInView.map((u) => yScale(u))
+          const minY = Math.min(...yPositions)
+          const maxY = Math.max(...yPositions)
+          const boxPadding = 12 // padding around the text
+          const boxWidth = 32 // approximate width of the truncated text
 
-        // Draw user labels
-        svg.selectAll('.user-label')
-          .data(sortedUsers)
-          .enter()
-          .append('text')
-          .attr('class', 'user-label')
-          .attr('x', -5) // Text anchor is 'end', so this is the right edge of the text
-        .attr('y', d => yScale(d))
+          svg
+            .append('rect')
+            .attr('x', -margin.left + 5) // Shifted right slightly
+            .attr('y', minY - boxPadding)
+            .attr('width', boxWidth)
+            .attr('height', maxY - minY + boxPadding * 2)
+            .attr('fill', 'none')
+            .attr('stroke', '#ff9800')
+            .attr('stroke-width', 2)
+            .attr('stroke-dasharray', '5,5')
+            .attr('rx', 4)
+            .attr('ry', 4)
+        }
+      }
+
+      // Draw user labels
+      svg
+        .selectAll('.user-label')
+        .data(sortedUsers)
+        .enter()
+        .append('text')
+        .attr('class', 'user-label')
+        .attr('x', -5) // Text anchor is 'end', so this is the right edge of the text
+        .attr('y', (d) => yScale(d))
         .attr('dy', '0.32em')
         .attr('text-anchor', 'end')
-        .attr('fill', d => {
-          if (d === this.selectedUser) return '#2d3748';
-          if (entityUsers.includes(d)) return '#3182ce';
-          return '#718096';
+        .attr('fill', (d) => {
+          if (d === this.selectedUser) return '#2d3748'
+          if (entityUsers.includes(d)) return '#3182ce'
+          return '#718096'
         })
-        .attr('font-weight', d => d === this.selectedUser ? 'bold' : 'normal')
+        .attr('font-weight', (d) =>
+          d === this.selectedUser ? 'bold' : 'normal',
+        )
         .attr('font-size', '11px')
-        .text(d => d.substring(0, 3) + '..');
-        
-      // Add tooltip for full addresses
-      svg.selectAll('.user-label')
-        .append('title')
-        .text(d => {
-          let type = 'Related User';
-          if (d === this.selectedUser) type = 'Selected User';
-          else if (entityUsers.includes(d)) type = 'Entity Member';
-          return `${type}: ${d}`;
-        });
+        .style('cursor', 'pointer')
+        .text((d) => `${d.substring(0, 3)}..`)
+        .on('click', (event, d) => {
+          this.$emit('user-selected', d)
+        })
+        .on('mouseover mouseenter pointerover', (event, d) => {
+          this.$emit('log-action', 'hover_behavior_user_label', { hoveredUserId: d })
+          d3.select(event.currentTarget).attr('font-weight', 'bold')
+          
+          const tooltip = d3.select(this.$refs.tooltip)
+          tooltip.transition().duration(200).style('opacity', 0.9)
+
+          let type = 'Related User'
+          if (d === this.selectedUser) type = 'Selected User'
+          else if (entityUsers.includes(d)) type = 'Entity Member'
+          
+          let htmlContent = `<strong>${type}:</strong><br/>${d}`
+
+          const [x, y] = d3.pointer(event, this.$refs.chartContainer)
+          tooltip
+            .html(htmlContent)
+            .style('display', 'block')
+            .style('left', `${(x || 0) + 10}px`)
+            .style('top', `${(y || 0) - 28}px`)
+        })
+        .on('mousemove pointermove', (event) => {
+          const tooltip = d3.select(this.$refs.tooltip)
+          const [x, y] = d3.pointer(event, this.$refs.chartContainer)
+          tooltip.style('left', `${(x || 0) + 10}px`).style('top', `${(y || 0) - 28}px`)
+        })
+        .on('mouseout mouseleave pointerout', (event, d) => {
+          d3.select(event.currentTarget).attr('font-weight', d === this.selectedUser ? 'bold' : 'normal')
+          
+          d3.select(this.$refs.tooltip)
+            .transition()
+            .duration(500)
+            .style('opacity', 0)
+            .on('end', function() {
+              d3.select(this).style('display', 'none')
+            })
+        })
 
       // Draw behavior points and area charts
-      let balanceScale;
+      let balanceScale
       if (hasData) {
         // Find global max/min for scales
-        let maxBalance = 0;
-        let maxAbsEarning = 0;
-        
-        Object.values(sequenceData).forEach(data => {
-          data.seq.forEach(d => {
-            if (d.balance > maxBalance) maxBalance = d.balance;
-          });
-          data.earningEvents.forEach(d => {
-            if (Math.abs(d.earning) > maxAbsEarning) maxAbsEarning = Math.abs(d.earning);
-          });
-        });
+        let maxBalance = 0
+        let maxAbsEarning = 0
+
+        Object.values(sequenceData).forEach((data) => {
+          data.seq.forEach((d) => {
+            if (d.balance > maxBalance) maxBalance = d.balance
+          })
+          data.earningEvents.forEach((d) => {
+            if (Math.abs(d.earning) > maxAbsEarning)
+              maxAbsEarning = Math.abs(d.earning)
+          })
+        })
 
         // We want the area chart to fit within the row height (distance between user lines)
         // If there are few users, we reduce the proportion of balance/earning height to make more room for the dots
-        const rowHeight = yScale.step();
-        const heightProportion = isFewUsers ? 0.3 : 0.5;
-        const maxAreaHeight = rowHeight * heightProportion;
+        const rowHeight = yScale.step()
+        const heightProportion = isFewUsers ? 0.3 : 0.5
+        const maxAreaHeight = rowHeight * heightProportion
 
-        balanceScale = d3.scaleLinear()
+        balanceScale = d3
+          .scaleLinear()
           .domain([0, maxBalance || 1])
-          .range([0, -maxAreaHeight]); // Upwards (negative y)
+          .range([0, -maxAreaHeight]) // Upwards (negative y)
 
-        const earningScale = d3.scaleLinear()
+        const earningScale = d3
+          .scaleLinear()
           .domain([0, maxAbsEarning || 1])
-          .range([0, maxAreaHeight]); // Downwards (positive y)
+          .range([0, maxAreaHeight]) // Downwards (positive y)
 
-        const balanceArea = d3.area()
-          .x(d => xScale(d.date))
+        const balanceArea = d3
+          .area()
+          .x((d) => xScale(d.date))
           .y0(-eventBoxPadding)
-          .y1(d => balanceScale(d.balance) - eventBoxPadding)
-          .curve(d3.curveStepAfter);
+          .y1((d) => balanceScale(d.balance) - eventBoxPadding)
+          .curve(d3.curveStepAfter)
 
         // Prepare transfer line marker
-        defs.append('marker')
+        defs
+          .append('marker')
           .attr('id', 'transfer-arrow')
           .attr('viewBox', '0 -5 10 10')
           .attr('refX', 12)
@@ -536,65 +710,77 @@ export default {
           .attr('orient', 'auto')
           .append('path')
           .attr('d', 'M0,-5L10,0L0,5')
-          .attr('fill', '#A0AEC0');
+          .attr('fill', '#A0AEC0')
 
-        const transferLinesGroup = foregroundGroup.append('g').attr('class', 'transfer-lines');
+        const transferLinesGroup = foregroundGroup
+          .append('g')
+          .attr('class', 'transfer-lines')
 
-        sortedUsers.forEach(user => {
-          const events = filteredData[user] || [];
-          const { seq, earningEvents } = sequenceData[user] || { seq: [], earningEvents: [] };
-          
-          const userBackgroundGroup = backgroundGroup.append('g')
+        sortedUsers.forEach((user) => {
+          const events = filteredData[user] || []
+          const { seq, earningEvents } = sequenceData[user] || {
+            seq: [],
+            earningEvents: [],
+          }
+
+          const userBackgroundGroup = backgroundGroup
+            .append('g')
             .attr('class', 'user-background')
-            .attr('transform', `translate(0, ${yScale(user)})`);
+            .attr('transform', `translate(0, ${yScale(user)})`)
 
-          const userForegroundGroup = foregroundGroup.append('g')
+          const userForegroundGroup = foregroundGroup
+            .append('g')
             .attr('class', 'user-foreground')
-            .attr('transform', `translate(0, ${yScale(user)})`);
-            
+            .attr('transform', `translate(0, ${yScale(user)})`)
+
           // Draw Area Charts and Bars first so they are behind the points
           if (seq.length > 0) {
             // Balance Area (Above line)
-            userBackgroundGroup.append('path')
+            userBackgroundGroup
+              .append('path')
               .datum(seq)
               .attr('class', 'balance-area')
               .attr('fill', '#90cdf4')
               .attr('opacity', 0.4)
-              .attr('d', balanceArea);
+              .attr('d', balanceArea)
           }
 
           // Draw Discrete Earning Bars (Below line)
           if (earningEvents.length > 0) {
-            const barWidth = 4; // Fixed width for discrete events
-            userBackgroundGroup.selectAll('.earning-bar')
+            const barWidth = 4 // Fixed width for discrete events
+            userBackgroundGroup
+              .selectAll('.earning-bar')
               .data(earningEvents)
               .enter()
               .append('rect')
               .attr('class', 'earning-bar')
-              .attr('x', d => xScale(d.date) - barWidth / 2)
+              .attr('x', (d) => xScale(d.date) - barWidth / 2)
               .attr('y', eventBoxPadding)
               .attr('width', barWidth)
-              .attr('height', d => earningScale(Math.abs(d.earning)))
-              .attr('fill', d => d.earning >= 0 ? '#68d391' : '#fc8181') // Green for profit, Red for loss
+              .attr('height', (d) => earningScale(Math.abs(d.earning)))
+              .attr('fill', (d) => (d.earning >= 0 ? '#68d391' : '#fc8181')) // Green for profit, Red for loss
               .attr('opacity', 0.8)
               .append('title') // Add simple tooltip
-              .text(d => `Earning: $${d.earning.toFixed(2)}`);
+              .text((d) => `Earning: $${d.earning.toFixed(2)}`)
           }
-            
-          events.forEach(event => {
-            const eventDate = new Date(event.timestamp);
-            const cx = xScale(eventDate);
-            
+
+          events.forEach((event) => {
+            const eventDate = parseDateSafe(event.timestamp)
+            const cx = xScale(eventDate)
+
             if (!event.isTrade) {
-              const isOut = event.type === 'transfer_out';
-              const counterpartyInView = sortedUsers.includes(event.counterparty);
-              
+              const isOut = event.type === 'transfer_out'
+              const counterpartyInView = sortedUsers.includes(
+                event.counterparty,
+              )
+
               // Only draw lines if it's an internal transfer between users in the current view
               if (isOut && counterpartyInView && user !== event.counterparty) {
-                const startY = yScale(user);
-                const endY = yScale(event.counterparty);
-                
-                transferLinesGroup.append('line')
+                const startY = yScale(user)
+                const endY = yScale(event.counterparty)
+
+                transferLinesGroup
+                  .append('line')
                   .datum({ cx_date: eventDate })
                   .attr('class', 'transfer-line')
                   .attr('x1', cx)
@@ -606,28 +792,32 @@ export default {
                   .attr('marker-end', 'url(#transfer-arrow)')
                   .attr('opacity', 0.6)
                   .append('title')
-                  .text(`Transfer ${event.amount} to ${event.counterparty}`);
+                  .text(`Transfer ${event.amount} to ${event.counterparty}`)
               }
             }
 
-            const eventGroup = userForegroundGroup.append('g')
+            const eventGroup = userForegroundGroup
+              .append('g')
               .datum({ date: eventDate })
               .attr('class', 'event-group')
-              .attr('transform', `translate(${cx}, 0)`);
-              
-            let circleColor = '#A0AEC0'; // default grey for transfers
-            let tooltipText = '';
-            
+              .attr('transform', `translate(${cx}, 0)`)
+
+            let circleColor = '#A0AEC0' // default grey for transfers
+            let tooltipText = ''
+
             if (event.isTrade) {
-              const isBuy = event.trade_info && event.trade_info.action === 'buy';
-              circleColor = isBuy ? '#4299e1' : '#ed64a6'; // blue for buy, pink for sell
-              tooltipText = `${isBuy ? 'Buy' : 'Sell'}: ${event.amount} @ $${parseFloat(event.trade_info?.price_usd || 0).toFixed(4)}`;
-              
-              const y1 = balanceScale(event._prevBalance || 0) - eventBoxPadding;
-              const y2 = balanceScale(event._currentBalance || 0) - eventBoxPadding;
-              
+              const isBuy =
+                event.trade_info && event.trade_info.action === 'buy'
+              circleColor = isBuy ? '#4299e1' : '#ed64a6' // blue for buy, pink for sell
+              tooltipText = `${isBuy ? 'Buy' : 'Sell'}: ${event.amount} @ $${parseFloat(event.trade_info?.price_usd || 0).toFixed(4)}`
+
+              const y1 = balanceScale(event._prevBalance || 0) - eventBoxPadding
+              const y2 =
+                balanceScale(event._currentBalance || 0) - eventBoxPadding
+
               // Draw balance difference bar
-              eventGroup.append('line')
+              eventGroup
+                .append('line')
                 .attr('x1', 0)
                 .attr('x2', 0)
                 .attr('y1', y1)
@@ -636,15 +826,17 @@ export default {
                 .attr('stroke-width', 4)
                 .attr('opacity', 0.8)
                 .append('title')
-                .text(`Balance change: ${Math.abs(event._currentBalance - event._prevBalance)}`);
-                
+                .text(
+                  `Balance change: ${Math.abs(event._currentBalance - event._prevBalance)}`,
+                )
             } else {
-              const isTransferIn = event.type === 'transfer_in';
-              tooltipText = `${isTransferIn ? 'Transfer In' : 'Transfer Out'}: ${event.amount}`;
+              const isTransferIn = event.type === 'transfer_in'
+              tooltipText = `${isTransferIn ? 'Transfer In' : 'Transfer Out'}: ${event.amount}`
             }
 
-            const circleRadius = isFewUsers ? 4 : 2;
-            eventGroup.append('circle')
+            const circleRadius = isFewUsers ? 4 : 2
+            eventGroup
+              .append('circle')
               .attr('r', circleRadius)
               .attr('cy', 0)
               .attr('fill', circleColor)
@@ -652,64 +844,124 @@ export default {
               .attr('stroke', d3.color(circleColor).darker(0.8))
               .attr('stroke-width', 0.5)
               .append('title')
-              .text(tooltipText);
-          });
-        });
+              .text(tooltipText)
+          })
+        })
       }
 
       // Setup Zoom
-      const zoom = d3.zoom()
+      const zoom = d3
+        .zoom()
         .scaleExtent([1, 50])
-        .translateExtent([[0, 0], [innerWidth, innerHeight]])
-        .extent([[0, 0], [innerWidth, innerHeight]])
+        .translateExtent([
+          [0, 0],
+          [width, height],
+        ])
+        .extent([
+          [0, 0],
+          [width, height],
+        ])
         .on('zoom', (event) => {
-          const newXScale = event.transform.rescaleX(xScale);
+          const newXScale = event.transform.rescaleX(xScale)
           
+          const domain = newXScale.domain()
+          // Only emit to parent if the zoom was initiated by a user event to prevent infinite sync loops
+          if (event.sourceEvent) {
+            this.$emit('time-window-changed', [domain[0], domain[1]])
+          }
+
           // Update X Axis
-          xAxisGroup.call(xAxis.scale(newXScale));
+          xAxisGroup.call(xAxis.scale(newXScale))
 
           // Update Manipulation Boxes
-          chartBody.selectAll('.manipulation-box')
-            .attr('x', d => {
-              let x1 = newXScale(d.startTs);
-              let x2 = newXScale(d.endTs);
-              if (x2 - x1 < 10) return (x1 + x2) / 2 - 5;
-              return x1;
+          chartBody
+            .selectAll('.manipulation-box')
+            .attr('x', (d) => {
+              let x1 = newXScale(d.startTs)
+              let x2 = newXScale(d.endTs)
+              if (x2 - x1 < 10) return (x1 + x2) / 2 - 5
+              return x1
             })
-            .attr('width', d => {
-              let x1 = newXScale(d.startTs);
-              let x2 = newXScale(d.endTs);
-              if (x2 - x1 < 10) return 10;
-              return x2 - x1;
-            });
+            .attr('width', (d) => {
+              let x1 = newXScale(d.startTs)
+              let x2 = newXScale(d.endTs)
+              if (x2 - x1 < 10) return 10
+              return x2 - x1
+            })
 
           if (hasData && balanceScale) {
             // Update Balance Area
-            const newBalanceArea = d3.area()
-              .x(d => newXScale(d.date))
+            const newBalanceArea = d3
+              .area()
+              .x((d) => newXScale(d.date))
               .y0(-eventBoxPadding)
-              .y1(d => balanceScale(d.balance) - eventBoxPadding)
-              .curve(d3.curveStepAfter);
-            chartBody.selectAll('.balance-area').attr('d', newBalanceArea);
+              .y1((d) => balanceScale(d.balance) - eventBoxPadding)
+              .curve(d3.curveStepAfter)
+            chartBody.selectAll('.balance-area').attr('d', newBalanceArea)
 
             // Update Earning Bars
-            chartBody.selectAll('.earning-bar')
-              .attr('x', d => newXScale(d.date) - 4 / 2); // barWidth = 4
+            chartBody
+              .selectAll('.earning-bar')
+              .attr('x', (d) => newXScale(d.date) - 4 / 2) // barWidth = 4
 
             // Update Transfer Lines
-            chartBody.selectAll('.transfer-line')
-              .attr('x1', d => newXScale(d.cx_date))
-              .attr('x2', d => newXScale(d.cx_date));
+            chartBody
+              .selectAll('.transfer-line')
+              .attr('x1', (d) => newXScale(d.cx_date))
+              .attr('x2', (d) => newXScale(d.cx_date))
 
             // Update Event Groups
-            chartBody.selectAll('.event-group')
-              .attr('transform', d => `translate(${newXScale(d.date)}, 0)`);
+            chartBody
+              .selectAll('.event-group')
+              .attr('transform', (d) => `translate(${newXScale(d.date)}, 0)`)
           }
-        });
+        })
 
-      zoomRect.call(zoom);
+      rootSvg.call(zoom)
+      
+      this._chartState = {
+        earliestDate,
+        snapshotDate,
+        xScale,
+        zoom,
+        rootSvg
+      }
+    },
+    syncTimeWindow() {
+      if (!this.syncTargetTimeWindow || this.syncTargetTimeWindow.length !== 2) return
+      if (!this._chartState) return
+      
+      const { earliestDate, snapshotDate, xScale, zoom, rootSvg } = this._chartState
+      const [targetMinDate, targetMaxDate] = this.syncTargetTimeWindow
+      
+      const targetMinTs = targetMinDate.getTime()
+      const targetMaxTs = targetMaxDate.getTime()
+      const origMinTs = earliestDate.getTime()
+      const origMaxTs = snapshotDate.getTime()
+      
+      const origSpan = origMaxTs - origMinTs
+      const targetSpan = targetMaxTs - targetMinTs
+      
+      if (targetSpan <= 0 || origSpan <= 0) return
+
+      let k = origSpan / targetSpan
+      if (k > 50) k = 50
+      if (k < 1) k = 1
+
+      // When scaled by k, the range maps [origMinTs, origMaxTs] to [0, width * k]
+      // We want targetMinTs to map to x=0.
+      // In original scale, targetMinTs is at xScale(targetMinDate).
+      // Under zoom identity translated by tx and scaled by k:
+      // newX = k * origX + tx. We want newX = 0 when origX = xScale(targetMinDate).
+      // So tx = -k * xScale(targetMinDate)
+      const tx = -k * xScale(new Date(targetMinTs))
+
+      const transform = d3.zoomIdentity.translate(tx, 0).scale(k)
+      
+      rootSvg.transition().duration(750)
+        .call(zoom.transform, transform)
     }
-  }
+  },
 }
 </script>
 

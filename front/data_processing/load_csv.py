@@ -1,11 +1,17 @@
+import argparse
 import csv
 import json
 import os
-import argparse
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 
 
-def process_csv(input_path: str, output_dir: str, sample_rows: int = 0, sample_max_bytes: int = 0, top_pairs: int = 20):
+def process_csv(
+    input_path: str,
+    output_dir: str,
+    sample_rows: int = 0,
+    sample_max_bytes: int = 0,
+    top_pairs: int = 20,
+):
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input file not found: {input_path}")
     os.makedirs(output_dir, exist_ok=True)
@@ -29,7 +35,9 @@ def process_csv(input_path: str, output_dir: str, sample_rows: int = 0, sample_m
         reader = csv.DictReader(f)
         sample_fieldnames = reader.fieldnames
         if sample_rows > 0 or sample_max_bytes > 0:
-            sample_writer = csv.DictWriter(open(sample_path, "w", newline="", encoding="utf-8"), fieldnames=sample_fieldnames)
+            sample_writer = csv.DictWriter(
+                open(sample_path, "w", newline="", encoding="utf-8"), fieldnames=sample_fieldnames
+            )
             sample_writer.writeheader()
 
         for row in reader:
@@ -60,7 +68,9 @@ def process_csv(input_path: str, output_dir: str, sample_rows: int = 0, sample_m
             if sample_writer:
                 if sample_rows and total_rows <= sample_rows:
                     sample_writer.writerow(row)
-                    sample_bytes += sum(len(str(v)) for v in row.values()) + len(sample_fieldnames)  # rough
+                    sample_bytes += sum(len(str(v)) for v in row.values()) + len(
+                        sample_fieldnames
+                    )  # rough
                 elif sample_max_bytes and sample_bytes < sample_max_bytes:
                     sample_writer.writerow(row)
                     sample_bytes += sum(len(str(v)) for v in row.values()) + len(sample_fieldnames)
@@ -131,7 +141,9 @@ def process_csv(input_path: str, output_dir: str, sample_rows: int = 0, sample_m
     for name in sample_fieldnames:
         base = column_desc_map.get(name, {"type": "string", "desc": ""})
         example = columns_examples.get(name, "")
-        columns_meta.append({"name": name, "type": base["type"], "desc": base["desc"], "example": example})
+        columns_meta.append(
+            {"name": name, "type": base["type"], "desc": base["desc"], "example": example}
+        )
 
     columns_meta_path = os.path.join(output_dir, "columns_meta.json")
     with open(columns_meta_path, "w", encoding="utf-8") as fm:
@@ -218,13 +230,24 @@ def process_transfers_csv(input_path: str, output_dir: str, top_n: int = 20):
 
     top_from = []
     for owner, cnt in from_owner_counter.most_common(top_n):
-        top_from.append({"owner": owner, "count": cnt, "amount_usd_sum": round(from_owner_amount[owner], 6)})
+        top_from.append(
+            {"owner": owner, "count": cnt, "amount_usd_sum": round(from_owner_amount[owner], 6)}
+        )
     top_to = []
     for owner, cnt in to_owner_counter.most_common(top_n):
-        top_to.append({"owner": owner, "count": cnt, "amount_usd_sum": round(to_owner_amount[owner], 6)})
+        top_to.append(
+            {"owner": owner, "count": cnt, "amount_usd_sum": round(to_owner_amount[owner], 6)}
+        )
     top_edges = []
     for (fo, to), cnt in edge_counter.most_common(top_n):
-        top_edges.append({"from_owner": fo, "to_owner": to, "count": cnt, "amount_usd_sum": round(edge_amount[(fo, to)], 6)})
+        top_edges.append(
+            {
+                "from_owner": fo,
+                "to_owner": to,
+                "count": cnt,
+                "amount_usd_sum": round(edge_amount[(fo, to)], 6),
+            }
+        )
 
     overview = {
         "rows": total_rows,
@@ -271,7 +294,9 @@ def process_transfers_csv(input_path: str, output_dir: str, top_n: int = 20):
     for name in fieldnames:
         base = column_desc_map.get(name, {"type": "string", "desc": ""})
         example = columns_examples.get(name, "")
-        columns_meta.append({"name": name, "type": base["type"], "desc": base["desc"], "example": example})
+        columns_meta.append(
+            {"name": name, "type": base["type"], "desc": base["desc"], "example": example}
+        )
     transfers_columns_meta_path = os.path.join(output_dir, "transfers_columns_meta.json")
     with open(transfers_columns_meta_path, "w", encoding="utf-8") as fm:
         json.dump({"columns": columns_meta}, fm, ensure_ascii=False, separators=(",", ":"))
@@ -283,13 +308,25 @@ def process_transfers_csv(input_path: str, output_dir: str, top_n: int = 20):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Stream load large CSV and produce summarized JSON for frontend.")
-    parser.add_argument("--mode", choices=["trades", "transfers"], default="trades", help="Processing mode")
+    parser = argparse.ArgumentParser(
+        description="Stream load large CSV and produce summarized JSON for frontend."
+    )
+    parser.add_argument(
+        "--mode", choices=["trades", "transfers"], default="trades", help="Processing mode"
+    )
     parser.add_argument("--input", default="public/ACT-24-11-10.csv", help="Input CSV path")
-    parser.add_argument("--output-dir", default="public/processed", help="Directory to write outputs")
-    parser.add_argument("--sample-rows", type=int, default=0, help="Write first N rows to partial CSV")
-    parser.add_argument("--sample-max-bytes", type=int, default=50_000_000, help="Max bytes for partial CSV")
-    parser.add_argument("--top-pairs", type=int, default=20, help="Number of top pairs to aggregate per day")
+    parser.add_argument(
+        "--output-dir", default="public/processed", help="Directory to write outputs"
+    )
+    parser.add_argument(
+        "--sample-rows", type=int, default=0, help="Write first N rows to partial CSV"
+    )
+    parser.add_argument(
+        "--sample-max-bytes", type=int, default=50_000_000, help="Max bytes for partial CSV"
+    )
+    parser.add_argument(
+        "--top-pairs", type=int, default=20, help="Number of top pairs to aggregate per day"
+    )
     parser.add_argument("--top-n", type=int, default=20, help="Top N list size for transfers mode")
     args = parser.parse_args()
 

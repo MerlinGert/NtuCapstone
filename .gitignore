@@ -1,2 +1,13 @@
 /front/public
 front/src/assets/user_behavior_sequences.json
+
+# OS files
+.DS_Store
+
+# Editor config
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+/front/server/__pycache__

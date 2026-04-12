@@ -1,16 +1,12 @@
-
 import csv
 import os
-import json
-import time
-import math
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
@@ -26,7 +22,9 @@ router = APIRouter(
 # Paths
 # ---------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BALANCE_SNAPSHOT_CSV = os.path.join(BASE_DIR, "public", "processed", "transfers", "balance_snapshots.csv")
+BALANCE_SNAPSHOT_CSV = os.path.join(
+    BASE_DIR, "public", "processed", "transfers", "balance_snapshots.csv"
+)
 TRADE_CSV = os.path.join(BASE_DIR, "public", "ACT-24-11-10.csv")
 TRANSFER_CSV = os.path.join(BASE_DIR, "public", "ACT_transfer_before_2024-11-10.csv")
 
@@ -36,19 +34,34 @@ csv.field_size_limit(2**31 - 1)
 # Pydantic Models
 # ---------------------------------------------------------------------------
 
+
 class TradingSequenceParams(BaseModel):
     """Rule3: Similar Trading Sequence"""
+
     enable: bool = True
-    time_window: float = Field(default=24.0, gt=0, description="Time window in hours for data loading")
-    max_time_diff_minutes: float = Field(default=2.0, ge=0, description="Max time difference between matched transactions in minutes")
-    direction_mode: str = Field(default="same_side_only", description="same_side_only | mixed_allowed")
-    sequence_representation: str = Field(default="action+amount", description="action_only | action+amount | action+price | action+amount+price")
-    min_contiguous_length: int = Field(default=5, ge=1, description="Min contiguous matching length")
+    time_window: float = Field(
+        default=24.0, gt=0, description="Time window in hours for data loading"
+    )
+    max_time_diff_minutes: float = Field(
+        default=2.0, ge=0, description="Max time difference between matched transactions in minutes"
+    )
+    direction_mode: str = Field(
+        default="same_side_only", description="same_side_only | mixed_allowed"
+    )
+    sequence_representation: str = Field(
+        default="action+amount",
+        description="action_only | action+amount | action+price | action+amount+price",
+    )
+    min_contiguous_length: int = Field(
+        default=5, ge=1, description="Min contiguous matching length"
+    )
     amount_similarity: float = Field(default=0.9, ge=0, le=1)
     price_similarity: float = Field(default=0.9, ge=0, le=1)
 
+
 class BalanceSequenceParams(BaseModel):
     """Rule4: Similar Balance Sequence"""
+
     enable: bool = True
     time_window: float = Field(default=1.0, gt=0, description="Time window in hours")
     balance_axis: str = Field(default="time_grid", description="time_grid | tx_step")
@@ -57,8 +70,10 @@ class BalanceSequenceParams(BaseModel):
     similarity: float = Field(default=0.9, ge=0, le=1, description="Pearson correlation threshold")
     topk_neighbors: int = Field(default=5, ge=1, description="Max similar neighbors per address")
 
+
 class EarningSequenceParams(BaseModel):
     """Rule5: Similar Earning Sequence"""
+
     enable: bool = True
     time_window: float = Field(default=1.0, gt=0, description="Time window in hours")
     earning_axis: str = Field(default="time_grid", description="time_grid | tx_step")
@@ -67,12 +82,16 @@ class EarningSequenceParams(BaseModel):
     similarity: float = Field(default=0.9, ge=0, le=1)
     topk_neighbors: int = Field(default=5, ge=1)
 
+
 class BehaviorDetectionRequest(BaseModel):
-    target_users: Optional[List[str]] = Field(None, description="User addresses to analyse. None = all.")
+    target_users: Optional[List[str]] = Field(
+        None, description="User addresses to analyse. None = all."
+    )
     time_range: Optional[Dict[str, str]] = Field(None, description="{'start': ..., 'end': ...}")
     trading_sequence: Optional[TradingSequenceParams] = None
     balance_sequence: Optional[BalanceSequenceParams] = None
     earning_sequence: Optional[EarningSequenceParams] = None
+
 
 class SimilarityEdge(BaseModel):
     source: str
@@ -81,15 +100,18 @@ class SimilarityEdge(BaseModel):
     rule: str
     details: Dict[str, Any] = {}
 
+
 class BehaviorDetectionResponse(BaseModel):
     status: str
     edges: List[SimilarityEdge]
     groups: List[Dict[str, Any]]
     metadata: Dict[str, Any]
 
+
 # ---------------------------------------------------------------------------
 # Utility helpers
 # ---------------------------------------------------------------------------
+
 
 def parse_time(t_str: str) -> datetime:
     """Parse time strings like '2024-10-19 11:27:09.000 UTC'."""
@@ -99,6 +121,7 @@ def parse_time(t_str: str) -> datetime:
     if t_str.endswith(" UTC"):
         return datetime.strptime(t_str, "%Y-%m-%d %H:%M:%S UTC")
     return datetime.strptime(t_str, "%Y-%m-%d %H:%M:%S")
+
 
 def parse_time_bin(bin_str: str) -> timedelta:
     """Convert '5m', '1h', '1d' to timedelta."""
@@ -111,11 +134,14 @@ def parse_time_bin(bin_str: str) -> timedelta:
         return timedelta(days=int(bin_str[:-1]))
     return timedelta(hours=1)
 
+
 def get_time_bin_seconds(bin_str: str) -> float:
     return parse_time_bin(bin_str).total_seconds()
 
+
 # Max addresses allowed in Rule3 pairwise comparison to prevent O(n²) timeout
 _MAX_PAIRWISE_ADDRESSES = 500
+
 
 def pearson_correlation(a: List[float], b: List[float]) -> float:
     """Pearson correlation between two equal-length sequences. Returns 0 on degenerate input."""
@@ -144,8 +170,12 @@ def _load_balance_snapshots(time_range: Optional[Dict[str, str]] = None) -> pd.D
             return pd.DataFrame()
         _balance_cache = pd.read_csv(BALANCE_SNAPSHOT_CSV, dtype=str)
         # Convert numeric columns
-        _balance_cache["change_amount"] = pd.to_numeric(_balance_cache["change_amount"], errors="coerce").fillna(0)
-        _balance_cache["balance_after"] = pd.to_numeric(_balance_cache["balance_after"], errors="coerce").fillna(0)
+        _balance_cache["change_amount"] = pd.to_numeric(
+            _balance_cache["change_amount"], errors="coerce"
+        ).fillna(0)
+        _balance_cache["balance_after"] = pd.to_numeric(
+            _balance_cache["balance_after"], errors="coerce"
+        ).fillna(0)
     df = _balance_cache.copy()
 
     if time_range:
@@ -163,9 +193,13 @@ def _load_trades(time_range: Optional[Dict[str, str]] = None) -> pd.DataFrame:
         if not os.path.exists(TRADE_CSV):
             return pd.DataFrame()
         cols = [
-            "tx_id", "block_time", "trader_id",
-            "token_bought_symbol", "token_sold_symbol",
-            "token_bought_amount", "token_sold_amount",
+            "tx_id",
+            "block_time",
+            "trader_id",
+            "token_bought_symbol",
+            "token_sold_symbol",
+            "token_bought_amount",
+            "token_sold_amount",
             "amount_usd",
         ]
         try:
@@ -187,6 +221,7 @@ def _load_trades(time_range: Optional[Dict[str, str]] = None) -> pd.DataFrame:
 # ===================================================================
 # Rule 3: Similar Trading Sequence
 # ===================================================================
+
 
 def _build_trading_sequences(
     df_trades: pd.DataFrame,
@@ -225,10 +260,10 @@ def _build_trading_sequences(
         sold_amt = float(row.get("token_sold_amount", 0))
         usd = float(row.get("amount_usd", 0))
         time_str = str(row.get("block_time", ""))
-        
+
         try:
             ts = parse_time(time_str).timestamp()
-        except:
+        except Exception:
             ts = 0.0
 
         # Determine action: buy ACT or sell ACT
@@ -243,13 +278,9 @@ def _build_trading_sequences(
         else:
             continue
 
-        sequences[trader].append({
-            "action": action,
-            "amount": amount,
-            "price": price,
-            "time": time_str,
-            "ts": ts
-        })
+        sequences[trader].append(
+            {"action": action, "amount": amount, "price": price, "time": time_str, "ts": ts}
+        )
 
     return dict(sequences)
 
@@ -294,7 +325,7 @@ def _compare_trading_sequences(
         max_diff = params.max_time_diff_minutes * 60
         if time_diff > max_diff:
             return False
-            
+
         return _action_match(a, b) and _amount_match(a, b) and _price_match(a, b)
 
     # Find longest contiguous matching sub-sequence (DP)
@@ -305,34 +336,34 @@ def _compare_trading_sequences(
     max_len = 0
     # dp[j] = length of contiguous match ending at seq_a[i-1], seq_b[j-1]
     prev = [0] * (m + 1)
-    
+
     for i in range(1, n + 1):
         curr = [0] * (m + 1)
         for j in range(1, m + 1):
             if _events_match(seq_a[i - 1], seq_b[j - 1]):
                 candidate_len = prev[j - 1] + 1
-                
+
                 # Verify time span constraint
                 # Sequence A match: from seq_a[i - candidate_len] to seq_a[i - 1]
                 # Sequence B match: from seq_b[j - candidate_len] to seq_b[j - 1]
-                
+
                 # We need to trim candidate_len if duration exceeds time_window
                 while candidate_len > 0:
                     start_idx_a = i - candidate_len
                     end_idx_a = i - 1
                     duration_a = seq_a[end_idx_a]["ts"] - seq_a[start_idx_a]["ts"]
-                    
+
                     start_idx_b = j - candidate_len
                     end_idx_b = j - 1
                     duration_b = seq_b[end_idx_b]["ts"] - seq_b[start_idx_b]["ts"]
-                    
+
                     if duration_a <= time_window_sec and duration_b <= time_window_sec:
                         break
-                    
+
                     candidate_len -= 1
-                
+
                 curr[j] = candidate_len
-                
+
                 if curr[j] > max_len:
                     max_len = curr[j]
             else:
@@ -357,7 +388,7 @@ def process_rule3(
         return []
 
     # Removed "last N hours" clipping. Now we use the full loaded data (respecting time_range).
-    
+
     sequences = _build_trading_sequences(df_trades, target_users, params)
     if len(sequences) < 2:
         return []
@@ -366,7 +397,9 @@ def process_rule3(
 
     # Guard against O(n²) blowup
     if len(addresses) > _MAX_PAIRWISE_ADDRESSES:
-        print(f"[Rule3] WARNING: {len(addresses)} addresses exceeds limit {_MAX_PAIRWISE_ADDRESSES}, truncating.")
+        print(
+            f"[Rule3] WARNING: {len(addresses)} addresses exceeds limit {_MAX_PAIRWISE_ADDRESSES}, truncating."
+        )
         addresses = addresses[:_MAX_PAIRWISE_ADDRESSES]
 
     edges: List[SimilarityEdge] = []
@@ -376,12 +409,15 @@ def process_rule3(
             a, b = addresses[i], addresses[j]
             score, detail = _compare_trading_sequences(sequences[a], sequences[b], params)
             if score > 0:
-                edges.append(SimilarityEdge(
-                    source=a, target=b,
-                    similarity=round(score, 4),
-                    rule="similar_trading_sequence",
-                    details=detail,
-                ))
+                edges.append(
+                    SimilarityEdge(
+                        source=a,
+                        target=b,
+                        similarity=round(score, 4),
+                        rule="similar_trading_sequence",
+                        details=detail,
+                    )
+                )
 
     return edges
 
@@ -389,6 +425,7 @@ def process_rule3(
 # ===================================================================
 # Rule 4: Similar Balance Sequence
 # ===================================================================
+
 
 def _build_balance_sequences(
     df_bal: pd.DataFrame,
@@ -476,22 +513,22 @@ def process_rule4(
             window_size_points = int((params.time_window * 3600) / bin_seconds)
             if window_size_points < 2:
                 window_size_points = 2
-    
+
     # If using tx_step or invalid window, fallback to full sequence
-    use_rolling = (window_size_points is not None)
+    use_rolling = window_size_points is not None
 
     for i in range(len(addresses)):
         for j in range(i + 1, len(addresses)):
             a, b = addresses[i], addresses[j]
             sa, sb = sequences[a], sequences[b]
             min_len = min(len(sa), len(sb))
-            
+
             # Truncate to same length for comparison
             sa_trunc = sa[:min_len]
             sb_trunc = sb[:min_len]
-            
+
             max_corr = 0.0
-            
+
             if use_rolling and min_len >= window_size_points:
                 # Use rolling correlation
                 s_a = pd.Series(sa_trunc)
@@ -507,7 +544,7 @@ def process_rule4(
             else:
                 # Fallback to full sequence correlation
                 max_corr = pearson_correlation(sa_trunc, sb_trunc)
-                
+
             if max_corr >= params.similarity:
                 neighbor_scores[a].append((b, max_corr))
                 neighbor_scores[b].append((a, max_corr))
@@ -520,12 +557,15 @@ def process_rule4(
             key = tuple(sorted([addr, peer]))
             if key not in seen:
                 seen.add(key)
-                edges.append(SimilarityEdge(
-                    source=key[0], target=key[1],
-                    similarity=round(corr, 4),
-                    rule="similar_balance_sequence",
-                    details={"pearson": round(corr, 4)},
-                ))
+                edges.append(
+                    SimilarityEdge(
+                        source=key[0],
+                        target=key[1],
+                        similarity=round(corr, 4),
+                        rule="similar_balance_sequence",
+                        details={"pearson": round(corr, 4)},
+                    )
+                )
 
     return edges
 
@@ -533,6 +573,7 @@ def process_rule4(
 # ===================================================================
 # Rule 5: Similar Earning Sequence
 # ===================================================================
+
 
 def _build_earning_sequences(
     df_trades: pd.DataFrame,
@@ -559,7 +600,7 @@ def _build_earning_sequences(
 
     # Compute cumulative realized PnL per trader
     cost_basis: Dict[str, float] = {}  # trader -> weighted avg buy price
-    holdings: Dict[str, float] = {}     # trader -> current holding amount
+    holdings: Dict[str, float] = {}  # trader -> current holding amount
     pnl_events: Dict[str, List[Dict]] = defaultdict(list)  # trader -> [{time, cum_pnl}]
     cum_pnl: Dict[str, float] = defaultdict(float)
 
@@ -610,7 +651,7 @@ def _build_earning_sequences(
     else:
         # time_grid mode
         td = parse_time_bin(params.time_bin)
-        
+
         # Determine global time range
         all_times = []
         for events in pnl_events.values():
@@ -618,7 +659,7 @@ def _build_earning_sequences(
                 all_times.append(parse_time(e["time"]))
         if not all_times:
             return {}
-        
+
         all_times.sort()
         t_min = all_times[0]
         t_max = all_times[-1]
@@ -634,7 +675,7 @@ def _build_earning_sequences(
         for trader, events in pnl_events.items():
             # Sort events by time
             events.sort(key=lambda x: parse_time(x["time"]))
-            
+
             evt_times = [parse_time(e["time"]) for e in events]
             evt_vals = [e["cum_pnl"] for e in events]
 
@@ -678,20 +719,20 @@ def process_rule5(
             window_size_points = int((params.time_window * 3600) / bin_seconds)
             if window_size_points < 2:
                 window_size_points = 2
-    
-    use_rolling = (window_size_points is not None)
+
+    use_rolling = window_size_points is not None
 
     for i in range(len(addresses)):
         for j in range(i + 1, len(addresses)):
             a, b = addresses[i], addresses[j]
             sa, sb = sequences[a], sequences[b]
             min_len = min(len(sa), len(sb))
-            
+
             sa_trunc = sa[:min_len]
             sb_trunc = sb[:min_len]
-            
+
             max_corr = 0.0
-            
+
             if use_rolling and min_len >= window_size_points:
                 s_a = pd.Series(sa_trunc)
                 s_b = pd.Series(sb_trunc)
@@ -703,7 +744,7 @@ def process_rule5(
                     max_corr = 0.0
             else:
                 max_corr = pearson_correlation(sa_trunc, sb_trunc)
-                
+
             if max_corr >= params.similarity:
                 neighbor_scores[a].append((b, max_corr))
                 neighbor_scores[b].append((a, max_corr))
@@ -716,12 +757,15 @@ def process_rule5(
             key = tuple(sorted([addr, peer]))
             if key not in seen:
                 seen.add(key)
-                edges.append(SimilarityEdge(
-                    source=key[0], target=key[1],
-                    similarity=round(corr, 4),
-                    rule="similar_earning_sequence",
-                    details={"pearson": round(corr, 4)},
-                ))
+                edges.append(
+                    SimilarityEdge(
+                        source=key[0],
+                        target=key[1],
+                        similarity=round(corr, 4),
+                        rule="similar_earning_sequence",
+                        details={"pearson": round(corr, 4)},
+                    )
+                )
 
     return edges
 
@@ -729,6 +773,7 @@ def process_rule5(
 # ===================================================================
 # Main detection entry point
 # ===================================================================
+
 
 class UnionFind:
     def __init__(self):
@@ -751,7 +796,7 @@ class UnionFind:
 def edges_to_groups(edges: List[SimilarityEdge]) -> List[Dict[str, Any]]:
     """Convert pairwise edges into connected component groups."""
     uf = UnionFind()
-    
+
     # Track rules per node pair to summarize group rules
     # key: (min(a,b), max(a,b)) -> set(rules)
     pair_rules = defaultdict(set)
@@ -777,13 +822,13 @@ def edges_to_groups(edges: List[SimilarityEdge]) -> List[Dict[str, Any]]:
         member_list = list(members)
         if len(member_list) < 2:
             continue
-            
+
         # Aggregate group stats
         group_rules = set()
         total_sim = 0.0
         count_sim = 0
         aggregated_details = []
-        
+
         # Check all internal pairs
         for i in range(len(member_list)):
             for j in range(i + 1, len(member_list)):
@@ -793,23 +838,27 @@ def edges_to_groups(edges: List[SimilarityEdge]) -> List[Dict[str, Any]]:
                     total_sim += max(pair_sims[key])
                     count_sim += 1
                     # Add simplified details for this pair
-                    aggregated_details.append({
-                        "pair": list(key),
-                        "rules": list(pair_rules[key]),
-                        "details": pair_details[key]
-                    })
-        
+                    aggregated_details.append(
+                        {
+                            "pair": list(key),
+                            "rules": list(pair_rules[key]),
+                            "details": pair_details[key],
+                        }
+                    )
+
         avg_sim = total_sim / count_sim if count_sim > 0 else 0.0
-        
-        results.append({
-            "group_id": f"behavior_group_{len(results)}",
-            "members": member_list,
-            "member_count": len(member_list),
-            "rules_matched": list(group_rules),
-            "avg_similarity": round(avg_sim, 4),
-            "pair_details": aggregated_details
-        })
-    
+
+        results.append(
+            {
+                "group_id": f"behavior_group_{len(results)}",
+                "members": member_list,
+                "member_count": len(member_list),
+                "rules_matched": list(group_rules),
+                "avg_similarity": round(avg_sim, 4),
+                "pair_details": aggregated_details,
+            }
+        )
+
     results.sort(key=lambda x: x["member_count"], reverse=True)
     return results
 
@@ -825,7 +874,9 @@ async def detect_behavior(request: BehaviorDetectionRequest):
     # Rule 3
     if request.trading_sequence and request.trading_sequence.enable:
         try:
-            edges3 = process_rule3(request.target_users, request.time_range, request.trading_sequence)
+            edges3 = process_rule3(
+                request.target_users, request.time_range, request.trading_sequence
+            )
             all_edges.extend(edges3)
         except Exception as e:
             print(f"Error in Rule3: {e}")
@@ -833,7 +884,9 @@ async def detect_behavior(request: BehaviorDetectionRequest):
     # Rule 4
     if request.balance_sequence and request.balance_sequence.enable:
         try:
-            edges4 = process_rule4(request.target_users, request.time_range, request.balance_sequence)
+            edges4 = process_rule4(
+                request.target_users, request.time_range, request.balance_sequence
+            )
             all_edges.extend(edges4)
         except Exception as e:
             print(f"Error in Rule4: {e}")
@@ -841,7 +894,9 @@ async def detect_behavior(request: BehaviorDetectionRequest):
     # Rule 5
     if request.earning_sequence and request.earning_sequence.enable:
         try:
-            edges5 = process_rule5(request.target_users, request.time_range, request.earning_sequence)
+            edges5 = process_rule5(
+                request.target_users, request.time_range, request.earning_sequence
+            )
             all_edges.extend(edges5)
         except Exception as e:
             print(f"Error in Rule5: {e}")
@@ -856,5 +911,5 @@ async def detect_behavior(request: BehaviorDetectionRequest):
         metadata={
             "total_edges": len(all_edges),
             "total_groups": len(groups),
-        }
+        },
     )

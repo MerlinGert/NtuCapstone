@@ -1,37 +1,50 @@
 import json
 import os
+from typing import List
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List
-import token_config
 
-router = APIRouter(
-    prefix="/api/user_behavior",
-    tags=["user_behavior"]
-)
+router = APIRouter(prefix="/api/user_behavior", tags=["user_behavior"])
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Token-keyed in-memory cache
+# In-memory cache: dict[coin] -> data
 _user_behavior_cache = {}
 
-def get_user_behavior_data(token: str = "ACT"):
-    if token not in _user_behavior_cache:
-        data_path = token_config.get_data_path(token, "user_behavior_sequences.json")
+
+def get_data_dir(coin: str):
+    if coin == "PNUT":
+        return os.path.join(BASE_DIR, "public", "data2")
+    return os.path.join(BASE_DIR, "public", "data")
+
+
+def get_user_behavior_data(coin: str):
+    global _user_behavior_cache
+    if coin not in _user_behavior_cache:
+        data_path = os.path.join(get_data_dir(coin), "user_behavior_sequences.json")
         if not os.path.exists(data_path):
-            raise FileNotFoundError(f"Data file not found at {data_path}")
-        with open(data_path, 'r') as f:
-            _user_behavior_cache[token] = json.load(f)
-    return _user_behavior_cache[token]
+            print(f"Warning: Data file not found at {data_path}")
+            _user_behavior_cache[coin] = {}
+        else:
+            try:
+                with open(data_path, "r") as f:
+                    _user_behavior_cache[coin] = json.load(f)
+            except Exception as e:
+                print(f"Error loading user behavior sequences for {coin}: {e}")
+                _user_behavior_cache[coin] = {}
+    return _user_behavior_cache[coin]
+
 
 class UserBehaviorRequest(BaseModel):
     users: List[str]
-    token: str = "ACT"
+    coin: str = "ACT"
+
 
 @router.post("/sequences")
 def get_sequences(request: UserBehaviorRequest):
     try:
-        data = get_user_behavior_data(request.token)
+        data = get_user_behavior_data(request.coin)
         result = {}
         for user in request.users:
             if user in data:

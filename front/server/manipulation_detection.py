@@ -6,7 +6,6 @@ Manipulation Detection Backend
 
 import bisect
 import csv
-import math
 import os
 import threading
 import time as _time
@@ -39,28 +38,38 @@ csv.field_size_limit(2**31 - 1)
 # Pydantic Models
 # ---------------------------------------------------------------------------
 
+
 class WashTradingParams(BaseModel):
     """Rule 1: Matched Buy/Sell Roundtrip (Wash Trading)"""
+
     enable: bool = True
     time_window: float = Field(default=24.0, gt=0, description="Sliding window in hours")
     min_tx_number: int = Field(default=4, ge=1, description="Min trades in window")
-    alt_ratio: float = Field(default=0.6, gt=0, lt=1,
-                             description="Direction alternation ratio = #direction-changes / (tx_count - 1)")
-    net_position_score: float = Field(default=0.1, ge=0, le=1,
-                                      description="Max |net_qty| / total_volume allowed")
+    alt_ratio: float = Field(
+        default=0.6,
+        gt=0,
+        lt=1,
+        description="Direction alternation ratio = #direction-changes / (tx_count - 1)",
+    )
+    net_position_score: float = Field(
+        default=0.1, ge=0, le=1, description="Max |net_qty| / total_volume allowed"
+    )
 
 
 class PumpDumpParams(BaseModel):
     """Rule 2: Coordinated Trading-Driven Price Move"""
+
     enable: bool = True
     time_window: float = Field(default=24.0, gt=0, description="Sliding window in hours")
     min_tx_number: int = Field(default=4, ge=1, description="Min trades per entity in window")
-    alt_ratio: float = Field(default=0.3, gt=0, lt=1,
-                             description="Max alternation ratio (low = mostly one direction)")
+    alt_ratio: float = Field(
+        default=0.3, gt=0, lt=1, description="Max alternation ratio (low = mostly one direction)"
+    )
     min_entity_number: int = Field(default=3, ge=1, description="Min coordinated entities")
     price_trend: str = Field(default="up", description="up | down")
-    price_ratio: float = Field(default=0.05, gt=0, lt=1,
-                               description="Min price change ratio within window")
+    price_ratio: float = Field(
+        default=0.05, gt=0, lt=1, description="Min price change ratio within window"
+    )
 
 
 class ManipulationDetectionRequest(BaseModel):
@@ -120,9 +129,13 @@ def _load_trades(time_range: Optional[Dict[str, str]] = None) -> pd.DataFrame:
                 if not os.path.exists(TRADE_CSV):
                     return pd.DataFrame()
                 cols = [
-                    "tx_id", "block_time", "trader_id",
-                    "token_bought_symbol", "token_sold_symbol",
-                    "token_bought_amount", "token_sold_amount",
+                    "tx_id",
+                    "block_time",
+                    "trader_id",
+                    "token_bought_symbol",
+                    "token_sold_symbol",
+                    "token_bought_amount",
+                    "token_sold_amount",
                     "amount_usd",
                 ]
                 try:
@@ -152,10 +165,10 @@ def _load_trades(time_range: Optional[Dict[str, str]] = None) -> pd.DataFrame:
     return df
 
 
-
 # ---------------------------------------------------------------------------
 # Helper: build per-trader event list
 # ---------------------------------------------------------------------------
+
 
 def _build_trader_events(
     df: pd.DataFrame,
@@ -193,23 +206,27 @@ def _build_trader_events(
         block_time = str(row.get("block_time", ""))
 
         if bought_sym == "ACT" and bought_amt > 0:
-            events[trader].append({
-                "action": "buy",
-                "amount": bought_amt,
-                "usd": usd,
-                "price": usd / bought_amt if bought_amt > 0 else 0,
-                "time_dt": time_dt,
-                "block_time": block_time,
-            })
+            events[trader].append(
+                {
+                    "action": "buy",
+                    "amount": bought_amt,
+                    "usd": usd,
+                    "price": usd / bought_amt if bought_amt > 0 else 0,
+                    "time_dt": time_dt,
+                    "block_time": block_time,
+                }
+            )
         elif sold_sym == "ACT" and sold_amt > 0:
-            events[trader].append({
-                "action": "sell",
-                "amount": sold_amt,
-                "usd": usd,
-                "price": usd / sold_amt if sold_amt > 0 else 0,
-                "time_dt": time_dt,
-                "block_time": block_time,
-            })
+            events[trader].append(
+                {
+                    "action": "sell",
+                    "amount": sold_amt,
+                    "usd": usd,
+                    "price": usd / sold_amt if sold_amt > 0 else 0,
+                    "time_dt": time_dt,
+                    "block_time": block_time,
+                }
+            )
 
     # Sort each trader's events by time
     for trader in events:
@@ -222,6 +239,7 @@ def _build_trader_events(
 # Helper: build global price timeline for price lookups
 # ---------------------------------------------------------------------------
 
+
 def _build_price_timeline(df: pd.DataFrame) -> Tuple[List[datetime], List[float]]:
     """
     Build sorted (time, price) arrays from ACT trades for price estimation.
@@ -229,9 +247,7 @@ def _build_price_timeline(df: pd.DataFrame) -> Tuple[List[datetime], List[float]
     if df.empty or "block_time_dt" not in df.columns:
         return [], []
 
-    act_mask = (
-        (df["token_bought_symbol"] == "ACT") | (df["token_sold_symbol"] == "ACT")
-    )
+    act_mask = (df["token_bought_symbol"] == "ACT") | (df["token_sold_symbol"] == "ACT")
     act_df = df[act_mask].copy()
 
     def _calc_price(row):
@@ -272,6 +288,7 @@ def _lookup_price(
 # ===================================================================
 # Rule 1: Wash Trading – Matched Buy/Sell Roundtrip
 # ===================================================================
+
 
 def _calc_alternation_ratio(actions: List[str]) -> float:
     """
@@ -334,7 +351,7 @@ def process_wash_trading(
                     break
                 left += 1
 
-            window_events = events[left: right + 1]
+            window_events = events[left : right + 1]
             tx_count = len(window_events)
             if tx_count < params.min_tx_number:
                 continue
@@ -354,18 +371,20 @@ def process_wash_trading(
             w_start = events[left].get("block_time", "")
             w_end = events[right].get("block_time", "")
 
-            hits.append(WashTradingHit(
-                trader_id=trader,
-                window_start=str(w_start),
-                window_end=str(w_end),
-                tx_count=tx_count,
-                buy_count=buy_count,
-                sell_count=sell_count,
-                alt_ratio=round(alt_r, 4),
-                net_position_score=round(nps, 4),
-                total_volume=round(total_vol, 4),
-                net_qty=round(net_qty, 4),
-            ))
+            hits.append(
+                WashTradingHit(
+                    trader_id=trader,
+                    window_start=str(w_start),
+                    window_end=str(w_end),
+                    tx_count=tx_count,
+                    buy_count=buy_count,
+                    sell_count=sell_count,
+                    alt_ratio=round(alt_r, 4),
+                    net_position_score=round(nps, 4),
+                    total_volume=round(total_vol, 4),
+                    net_qty=round(net_qty, 4),
+                )
+            )
 
             # Skip ahead to avoid near-duplicate overlapping windows
             left = right + 1
@@ -376,6 +395,7 @@ def process_wash_trading(
 # ===================================================================
 # Rule 2: Pump & Dump – Coordinated Trading-Driven Price Move
 # ===================================================================
+
 
 def process_pump_dump(
     trader_events: Dict[str, List[Dict[str, Any]]],
@@ -438,7 +458,7 @@ def process_pump_dump(
             continue
         prev_left = left
 
-        window_slice = all_events[left: right + 1]
+        window_slice = all_events[left : right + 1]
         if len(window_slice) < params.min_tx_number:
             continue
 
@@ -513,18 +533,20 @@ def process_pump_dump(
             continue
         seen_windows.add(dedup_key)
 
-        hits.append(PumpDumpHit(
-            window_start=str(all_events[left][2].get("block_time", "")),
-            window_end=str(all_events[right][2].get("block_time", "")),
-            entity_count=len(qualifying_traders),
-            entities=[t[0] for t in qualifying_traders],
-            dominant_direction=group_direction,
-            avg_alt_ratio=round(avg_alt, 4),
-            price_start=round(p_start, 8),
-            price_end=round(p_end, 8),
-            price_change_ratio=round(abs(price_change_ratio), 4),
-            total_volume=round(total_vol, 4),
-        ))
+        hits.append(
+            PumpDumpHit(
+                window_start=str(all_events[left][2].get("block_time", "")),
+                window_end=str(all_events[right][2].get("block_time", "")),
+                entity_count=len(qualifying_traders),
+                entities=[t[0] for t in qualifying_traders],
+                dominant_direction=group_direction,
+                avg_alt_ratio=round(avg_alt, 4),
+                price_start=round(p_start, 8),
+                price_end=round(p_end, 8),
+                price_change_ratio=round(abs(price_change_ratio), 4),
+                total_volume=round(total_vol, 4),
+            )
+        )
 
     return hits
 
@@ -532,6 +554,7 @@ def process_pump_dump(
 # ===================================================================
 # API Endpoint
 # ===================================================================
+
 
 @router.post("/detect", response_model=ManipulationDetectionResponse)
 async def detect_manipulation_v2(request: ManipulationDetectionRequest):
@@ -567,7 +590,10 @@ async def detect_manipulation_v2(request: ManipulationDetectionRequest):
         if request.pump_dump and request.pump_dump.enable:
             price_times, price_values = _build_price_timeline(df)
             pd_hits = process_pump_dump(
-                trader_events, request.pump_dump, price_times, price_values,
+                trader_events,
+                request.pump_dump,
+                price_times,
+                price_values,
             )
 
         elapsed = _time.time() - start
@@ -590,5 +616,6 @@ async def detect_manipulation_v2(request: ManipulationDetectionRequest):
 
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
