@@ -35,10 +35,11 @@
       <svg ref="bandsOverlay" class="bands-overlay"></svg>
 
       <!-- Upper manipulation cards (Round Trip) -->
-      <div class="manipulation-cards-container scroll-x top-cards scroll-top" @scroll="drawBands" ref="topCardsContainer">
+      <div class="manipulation-cards-container scroll-x top-cards scroll-top" @scroll="handleCardScroll($event, 'topCardsContainer')" ref="topCardsContainer">
         <div class="manipulation-card top-card" v-for="(card, i) in topCards" :key="'top-'+i" :title="card.tooltip" 
              @click="$emit('card-click', card.uniqueUsers)" 
              @mouseenter="$emit('log-action', 'hover_manipulation_card', { type: 'round_trip', time: card.timeLabel, usersCount: card.uniqueUsers.length })"
+             @mouseleave="$emit('log-action', 'cancel_hover', { hoverType: 'hover_manipulation_card' })"
              style="cursor: pointer;">
           <div class="card-time">{{ card.timeLabel }}</div>
           <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
@@ -57,10 +58,11 @@
       </div>
 
       <!-- Lower manipulation cards (Same Direction) -->
-      <div class="manipulation-cards-container scroll-x bottom-cards" @scroll="drawBands" ref="bottomCardsContainer">
+      <div class="manipulation-cards-container scroll-x bottom-cards" @scroll="handleCardScroll($event, 'bottomCardsContainer')" ref="bottomCardsContainer">
         <div class="manipulation-card" v-for="(card, i) in bottomCards" :key="'bottom-'+i" :title="card.tooltip" 
              @click="$emit('card-click', card.uniqueUsers)" 
              @mouseenter="$emit('log-action', 'hover_manipulation_card', { type: 'same_direction', time: card.timeLabel, usersCount: card.uniqueUsers.length })"
+             @mouseleave="$emit('log-action', 'cancel_hover', { hoverType: 'hover_manipulation_card' })"
              style="cursor: pointer;">
           <div class="card-time">{{ card.timeLabel }}</div>
           <div class="card-stats">{{ card.timeSpan }} | ${{ card.totalAmount }}</div>
@@ -730,7 +732,10 @@ export default {
       // Update hover interactions to use hoverRect
       hoverRect
         .on('mousemove', (e) => {
-          const [mx] = d3.pointer(e, hoverRect.node())
+          // Add debounce to not trigger too frequently on the same candle, but clear hover timeout on move
+          if (this.mouseMoveTimer) clearTimeout(this.mouseMoveTimer);
+          this.mouseMoveTimer = setTimeout(() => {
+            const [mx] = d3.pointer(e, hoverRect.node())
 
           // Find closest candle based on x position
           let closestDist = Infinity
@@ -837,9 +842,11 @@ export default {
                 ${d.sameDirectionCount > 0 ? `<div style="color:#e53e3e;">Same Dir: ${d.sameDirectionCount}</div>` : ''}
               `)
           } else {
+            this.$emit('log-action', 'cancel_hover', { hoverType: 'hover_kline' })
             g.selectAll('.crosshair').remove()
             tooltip.style('display', 'none')
           }
+          }, 50)
         })
         .on('click', (e) => {
           const [mx] = d3.pointer(e, hoverRect.node())
@@ -868,6 +875,8 @@ export default {
           }
         })
         .on('mouseleave', () => {
+          this.$emit('log-action', 'cancel_hover', { hoverType: 'hover_kline' })
+          if (this.mouseMoveTimer) clearTimeout(this.mouseMoveTimer);
           g.selectAll('.crosshair').remove()
           tooltip.style('display', 'none')
         })
@@ -1063,6 +1072,51 @@ export default {
       this.bottomCards.forEach((card, i) => {
         drawCard(card, false, i)
       })
+    },
+    handleCardScroll(event, containerRef) {
+      this.drawBands()
+      
+      const container = event.target
+      const scrollLeft = container.scrollLeft
+      
+      // Throttle logging the scroll action slightly so we don't spam emit for every pixel
+      // We rely on the parent component's log merging feature, but still want to reduce raw event spam
+      if (!this.scrollLogTimers) {
+        this.scrollLogTimers = {}
+      }
+      
+      if (this.scrollLogTimers[containerRef]) {
+        return; // Skip if we're throttling
+      }
+      
+      this.scrollLogTimers[containerRef] = setTimeout(() => {
+        const type = containerRef === 'topCardsContainer' ? 'round_trip' : 'same_direction'
+        
+        // Calculate which cards are currently visible in the container viewport
+        const containerWidth = container.clientWidth
+        const visibleCards = []
+        
+        const cardElements = container.querySelectorAll('.manipulation-card')
+        cardElements.forEach((el, index) => {
+          const rect = el.getBoundingClientRect()
+          const containerRect = container.getBoundingClientRect()
+          
+          // Check if the card is at least partially visible in the container's horizontal viewport
+          if (rect.right > containerRect.left && rect.left < containerRect.right) {
+            // Get the corresponding card data
+            const cardDataList = containerRef === 'topCardsContainer' ? this.topCards : this.bottomCards
+            if (cardDataList[index]) {
+              visibleCards.push(cardDataList[index].timeLabel)
+            }
+          }
+        })
+
+        this.$emit('log-action', 'scroll_manipulation_cards', { 
+          type: type, 
+          visibleCards: visibleCards 
+        })
+        this.scrollLogTimers[containerRef] = null
+      }, 150) // Increased throttle to 150ms since DOM calculations are slightly heavier
     },
     syncTimeWindow() {
       if (!this.syncTargetTimeWindow || !this.chartState || !this.ohlc.length) return

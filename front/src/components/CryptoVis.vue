@@ -354,6 +354,8 @@ export default {
       hoverTimers: {}, // Store timers for delayed hover logging
       isZooming: false, // Track if a zoom operation is actively happening
       zoomEndTimer: null, // Timer to clear the zooming state
+      isScrollingCards: false, // Track if a card scroll operation is actively happening
+      scrollCardsEndTimer: null, // Timer to clear the card scrolling state
       // ezio: annotation recording state
       annotationRecords: [], // Array to store snapshot annotations
       activeBottomTab: 'actions', // 'actions' | 'annotations'
@@ -387,7 +389,17 @@ export default {
     },
 
     logUserAction(actionType, actionInfo = {}, userId = null) {
-      // Mark as zooming when a zoom action starts to suppress hovers
+      // If it's a cancel hover action, clear the timer and return
+      if (actionType === 'cancel_hover') {
+        const hoverTypeToCancel = actionInfo.hoverType;
+        if (hoverTypeToCancel && this.hoverTimers[hoverTypeToCancel]) {
+          clearTimeout(this.hoverTimers[hoverTypeToCancel]);
+          this.hoverTimers[hoverTypeToCancel] = null;
+        }
+        return;
+      }
+
+      // Mark as zooming when a zoom action starts to suppress hovers and card scrolls
       if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart') {
         this.isZooming = true;
         if (this.zoomEndTimer) {
@@ -399,11 +411,33 @@ export default {
         }, 500);
       }
 
+      // If we are currently zooming the K-line chart, the manipulation cards might automatically scroll 
+      // due to alignment logic. We should ignore these auto-scrolls.
+      if (this.isZooming && actionType === 'scroll_manipulation_cards') {
+        return;
+      }
+
+      // Mark as scrolling cards to suppress manipulation card hovers
+      if (actionType === 'scroll_manipulation_cards') {
+        this.isScrollingCards = true;
+        if (this.scrollCardsEndTimer) {
+          clearTimeout(this.scrollCardsEndTimer);
+        }
+        // Assume scrolling is finished if no new scroll event arrives for 500ms
+        this.scrollCardsEndTimer = setTimeout(() => {
+          this.isScrollingCards = false;
+        }, 500);
+      }
+
       // For hover actions, implement a delay to avoid recording accidental fast fly-overs
       // Also, if the user is currently zooming (or recently zoomed), ignore hovers to prevent zoom misclicks
+      // If the user is scrolling cards, ignore card hovers specifically
       if (actionType.startsWith('hover_')) {
         if (this.isZooming) {
           return; // Ignore hovers entirely during zoom operations
+        }
+        if (this.isScrollingCards && actionType === 'hover_manipulation_card') {
+          return; // Ignore card hovers entirely during card scrolling operations
         }
 
         // Clear any existing timer for this specific hover type
@@ -414,13 +448,14 @@ export default {
         // We capture the timestamp at the moment the hover started
         const hoverStartTime = new Date().toISOString()
         
-        // Set a new timer. Only log if the user hovers for more than 500ms
+        // Set a new timer. Only log if the user hovers for more than the globally controlled threshold (3000ms)
         this.hoverTimers[actionType] = setTimeout(() => {
-          // Double check zooming state just in case it started while we were waiting
-          if (!this.isZooming) {
-            this._executeLogAction(actionType, actionInfo, userId, hoverStartTime)
-          }
-        }, 500)
+          // Double check zooming/scrolling state just in case it started while we were waiting
+          if (this.isZooming) return;
+          if (this.isScrollingCards && actionType === 'hover_manipulation_card') return;
+          
+          this._executeLogAction(actionType, actionInfo, userId, hoverStartTime)
+        }, 3000) // 3 seconds global threshold for hovers
         
         return; // Exit early, the actual logging happens in the timeout
       }
@@ -432,18 +467,30 @@ export default {
     _executeLogAction(actionType, actionInfo = {}, userId = null, customTimestamp = null) {
       const currentTimestamp = customTimestamp || new Date().toISOString()
       
-      // If it's a zoom action or hover action, try to merge with the previous action if it's also the same type
-      // and occurred recently (e.g., within 2 seconds for zoom, 3 seconds for hover)
-      if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart' || actionType.startsWith('hover_')) {
+      // If it's a zoom action, card scroll action, or hover action, try to merge with the previous action if it's also the same type.
+      // For hovers, we merge purely based on consecutive matching types, regardless of time elapsed.
+      // For navigation (zoom/scroll), we still enforce a 2-second time window for merging.
+      if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart' || actionType === 'scroll_manipulation_cards' || actionType.startsWith('hover_')) {
         const lastAction = this.userActionSequence[this.userActionSequence.length - 1]
         
         if (lastAction && lastAction.actionType === actionType) {
-          const lastTime = new Date(lastAction.timestamp).getTime()
-          const currentTime = new Date(currentTimestamp).getTime()
+          const isHoverAction = actionType.startsWith('hover_')
           
-          const timeLimit = actionType.startsWith('hover_') ? 3000 : 2000;
+          let shouldMerge = false
           
-          if (currentTime - lastTime < timeLimit) {
+          if (isHoverAction) {
+            // Merge all consecutive hovers of the same type infinitely
+            shouldMerge = true
+          } else {
+            // For zoom/scroll, enforce time limit
+            const lastTime = new Date(lastAction.timestamp).getTime()
+            const currentTime = new Date(currentTimestamp).getTime()
+            if (currentTime - lastTime < 2000) {
+              shouldMerge = true
+            }
+          }
+          
+          if (shouldMerge) {
             // Merge by accumulating the action's info and updating timestamp instead of pushing a new one
             lastAction.timestamp = currentTimestamp
             

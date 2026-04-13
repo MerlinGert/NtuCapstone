@@ -42,9 +42,14 @@ When merged, the `actionInfo` becomes an **Array** of objects: `[{ time: "ISOStr
 | :--- | :--- | :--- | :--- | :--- |
 | `zoom_kline_chart` | `K-line Chart` | `K-line Chart` | `{ timeWindow: [startTime, endTime] }` | User panned or zoomed the candlestick chart. |
 | `zoom_behavior_chart` | `Behavior Details` | `Behavior Details`| `{ timeWindow: [startTime, endTime] }` | User panned or zoomed the behavior sequence chart. |
+| `scroll_manipulation_cards` | `K-line Chart` | `K-line Chart` | `{ type: "round_trip" \| "same_direction", visibleCards: ["time_label1", "time_label2"] }` | User horizontally scrolled the manipulation card container, bringing new cards into view. **Note:** Card scrolling triggered automatically by zooming the K-line chart is suppressed and not logged. |
 
 ## 5. Hover Exploration Actions (Merged)
-Like navigation actions, hovers are merged into an array if they occur sequentially. The system also employs a 500ms debounce delay to filter out accidental, rapid mouse fly-overs. If a user is actively zooming/panning (`isZooming = true`), hover logging is completely suppressed to prevent misclicks.
+Like navigation actions, hovers are merged into an array if they occur sequentially. The system employs a **3000ms (3 seconds)** debounce delay to filter out accidental, rapid mouse fly-overs. If a user is actively zooming/panning (`isZooming = true`) or scrolling cards (`isScrollingCards = true`), hover logging is completely suppressed to prevent misclicks.
+
+If the user stops hovering before the 3 seconds are up, a `cancel_hover` action aborts the logging.
+
+**Hover Merging Rule:** Once a hover is successfully logged, if the very next action is another hover of the **exact same type**, they will be merged into a single action array regardless of how much time passed between them. Time limits only apply to merging navigation actions (zoom/scroll).
 
 | Action Type | Source View | Target View | Saved Information (`data` inside Array) | Description |
 | :--- | :--- | :--- | :--- | :--- |
