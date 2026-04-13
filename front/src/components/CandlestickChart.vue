@@ -81,6 +81,7 @@
 import * as d3 from 'd3'
 // ezio: import CandlestickSnapshot
 import CandlestickSnapshot from './CandlestickSnapshot.vue'
+import html2canvas from 'html2canvas'
 
 const COLORS = {
   bull: '#26a69a', // Green (欧美习惯：阳线涨为绿)
@@ -1230,32 +1231,21 @@ export default {
       alignCard('topCardsContainer', this.topCards)
       alignCard('bottomCardsContainer', this.bottomCards)
     },
-    // ezio: open snapshot modal
-    openSnapshot() {
-      this.snapshotPayload = this.captureSnapshot()
-      this.showSnapshot = true
-    },
-    // ezio: capture current K-line visualization state for snapshot
-    captureSnapshot() {
-      if (!this.chartState || this.ohlc.length === 0) return null
-
-      const state = this.chartState
-      const zt = this.zoomTransform
-      const initialZoom = zt ? { k: zt.k, x: zt.x, y: zt.y } : null
-
-      return {
-        time: new Date().toLocaleString(),
-        currentCoin: this.currentCoin,
-        currentGranularity: this.currentGranularity,
-        ohlc: this.ohlc.map(d => ({ ...d })),
-        visibleData: state.visibleData.map(d => ({ ...d })),
-        topCards: this.topCards,
-        bottomCards: this.bottomCards,
-        zoomTransform: initialZoom,
-        margin: { ...state.m },
-        W: state.W,
-        H: state.H,
-        iW: state.iW,
+    // ezio: open snapshot — screenshot the current view with html2canvas
+    async openSnapshot() {
+      const wrap = this.$refs.wrap
+      if (!wrap) return
+      try {
+        const canvas = await html2canvas(wrap, { backgroundColor: '#ffffff', scale: 1, useCORS: true })
+        this.snapshotPayload = {
+          imageDataUrl: canvas.toDataURL(),
+          currentCoin: this.currentCoin,
+          currentGranularity: this.currentGranularity,
+          time: new Date().toLocaleString(),
+        }
+        this.showSnapshot = true
+      } catch (e) {
+        console.error('Snapshot capture failed', e)
       }
     },
   },
