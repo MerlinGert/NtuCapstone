@@ -354,7 +354,7 @@ export default {
         return;
       }
 
-      // Mark as zooming when a zoom action starts to suppress hovers
+      // Mark as zooming when a zoom action starts to suppress hovers and card scrolls
       if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart') {
         this.isZooming = true;
         if (this.zoomEndTimer) {
@@ -364,6 +364,12 @@ export default {
         this.zoomEndTimer = setTimeout(() => {
           this.isZooming = false;
         }, 500);
+      }
+
+      // If we are currently zooming the K-line chart, the manipulation cards might automatically scroll 
+      // due to alignment logic. We should ignore these auto-scrolls.
+      if (this.isZooming && actionType === 'scroll_manipulation_cards') {
+        return;
       }
 
       // Mark as scrolling cards to suppress manipulation card hovers
@@ -416,18 +422,30 @@ export default {
     _executeLogAction(actionType, actionInfo = {}, userId = null, customTimestamp = null) {
       const currentTimestamp = customTimestamp || new Date().toISOString()
       
-      // If it's a zoom action, card scroll action, or hover action, try to merge with the previous action if it's also the same type
-      // and occurred recently (e.g., within 2 seconds for zoom/scroll, 3 seconds for hover)
+      // If it's a zoom action, card scroll action, or hover action, try to merge with the previous action if it's also the same type.
+      // For hovers, we merge purely based on consecutive matching types, regardless of time elapsed.
+      // For navigation (zoom/scroll), we still enforce a 2-second time window for merging.
       if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart' || actionType === 'scroll_manipulation_cards' || actionType.startsWith('hover_')) {
         const lastAction = this.userActionSequence[this.userActionSequence.length - 1]
         
         if (lastAction && lastAction.actionType === actionType) {
-          const lastTime = new Date(lastAction.timestamp).getTime()
-          const currentTime = new Date(currentTimestamp).getTime()
+          const isHoverAction = actionType.startsWith('hover_')
           
-          const timeLimit = actionType.startsWith('hover_') ? 3000 : 2000;
+          let shouldMerge = false
           
-          if (currentTime - lastTime < timeLimit) {
+          if (isHoverAction) {
+            // Merge all consecutive hovers of the same type infinitely
+            shouldMerge = true
+          } else {
+            // For zoom/scroll, enforce time limit
+            const lastTime = new Date(lastAction.timestamp).getTime()
+            const currentTime = new Date(currentTimestamp).getTime()
+            if (currentTime - lastTime < 2000) {
+              shouldMerge = true
+            }
+          }
+          
+          if (shouldMerge) {
             // Merge by accumulating the action's info and updating timestamp instead of pushing a new one
             lastAction.timestamp = currentTimestamp
             
