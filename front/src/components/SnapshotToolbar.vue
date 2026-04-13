@@ -21,6 +21,14 @@
         <circle cx="11" cy="11" r="2"/>
       </svg>
     </button>
+    <!-- ezio: Box / Rect tool -->
+    <button class="tb-btn" :class="{ active: tool === 'rect' }"
+      @click="$emit('update:tool', 'rect')" title="Box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+      </svg>
+    </button>
     <!-- Eraser tool -->
     <button class="tb-btn" :class="{ active: tool === 'eraser' }"
       @click="$emit('update:tool', 'eraser')" title="Eraser">
@@ -37,7 +45,7 @@
       class="color-swatch" :class="{ active: color === c.value }"
       :style="{ background: c.value }"
       :title="c.label"
-      @click="$emit('update:color', c.value); $emit('update:tool', 'pen')">
+      @click="onColorClick(c.value)">
     </span>
 
     <span class="tb-sep"></span>
@@ -74,6 +82,15 @@ export default {
         { value: 'rgba(50,50,50,0.8)',     label: 'Black' }
       ]
     };
+  },
+  methods: {
+    // ezio: keep rect tool active when changing color; otherwise switch to pen
+    onColorClick(color) {
+      this.$emit('update:color', color);
+      if (this.tool !== 'rect') {
+        this.$emit('update:tool', 'pen');
+      }
+    }
   }
 };
 </script>

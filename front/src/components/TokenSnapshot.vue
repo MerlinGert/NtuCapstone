@@ -324,25 +324,32 @@ export default {
             this.redrawCanvas();
         },
 
-        // ezio: redraw persistent sketch strokes on canvas
+        // ezio: redraw persistent sketch strokes and rects on canvas
         redrawCanvas() {
             const canvas = this.$refs.lassoCanvas;
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             this.sketchStrokes.forEach(stroke => {
-                if (stroke.points.length < 2) return;
-                ctx.beginPath();
-                ctx.moveTo(stroke.points[0][0], stroke.points[0][1]);
-                for (let i = 1; i < stroke.points.length; i++) {
-                    ctx.lineTo(stroke.points[i][0], stroke.points[i][1]);
-                }
                 ctx.strokeStyle = stroke.color;
                 ctx.lineWidth = stroke.width;
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
                 ctx.setLineDash([]);
-                ctx.stroke();
+                // ezio: dispatch on type — rect vs freehand stroke
+                if (stroke.type === 'rect') {
+                    ctx.beginPath();
+                    ctx.rect(stroke.x, stroke.y, stroke.w, stroke.h);
+                    ctx.stroke();
+                } else {
+                    if (stroke.points.length < 2) return;
+                    ctx.beginPath();
+                    ctx.moveTo(stroke.points[0][0], stroke.points[0][1]);
+                    for (let i = 1; i < stroke.points.length; i++) {
+                        ctx.lineTo(stroke.points[i][0], stroke.points[i][1]);
+                    }
+                    ctx.stroke();
+                }
             });
         },
 
@@ -426,11 +433,21 @@ export default {
 
             // ezio: capture vm for use in event listeners
             const vm = this;
+            // ezio: rect tool drag origin
+            let rectStart = null;
 
-            // ezio: eraser hit-test helper — returns true if (x,y) is near any point in a stroke
+            // ezio: hit-test helper for both freehand strokes and rects
             const ERASER_RADIUS = 10;
-            const isNearStroke = (stroke, x, y) => {
-                return stroke.points.some(([px, py]) => Math.hypot(px - x, py - y) < ERASER_RADIUS);
+            const isNearItem = (item, x, y) => {
+                if (item.type === 'rect') {
+                    const { x: rx, y: ry, w: rw, h: rh } = item;
+                    const nearLeft   = Math.abs(x - rx) < ERASER_RADIUS && y >= ry - ERASER_RADIUS && y <= ry + rh + ERASER_RADIUS;
+                    const nearRight  = Math.abs(x - (rx + rw)) < ERASER_RADIUS && y >= ry - ERASER_RADIUS && y <= ry + rh + ERASER_RADIUS;
+                    const nearTop    = Math.abs(y - ry) < ERASER_RADIUS && x >= rx - ERASER_RADIUS && x <= rx + rw + ERASER_RADIUS;
+                    const nearBottom = Math.abs(y - (ry + rh)) < ERASER_RADIUS && x >= rx - ERASER_RADIUS && x <= rx + rw + ERASER_RADIUS;
+                    return nearLeft || nearRight || nearTop || nearBottom;
+                }
+                return item.points.some(([px, py]) => Math.hypot(px - x, py - y) < ERASER_RADIUS);
             };
 
             canvas.addEventListener("mousedown", (e) => {
@@ -441,9 +458,12 @@ export default {
                 const y = e.clientY - rect.top;
                 points = [[x, y]];
 
-                // ezio: eraser immediately erases on mousedown
-                if (vm.activeTool === 'eraser') {
-                    vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y));
+                // ezio: rect tool records drag origin
+                if (vm.activeTool === 'rect') {
+                    rectStart = { x, y };
+                } else if (vm.activeTool === 'eraser') {
+                    // ezio: eraser immediately erases on mousedown
+                    vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearItem(s, x, y));
                 }
                 vm.redrawCanvas();
             });
@@ -472,9 +492,22 @@ export default {
                         ctx.setLineDash([]);
                         ctx.stroke();
                     }
+                } else if (vm.activeTool === 'rect' && rectStart) {
+                    // ezio: draw preview rectangle while dragging
+                    vm.redrawCanvas();
+                    const rx = Math.min(rectStart.x, x);
+                    const ry = Math.min(rectStart.y, y);
+                    const rw = Math.abs(x - rectStart.x);
+                    const rh = Math.abs(y - rectStart.y);
+                    ctx.beginPath();
+                    ctx.rect(rx, ry, rw, rh);
+                    ctx.strokeStyle = vm.penColor;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([]);
+                    ctx.stroke();
                 } else if (vm.activeTool === 'eraser') {
                     // ezio: erase strokes touched by the eraser path
-                    vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y));
+                    vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearItem(s, x, y));
                     vm.redrawCanvas();
                 } else {
                     // select mode: draw lasso polygon
@@ -507,6 +540,20 @@ export default {
                             width: 2
                         });
                     }
+                    vm.redrawCanvas();
+                } else if (vm.activeTool === 'rect' && rectStart) {
+                    // ezio: finalize rectangle
+                    const rect = canvas.getBoundingClientRect();
+                    const fx = e.clientX - rect.left;
+                    const fy = e.clientY - rect.top;
+                    const rx = Math.min(rectStart.x, fx);
+                    const ry = Math.min(rectStart.y, fy);
+                    const rw = Math.abs(fx - rectStart.x);
+                    const rh = Math.abs(fy - rectStart.y);
+                    if (rw > 2 || rh > 2) {
+                        vm.sketchStrokes.push({ type: 'rect', x: rx, y: ry, w: rw, h: rh, color: vm.penColor, width: 2 });
+                    }
+                    rectStart = null;
                     vm.redrawCanvas();
                 } else if (vm.activeTool === 'eraser') {
                     vm.redrawCanvas();
@@ -607,6 +654,7 @@ export default {
 /* ezio: cursor per tool */
 .lasso-overlay.cursor-select { cursor: crosshair; }
 .lasso-overlay.cursor-pen    { cursor: crosshair; }
+.lasso-overlay.cursor-rect    { cursor: crosshair; }
 .lasso-overlay.cursor-eraser { cursor: pointer; }
 
 /* 可视化区域：固定高度 */

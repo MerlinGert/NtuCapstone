@@ -204,27 +204,37 @@ export default {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const t = this._currentTransform;
       const margin = this._margin || { left: 40 };
-      // Redraw all persistent strokes with zoom-adjusted X coordinates
+      // Redraw all persistent strokes and rects with zoom-adjusted X coordinates
       this.sketchStrokes.forEach(stroke => {
-        if (stroke.points.length < 2) return;
-        ctx.beginPath();
-        // ezio: convert data-space X back to screen-space using current zoom transform
-        const sx = stroke.points[0][0];
-        const sy = stroke.points[0][1];
-        const screenX0 = t.applyX(sx - margin.left) + margin.left;
-        ctx.moveTo(screenX0, sy);
-        for (let i = 1; i < stroke.points.length; i++) {
-          const px = stroke.points[i][0];
-          const py = stroke.points[i][1];
-          const screenX = t.applyX(px - margin.left) + margin.left;
-          ctx.lineTo(screenX, py);
-        }
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = stroke.width;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.setLineDash([]);
-        ctx.stroke();
+        // ezio: dispatch on type — rect vs freehand stroke
+        if (stroke.type === 'rect') {
+          const screenX = t.applyX(stroke.x - margin.left) + margin.left;
+          const screenX2 = t.applyX((stroke.x + stroke.w) - margin.left) + margin.left;
+          const screenW = screenX2 - screenX;
+          ctx.beginPath();
+          ctx.rect(screenX, stroke.y, screenW, stroke.h);
+          ctx.stroke();
+        } else {
+          if (stroke.points.length < 2) return;
+          ctx.beginPath();
+          // ezio: convert data-space X back to screen-space using current zoom transform
+          const sx = stroke.points[0][0];
+          const sy = stroke.points[0][1];
+          const screenX0 = t.applyX(sx - margin.left) + margin.left;
+          ctx.moveTo(screenX0, sy);
+          for (let i = 1; i < stroke.points.length; i++) {
+            const px = stroke.points[i][0];
+            const py = stroke.points[i][1];
+            const screenX = t.applyX(px - margin.left) + margin.left;
+            ctx.lineTo(screenX, py);
+          }
+          ctx.stroke();
+        }
       });
     },
 
@@ -810,17 +820,31 @@ export default {
       let dragStartY = 0;
       let isPanning = false;
 
-      // ezio: eraser hit-test helper — returns true if (x,y) is near any point in a stroke
+      // ezio: hit-test helper for both freehand strokes and rects (zoom-aware)
       const ERASER_RADIUS = 10;
-      const isNearStroke = (stroke, x, y) => {
-        // ezio: convert data-space points to screen-space for comparison
+      const isNearItem = (item, x, y) => {
         const t = vm._currentTransform;
         const margin = vm._margin || { left: 40 };
-        return stroke.points.some(([px, py]) => {
+        // ezio: rect edge-proximity detection with zoom transform
+        if (item.type === 'rect') {
+          const screenX = t.applyX(item.x - margin.left) + margin.left;
+          const screenX2 = t.applyX((item.x + item.w) - margin.left) + margin.left;
+          const screenW = screenX2 - screenX;
+          const ry = item.y, rh = item.h;
+          const nearLeft   = Math.abs(x - screenX) < ERASER_RADIUS && y >= ry - ERASER_RADIUS && y <= ry + rh + ERASER_RADIUS;
+          const nearRight  = Math.abs(x - (screenX + screenW)) < ERASER_RADIUS && y >= ry - ERASER_RADIUS && y <= ry + rh + ERASER_RADIUS;
+          const nearTop    = Math.abs(y - ry) < ERASER_RADIUS && x >= screenX - ERASER_RADIUS && x <= screenX + screenW + ERASER_RADIUS;
+          const nearBottom = Math.abs(y - (ry + rh)) < ERASER_RADIUS && x >= screenX - ERASER_RADIUS && x <= screenX + screenW + ERASER_RADIUS;
+          return nearLeft || nearRight || nearTop || nearBottom;
+        }
+        // ezio: convert data-space points to screen-space for comparison
+        return item.points.some(([px, py]) => {
           const screenX = t.applyX(px - margin.left) + margin.left;
           return Math.hypot(screenX - x, py - y) < ERASER_RADIUS;
         });
       };
+      // ezio: rect tool drag origin
+      let rectStart = null;
 
       // ezio: forward wheel events from canvas to d3.zoom for X-axis zoom
       canvas.addEventListener('wheel', (e) => {
@@ -842,9 +866,12 @@ export default {
         dragStartY = y;
         currentPoints = [[x, y]];
 
-        // ezio: eraser immediately erases on mousedown
-        if (vm.activeTool === 'eraser') {
-          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y));
+        // ezio: rect tool records drag origin
+        if (vm.activeTool === 'rect') {
+          rectStart = { x, y };
+        } else if (vm.activeTool === 'eraser') {
+          // ezio: eraser immediately erases on mousedown
+          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearItem(s, x, y));
         }
         vm.redrawCanvas();
       });
@@ -874,9 +901,22 @@ export default {
             ctx.setLineDash([]);
             ctx.stroke();
           }
+        } else if (vm.activeTool === 'rect' && rectStart) {
+          // ezio: draw preview rectangle while dragging
+          vm.redrawCanvas();
+          const rx = Math.min(rectStart.x, x);
+          const ry = Math.min(rectStart.y, y);
+          const rw = Math.abs(x - rectStart.x);
+          const rh = Math.abs(y - rectStart.y);
+          ctx.beginPath();
+          ctx.rect(rx, ry, rw, rh);
+          ctx.strokeStyle = vm.penColor;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]);
+          ctx.stroke();
         } else if (vm.activeTool === 'eraser') {
           // ezio: erase strokes touched by the eraser path
-          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y));
+          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearItem(s, x, y));
           vm.redrawCanvas();
         } else {
           // ezio: select mode — drag to pan if moved > 5px
@@ -927,6 +967,28 @@ export default {
               width: 2
             });
           }
+          vm.redrawCanvas();
+        } else if (vm.activeTool === 'rect' && rectStart) {
+          // ezio: finalize rectangle — convert screen X to data-space
+          const rx = Math.min(rectStart.x, x);
+          const ry = Math.min(rectStart.y, y);
+          const rw = Math.abs(x - rectStart.x);
+          const rh = Math.abs(y - rectStart.y);
+          if (rw > 2 || rh > 2) {
+            const t = vm._currentTransform;
+            const margin = vm._margin;
+            const dataX = t.invertX(rx - margin.left) + margin.left;
+            const dataX2 = t.invertX((rx + rw) - margin.left) + margin.left;
+            const dataW = dataX2 - dataX;
+            const rectObj = { type: 'rect', x: dataX, y: ry, w: dataW, h: rh, color: vm.penColor, width: 2 };
+            vm.sketchStrokes.push(rectObj);
+            // ezio: record sketch-rect operation
+            vm.recordOperation('sketch-rect', {
+              strokeIndex: vm.sketchStrokes.length - 1,
+              ...rectObj
+            });
+          }
+          rectStart = null;
           vm.redrawCanvas();
         } else if (vm.activeTool === 'eraser') {
           // ezio: eraser mouseup — just redraw
@@ -997,6 +1059,19 @@ export default {
           case 'sketch':
             this.sketchStrokes.push({
               points: entry.payload.points,
+              color: entry.payload.color,
+              width: entry.payload.width
+            });
+            this.redrawCanvas();
+            break;
+          // ezio: replay rect sketch operations
+          case 'sketch-rect':
+            this.sketchStrokes.push({
+              type: 'rect',
+              x: entry.payload.x,
+              y: entry.payload.y,
+              w: entry.payload.w,
+              h: entry.payload.h,
               color: entry.payload.color,
               width: entry.payload.width
             });
@@ -1090,6 +1165,7 @@ export default {
 /* ezio: cursor per tool */
 .lasso-overlay.cursor-select { cursor: pointer; }
 .lasso-overlay.cursor-pen    { cursor: crosshair; }
+.lasso-overlay.cursor-rect    { cursor: crosshair; }
 .lasso-overlay.cursor-eraser { cursor: pointer; }
 
 .lasso-overlay {

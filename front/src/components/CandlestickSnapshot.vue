@@ -68,17 +68,24 @@ export default {
       const ctx = canvas.getContext('2d')
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       this.sketchStrokes.forEach(stroke => {
-        if (stroke.points.length < 2) return
-        ctx.beginPath()
-        ctx.moveTo(stroke.points[0][0], stroke.points[0][1])
-        for (let i = 1; i < stroke.points.length; i++) {
-          ctx.lineTo(stroke.points[i][0], stroke.points[i][1])
-        }
         ctx.strokeStyle = stroke.color
         ctx.lineWidth = stroke.width
         ctx.lineCap = 'round'
         ctx.lineJoin = 'round'
-        ctx.stroke()
+        // ezio: dispatch on type — rect vs freehand stroke
+        if (stroke.type === 'rect') {
+          ctx.beginPath()
+          ctx.rect(stroke.x, stroke.y, stroke.w, stroke.h)
+          ctx.stroke()
+        } else {
+          if (stroke.points.length < 2) return
+          ctx.beginPath()
+          ctx.moveTo(stroke.points[0][0], stroke.points[0][1])
+          for (let i = 1; i < stroke.points.length; i++) {
+            ctx.lineTo(stroke.points[i][0], stroke.points[i][1])
+          }
+          ctx.stroke()
+        }
       })
     },
 
@@ -124,10 +131,22 @@ export default {
 
       let isDrawing = false
       let points = []
+      // ezio: rect tool drag origin
+      let rectStart = null
 
       const ERASER_RADIUS = 10
-      const isNearStroke = (stroke, x, y) =>
-        stroke.points.some(([px, py]) => Math.hypot(px - x, py - y) < ERASER_RADIUS)
+      // ezio: hit-test for both freehand strokes and rects
+      const isNearItem = (item, x, y) => {
+        if (item.type === 'rect') {
+          const { x: rx, y: ry, w: rw, h: rh } = item
+          const nearLeft   = Math.abs(x - rx) < ERASER_RADIUS && y >= ry - ERASER_RADIUS && y <= ry + rh + ERASER_RADIUS
+          const nearRight  = Math.abs(x - (rx + rw)) < ERASER_RADIUS && y >= ry - ERASER_RADIUS && y <= ry + rh + ERASER_RADIUS
+          const nearTop    = Math.abs(y - ry) < ERASER_RADIUS && x >= rx - ERASER_RADIUS && x <= rx + rw + ERASER_RADIUS
+          const nearBottom = Math.abs(y - (ry + rh)) < ERASER_RADIUS && x >= rx - ERASER_RADIUS && x <= rx + rw + ERASER_RADIUS
+          return nearLeft || nearRight || nearTop || nearBottom
+        }
+        return item.points.some(([px, py]) => Math.hypot(px - x, py - y) < ERASER_RADIUS)
+      }
 
       canvas.addEventListener('mousedown', (e) => {
         isDrawing = true
@@ -135,8 +154,11 @@ export default {
         const x = e.clientX - rect.left
         const y = e.clientY - rect.top
         points = [[x, y]]
-        if (vm.activeTool === 'eraser') {
-          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y))
+        // ezio: rect tool records drag origin
+        if (vm.activeTool === 'rect') {
+          rectStart = { x, y }
+        } else if (vm.activeTool === 'eraser') {
+          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearItem(s, x, y))
           vm.redrawCanvas()
         }
       })
@@ -160,17 +182,42 @@ export default {
             ctx.lineJoin = 'round'
             ctx.stroke()
           }
+        } else if (vm.activeTool === 'rect' && rectStart) {
+          // ezio: draw preview rectangle while dragging
+          vm.redrawCanvas()
+          const rx = Math.min(rectStart.x, x)
+          const ry = Math.min(rectStart.y, y)
+          const rw = Math.abs(x - rectStart.x)
+          const rh = Math.abs(y - rectStart.y)
+          ctx.beginPath()
+          ctx.rect(rx, ry, rw, rh)
+          ctx.strokeStyle = vm.penColor
+          ctx.lineWidth = 2
+          ctx.stroke()
         } else if (vm.activeTool === 'eraser') {
-          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearStroke(s, x, y))
+          vm.sketchStrokes = vm.sketchStrokes.filter(s => !isNearItem(s, x, y))
           vm.redrawCanvas()
         }
       })
 
-      canvas.addEventListener('mouseup', () => {
+      canvas.addEventListener('mouseup', (e) => {
         if (!isDrawing) return
         isDrawing = false
         if (vm.activeTool === 'pen' && points.length >= 2) {
           vm.sketchStrokes.push({ points: points.slice(), color: vm.penColor, width: 2 })
+        } else if (vm.activeTool === 'rect' && rectStart) {
+          // ezio: finalize rectangle
+          const rect = canvas.getBoundingClientRect()
+          const x = e.clientX - rect.left
+          const y = e.clientY - rect.top
+          const rx = Math.min(rectStart.x, x)
+          const ry = Math.min(rectStart.y, y)
+          const rw = Math.abs(x - rectStart.x)
+          const rh = Math.abs(y - rectStart.y)
+          if (rw > 2 || rh > 2) {
+            vm.sketchStrokes.push({ type: 'rect', x: rx, y: ry, w: rw, h: rh, color: vm.penColor, width: 2 })
+          }
+          rectStart = null
         }
         vm.redrawCanvas()
         points = []
@@ -230,6 +277,7 @@ export default {
 }
 .sketch-overlay.cursor-select { cursor: default; }
 .sketch-overlay.cursor-pen { cursor: crosshair; }
+.sketch-overlay.cursor-rect { cursor: crosshair; }
 .sketch-overlay.cursor-eraser { cursor: pointer; }
 
 .floating-toolbar {
