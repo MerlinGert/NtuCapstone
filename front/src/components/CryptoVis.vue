@@ -65,20 +65,41 @@
                 @detection-complete="handleDetectionComplete"
                 @user-selected="handleUserSelect"
                 @log-action="logUserAction"
+                @snapshot-input="handleSnapshotAnnotation('token_distribution', $event)"
             />
         </n-card>
         
-        <n-card
-            size="small"
-            class="panel-card"
-            style="width:100%;height:40%;flex-shrink:0;"
-            header-style="text-align:left;height:50px;font-size:1.4em;"
-            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
-        >
+        <!-- ezio: tab-switched panel for User Actions / Annotations -->
+        <div class="bottom-tab-panel" style="width:100%;height:40%;flex-shrink:0; display:flex; flex-direction:column; border:1px solid #efeff5; border-radius:3px; background:#fff;">
+          <div class="tab-header" style="flex-shrink:0; display:flex; border-bottom:1px solid #eef2f7; background:#f8fafc;">
+            <button
+              class="tab-btn"
+              :class="{ active: activeBottomTab === 'actions' }"
+              @click="activeBottomTab = 'actions'"
+              style="flex:1; padding:6px 0; border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:#718096; border-bottom:2px solid transparent; transition: all 0.2s;"
+              :style="activeBottomTab === 'actions' ? 'color:#3182ce; border-bottom-color:#3182ce; background:#fff;' : ''"
+            >User Actions</button>
+            <button
+              class="tab-btn"
+              :class="{ active: activeBottomTab === 'annotations' }"
+              @click="activeBottomTab = 'annotations'"
+              style="flex:1; padding:6px 0; border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:#718096; border-bottom:2px solid transparent; transition: all 0.2s;"
+              :style="activeBottomTab === 'annotations' ? 'color:#d97706; border-bottom-color:#d97706; background:#fff;' : ''"
+            >Annotations</button>
+          </div>
+          <div style="flex:1; height:0; min-height:0; overflow:hidden;">
             <UserActionTimeline
+                v-show="activeBottomTab === 'actions'"
                 :actions="userActionSequence"
+                style="height:100%;"
             />
-        </n-card>
+            <AnnotationTimeline
+                v-show="activeBottomTab === 'annotations'"
+                :annotations="annotationRecords"
+                style="height:100%;"
+            />
+          </div>
+        </div>
     </div>
 
 
@@ -102,6 +123,7 @@
                 @time-window-changed="handleKlineTimeWindowChanged"
                 @card-click="handleManipulationCardClick"
                 @log-action="logUserAction"
+                @snapshot-input="handleSnapshotAnnotation('candlestick_chart', $event)"
                 style="width:100%;height:100%;"
               />
             </div>
@@ -135,6 +157,7 @@
                 @time-window-changed="handleBehaviorTimeWindowChanged"
                 @user-selected="handleBehaviorDetailUserSelect"
                 @log-action="logUserAction"
+                @snapshot-input="handleSnapshotAnnotation('behavior_details', $event)"
             />
         </n-card>
     </div>
@@ -167,6 +190,8 @@ import CandlestickChart from './CandlestickChart.vue'
 import ControlPanel from './ControlPanel.vue'
 import TokenDistribution from './TokenDistribution.vue'
 import UserActionTimeline from './UserActionTimeline.vue'
+// ezio: import AnnotationTimeline for snapshot annotation display
+import AnnotationTimeline from './AnnotationTimeline.vue'
 
 export default {
   components: {
@@ -184,6 +209,7 @@ export default {
     CandlestickChart,
     BehaviorDetails,
     UserActionTimeline,
+    AnnotationTimeline,
   },
   data() {
     return {
@@ -328,6 +354,10 @@ export default {
       hoverTimers: {}, // Store timers for delayed hover logging
       isZooming: false, // Track if a zoom operation is actively happening
       zoomEndTimer: null, // Timer to clear the zooming state
+      // ezio: annotation recording state
+      annotationRecords: [], // Array to store snapshot annotations
+      activeBottomTab: 'actions', // 'actions' | 'annotations'
+      _annotationSeqId: 0, // auto-increment ID for annotations
     }
   },
   watch: {
@@ -341,6 +371,21 @@ export default {
     },
   },
   methods: {
+    // ezio: handle annotation submission from snapshot modals
+    handleSnapshotAnnotation(sourceView, payload) {
+      const record = {
+        id: this._annotationSeqId++,
+        timestamp: new Date().toISOString(),
+        sourceView,
+        text: payload.text || '',
+        selectedItems: payload.selectedItems || payload.selectedIds || [],
+        sketchDataUrl: payload.sketchDataUrl || null,
+      }
+      this.annotationRecords.push(record)
+      // ezio: auto-switch to annotations tab when a new annotation arrives
+      this.activeBottomTab = 'annotations'
+    },
+
     logUserAction(actionType, actionInfo = {}, userId = null) {
       // Mark as zooming when a zoom action starts to suppress hovers
       if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart') {

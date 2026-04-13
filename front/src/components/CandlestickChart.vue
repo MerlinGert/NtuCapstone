@@ -3,7 +3,9 @@
     <div class="header-panel">
       <div class="panel-title" style="display: flex; align-items: center; gap: 10px;">
         {{ currentCoin }} K-Line
-        <button 
+        <!-- ezio: Snapshot button -->
+        <button @click="openSnapshot" style="padding:3px 6px; cursor:pointer; background-color:#4caf50; color:white; border:none; border-radius:4px; font-weight:bold; font-size:12px;">Snapshot</button>
+        <button
           v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
           class="sync-btn" 
           @click="() => {
@@ -67,11 +69,18 @@
         <div v-if="bottomCards.length === 0" class="empty-cards">No Same Direction manipulations</div>
       </div>
     </div>
+
+    <!-- ezio: Candlestick Snapshot Modal -->
+    <div v-if="showSnapshot" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; display:flex; justify-content:center; align-items:center;">
+      <CandlestickSnapshot :snapshot-data="snapshotPayload" @close="showSnapshot = false" @snapshot-input="$emit('snapshot-input', $event)" />
+    </div>
   </div>
 </template>
 
 <script>
 import * as d3 from 'd3'
+// ezio: import CandlestickSnapshot
+import CandlestickSnapshot from './CandlestickSnapshot.vue'
 
 const COLORS = {
   bull: '#26a69a', // Green (欧美习惯：阳线涨为绿)
@@ -94,11 +103,9 @@ const GRANULARITIES = [
 
 export default {
   name: 'CandlestickChart',
+  // ezio
+  components: { CandlestickSnapshot },
   props: {
-    token: {
-      type: String,
-      default: 'ACT'
-    },
     manipulationResults: {
       type: Array,
       default: () => [],
@@ -122,6 +129,9 @@ export default {
       resizeObs: null,
       panelWidth: 400,
       zoomTransform: null,
+      // ezio: snapshot state
+      showSnapshot: false,
+      snapshotPayload: null,
     }
   },
   computed: {
@@ -293,9 +303,6 @@ export default {
   watch: {
     currentGranularity() {
       this.refresh()
-    },
-    token() {
-      this.loadData()
     },
     manipulationResults: {
       deep: true,
@@ -1222,6 +1229,34 @@ export default {
 
       alignCard('topCardsContainer', this.topCards)
       alignCard('bottomCardsContainer', this.bottomCards)
+    },
+    // ezio: open snapshot modal
+    openSnapshot() {
+      this.snapshotPayload = this.captureSnapshot()
+      this.showSnapshot = true
+    },
+    // ezio: capture current K-line visualization state for snapshot
+    captureSnapshot() {
+      if (!this.chartState || this.ohlc.length === 0) return null
+
+      const state = this.chartState
+      const zt = this.zoomTransform
+      const initialZoom = zt ? { k: zt.k, x: zt.x, y: zt.y } : null
+
+      return {
+        time: new Date().toLocaleString(),
+        currentCoin: this.currentCoin,
+        currentGranularity: this.currentGranularity,
+        ohlc: this.ohlc.map(d => ({ ...d })),
+        visibleData: state.visibleData.map(d => ({ ...d })),
+        topCards: this.topCards,
+        bottomCards: this.bottomCards,
+        zoomTransform: initialZoom,
+        margin: { ...state.m },
+        W: state.W,
+        H: state.H,
+        iW: state.iW,
+      }
     },
   },
 }

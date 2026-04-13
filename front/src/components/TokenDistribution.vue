@@ -5,7 +5,7 @@
             <div class="panel-title">{{ displayTime }}</div>
             <div class="control-group">
                 <label>Scale:</label>
-                <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="drawChart">
+                <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="onScaleChange">
                 <span>{{ scaleFactor }}</span>
                 <span style="margin-left: 10px;">Active Users: {{ userCount }}</span>
             </div>
@@ -15,7 +15,8 @@
 
         <!-- ezio: Snapshot Modal -->
         <div v-if="showSnapshot" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
-            <TokenSnapshot :snapshot-data="snapshotPayload" @close="showSnapshot = false" />
+            <!-- ezio: bubble snapshot-input event to parent -->
+            <TokenSnapshot :snapshot-data="snapshotPayload" @close="showSnapshot = false" @snapshot-input="$emit('snapshot-input', $event)" />
         </div>
 
         <!-- Chart -->

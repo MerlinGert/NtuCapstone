@@ -52,6 +52,8 @@
             <span class="toggle-text">Show Manipulation Boxes</span>
           </div>
         </div>
+        <!-- ezio: Snapshot button -->
+        <button @click="openSnapshot" class="snapshot-btn" style="padding: 3px 6px; cursor: pointer; background-color: #4caf50; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; margin-left: 8px;">Snapshot</button>
       </div>
       
       <div class="data-view">
@@ -65,14 +67,23 @@
         </div>
       </div>
     </div>
+    <!-- ezio: Behavior Snapshot Modal -->
+    <div v-if="showSnapshot" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+      <!-- ezio: bubble snapshot-input event to parent -->
+      <BehaviorSnapshot :snapshot-data="snapshotPayload" @close="showSnapshot = false" @snapshot-input="$emit('snapshot-input', $event)" />
+    </div>
   </div>
 </template>
 
 <script>
-import * as d3 from 'd3'
+import * as d3 from 'd3';
+// ezio: import BehaviorSnapshot
+import BehaviorSnapshot from './BehaviorSnapshot.vue';
 
 export default {
   name: 'BehaviorDetails',
+  // ezio: register BehaviorSnapshot component
+  components: { BehaviorSnapshot },
   props: {
     selectedUser: {
       type: String,
@@ -106,8 +117,10 @@ export default {
   data() {
     return {
       showManipulationBoxes: true,
-      showRelatedUsers: false,
-    }
+      // ezio: snapshot state
+      showSnapshot: false,
+      snapshotPayload: null
+    };
   },
   watch: {
     behaviorData: {
@@ -151,6 +164,36 @@ export default {
       if (this.behaviorData && Object.keys(this.behaviorData).length > 0) {
         this.drawChart()
       }
+    },
+    // ezio: open snapshot modal
+    openSnapshot() {
+      this.snapshotPayload = this.captureSnapshot();
+      this.showSnapshot = true;
+    },
+    // ezio: capture current visualization state for snapshot — directly reuses drawChart() computed data
+    captureSnapshot() {
+      if (!this._lastChartState) return null;
+
+      const state = this._lastChartState;
+      // ezio: [2/3 DetailSnapshot initial state] include saved zoom transform in payload so snapshot opens at same view
+      const zt = this._currentZoomTransform;
+      const initialZoom = zt ? { k: zt.k, x: zt.x, y: zt.y } : null;
+
+      return {
+        time: this.snapshotTime,
+        selectedUser: this.selectedUser,
+        sortedUsers: state.sortedUsers,
+        filteredData: state.filteredData,
+        sequenceData: state.sequenceData,
+        timeDomain: state.timeDomain,
+        entityInfo: this.entityInfo,
+        entityUsers: state.entityUsers,
+        manipulationResults: this.manipulationResults,
+        showManipulationBoxes: this.showManipulationBoxes,
+        isFewUsers: state.isFewUsers,
+        eventBoxPadding: state.eventBoxPadding,
+        initialZoom
+      };
     },
     drawChart() {
       const container = this.$refs.chartContainer
@@ -340,6 +383,17 @@ export default {
 
         sequenceData[user] = { seq: finalSeq, earningEvents }
       })
+
+      // ezio: save chart state so captureSnapshot() can reuse exactly what drawChart() computed
+      this._lastChartState = {
+        sortedUsers,
+        filteredData,
+        sequenceData,
+        timeDomain: [earliestDate.getTime(), snapshotDate.getTime()],
+        entityUsers,
+        isFewUsers: sortedUsers.length <= 5,
+        eventBoxPadding: sortedUsers.length <= 5 ? 10 : 6,
+      }
 
       // Set up dimensions
       const width = container.clientWidth || 800
@@ -869,6 +923,8 @@ export default {
           if (event.sourceEvent) {
             this.$emit('time-window-changed', [domain[0], domain[1]])
           }
+          // ezio: [1/3 DetailSnapshot initial state] persist zoom transform on every zoom event for snapshot reuse
+          this._currentZoomTransform = event.transform
 
           // Update X Axis
           xAxisGroup.call(xAxis.scale(newXScale))

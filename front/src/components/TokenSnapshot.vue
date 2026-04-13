@@ -102,20 +102,52 @@ export default {
         });
     },
     methods: {
+        // ezio: allow empty text; capture full screenshot (SVG + sketch canvas composited)
         handleInput() {
-            if (!this.inputText.trim()) return;
-            // ezio: include sketch data in emission
-            const canvas = this.$refs.lassoCanvas;
-            let sketchDataUrl = null;
-            if (canvas && this.sketchStrokes.length > 0) {
-                sketchDataUrl = canvas.toDataURL();
+            const svgEl = this.$refs.snapshotSvg;
+            const sketchCanvas = this.$refs.lassoCanvas;
+            const container = this.$refs.svgContainer;
+            const w = container ? container.offsetWidth : 800;
+            const h = container ? container.offsetHeight : 400;
+            const inputText = this.inputText;
+            const selectedIds = this.selectedNodes.map(n => n.id);
+
+            // ezio: helper to emit and reset
+            const emitResult = (dataUrl) => {
+                this.$emit('snapshot-input', {
+                    text: inputText,
+                    selectedIds,
+                    sketchDataUrl: dataUrl
+                });
+                this.inputText = '';
+            };
+
+            // ezio: composite SVG + sketch canvas into one image
+            if (svgEl) {
+                const svgData = new XMLSerializer().serializeToString(svgEl);
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                const img = new Image();
+                img.onload = () => {
+                    const c = document.createElement('canvas');
+                    c.width = w;
+                    c.height = h;
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    URL.revokeObjectURL(url);
+                    if (sketchCanvas) ctx.drawImage(sketchCanvas, 0, 0);
+                    emitResult(c.toDataURL());
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    emitResult(sketchCanvas ? sketchCanvas.toDataURL() : null);
+                };
+                img.src = url;
+            } else {
+                emitResult(sketchCanvas ? sketchCanvas.toDataURL() : null);
             }
-            this.$emit('snapshot-input', {
-                text: this.inputText,
-                selectedIds: this.selectedNodes.map(n => n.id),
-                sketchDataUrl
-            });
-            this.inputText = "";
         },
 
         renderSnapshot() {
