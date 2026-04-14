@@ -5,6 +5,13 @@
             <div class="panel-title">{{ displayTime }}</div>
             <div style="flex: 1"></div>
             <div class="control-group">
+                <div style="display: flex; align-items: center; gap: 6px; margin-right: 10px;">
+                  <label class="toggle-switch">
+                    <input type="checkbox" v-model="showLinks" @change="onShowLinksChange">
+                    <span class="slider"></span>
+                  </label>
+                  <span class="toggle-text" style="font-size: 12px; white-space: nowrap;">Show Links</span>
+                </div>
                 <label>Scale:</label>
                 <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="onScaleChange">
                 <span>{{ scaleFactor }}</span>
@@ -70,6 +77,7 @@ export default {
       // ezio
       showSnapshot: false,
       snapshotPayload: null,
+      showLinks: true, // Controls visibility of links
     }
   },
   props: {
@@ -155,6 +163,23 @@ export default {
     window.removeEventListener('resize', this.setSvg)
   },
   methods: {
+    onScaleChange() {
+      this.drawChart()
+      this.$emit('log-action', 'scale_change', { scaleFactor: this.scaleFactor })
+    },
+    onShowLinksChange() {
+      // Re-draw without changing layout by just updating opacities. 
+      // If we call drawChart() it restarts simulation and changes layout.
+      // So we just update the DOM elements directly if the chart is already drawn.
+      const svg = d3.select(this.$refs.chart_container).select('svg.tokenDistribution')
+      if (svg.select('.link-layer').empty()) {
+        this.drawChart()
+      } else {
+        svg.select('.link-layer').selectAll('line')
+           .attr('stroke-opacity', this.showLinks ? 0.4 : 0)
+        this.$emit('log-action', 'toggle_show_links', { enabled: this.showLinks })
+      }
+    },
     processManipulationResults() {
       if (
         !this.manipulationDetectionResults ||
@@ -731,6 +756,9 @@ export default {
         `Simulation Links: ${simulationLinks.length} (from ${linksToDraw.length} raw links)`,
       )
 
+      // Hover highlight logic
+      // (Hover highlight logic removed as per user request, only keeping tooltips)
+
       // Draw Links
       const linkElements = linkGroup
         .selectAll('line')
@@ -740,7 +768,7 @@ export default {
         .style('stroke-dasharray', (d) =>
           d.type === 'entity' ? '5,5' : 'none',
         )
-        .attr('stroke-opacity', 0.4) // Increased transparency
+        .attr('stroke-opacity', (d) => this.showLinks ? 0.4 : 0) // Increased transparency or hidden
         .attr('stroke-width', (d) =>
           Math.max(2, Math.min(Math.sqrt(d.weight) * 1.5, 7)),
         ) // Made lines thicker
@@ -1167,6 +1195,61 @@ export default {
 .tokenDistribution {
     width: 100%;
     height: 100%;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e2e8f0;
+  transition: .3s;
+  border-radius: 18px;
+  border: 1px solid #cbd5e1;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+input:checked + .slider {
+  background-color: #4a5568;
+  border-color: #4a5568;
+}
+
+input:checked + .slider:before {
+  transform: translateX(14px);
+}
+
+.toggle-text {
+  font-size: 12px;
+  color: #4a5568;
+  font-weight: 500;
+  user-select: none;
 }
 
 .header-panel {
