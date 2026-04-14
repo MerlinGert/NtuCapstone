@@ -179,6 +179,11 @@ export default {
       const zt = this._currentZoomTransform;
       const initialZoom = zt ? { k: zt.k, x: zt.x, y: zt.y } : null;
 
+      // ezio: capture original chart dimensions for aspect-ratio preservation in snapshot
+      const chartContainer = this.$refs.chartContainer;
+      const originalWidth = chartContainer ? chartContainer.clientWidth : 800;
+      const originalHeight = chartContainer ? chartContainer.clientHeight : 400;
+
       return {
         time: this.snapshotTime,
         selectedUser: this.selectedUser,
@@ -192,7 +197,11 @@ export default {
         showManipulationBoxes: this.showManipulationBoxes,
         isFewUsers: state.isFewUsers,
         eventBoxPadding: state.eventBoxPadding,
-        initialZoom
+        initialZoom,
+        // ezio: pass aspect ratio and original dimensions so snapshot can match proportions
+        chartAspectRatio: originalWidth / originalHeight,
+        originalWidth,
+        originalHeight
       };
     },
     drawChart() {

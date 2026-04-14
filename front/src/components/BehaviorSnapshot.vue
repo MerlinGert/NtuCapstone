@@ -63,7 +63,7 @@
         @keyup.enter="handleInput"
         class="text-input"
       />
-      <button @click="handleInput" class="send-btn">Send</button>
+      <button @click="handleInput" class="send-btn">Annotate</button>
     </div>
   </div>
 </template>
@@ -112,9 +112,13 @@ export default {
       this.renderSnapshot();
       this.setupInteraction();
       // ezio: [3/3 DetailSnapshot initial state] apply zoom transform from BehaviorDetails so snapshot matches detail view
+      // ezio: rescale translate-x by width ratio so zoom maps correctly to the resized snapshot
       if (this.snapshotData.initialZoom && this._zoom && this._zoomRect) {
         const iz = this.snapshotData.initialZoom;
-        const t = d3.zoomIdentity.translate(iz.x, iz.y).scale(iz.k);
+        const origW = this.snapshotData.originalWidth;
+        const snapW = this._innerWidth;
+        const scaleRatio = origW && snapW ? (snapW / origW) : 1;
+        const t = d3.zoomIdentity.translate(iz.x * scaleRatio, iz.y).scale(iz.k);
         this._zoomRect.call(this._zoom.transform, t);
       }
     });
@@ -159,6 +163,8 @@ export default {
           operationLog
         });
         this.inputText = '';
+        // ezio: close snapshot window after annotate
+        this.$emit('close');
       };
 
       // ezio: composite SVG + sketch canvas into one image
@@ -391,6 +397,26 @@ export default {
       if (!data) return;
 
       const container = this.$refs.svgContainer;
+
+      // ezio: content-adaptive sizing — use original chart dimensions, scale down only if needed
+      if (data.originalWidth && data.originalHeight) {
+        const nonVisHeight = 330; // approx header + details + input + gaps + padding
+        const maxW = window.innerWidth * 0.9 - 30;  // 90vw minus container padding
+        const maxH = window.innerHeight * 0.9 - nonVisHeight; // 90vh minus non-vis chrome
+
+        let visW = data.originalWidth;
+        let visH = data.originalHeight;
+
+        // scale down proportionally if original exceeds available space
+        const scale = Math.min(1, maxW / visW, maxH / visH);
+        visW = Math.round(visW * scale);
+        visH = Math.round(visH * scale);
+
+        container.style.width = visW + 'px';
+        container.style.height = visH + 'px';
+        container.style.flex = 'none';
+      }
+
       const width = container.offsetWidth;
       const height = container.offsetHeight;
       const margin = { top: 30, right: 20, bottom: 10, left: 40 };
@@ -1089,14 +1115,14 @@ export default {
 </script>
 
 <style scoped>
+/* ezio: content-adaptive container — sized by vis-area, capped by viewport */
 .behavior-snapshot-container {
   background: white;
   padding: 15px;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  width: 90%;
-  max-width: 900px;
-  height: 90vh;
+  max-width: 90vw;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1125,12 +1151,14 @@ export default {
   font-weight: bold;
 }
 
+/* ezio: margin-left:auto pushes × to the right, matching other snapshots */
 .close-btn {
   background: none;
   border: none;
   font-size: 22px;
   cursor: pointer;
   color: #666;
+  margin-left: auto;
 }
 
 .close-btn:hover {

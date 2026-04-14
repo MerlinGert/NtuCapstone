@@ -21,7 +21,7 @@
     <div class="input-area">
       <input type="text" v-model="inputText" placeholder="Enter annotation text..."
         @keyup.enter="handleInput" class="text-input" />
-      <button @click="handleInput" class="send-btn">Send</button>
+      <button @click="handleInput" class="send-btn">Annotate</button>
     </div>
   </div>
 </template>
@@ -107,6 +107,8 @@ export default {
           sketchDataUrl: dataUrl
         })
         this.inputText = ''
+        // ezio: close snapshot window after annotate
+        this.$emit('close')
       }
 
       if (img && sketchCanvas) {

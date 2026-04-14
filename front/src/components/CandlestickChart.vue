@@ -83,7 +83,8 @@
 import * as d3 from 'd3'
 // ezio: import CandlestickSnapshot
 import CandlestickSnapshot from './CandlestickSnapshot.vue'
-import html2canvas from 'html2canvas'
+// ezio: use html-to-image instead of html2canvas for faster SVG-heavy screenshot
+import { toPng } from 'html-to-image'
 
 const COLORS = {
   bull: '#26a69a', // Green (欧美习惯：阳线涨为绿)
@@ -1285,14 +1286,14 @@ export default {
       alignCard('topCardsContainer', this.topCards)
       alignCard('bottomCardsContainer', this.bottomCards)
     },
-    // ezio: open snapshot — screenshot the current view with html2canvas
+    // ezio: open snapshot — screenshot the current view with html-to-image (faster than html2canvas for SVG-heavy DOM)
     async openSnapshot() {
       const wrap = this.$refs.wrap
       if (!wrap) return
       try {
-        const canvas = await html2canvas(wrap, { backgroundColor: '#ffffff', scale: 1, useCORS: true })
+        const dataUrl = await toPng(wrap, { backgroundColor: '#ffffff', pixelRatio: 1 })
         this.snapshotPayload = {
-          imageDataUrl: canvas.toDataURL(),
+          imageDataUrl: dataUrl,
           currentCoin: this.currentCoin,
           currentGranularity: this.currentGranularity,
           time: new Date().toLocaleString(),

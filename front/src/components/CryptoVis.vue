@@ -50,9 +50,11 @@
     </div>
 
 <div style="flex: 6; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+        <!-- ezio: snapshot shortcut marker -->
         <n-card
             size="small"
             class="panel-card"
+            data-snapshot-view="token_distribution"
             style="width:100%;height:60%;flex-shrink:0; margin-bottom: 5px;"
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
@@ -104,9 +106,11 @@
 
 
     <div style="flex: 9; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
+        <!-- ezio: snapshot shortcut marker -->
         <n-card
           size="small"
           class="panel-card"
+          data-snapshot-view="candlestick_chart"
           style="width:100%;height:60%;flex-shrink:0; margin-bottom: 5px;"
           header-style="text-align:left;height:50px;font-size:1.4em;"
           :content-style="{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }"
@@ -114,7 +118,8 @@
 
           <div style="flex:1; border-top:1px solid #eef2f7; border-bottom:1px solid #eef2f7; display:flex; flex-direction:column; overflow:hidden; background:#fff;">
             <div style="width:100%; height:100%; min-height:0; overflow:hidden;">
-              <CandlestickChart 
+              <!-- ezio: added ref for snapshot shortcut -->
+              <CandlestickChart ref="candlestickChart"
                 :manipulation-results="manipulation_detection_results"
                 :selected-user="selectedUser"
                 :entity-info="selectedEntityInfo"
@@ -131,9 +136,11 @@
 
 
         </n-card>
+        <!-- ezio: snapshot shortcut marker -->
         <n-card
             size="small"
             class="panel-card"
+            data-snapshot-view="behavior_details"
             style="width:100%;height:40%;flex-shrink:0;"
             header-style="text-align:left;height:50px;font-size:1.4em;"
             :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
@@ -373,6 +380,23 @@ export default {
     },
   },
   methods: {
+    // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
+    openSnapshotByMouse() {
+      const el = document.elementFromPoint(this._mouseX, this._mouseY);
+      if (!el) return;
+      const panel = el.closest('[data-snapshot-view]');
+      if (!panel) return;
+      const view = panel.dataset.snapshotView;
+      const refMap = {
+        token_distribution: 'tokenDistribution',
+        candlestick_chart: 'candlestickChart',
+        behavior_details: 'behaviorDetails',
+      };
+      const refName = refMap[view];
+      if (refName && this.$refs[refName] && typeof this.$refs[refName].openSnapshot === 'function') {
+        this.$refs[refName].openSnapshot();
+      }
+    },
     // ezio: handle annotation submission from snapshot modals
     handleSnapshotAnnotation(sourceView, payload) {
       const record = {
@@ -1594,11 +1618,34 @@ export default {
     },
   },
   async mounted() {
+    // ezio: init mouse position for snapshot shortcut (non-reactive to avoid perf overhead)
+    this._mouseX = 0;
+    this._mouseY = 0;
+    // ezio: track mouse position for snapshot shortcut
+    this._onMouseMove = (e) => {
+      this._mouseX = e.clientX;
+      this._mouseY = e.clientY;
+    };
+    document.addEventListener('mousemove', this._onMouseMove);
+    // ezio: Alt+S (Mac: Option+S) keyboard shortcut to open snapshot for hovered view
+    this._onKeyDown = (e) => {
+      if (e.altKey && (e.key === 's' || e.key === 'ß' || e.key === 'S')) {
+        e.preventDefault();
+        this.openSnapshotByMouse();
+      }
+    };
+    document.addEventListener('keydown', this._onKeyDown);
+
     try {
       await this.initializeForCurrentCoin()
     } catch (error) {
       console.error('CryptoVis: Error during initial load:', error)
     }
+  },
+  // ezio: cleanup snapshot shortcut listeners
+  beforeDestroy() {
+    document.removeEventListener('mousemove', this._onMouseMove);
+    document.removeEventListener('keydown', this._onKeyDown);
   },
   updated() {},
 }
