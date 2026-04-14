@@ -100,17 +100,19 @@ export default {
       // Global context actions that start a new branch from root
       const rootLevelActions = [
         'change_coin', 
-        'update_snapshot', 
         'run_entity_detection', 
         'update_link_detection', 
         'run_manipulation_detection'
       ]
 
       let currentParent = root;
+      // ezio: track the last 'change_coin' node so update_snapshot can be attached under it
+      let lastCoinNode = root;
 
       allEvents.forEach((event, i) => {
         this.nodesCount++
         const isRootConfig = rootLevelActions.includes(event.actionType)
+        const isUpdateSnapshot = event.actionType === 'update_snapshot'
         
         const newNode = {
           id: `node_${i}`,
@@ -118,13 +120,23 @@ export default {
           type: event.actionType === 'annotation' ? 'annotation' : 'action',
           data: event,
           children: [],
-          parent: isRootConfig ? root : currentParent
+          parent: null // will be set below
         }
         
         if (isRootConfig) {
+          newNode.parent = root
           root.children.push(newNode)
           currentParent = newNode
+          if (event.actionType === 'change_coin') {
+             lastCoinNode = newNode;
+          }
+        } else if (isUpdateSnapshot) {
+          // Attach update_snapshot to the last change_coin branch (or root if none exists)
+          newNode.parent = lastCoinNode
+          lastCoinNode.children.push(newNode)
+          currentParent = newNode
         } else {
+          newNode.parent = currentParent
           currentParent.children.push(newNode)
           currentParent = newNode
         }

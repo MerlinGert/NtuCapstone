@@ -108,10 +108,10 @@ const GRANULARITIES = [
   { key: '5min', label: '5m' },
   { key: '15min', label: '15m' },
   { key: '30min', label: '30m' },
-  { key: '1H', label: '1H' },
-  { key: '1D', label: '1D' },
-  { key: '3D', label: '3D' },
-  { key: '1W', label: '1W' },
+  { key: '1H', label: '1h' },
+  { key: '1D', label: '1d' },
+  { key: '3D', label: '3d' },
+  { key: '1W', label: '1w' },
 ]
 
 export default {
