@@ -41,6 +41,17 @@
             <span class="toggle-text">Show Related Users</span>
           </div>
 
+          <div style="display: flex; align-items: center; gap: 8px; margin-right: 15px;">
+            <label class="toggle-switch">
+              <input type="checkbox" v-model="useSequentialTime" @change="() => {
+                $emit('log-action', 'toggle_sequential_time', { enabled: useSequentialTime });
+                drawChart();
+              }">
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-text">Sequential Time</span>
+          </div>
+
           <div v-if="manipulationResults && manipulationResults.length > 0" style="display: flex; align-items: center; gap: 8px;">
             <label class="toggle-switch">
               <input type="checkbox" v-model="showManipulationBoxes" @change="() => {
@@ -51,9 +62,11 @@
             </label>
             <span class="toggle-text">Show Manipulation Boxes</span>
           </div>
+          <!-- ezio: Snapshot button -->
+          <button @click="openSnapshot" title="Snapshot & Annotate" class="snapshot-btn" style="padding: 4px; cursor: pointer; background-color: #f8fafc; color: #4a5568; border: 1px solid #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; margin-left: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          </button>
         </div>
-        <!-- ezio: Snapshot button -->
-        <button @click="openSnapshot" class="snapshot-btn" style="padding: 3px 6px; cursor: pointer; background-color: #4caf50; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; margin-left: 8px;">Snapshot</button>
       </div>
       
       <div class="data-view">
@@ -117,6 +130,8 @@ export default {
   data() {
     return {
       showManipulationBoxes: true,
+      showRelatedUsers: false,
+      useSequentialTime: false, // New property for Sequential Time
       // ezio: snapshot state
       showSnapshot: false,
       snapshotPayload: null
@@ -390,7 +405,19 @@ export default {
           )
         }
 
-        sequenceData[user] = { seq: finalSeq, earningEvents }
+        // Aggregate earning events that happen at the exact same time
+        const earningMap = new Map();
+        earningEvents.forEach(e => {
+          const timeKey = e.date.getTime();
+          if (earningMap.has(timeKey)) {
+             earningMap.get(timeKey).earning += e.earning;
+          } else {
+             earningMap.set(timeKey, { date: e.date, earning: e.earning });
+          }
+        });
+        const aggregatedEarningEvents = Array.from(earningMap.values());
+
+        sequenceData[user] = { seq: finalSeq, earningEvents: aggregatedEarningEvents }
       })
 
       // ezio: save chart state so captureSnapshot() can reuse exactly what drawChart() computed
@@ -407,7 +434,7 @@ export default {
       // Set up dimensions
       const width = container.clientWidth || 800
       const height = container.clientHeight || 400
-      const margin = { top: 30, right: 20, bottom: 20, left: 40 } // Adjusted bottom margin for time axis alignment
+      const margin = { top: 30, right: 20, bottom: 25, left: 40 } // Adjusted bottom margin
       const innerWidth = width - margin.left - margin.right
       const innerHeight = height - margin.top - margin.bottom
 
@@ -448,15 +475,108 @@ export default {
         .range([0, innerHeight])
         .padding(0.5)
 
-      // X Scale for time
-      const xScale = d3
-        .scaleTime()
-        .domain([earliestDate, snapshotDate])
-        .range([0, innerWidth])
+      // X Scale setup
+      let xScale;
+      let xAxis;
+      
+      // We need to collect all unique timestamps for sequential time mode
+      const uniqueTimestamps = new Set();
+      
+      if (this.useSequentialTime && hasData) {
+        // Collect all timestamps from filtered data
+        sortedUsers.forEach(user => {
+          if (filteredData[user]) {
+            filteredData[user].forEach(event => {
+              const ts = parseDateSafe(event.timestamp).getTime();
+              if (!isNaN(ts)) uniqueTimestamps.add(ts);
+            });
+          }
+          if (sequenceData[user]) {
+            sequenceData[user].seq.forEach(d => {
+               uniqueTimestamps.add(d.date.getTime());
+            });
+            sequenceData[user].earningEvents.forEach(d => {
+               uniqueTimestamps.add(d.date.getTime());
+            });
+          }
+        });
+        
+        // Add start and end dates to ensure full domain coverage
+        uniqueTimestamps.add(earliestDate.getTime());
+        uniqueTimestamps.add(snapshotDate.getTime());
+        
+        const sortedTimestamps = Array.from(uniqueTimestamps).sort((a, b) => a - b);
+        
+        xScale = d3.scaleLinear()
+          .domain([0, sortedTimestamps.length > 0 ? sortedTimestamps.length - 1 : 1])
+          .range([0, innerWidth]);
+          
+        xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(i => {
+          const index = Math.round(i);
+          if (index >= 0 && index < sortedTimestamps.length) {
+            return d3.timeFormat('%m-%d %H:%M')(new Date(sortedTimestamps[index]));
+          }
+          return '';
+        });
+        
+        // Store mapping for O(1) lookups during rendering
+        xScale.timeToIndex = new Map(sortedTimestamps.map((ts, i) => [ts, i]));
+        xScale.sortedTimestamps = sortedTimestamps;
+        
+      } else {
+        // Absolute Time (Default)
+        xScale = d3
+          .scaleTime()
+          .domain([earliestDate, snapshotDate])
+          .range([0, innerWidth])
+          
+        xAxis = d3.axisBottom(xScale)
+      }
 
       // X Axis (Bottom)
-      const xAxis = d3.axisBottom(xScale)
-      const xAxisGroup = svg.append('g').attr('class', 'x-axis').attr('transform', `translate(0, ${innerHeight})`).call(xAxis)
+      const xAxisGroup = svg.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0, ${innerHeight})`)
+        .call(xAxis)
+        
+      // Professional styling for the X axis
+      xAxisGroup.select('.domain').attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+      xAxisGroup.selectAll('.tick line').attr('stroke', '#cbd5e1')
+      xAxisGroup.selectAll('.tick text')
+        .attr('fill', '#4a5568')
+        .attr('font-size', '10px')
+        .attr('font-weight', '500')
+        .attr('font-family', 'Inter, -apple-system, sans-serif')
+        .attr('dy', '0.8em')
+
+      // Helper function to get X coordinate regardless of scale type
+      const getX = (dateObj) => {
+        if (!dateObj || isNaN(dateObj.getTime())) return 0;
+        const ts = dateObj.getTime();
+        
+        if (this.useSequentialTime && xScale.timeToIndex) {
+          // Exact match
+          if (xScale.timeToIndex.has(ts)) {
+            return xScale(xScale.timeToIndex.get(ts));
+          }
+          // If not exact match (e.g. manipulation box start/end), find the closest index using binary search or simple loop
+          // (Since array isn't massive, simple find/bisect is fine)
+          const sorted = xScale.sortedTimestamps;
+          let closestIdx = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < sorted.length; i++) {
+             const diff = Math.abs(sorted[i] - ts);
+             if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+             }
+             if (sorted[i] > ts) break; // Optimization since it's sorted
+          }
+          return xScale(closestIdx);
+        } else {
+          return xScale(dateObj);
+        }
+      }
 
       // Define padding for event elements
       // If there are few users, we can make the dots row larger
@@ -537,8 +657,8 @@ export default {
 
           if (Number.isNaN(startTs) || Number.isNaN(endTs)) return
 
-          let x1 = xScale(startTs)
-          let x2 = xScale(endTs)
+          let x1 = getX(startTs)
+          let x2 = getX(endTs)
 
           // Ensure min width if it's a single point or very short
           if (x2 - x1 < 10) {
@@ -758,7 +878,7 @@ export default {
 
         const balanceArea = d3
           .area()
-          .x((d) => xScale(d.date))
+          .x((d) => getX(d.date))
           .y0(-eventBoxPadding)
           .y1((d) => balanceScale(d.balance) - eventBoxPadding)
           .curve(d3.curveStepAfter)
@@ -819,7 +939,7 @@ export default {
               .enter()
               .append('rect')
               .attr('class', 'earning-bar')
-              .attr('x', (d) => xScale(d.date) - barWidth / 2)
+              .attr('x', (d) => getX(d.date) - barWidth / 2)
               .attr('y', eventBoxPadding)
               .attr('width', barWidth)
               .attr('height', (d) => earningScale(Math.abs(d.earning)))
@@ -831,7 +951,7 @@ export default {
 
           events.forEach((event) => {
             const eventDate = parseDateSafe(event.timestamp)
-            const cx = xScale(eventDate)
+            const cx = getX(eventDate)
 
             if (!event.isTrade) {
               const isOut = event.type === 'transfer_out'
@@ -929,6 +1049,32 @@ export default {
         .on('zoom', (event) => {
           const newXScale = event.transform.rescaleX(xScale)
           
+          // Re-create the getX helper for the zoomed scale
+          const getZoomedX = (dateObj) => {
+            if (!dateObj || isNaN(dateObj.getTime())) return 0;
+            const ts = dateObj.getTime();
+            
+            if (this.useSequentialTime && xScale.timeToIndex) {
+              if (xScale.timeToIndex.has(ts)) {
+                return newXScale(xScale.timeToIndex.get(ts));
+              }
+              const sorted = xScale.sortedTimestamps;
+              let closestIdx = 0;
+              let minDiff = Infinity;
+              for (let i = 0; i < sorted.length; i++) {
+                 const diff = Math.abs(sorted[i] - ts);
+                 if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = i;
+                 }
+                 if (sorted[i] > ts) break;
+              }
+              return newXScale(closestIdx);
+            } else {
+              return newXScale(dateObj);
+            }
+          }
+          
           const domain = newXScale.domain()
           // Only emit to parent if the zoom was initiated by a user event to prevent infinite sync loops
           if (event.sourceEvent) {
@@ -939,19 +1085,29 @@ export default {
 
           // Update X Axis
           xAxisGroup.call(xAxis.scale(newXScale))
+          
+          // Re-apply styles after zoom redraws the axis
+          xAxisGroup.select('.domain').attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+          xAxisGroup.selectAll('.tick line').attr('stroke', '#cbd5e1')
+          xAxisGroup.selectAll('.tick text')
+            .attr('fill', '#4a5568')
+            .attr('font-size', '10px')
+            .attr('font-weight', '500')
+            .attr('font-family', 'Inter, -apple-system, sans-serif')
+            .attr('dy', '0.8em')
 
           // Update Manipulation Boxes
           chartBody
             .selectAll('.manipulation-box')
             .attr('x', (d) => {
-              let x1 = newXScale(d.startTs)
-              let x2 = newXScale(d.endTs)
+              let x1 = getZoomedX(d.startTs)
+              let x2 = getZoomedX(d.endTs)
               if (x2 - x1 < 10) return (x1 + x2) / 2 - 5
               return x1
             })
             .attr('width', (d) => {
-              let x1 = newXScale(d.startTs)
-              let x2 = newXScale(d.endTs)
+              let x1 = getZoomedX(d.startTs)
+              let x2 = getZoomedX(d.endTs)
               if (x2 - x1 < 10) return 10
               return x2 - x1
             })
@@ -960,7 +1116,7 @@ export default {
             // Update Balance Area
             const newBalanceArea = d3
               .area()
-              .x((d) => newXScale(d.date))
+              .x((d) => getZoomedX(d.date))
               .y0(-eventBoxPadding)
               .y1((d) => balanceScale(d.balance) - eventBoxPadding)
               .curve(d3.curveStepAfter)
@@ -969,18 +1125,18 @@ export default {
             // Update Earning Bars
             chartBody
               .selectAll('.earning-bar')
-              .attr('x', (d) => newXScale(d.date) - 4 / 2) // barWidth = 4
+              .attr('x', (d) => getZoomedX(d.date) - 4 / 2) // barWidth = 4
 
             // Update Transfer Lines
             chartBody
               .selectAll('.transfer-line')
-              .attr('x1', (d) => newXScale(d.cx_date))
-              .attr('x2', (d) => newXScale(d.cx_date))
+              .attr('x1', (d) => getZoomedX(d.cx_date))
+              .attr('x2', (d) => getZoomedX(d.cx_date))
 
             // Update Event Groups
             chartBody
               .selectAll('.event-group')
-              .attr('transform', (d) => `translate(${newXScale(d.date)}, 0)`)
+              .attr('transform', (d) => `translate(${getZoomedX(d.date)}, 0)`)
           }
         })
 

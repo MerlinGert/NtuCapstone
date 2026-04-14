@@ -203,6 +203,9 @@ export default {
         if (type === 'toggle_show_manipulation_boxes') {
           return `${summaryInfo.enabled ? 'Enabled' : 'Disabled'} "Show Manipulation Boxes"`
         }
+        if (type === 'toggle_sequential_time') {
+          return `${summaryInfo.enabled ? 'Enabled' : 'Disabled'} "Sequential Time"`
+        }
         if (type === 'sync_time_window') {
           return `Synchronized time window from ${summaryInfo.source === 'kline_chart' ? 'K-line Chart' : 'Behavior Details'}`
         }

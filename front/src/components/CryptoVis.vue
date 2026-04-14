@@ -185,9 +185,6 @@
   </n-layout>
 
 </n-layout-content>
-<n-layout-footer position="absolute" style="height: 18px">
-  <div class="footer"></div>
-</n-layout-footer>
 </n-layout>
 </template>
 
@@ -199,7 +196,6 @@ import {
   NCheckbox,
   NLayout,
   NLayoutContent,
-  NLayoutFooter,
   NLayoutHeader,
   NSelect,
   NSpace,
@@ -223,7 +219,6 @@ export default {
     NSwitch,
     NSpace,
     NLayoutHeader,
-    NLayoutFooter,
     NLayoutContent,
     TokenDistribution,
     ControlPanel,
@@ -571,7 +566,7 @@ export default {
       if (actionType.includes('kline_chart') || actionType === 'click_manipulation_card' || actionType === 'hover_manipulation_card' || actionType === 'click_kline_align_cards' || actionType === 'scroll_manipulation_cards' || actionType === 'hover_kline') {
         sourceView = 'kline_chart';
         targetView = (actionType.includes('zoom') || actionType === 'scroll_manipulation_cards' || actionType === 'hover_kline') ? 'kline_chart' : (actionType.includes('click_manipulation_card') ? 'behavior_details' : 'kline_chart');
-      } else if (actionType.includes('behavior_chart') || actionType.includes('behavior_user_label') || actionType.includes('behavior_manipulation_box') || actionType.includes('toggle_show')) {
+      } else if (actionType.includes('behavior_chart') || actionType.includes('behavior_user_label') || actionType.includes('behavior_manipulation_box') || actionType.includes('toggle_show') || actionType === 'toggle_sequential_time') {
         sourceView = 'behavior_details';
         targetView = 'behavior_details';
       } else if (actionType.includes('token_distribution') || actionType === 'select_user_from_network') {
@@ -581,7 +576,7 @@ export default {
         sourceView = 'control_panel';
         targetView = 'all_views';
       } else if (actionType === 'change_coin') {
-        sourceView = 'header_panel';
+        sourceView = 'system';
         targetView = 'all_views';
       } else if (actionType === 'sync_time_window') {
         sourceView = actionInfo.source;
@@ -1678,14 +1673,6 @@ a {
   height: 50px;
   letter-spacing: 2px;
   border-bottom: 2px solid #e2e8f0;
-}
-.footer {
-  height: 18px;
-  font-size: 0.8em;
-  text-align: center;
-  background: #f7f8fa;
-  color: #a0aec0;
-  border-top: 1px solid #e2e8f0;
 }
 .card-header-text {
   font-weight: 700;

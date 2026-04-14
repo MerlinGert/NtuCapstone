@@ -5,11 +5,12 @@
       <div class="count-badge">{{ nodesCount }}</div>
       <div style="flex: 1"></div>
       <div class="tree-legend">
-        <div class="legend-item"><div class="legend-box" style="background:#fff5f5; border-color:#fed7d7"></div>System</div>
-        <div class="legend-item"><div class="legend-box" style="background:#ebf8ff; border-color:#bee3f8"></div>Interact</div>
-        <div class="legend-item"><div class="legend-box" style="background:#f0fff4; border-color:#c6f6d5"></div>Zoom/Scroll</div>
-        <div class="legend-item"><div class="legend-box" style="background:#faf5ff; border-color:#e9d8fd"></div>Hover</div>
-        <div class="legend-item"><div class="legend-box" style="background:#fef3c7; border-color:#fde68a"></div>Annotation</div>
+        <div class="legend-item"><div class="legend-box" style="background:#fee2e2; border-color:#fca5a5"></div>System</div>
+        <div class="legend-item"><div class="legend-box" style="background:#dbeafe; border-color:#93c5fd"></div>Interact</div>
+        <div class="legend-item"><div class="legend-box" style="background:#dcfce7; border-color:#86efac"></div>Zoom/Scroll</div>
+        <div class="legend-item"><div class="legend-box" style="background:#f3e8ff; border-color:#d8b4fe"></div>Hover</div>
+        <div class="legend-item"><div class="legend-box" style="background:#fde68a; border-color:#fcd34d"></div>Annotation</div>
+        <div class="legend-item"><div class="legend-box" style="background:#edf2f7; border-color:#e2e8f0"></div>Other</div>
       </div>
     </div>
     <div class="tree-content" ref="svgContainer">
@@ -315,9 +316,9 @@ export default {
       
       // Colors for the rounded segments (all the same light gray)
       const bandColors = {
-        'token_distribution': '#f1f5f9',
-        'kline_chart': '#f1f5f9',
-        'behavior_details': '#f1f5f9'
+        'token_distribution': '#f8fafc',
+        'kline_chart': '#f8fafc',
+        'behavior_details': '#f8fafc'
       }
 
       // To ensure we break the capsule if the user switches to a different view and then comes back,
@@ -495,12 +496,12 @@ export default {
 
       // Colors mapping based on UserActionTimeline classes
       const typeColors = {
-        interaction: { bg: '#ebf8ff', text: '#2b6cb0', border: '#bee3f8' },
-        zoom: { bg: '#f0fff4', text: '#2c7a7b', border: '#c6f6d5' },
-        hover: { bg: '#faf5ff', text: '#2f855a', border: '#e9d8fd' },
-        system: { bg: '#fff5f5', text: '#c53030', border: '#fed7d7' },
+        interaction: { bg: '#dbeafe', text: '#2b6cb0', border: '#93c5fd' },
+        zoom: { bg: '#dcfce7', text: '#2c7a7b', border: '#86efac' },
+        hover: { bg: '#f3e8ff', text: '#2f855a', border: '#d8b4fe' },
+        system: { bg: '#fee2e2', text: '#c53030', border: '#fca5a5' },
         default: { bg: '#edf2f7', text: '#4a5568', border: '#e2e8f0' },
-        annotation: { bg: '#fef3c7', text: '#92400e', border: '#fde68a' }, // Amber from AnnotationTimeline
+        annotation: { bg: '#fde68a', text: '#92400e', border: '#fcd34d' }, // Amber from AnnotationTimeline
         view_branch: { bg: '#f8fafc', text: '#4a5568', border: '#cbd5e1' } // Special color for structural view nodes
       }
 

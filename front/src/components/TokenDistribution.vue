@@ -3,14 +3,17 @@
         <!-- Info Header -->
         <div class="header-panel">
             <div class="panel-title">{{ displayTime }}</div>
+            <div style="flex: 1"></div>
             <div class="control-group">
                 <label>Scale:</label>
                 <input type="range" v-model.number="scaleFactor" min="0.1" max="1.5" step="0.1" @input="onScaleChange">
                 <span>{{ scaleFactor }}</span>
-                <span style="margin-left: 10px;">Active Users: {{ userCount }}</span>
+                <span style="margin-left: 10px; margin-right: 10px;">Active Users: {{ userCount }}</span>
             </div>
             <!-- ezio -->
-            <button @click="openSnapshot" style="padding: 3px 6px; cursor: pointer; background-color: #4caf50; color: white; border: none; border-radius: 4px; font-weight: bold; font-size: 12px;">Snapshot</button>
+            <button @click="openSnapshot" title="Snapshot & Annotate" style="padding: 4px; cursor: pointer; background-color: #f8fafc; color: #4a5568; border: 1px solid #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </button>
         </div>
 
         <!-- ezio: Snapshot Modal -->
