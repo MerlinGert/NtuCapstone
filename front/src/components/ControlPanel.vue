@@ -538,6 +538,65 @@ export default {
 </script>
 
 <style scoped>
+/* ezio: Checkbox styling to match naive-ui style */
+input[type="checkbox"] {
+  appearance: none;
+  background-color: #fff;
+  margin: 0;
+  font: inherit;
+  color: currentColor;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  transform: scale(0);
+  transition: 120ms transform ease-in-out;
+  box-shadow: inset 1em 1em white;
+  background-color: transparent;
+  transform-origin: center;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+input[type="checkbox"]:checked {
+  background-color: #4a5568;
+  border-color: #4a5568;
+}
+
+input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+/* ezio: Select and Input styling */
+select, input[type="number"], input[type="text"] {
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #4a5568;
+  font-size: 12px;
+  transition: all 0.2s;
+  outline: none;
+}
+
+select:hover, input[type="number"]:hover, input[type="text"]:hover {
+  border-color: #cbd5e1;
+}
+
+select:focus, input[type="number"]:focus, input[type="text"]:focus {
+  border-color: #4a5568;
+  box-shadow: 0 0 0 2px rgba(74, 85, 104, 0.1);
+}
+
 .action-btn {
     padding: 6px 16px;
     background: #4a5568;

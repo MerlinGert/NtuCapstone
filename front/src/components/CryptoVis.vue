@@ -1687,11 +1687,15 @@ a {
   border: none !important;
   box-shadow: 0 1px 8px rgba(0,0,0,0.12) !important;
 }
-/* 粒度按钮面板 */
-.checkbox{
-  --n-color-checked: #728efd !important;
-  --n-border-checked:  #728efd !important;
-  --n-border-focus:  #728efd !important;
+/* 全局按钮面板和输入系样式覆盖 */
+.checkbox {
+  --n-color-checked: #4a5568 !important;
+  --n-border-checked:  #4a5568 !important;
+  --n-border-focus:  #4a5568 !important;
+}
+.n-switch {
+  --n-rail-color-active: #4a5568 !important;
+  --n-box-shadow-focus: 0 0 0 2px rgba(74, 85, 104, 0.2) !important;
 }
 .dataset_label{
   font-size: 15px;

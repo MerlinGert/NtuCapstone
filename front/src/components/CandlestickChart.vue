@@ -8,7 +8,7 @@
       <div class="controls-wrapper" style="display: flex; align-items: center; gap: 10px;">
         <button
           v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
-          class="sync-btn" 
+          class="action-btn sync-btn" 
           :disabled="isSequentialTime"
           @click="() => {
             if (isSequentialTime) return;
@@ -17,12 +17,7 @@
           }"
           title="Sync time window to Behavior Details view"
           :style="{
-            fontSize: '12px', fontWeight: 'normal', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px',
-            cursor: isSequentialTime ? 'not-allowed' : 'pointer',
-            border: '1px solid #e2e8f0', borderRadius: '4px',
-            background: isSequentialTime ? '#f1f5f9' : '#fff',
-            color: isSequentialTime ? '#94a3b8' : '#4a5568',
-            opacity: isSequentialTime ? 0.6 : 1
+            fontSize: '12px', fontWeight: 'normal', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px'
           }"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
@@ -30,7 +25,7 @@
         </button>
         <div class="granularity-panel">
           <button v-for="g in granularities" :key="g.key"
-            :class="['gran-btn', currentGranularity===g.key ? 'gran-btn--active' : '']"
+            :class="['action-btn', 'gran-btn', currentGranularity===g.key ? 'gran-btn--active' : '']"
             @click="() => {
               currentGranularity = g.key;
               $emit('log-action', 'change_kline_granularity', { granularity: g.key, label: g.label });
@@ -38,7 +33,7 @@
           >{{ g.label }}</button>
         </div>
         <!-- ezio: Snapshot button -->
-        <button @click="openSnapshot" title="Snapshot & Annotate" style="padding: 4px; cursor: pointer; background-color: #f8fafc; color: #4a5568; border: 1px solid #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+        <button @click="openSnapshot" title="Snapshot & Annotate" class="action-btn" style="padding: 4px; display: flex; align-items: center; justify-content: center;">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
         </button>
       </div>
@@ -1344,6 +1339,26 @@ export default {
 </script>
 
 <style scoped>
+.action-btn {
+    background: #f8fafc;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.action-btn:hover:not(:disabled) {
+    background: #edf2f7;
+    border-color: #cbd5e1;
+    color: #2d3748;
+}
+.action-btn:disabled {
+    cursor: not-allowed;
+    background: #f1f5f9;
+    color: #94a3b8;
+    opacity: 0.6;
+}
+
 .candlestick-container {
   display: flex;
   flex-direction: column;
@@ -1381,10 +1396,10 @@ export default {
 
 .gran-btn {
   padding: 4px 10px;
-  border: 1px solid #e8edf3;
+  border: 1px solid #e2e8f0;
   border-radius: 4px;
-  background: #fff;
-  color: #90a0b7;
+  background: #f8fafc;
+  color: #4a5568;
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
@@ -1395,16 +1410,16 @@ export default {
   box-shadow: none;
 }
 .gran-btn:hover {
-  background: #f4f7fd;
-  color: #7090b8;
-  border-color: #d0ddef;
+  background: #edf2f7;
+  color: #2d3748;
+  border-color: #cbd5e1;
 }
 .gran-btn--active {
-  background: #edf3ff !important;
-  color: #7090c8 !important;
-  border-color: #d2e0f8 !important;
+  background: #f1f5f9 !important;
+  color: #4a5568 !important;
+  border-color: #cbd5e1 !important;
   font-weight: 600 !important;
-  box-shadow: none !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.05) !important;
 }
 
 .candlestick-wrap {

@@ -18,7 +18,7 @@
         <div class="controls">
           <button 
             v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
-            class="sync-btn" 
+            class="action-btn sync-btn" 
             :disabled="useSequentialTime"
             @click="() => {
               if (useSequentialTime) return;
@@ -27,12 +27,7 @@
             }"
             title="Sync time window to K-Line view"
             :style="{
-              fontSize: '12px', fontWeight: 'normal', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px',
-              cursor: useSequentialTime ? 'not-allowed' : 'pointer',
-              border: '1px solid #e2e8f0', borderRadius: '4px',
-              background: useSequentialTime ? '#f1f5f9' : '#fff',
-              color: useSequentialTime ? '#94a3b8' : '#4a5568',
-              opacity: useSequentialTime ? 0.6 : 1
+              fontSize: '12px', fontWeight: 'normal', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px'
             }"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
@@ -73,7 +68,7 @@
             <span class="toggle-text">Show Manipulation Boxes</span>
           </div>
           <!-- ezio: Snapshot button -->
-          <button @click="openSnapshot" title="Snapshot & Annotate" class="snapshot-btn" style="padding: 4px; cursor: pointer; background-color: #f8fafc; color: #4a5568; border: 1px solid #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; margin-left: 8px;">
+          <button @click="openSnapshot" title="Snapshot & Annotate" class="action-btn snapshot-btn" style="padding: 4px; display: flex; align-items: center; justify-content: center; margin-left: 8px;">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
           </button>
         </div>
@@ -1199,6 +1194,26 @@ export default {
 </script>
 
 <style scoped>
+.action-btn {
+    background: #f8fafc;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.action-btn:hover:not(:disabled) {
+    background: #edf2f7;
+    border-color: #cbd5e1;
+    color: #2d3748;
+}
+.action-btn:disabled {
+    cursor: not-allowed;
+    background: #f1f5f9;
+    color: #94a3b8;
+    opacity: 0.6;
+}
+
 .behavior-details-container {
   width: 100%;
   height: 100%;
@@ -1276,8 +1291,8 @@ export default {
 .toggle-switch {
   position: relative;
   display: inline-block;
-  width: 36px;
-  height: 20px;
+  width: 32px;
+  height: 18px;
 }
 
 .toggle-switch input {
@@ -1293,29 +1308,32 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #cbd5e0;
+  background-color: #e2e8f0;
   transition: .3s;
-  border-radius: 20px;
+  border-radius: 18px;
+  border: 1px solid #cbd5e1;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 16px;
-  width: 16px;
+  height: 12px;
+  width: 12px;
   left: 2px;
   bottom: 2px;
   background-color: white;
   transition: .3s;
   border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 input:checked + .slider {
-  background-color: #fc8181; /* Soft red to match manipulation boxes */
+  background-color: #4a5568;
+  border-color: #4a5568;
 }
 
 input:checked + .slider:before {
-  transform: translateX(16px);
+  transform: translateX(14px);
 }
 
 .toggle-text {

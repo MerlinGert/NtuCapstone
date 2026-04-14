@@ -11,7 +11,7 @@
                 <span style="margin-left: 10px; margin-right: 10px;">Active Users: {{ userCount }}</span>
             </div>
             <!-- ezio -->
-            <button @click="openSnapshot" title="Snapshot & Annotate" style="padding: 4px; cursor: pointer; background-color: #f8fafc; color: #4a5568; border: 1px solid #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+            <button @click="openSnapshot" title="Snapshot & Annotate" class="action-btn" style="padding: 4px; display: flex; align-items: center; justify-content: center;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
             </button>
         </div>
@@ -1144,6 +1144,26 @@ export default {
 </script>
 
 <style scoped>
+.action-btn {
+    background: #f8fafc;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.action-btn:hover:not(:disabled) {
+    background: #edf2f7;
+    border-color: #cbd5e1;
+    color: #2d3748;
+}
+.action-btn:disabled {
+    cursor: not-allowed;
+    background: #f1f5f9;
+    color: #94a3b8;
+    opacity: 0.6;
+}
+
 .tokenDistribution {
     width: 100%;
     height: 100%;
