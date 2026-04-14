@@ -9,12 +9,21 @@
         <button
           v-if="syncTargetTimeWindow && syncTargetTimeWindow.length === 2" 
           class="sync-btn" 
+          :disabled="isSequentialTime"
           @click="() => {
+            if (isSequentialTime) return;
             syncTimeWindow();
             $emit('log-action', 'sync_time_window', { source: 'kline_chart' });
           }"
           title="Sync time window to Behavior Details view"
-          style="font-size: 12px; font-weight: normal; padding: 2px 6px; display: flex; align-items: center; gap: 4px; cursor: pointer; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; color: #4a5568;"
+          :style="{
+            fontSize: '12px', fontWeight: 'normal', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: '4px',
+            cursor: isSequentialTime ? 'not-allowed' : 'pointer',
+            border: '1px solid #e2e8f0', borderRadius: '4px',
+            background: isSequentialTime ? '#f1f5f9' : '#fff',
+            color: isSequentialTime ? '#94a3b8' : '#4a5568',
+            opacity: isSequentialTime ? 0.6 : 1
+          }"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M3 22v-6h6"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path></svg>
           Sync Time
@@ -127,6 +136,10 @@ export default {
       type: Array,
       default: () => null,
     },
+    isSequentialTime: {
+      type: Boolean,
+      default: false,
+    }
   },
   data() {
     return {

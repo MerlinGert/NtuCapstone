@@ -138,6 +138,7 @@
                 :entity-info="selectedEntityInfo"
                 :current-coin="currentCoin"
                 :sync-target-time-window="behaviorTimeWindow"
+                :is-sequential-time="behaviorSequentialTime"
                 @time-window-changed="handleKlineTimeWindowChanged"
                 @card-click="handleManipulationCardClick"
                 @log-action="logUserAction"
@@ -175,6 +176,7 @@
                 :manipulation-results="manipulation_detection_results"
                 :sync-target-time-window="klineTimeWindow"
                 @time-window-changed="handleBehaviorTimeWindowChanged"
+                @sequential-time-changed="handleSequentialTimeChanged"
                 @user-selected="handleBehaviorDetailUserSelect"
                 @log-action="logUserAction"
                 @snapshot-input="handleSnapshotAnnotation('behavior_details', $event)"
@@ -366,6 +368,7 @@ export default {
       selectedEntityInfo: null,
       klineTimeWindow: null,
       behaviorTimeWindow: null,
+      behaviorSequentialTime: false, // Track if BehaviorDetails is using sequential time
       selectedCardUsers: [],
       userActionSequence: [], // Array to store user actions
       hoverTimers: {}, // Store timers for delayed hover logging
