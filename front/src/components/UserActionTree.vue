@@ -105,20 +105,11 @@ export default {
         'run_manipulation_detection'
       ]
 
-      let lastGlobalNode = root;
-      let lastNodeByView = {};
+      let currentParent = root;
 
       allEvents.forEach((event, i) => {
         this.nodesCount++
         const isRootConfig = rootLevelActions.includes(event.actionType)
-        
-        let parent;
-        if (isRootConfig) {
-          parent = root;
-        } else {
-          const sv = event.sourceView || 'system';
-          parent = lastNodeByView[sv] || lastGlobalNode;
-        }
         
         const newNode = {
           id: `node_${i}`,
@@ -126,35 +117,15 @@ export default {
           type: event.actionType === 'annotation' ? 'annotation' : 'action',
           data: event,
           children: [],
-          parent: parent
+          parent: isRootConfig ? root : currentParent
         }
-        parent.children.push(newNode)
         
         if (isRootConfig) {
-          lastGlobalNode = newNode;
-          // Reset all views to point to this new global state
-          Object.keys(lastNodeByView).forEach(k => {
-            lastNodeByView[k] = newNode;
-          });
-          const tv = event.targetView;
-          if (tv && tv !== 'all_views' && tv !== 'system') {
-            lastNodeByView[tv] = newNode;
-          }
+          root.children.push(newNode)
+          currentParent = newNode
         } else {
-          const sv = event.sourceView || 'system';
-          lastNodeByView[sv] = newNode;
-          
-          const tv = event.targetView;
-          if (tv && tv !== 'system') {
-            if (tv === 'all_views') {
-              lastGlobalNode = newNode;
-              Object.keys(lastNodeByView).forEach(k => {
-                lastNodeByView[k] = newNode;
-              });
-            } else {
-              lastNodeByView[tv] = newNode;
-            }
-          }
+          currentParent.children.push(newNode)
+          currentParent = newNode
         }
       })
       
@@ -247,17 +218,28 @@ export default {
       const root = d3.hierarchy(treeData)
       
       // Compute tree layout. We use a tidy tree layout.
-      // dx is the vertical distance between nodes, dy is the horizontal
-      const dx = 24 // Vertical distance
-      const baseDy = 60 // Base horizontal distance
+      // dx is the vertical distance between branches, dy is the horizontal
+      const dx = 75 // Exactly enough for 3 lanes (+/- 25) plus a standard 25px gap to match the inter-lane spacing
+      const baseDy = 35 // Reduced horizontal distance to make tree more compact
       const tree = d3.tree().nodeSize([dx, baseDy])
       tree(root)
 
       // Post-process the tree to compact consecutive nodes of the same type on the same branch
-      // We calculate a custom Y coordinate (horizontal position in the D3 layout)
+      // and adjust their vertical (x) positions based on their sourceView
+      
+      // Reduced the vertical offsets to compress the 3 views into a tighter group
+      const viewLanes = {
+        'token_distribution': -25,
+        'kline_chart': 0,
+        'behavior_details': 25,
+        'system': 0,
+        'control_panel': 0,
+        'header_panel': 0
+      };
+
       root.eachBefore(d => {
+        // Adjust horizontal (y) spacing for compacting
         if (d.parent) {
-          // Check if this node is the ONLY child of its parent, AND they have the same action type
           const isContinuousSameType = 
             d.parent.children.length === 1 && 
             d.data.data && d.parent.data.data && 
@@ -265,28 +247,52 @@ export default {
             d.data.type !== 'root' && d.parent.data.type !== 'root';
             
           if (isContinuousSameType) {
-            // Compress the horizontal gap (e.g., 12px instead of 60px)
             d.customY = d.parent.customY + 14;
           } else {
-            // Use normal gap
             d.customY = d.parent.customY + baseDy;
           }
         } else {
           d.customY = 0;
         }
+        
+        // Adjust vertical (x) spacing based on source view
+        if (d.data.type !== 'root' && d.data.data && d.data.data.sourceView) {
+           const sv = d.data.data.sourceView;
+           // Offset the node vertically based on the view it belongs to
+           d.customX = (d.parent && d.parent.data.type === 'root' ? d.x : (d.parent ? d.parent.customX : d.x)) + (viewLanes[sv] !== undefined ? viewLanes[sv] : 0);
+           // Actually, since we want them to form absolute lanes relative to their system root parent:
+           
+           // Find the closest system root ancestor
+           let systemAncestor = d;
+           while(systemAncestor.parent && systemAncestor.parent.data.type !== 'root') {
+             systemAncestor = systemAncestor.parent;
+           }
+           
+           // The base X is the X coordinate of the system action that started this branch
+           const baseX = systemAncestor.x;
+           
+           // Apply lane offset
+           const laneOffset = viewLanes[sv] !== undefined ? viewLanes[sv] : 0;
+           d.customX = baseX + laneOffset;
+        } else {
+           d.customX = d.x;
+        }
       })
 
-      // Replace the default D3 computed y with our custom compressed y
+      // Replace the default D3 computed coordinates
       root.each(d => {
         d.y = d.customY;
+        d.x = d.customX;
       })
 
       // Center the tree in the SVG initially based on vertical (x) bounds
       let x0 = Infinity
       let x1 = -x0
+      let maxY = 0
       root.each(d => {
         if (d.x > x1) x1 = d.x
         if (d.x < x0) x0 = d.x
+        if (d.y > maxY) maxY = d.y
       })
 
       // Add a slight padding so root isn't right against the left edge
@@ -301,6 +307,172 @@ export default {
         })
       svg.call(zoom)
 
+      // Draw background swimlane segments behind everything
+      const bgGroup = g.append('g').attr('class', 'swimlane-backgrounds')
+      
+      // We traverse the tree and identify consecutive segments of nodes in the same lane
+      const laneSegments = []
+      
+      // Colors for the rounded segments (all the same light gray)
+      const bandColors = {
+        'token_distribution': '#f1f5f9',
+        'kline_chart': '#f1f5f9',
+        'behavior_details': '#f1f5f9'
+      }
+
+      // To ensure we break the capsule if the user switches to a different view and then comes back,
+      // we need to process nodes chronologically and track the last active view lane for the current system branch.
+      
+      // We sort the descendants chronologically based on their ID/order to guarantee we trace the user's path correctly
+      const sortedNodes = root.descendants().sort((a, b) => {
+        // Root is always first
+        if (a.data.type === 'root') return -1;
+        if (b.data.type === 'root') return 1;
+        // Extract the index from id (e.g. "node_5")
+        const aId = parseInt(a.data.id.split('_')[1]);
+        const bId = parseInt(b.data.id.split('_')[1]);
+        return aId - bId;
+      });
+
+      let currentActiveSegment = null;
+      // Track which view lanes have already been labeled for each system branch (using system branch y-coord as key)
+      const labeledLanes = {};
+
+      sortedNodes.forEach(d => {
+        // Only process nodes that actually belong to a specific view lane
+        if (d.data.type !== 'root') {
+          const sv = d.data.data.sourceView || 'system'
+          
+          // Find the closest system root ancestor to use its x (vertical pos) as a unique identifier for the current system branch
+          let systemAncestor = d;
+          while(systemAncestor.parent && systemAncestor.parent.data.type !== 'root') {
+            systemAncestor = systemAncestor.parent;
+          }
+          const branchId = systemAncestor.x;
+          
+          // Initialize tracking for this system branch if it doesn't exist
+          if (!labeledLanes[branchId]) {
+            labeledLanes[branchId] = new Set();
+          }
+          
+          // Determine if this is the very first time we see this view lane in this system branch
+          let isFirstInBranch = false;
+          if (sv !== 'system' && sv !== 'control_panel' && sv !== 'header_panel') {
+            if (!labeledLanes[branchId].has(sv)) {
+              isFirstInBranch = true;
+              labeledLanes[branchId].add(sv);
+            }
+          }
+
+          // System actions, control panel actions, and global configs do NOT get a capsule
+          // They also break any active capsule
+          if (sv === 'system' || sv === 'control_panel' || sv === 'header_panel') {
+            currentActiveSegment = null;
+            return;
+          }
+          
+          // Ensure that actionType 'click_kline_align_cards' specifically acts as a valid node for grouping
+          // by not doing anything special to exclude it. It has sourceView 'kline_chart'.
+          
+          // Check if we can append to the currently active segment
+          // It must be the exact same lane (same yCenter) AND the user hasn't switched to another view in between
+          if (currentActiveSegment && currentActiveSegment.view === sv && Math.abs(currentActiveSegment.yCenter - d.x) < 5) {
+             currentActiveSegment.nodes.push(d)
+             currentActiveSegment.minX = Math.min(currentActiveSegment.minX, d.y)
+             currentActiveSegment.maxX = Math.max(currentActiveSegment.maxX, d.y)
+             // We don't overwrite isFirstInBranch for appended nodes, it only applies to the segment start
+          } else {
+             // Either there is no active segment, OR the user switched to a different view/branch
+             // So we MUST start a brand new capsule
+             currentActiveSegment = {
+               view: sv,
+               yCenter: d.x,
+               minX: d.y,
+               maxX: d.y,
+               nodes: [d],
+               isFirstInBranch: isFirstInBranch, // tag the segment if it's the very first of its kind
+               branchId: branchId // track the branch to connect later
+             }
+             laneSegments.push(currentActiveSegment)
+          }
+        } else {
+          // Root nodes also break any active capsule
+          currentActiveSegment = null;
+        }
+      })
+
+      // Calculate bounds for each view lane within each system branch to draw connecting dashed lines
+      const laneBounds = {};
+      laneSegments.forEach(seg => {
+        if (seg.branchId === undefined) return;
+        const key = `${seg.branchId}_${seg.view}`;
+        if (!laneBounds[key]) {
+          laneBounds[key] = {
+            yCenter: seg.yCenter,
+            minX: seg.minX,
+            maxX: seg.maxX
+          };
+        } else {
+          laneBounds[key].minX = Math.min(laneBounds[key].minX, seg.minX);
+          laneBounds[key].maxX = Math.max(laneBounds[key].maxX, seg.maxX);
+        }
+      });
+
+      // Draw dashed connecting lines underneath the capsules
+      Object.values(laneBounds).forEach(bound => {
+        if (bound.minX < bound.maxX) {
+          bgGroup.append('line')
+            .attr('x1', bound.minX)
+            .attr('y1', bound.yCenter)
+            .attr('x2', bound.maxX)
+            .attr('y2', bound.yCenter)
+            .attr('stroke', '#e2e8f0') // Very subtle light gray (slate-200)
+            .attr('stroke-width', 2)
+            .attr('stroke-dasharray', '4,4') // Dashed pattern
+        }
+      });
+
+      // Draw the computed segments as rounded rectangles
+      laneSegments.forEach(seg => {
+        if (seg.nodes.length === 0) return
+        
+        // Pad the bounding box a bit so it wraps the 16x16 node rects nicely
+        const paddingX = 14
+        const paddingY = 14
+        // The segment bounding box width is simply the span of the node centers
+        // plus padding on both left and right sides.
+        const width = (seg.maxX - seg.minX) + paddingX * 2
+        
+        bgGroup.append('rect')
+          .attr('x', seg.minX - paddingX)
+          .attr('y', seg.yCenter - paddingY)
+          .attr('width', width)
+          .attr('height', paddingY * 2)
+          .attr('rx', paddingY) // Fully rounded capsule shape
+          .attr('fill', bandColors[seg.view] || '#f8fafc')
+          .attr('stroke', 'none')
+          
+        // If this is the first capsule for this view in the current system branch, draw a label before it
+        if (seg.isFirstInBranch) {
+          let labelText = '';
+          if (seg.view === 'token_distribution') labelText = 'Token Distribution';
+          else if (seg.view === 'kline_chart') labelText = 'K-line Chart';
+          else if (seg.view === 'behavior_details') labelText = 'Behavior Details';
+          
+          if (labelText) {
+            bgGroup.append('text')
+              .attr('x', seg.minX - paddingX - 6) // Slightly to the left of the capsule
+              .attr('y', seg.yCenter) // Center vertically with the lane
+              .attr('dy', '0.32em') // Vertical alignment adjustment
+              .attr('text-anchor', 'end') // Right-align text so it flows leftward away from the capsule
+              .attr('font-size', '10px')
+              .attr('font-weight', '600')
+              .attr('fill', '#94a3b8') // slate-400 color for a subtle look
+              .text(labelText)
+          }
+        }
+      })
+
       // Links
       g.append('g')
         .attr('fill', 'none')
@@ -312,8 +484,6 @@ export default {
         .attr('d', d3.linkHorizontal()
             .x(d => d.y)
             .y(d => d.x))
-
-      // Helper to get action class (same as timeline)
       const getActionClass = (type) => {
         if (!type) return 'default'
         if (type.includes('zoom') || type.includes('scroll')) return 'zoom'
@@ -331,8 +501,21 @@ export default {
         system: { bg: '#fff5f5', text: '#c53030', border: '#fed7d7' },
         default: { bg: '#edf2f7', text: '#4a5568', border: '#e2e8f0' },
         annotation: { bg: '#fef3c7', text: '#92400e', border: '#fde68a' }, // Amber from AnnotationTimeline
-        sequential_group: { bg: '#cbd5e1', text: '#334155', border: '#94a3b8' } // Gray for the group node
+        view_branch: { bg: '#f8fafc', text: '#4a5568', border: '#cbd5e1' } // Special color for structural view nodes
       }
+
+      // Links
+      g.append('g')
+        .attr('fill', 'none')
+        .attr('stroke', '#cbd5e1')
+        .attr('stroke-width', 1.5)
+        .selectAll('path')
+        .data(root.links())
+        .join('path')
+        .attr('d', d3.linkHorizontal()
+            .x(d => d.y)
+            .y(d => d.x))
+        .attr('stroke-dasharray', d => d.target.data.type === 'view_branch' ? '4,4' : 'none') // Dashed lines for view branches
 
       // Nodes
       const node = g.append('g')
@@ -351,17 +534,35 @@ export default {
         .attr('fill', d => {
           if (d.data.type === 'root') return '#4a5568'
           if (d.data.type === 'annotation') return typeColors.annotation.bg
+          if (d.data.type === 'view_branch') return typeColors.view_branch.bg
           const cat = getActionClass(d.data.data ? d.data.data.actionType : '')
           return typeColors[cat] ? typeColors[cat].bg : typeColors.default.bg
         })
         .attr('stroke', d => {
           if (d.data.type === 'root') return '#2d3748'
           if (d.data.type === 'annotation') return typeColors.annotation.border
+          if (d.data.type === 'view_branch') return typeColors.view_branch.border
           const cat = getActionClass(d.data.data ? d.data.data.actionType : '')
           return typeColors[cat] ? typeColors[cat].border : typeColors.default.border
         })
         .attr('stroke-width', 1.5)
         .style('cursor', 'pointer')
+
+      // Add a small icon/initial to view branches so they are recognizable
+      node.filter(d => d.data.type === 'view_branch')
+        .append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.3em')
+        .attr('font-size', '8px')
+        .attr('font-weight', 'bold')
+        .attr('fill', '#4a5568')
+        .style('pointer-events', 'none')
+        .text(d => {
+          if (d.data.data.viewKey === 'token_distribution') return 'TD'
+          if (d.data.data.viewKey === 'kline_chart') return 'KL'
+          if (d.data.data.viewKey === 'behavior_details') return 'BD'
+          return 'V'
+        })
         
       const tooltipDiv = d3.select(this.$refs.tooltip)
 
@@ -415,6 +616,7 @@ export default {
             .attr('stroke', d_data => {
               if (d_data.data.type === 'root') return '#2d3748'
               if (d_data.data.type === 'annotation') return typeColors.annotation.border
+              if (d_data.data.type === 'view_branch') return typeColors.view_branch.border
               const cat = getActionClass(d_data.data.data ? d_data.data.data.actionType : '')
               return typeColors[cat] ? typeColors[cat].border : typeColors.default.border
             })

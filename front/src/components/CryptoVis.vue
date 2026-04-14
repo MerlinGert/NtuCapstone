@@ -380,7 +380,7 @@ export default {
       scrollCardsEndTimer: null, // Timer to clear the card scrolling state
       // ezio: annotation recording state
       annotationRecords: [], // Array to store snapshot annotations
-      activeBottomTab: 'actions', // 'actions' | 'annotations'
+      activeBottomTab: 'tree', // 'actions' | 'annotations' | 'tree'
       _annotationSeqId: 0, // auto-increment ID for annotations
     }
   },
@@ -568,9 +568,9 @@ export default {
       let targetView = 'system';
       
       // Infer source and target views based on action types
-      if (actionType.includes('kline_chart') || actionType === 'click_manipulation_card' || actionType === 'hover_manipulation_card') {
+      if (actionType.includes('kline_chart') || actionType === 'click_manipulation_card' || actionType === 'hover_manipulation_card' || actionType === 'click_kline_align_cards' || actionType === 'scroll_manipulation_cards' || actionType === 'hover_kline') {
         sourceView = 'kline_chart';
-        targetView = actionType.includes('zoom') ? 'kline_chart' : (actionType.includes('click') ? 'behavior_details' : 'kline_chart');
+        targetView = (actionType.includes('zoom') || actionType === 'scroll_manipulation_cards' || actionType === 'hover_kline') ? 'kline_chart' : (actionType.includes('click_manipulation_card') ? 'behavior_details' : 'kline_chart');
       } else if (actionType.includes('behavior_chart') || actionType.includes('behavior_user_label') || actionType.includes('behavior_manipulation_box') || actionType.includes('toggle_show')) {
         sourceView = 'behavior_details';
         targetView = 'behavior_details';

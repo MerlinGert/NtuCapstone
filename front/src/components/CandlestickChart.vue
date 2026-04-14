@@ -897,6 +897,12 @@ export default {
         const container = this.$refs[containerRef]
         if (!container) return
 
+        container._isProgrammaticScroll = true;
+        if (container._programmaticScrollTimer) clearTimeout(container._programmaticScrollTimer);
+        container._programmaticScrollTimer = setTimeout(() => {
+          container._isProgrammaticScroll = false;
+        }, 1000);
+
         // Find the first card that falls within or after the visible time window
         const targetIndex = cardsData.findIndex((c) => c.ts >= visibleStartTs)
 
@@ -1091,6 +1097,12 @@ export default {
       }
       
       this.scrollLogTimers[containerRef] = setTimeout(() => {
+        // Skip logging if this was a programmatic scroll (e.g. from sync time window or click alignment)
+        if (container._isProgrammaticScroll) {
+          this.scrollLogTimers[containerRef] = null;
+          return;
+        }
+
         const type = containerRef === 'topCardsContainer' ? 'round_trip' : 'same_direction'
         
         // Calculate which cards are currently visible in the container viewport
@@ -1261,6 +1273,12 @@ export default {
       const alignCard = (containerRef, cardsData) => {
         const container = this.$refs[containerRef]
         if (!container) return
+        
+        container._isProgrammaticScroll = true;
+        if (container._programmaticScrollTimer) clearTimeout(container._programmaticScrollTimer);
+        container._programmaticScrollTimer = setTimeout(() => {
+          container._isProgrammaticScroll = false;
+        }, 1000); // Allow 1s for smooth scroll to finish
         
         const targetIndex = cardsData.findIndex(c => c.ts === targetTs)
         if (targetIndex !== -1) {
