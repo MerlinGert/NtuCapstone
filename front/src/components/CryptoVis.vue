@@ -86,6 +86,13 @@
               style="flex:1; padding:6px 0; border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:#718096; border-bottom:2px solid transparent; transition: all 0.2s;"
               :style="activeBottomTab === 'annotations' ? 'color:#d97706; border-bottom-color:#d97706; background:#fff;' : ''"
             >Annotations</button>
+            <button
+              class="tab-btn"
+              :class="{ active: activeBottomTab === 'tree' }"
+              @click="activeBottomTab = 'tree'"
+              style="flex:1; padding:6px 0; border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:#718096; border-bottom:2px solid transparent; transition: all 0.2s;"
+              :style="activeBottomTab === 'tree' ? 'color:#059669; border-bottom-color:#059669; background:#fff;' : ''"
+            >Action Tree</button>
           </div>
           <div style="flex:1; height:0; min-height:0; overflow:hidden;">
             <UserActionTimeline
@@ -95,6 +102,12 @@
             />
             <AnnotationTimeline
                 v-show="activeBottomTab === 'annotations'"
+                :annotations="annotationRecords"
+                style="height:100%;"
+            />
+            <UserActionTree
+                v-show="activeBottomTab === 'tree'"
+                :actions="userActionSequence"
                 :annotations="annotationRecords"
                 style="height:100%;"
             />
@@ -190,6 +203,7 @@ import CandlestickChart from './CandlestickChart.vue'
 import ControlPanel from './ControlPanel.vue'
 import TokenDistribution from './TokenDistribution.vue'
 import UserActionTimeline from './UserActionTimeline.vue'
+import UserActionTree from './UserActionTree.vue'
 // ezio: import AnnotationTimeline for snapshot annotation display
 import AnnotationTimeline from './AnnotationTimeline.vue'
 
@@ -210,6 +224,7 @@ export default {
     BehaviorDetails,
     UserActionTimeline,
     AnnotationTimeline,
+    UserActionTree,
   },
   data() {
     return {
