@@ -18,6 +18,25 @@
     </div>
     <!-- Tooltip div moved outside tree-content to avoid overflow clipping -->
     <div ref="tooltip" class="tree-tooltip" style="opacity: 0; display: none;"></div>
+
+    <!-- ezio: Popup for annotation details -->
+    <div v-if="selectedAnnotation" class="annotation-popup-overlay" @click.self="closeAnnotationPopup">
+      <div class="annotation-popup">
+        <div class="popup-header">
+          <h3>Annotation Details</h3>
+          <button class="close-btn" @click="closeAnnotationPopup">×</button>
+        </div>
+        <div class="popup-body">
+          <div class="popup-time">{{ new Date(selectedAnnotation.timestamp).toLocaleString() }}</div>
+          <div class="popup-text" v-if="selectedAnnotation.text">{{ selectedAnnotation.text }}</div>
+          <div class="popup-empty-text" v-else>No text provided</div>
+          
+          <div v-if="selectedAnnotation.sketchDataUrl" class="popup-image-container">
+            <img :src="selectedAnnotation.sketchDataUrl" class="popup-image" alt="Annotation Sketch" />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -38,7 +57,8 @@ export default {
   },
   data() {
     return {
-      nodesCount: 0
+      nodesCount: 0,
+      selectedAnnotation: null
     }
   },
   watch: {
@@ -70,6 +90,9 @@ export default {
     }
   },
   methods: {
+    closeAnnotationPopup() {
+      this.selectedAnnotation = null
+    },
     buildTreeData() {
       // Merge actions and annotations, sort by time
       let allEvents = [...this.actions]
@@ -635,6 +658,11 @@ export default {
             })
             .attr('stroke-width', 1.5)
         })
+        .on('click', (event, d) => {
+          if (d.data.type === 'annotation' && d.data.data) {
+            this.selectedAnnotation = d.data.data
+          }
+        })
     }
   }
 }
@@ -720,5 +748,103 @@ export default {
   z-index: 9999;
   max-width: 250px;
   word-wrap: break-word;
+}
+
+/* ezio: annotation popup styles */
+.annotation-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.annotation-popup {
+  background: #fff;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 8px 8px 0 0;
+}
+
+.popup-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #2d3748;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #a0aec0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.close-btn:hover {
+  color: #4a5568;
+}
+
+.popup-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.popup-time {
+  font-size: 12px;
+  color: #718096;
+}
+
+.popup-text {
+  font-size: 14px;
+  color: #2d3748;
+  line-height: 1.5;
+  background: #f1f5f9;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #fcd34d;
+}
+
+.popup-empty-text {
+  font-size: 14px;
+  color: #a0aec0;
+  font-style: italic;
+}
+
+.popup-image-container {
+  margin-top: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.popup-image {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 </style>

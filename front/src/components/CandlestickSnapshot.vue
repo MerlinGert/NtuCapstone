@@ -7,9 +7,11 @@
 
     <!-- ezio: screenshot image + canvas overlay for annotation -->
     <div class="vis-area" ref="visArea">
-      <img :src="snapshotData.imageDataUrl" class="snapshot-img" draggable="false" />
-      <canvas ref="sketchCanvas" class="sketch-overlay"
-          :class="'cursor-' + activeTool"></canvas>
+      <div class="canvas-wrapper" style="position: relative; display: flex; max-width: 100%; max-height: 100%;">
+        <img :src="snapshotData.imageDataUrl" class="snapshot-img" draggable="false" ref="snapshotImg" />
+        <canvas ref="sketchCanvas" class="sketch-overlay"
+            :class="'cursor-' + activeTool"></canvas>
+      </div>
       <SnapshotToolbar class="floating-toolbar"
           :tool="activeTool" :color="penColor"
           @update:tool="activeTool = $event"
@@ -49,17 +51,39 @@ export default {
     activeTool() { this.redrawCanvas() }
   },
   mounted() {
-    this.$nextTick(() => this.setupCanvas())
+    this.$nextTick(() => {
+      const img = this.$refs.snapshotImg
+      if (img && img.complete) {
+        this.setupCanvas()
+      } else if (img) {
+        img.onload = () => this.setupCanvas()
+      }
+      
+      // Also handle resize
+      window.addEventListener('resize', this.setupCanvas)
+    })
+  },
+  beforeUnmount() {
+    window.removeEventListener('resize', this.setupCanvas)
   },
   methods: {
-    // ezio: init canvas to match vis-area size
+    // ezio: init canvas to match exactly the image's layout dimensions
     setupCanvas() {
       const canvas = this.$refs.sketchCanvas
-      const container = this.$refs.visArea
-      if (!canvas || !container) return
-      canvas.width = container.offsetWidth
-      canvas.height = container.offsetHeight
-      this._setupInteraction()
+      const img = this.$refs.snapshotImg
+      if (!canvas || !img) return
+      
+      if (!img.clientWidth || !img.clientHeight) return // Not rendered yet
+      
+      // Set the canvas actual drawing resolution to match its CSS size (1:1 with the image pixels on screen)
+      canvas.width = img.clientWidth
+      canvas.height = img.clientHeight
+      
+      if (!this._interactionSetup) {
+        this._setupInteraction()
+        this._interactionSetup = true
+      }
+      this.redrawCanvas()
     },
 
     redrawCanvas() {
@@ -96,7 +120,7 @@ export default {
 
     // ezio: composite screenshot image + sketch into one image and emit
     handleInput() {
-      const img = this.$refs.visArea?.querySelector('img')
+      const img = this.$refs.snapshotImg
       const sketchCanvas = this.$refs.sketchCanvas
       const inputText = this.inputText
 
@@ -116,6 +140,8 @@ export default {
         c.width = sketchCanvas.width
         c.height = sketchCanvas.height
         const ctx = c.getContext('2d')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, c.width, c.height)
         ctx.drawImage(img, 0, 0, c.width, c.height)
         ctx.drawImage(sketchCanvas, 0, 0)
         emitResult(c.toDataURL())
@@ -264,11 +290,22 @@ export default {
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f8fafc;
+}
+.canvas-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-width: 100%;
+  max-height: 100%;
 }
 .snapshot-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  max-width: 100%;
+  max-height: 100%;
   display: block;
 }
 .sketch-overlay {
