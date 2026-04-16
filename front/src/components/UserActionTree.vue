@@ -3,6 +3,20 @@
     <div class="header-panel">
       <div class="panel-title">Action Tree</div>
       <div class="count-badge">{{ nodesCount }}</div>
+      
+      <!-- ezio: Multi-select insight buttons -->
+      <div class="insight-controls" style="margin-left: 16px; display: flex; gap: 8px;">
+        <button v-if="!isMultiSelectMode" class="insight-btn" @click="startMultiSelect" title="Create Insight" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
+        <template v-else>
+          <button class="insight-btn cancel-btn" @click="cancelMultiSelect">Cancel</button>
+          <button class="insight-btn confirm-btn" @click="openInsightPopup" :disabled="selectedInsightAnnotations.length === 0">
+            Confirm ({{ selectedInsightAnnotations.length }})
+          </button>
+        </template>
+      </div>
+
       <div style="flex: 1"></div>
       <div class="tree-legend">
         <div class="legend-item"><div class="legend-box" style="background:#fee2e2; border-color:#fca5a5"></div>System</div>
@@ -27,7 +41,10 @@
           <button class="close-btn" @click="closeAnnotationPopup">×</button>
         </div>
         <div class="popup-body">
-          <div class="popup-time">{{ new Date(selectedAnnotation.timestamp).toLocaleString() }}</div>
+          <div class="popup-time">
+            <span style="font-weight: bold; color: #718096; margin-right: 4px;">#{{ selectedAnnotation.id !== undefined ? selectedAnnotation.id : 'N/A' }}</span>
+            {{ new Date(selectedAnnotation.timestamp || Date.now()).toLocaleString() }}
+          </div>
           <div class="popup-text" v-if="selectedAnnotation.text">{{ selectedAnnotation.text }}</div>
           <div class="popup-empty-text" v-else>No text provided</div>
           
@@ -37,14 +54,83 @@
         </div>
       </div>
     </div>
+
+    <!-- ezio: Popup for High-level Insight Creation -->
+    <div v-if="showInsightPopup" class="annotation-popup-overlay" @click.self="closeInsightPopup">
+      <div class="annotation-popup insight-popup">
+        <div class="popup-header">
+          <h3>Create High-Level Insight</h3>
+          <button class="close-btn" @click="closeInsightPopup">×</button>
+        </div>
+        <div class="popup-body">
+          <div class="insight-annotations-list">
+            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Selected Annotations ({{ selectedInsightAnnotations.length }})</h4>
+            <InsightAnnotationItem 
+              v-for="(anno, idx) in selectedInsightAnnotations" 
+              :key="anno.id !== undefined ? anno.id : idx" 
+              :item-id="anno.id" 
+              :annotations="annotations" 
+              :actions="actions" 
+            />
+          </div>
+          <div class="insight-input-area">
+            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Insight Notes</h4>
+            <textarea v-model="insightText" placeholder="Enter high-level insights here..." class="insight-textarea"></textarea>
+          </div>
+        </div>
+        <div class="popup-footer">
+          <button class="insight-btn cancel-btn" @click="closeInsightPopup">Cancel</button>
+          <button class="insight-btn confirm-btn" @click="saveInsight" :disabled="!insightText.trim()">Save Insight</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ezio: Popup for High-level Insight Viewing -->
+    <div v-if="selectedInsightToView" class="annotation-popup-overlay" @click.self="closeInsightViewPopup">
+      <div class="annotation-popup insight-popup">
+        <div class="popup-header">
+          <h3>High-Level Insight</h3>
+          <button class="close-btn" @click="closeInsightViewPopup">×</button>
+        </div>
+        <div class="popup-body">
+          <div class="popup-time">
+            <span style="background: #3182ce; color: white; padding: 2px 4px; border-radius: 4px; font-size: 10px; margin-right: 4px;">Insight</span>
+            <span style="font-weight: bold; color: #718096; margin-right: 4px;">#{{ selectedInsightToView.id !== undefined ? selectedInsightToView.id : (selectedInsightToView.actionInfo?.id !== undefined ? selectedInsightToView.actionInfo.id : 'N/A') }}</span>
+            {{ new Date(selectedInsightToView.timestamp).toLocaleString() }}
+          </div>
+          
+          <div class="insight-input-area" style="margin-top: 0; margin-bottom: 16px;">
+            <div class="popup-text" style="background: #eef2f7; border-left-color: #3182ce;">
+              {{ selectedInsightToView.actionInfo ? selectedInsightToView.actionInfo.text : '' }}
+            </div>
+          </div>
+          
+          <div class="insight-annotations-list" v-if="selectedInsightToView.actionInfo && selectedInsightToView.actionInfo.refAnnotations && selectedInsightToView.actionInfo.refAnnotations.length > 0">
+            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Referenced Annotations ({{ selectedInsightToView.actionInfo.refAnnotations.length }})</h4>
+            <InsightAnnotationItem 
+              v-for="refId in selectedInsightToView.actionInfo.refAnnotations" 
+              :key="refId" 
+              :item-id="refId" 
+              :annotations="annotations" 
+              :actions="actions" 
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script>
 import * as d3 from 'd3'
+import InsightAnnotationItem from './InsightAnnotationItem.vue'
 
 export default {
   name: 'UserActionTree',
+  components: {
+    InsightAnnotationItem
+  },
   props: {
     actions: {
       type: Array,
@@ -58,7 +144,13 @@ export default {
   data() {
     return {
       nodesCount: 0,
-      selectedAnnotation: null
+      selectedAnnotation: null,
+      selectedInsightToView: null,
+      // ezio: high-level insight state
+      isMultiSelectMode: false,
+      selectedInsightAnnotations: [],
+      showInsightPopup: false,
+      insightText: ''
     }
   },
   watch: {
@@ -93,15 +185,72 @@ export default {
     closeAnnotationPopup() {
       this.selectedAnnotation = null
     },
+    // ezio: high level insight methods
+    startMultiSelect() {
+      this.isMultiSelectMode = true
+      this.selectedInsightAnnotations = []
+      this.drawTree()
+    },
+    cancelMultiSelect() {
+      this.isMultiSelectMode = false
+      this.selectedInsightAnnotations = []
+      this.drawTree()
+    },
+    openInsightPopup() {
+      if (this.selectedInsightAnnotations.length > 0) {
+        this.showInsightPopup = true
+        this.insightText = ''
+      }
+    },
+    closeInsightPopup() {
+      this.showInsightPopup = false
+    },
+    closeInsightViewPopup() {
+      this.selectedInsightToView = null
+    },
+    saveInsight() {
+      if (!this.insightText.trim()) return
+      
+      const payload = {
+        refAnnotations: this.selectedInsightAnnotations.map(a => a.id),
+        text: this.insightText
+      }
+      
+      this.$emit('log-action', 'high_level_insight', payload)
+      
+      // Also emit to add to annotation records
+      this.$emit('add-insight-annotation', {
+        text: this.insightText,
+        sourceView: 'system',
+        selectedItems: payload.refAnnotations
+      })
+      
+      this.showInsightPopup = false
+      this.cancelMultiSelect()
+    },
+    getAnnotationById(id) {
+      return this.annotations.find(a => a.id === id);
+    },
+    getActionByAnnotationId(id) {
+      return this.actions.find(a => a.actionType === 'annotation' && a.actionInfo && a.actionInfo.id === id);
+    },
     buildTreeData() {
       // Merge actions and annotations, sort by time
-      let allEvents = [...this.actions]
+      // Filter out high_level_insight from actions to avoid duplicates with annotationRecords
+      let allEvents = this.actions.filter(a => a.actionType !== 'high_level_insight')
       
       this.annotations.forEach(anno => {
         allEvents.push({
           ...anno,
-          actionType: 'annotation',
-          actionInfo: { text: anno.text, selectedItems: anno.selectedItems },
+          actionType: anno.isInsight ? 'high_level_insight' : 'annotation',
+          actionInfo: { 
+            id: anno.id, 
+            text: anno.text, 
+            refAnnotations: anno.isInsight ? anno.selectedItems : undefined,
+            selectedItems: anno.selectedItems, 
+            sketchDataUrl: anno.sketchDataUrl, 
+            timestamp: anno.timestamp 
+          },
           isAnnotation: true,
           targetView: anno.sourceView
         })
@@ -136,11 +285,12 @@ export default {
         this.nodesCount++
         const isRootConfig = rootLevelActions.includes(event.actionType)
         const isUpdateSnapshot = event.actionType === 'update_snapshot'
+        const isHighLevelInsight = event.actionType === 'high_level_insight'
         
         const newNode = {
           id: `node_${i}`,
           name: this.formatActionType(event.actionType),
-          type: event.actionType === 'annotation' ? 'annotation' : 'action',
+          type: (event.actionType === 'annotation' || isHighLevelInsight) ? 'annotation' : 'action',
           data: event,
           children: [],
           parent: null // will be set below
@@ -218,8 +368,18 @@ export default {
         if (type === 'toggle_show_manipulation_boxes') {
           return `${summaryInfo.enabled ? 'Enabled' : 'Disabled'} "Show Manipulation Boxes"`
         }
+        if (type === 'toggle_show_links') {
+          return `${summaryInfo.enabled ? 'Enabled' : 'Disabled'} "Show Links"`
+        }
+        if (type === 'scale_change') {
+          return `Changed Scale to ${summaryInfo.scaleFactor}`
+        }
         if (type === 'sync_time_window') {
           return `Synchronized time window from ${summaryInfo.source === 'kline_chart' ? 'K-line Chart' : 'Behavior Details'}`
+        }
+        
+        if (type === 'high_level_insight') {
+          return `Insight: ${summaryInfo.text || 'No text provided'}`
         }
         
         // Fallback
@@ -342,6 +502,8 @@ export default {
           g.attr('transform', event.transform)
         })
       svg.call(zoom)
+      // ezio: Disable double-click to zoom on the entire SVG canvas
+      svg.on('dblclick.zoom', null)
 
       // Draw background swimlane segments behind everything
       const bgGroup = g.append('g').attr('class', 'swimlane-backgrounds')
@@ -522,10 +684,11 @@ export default {
             .y(d => d.x))
       const getActionClass = (type) => {
         if (!type) return 'default'
-        if (type.includes('zoom') || type.includes('scroll')) return 'zoom'
+        if (type.includes('zoom') || type.includes('scroll') || type.includes('scale')) return 'zoom'
         if (type.startsWith('hover_')) return 'hover'
-        if (type.includes('select') || type.includes('click')) return 'interaction'
-        if (type.includes('run') || type.includes('update')) return 'system'
+        if (type.includes('select') || type.includes('click') || type.includes('toggle')) return 'interaction'
+        if (type.includes('run') || type.includes('update') || type === 'change_coin') return 'system'
+        if (type === 'high_level_insight') return 'annotation'
         return 'default'
       }
 
@@ -575,13 +738,23 @@ export default {
           return typeColors[cat] ? typeColors[cat].bg : typeColors.default.bg
         })
         .attr('stroke', d => {
+          if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
+            const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
+            if (isSelected) return '#e53e3e';
+          }
           if (d.data.type === 'root') return '#2d3748'
           if (d.data.type === 'annotation') return typeColors.annotation.border
           if (d.data.type === 'view_branch') return typeColors.view_branch.border
           const cat = getActionClass(d.data.data ? d.data.data.actionType : '')
           return typeColors[cat] ? typeColors[cat].border : typeColors.default.border
         })
-        .attr('stroke-width', 1.5)
+        .attr('stroke-width', d => {
+          if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
+            const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
+            if (isSelected) return 3;
+          }
+          return 1.5;
+        })
         .style('cursor', 'pointer')
 
       // Add a small icon/initial to view branches so they are recognizable
@@ -602,6 +775,8 @@ export default {
         
       const tooltipDiv = d3.select(this.$refs.tooltip)
 
+      let clickTimeout = null;
+
       // Hover interactions
       node
         .on('mouseover', (event, d) => {
@@ -620,7 +795,7 @@ export default {
              let summary = ''
              
              // Annotations have their own text payload, actions use the formatter
-             if (actionType === 'annotation') {
+             if (actionType === 'annotation' || actionType === 'high_level_insight') {
                 summary = info.text || 'No description provided'
              } else {
                 summary = this.formatActionSummary(actionType, info)
@@ -650,18 +825,82 @@ export default {
             .on('end', () => tooltipDiv.style('display', 'none'))
           d3.select(event.currentTarget).select('rect')
             .attr('stroke', d_data => {
+              if (this.isMultiSelectMode && d_data.data.type === 'annotation' && d_data.data.data && d_data.data.data.actionInfo) {
+                const isSelected = this.selectedInsightAnnotations.some(a => a.id === d_data.data.data.actionInfo.id);
+                if (isSelected) return '#e53e3e';
+              }
               if (d_data.data.type === 'root') return '#2d3748'
               if (d_data.data.type === 'annotation') return typeColors.annotation.border
               if (d_data.data.type === 'view_branch') return typeColors.view_branch.border
               const cat = getActionClass(d_data.data.data ? d_data.data.data.actionType : '')
               return typeColors[cat] ? typeColors[cat].border : typeColors.default.border
             })
-            .attr('stroke-width', 1.5)
+            .attr('stroke-width', d_data => {
+              if (this.isMultiSelectMode && d_data.data.type === 'annotation' && d_data.data.data && d_data.data.data.actionInfo) {
+                const isSelected = this.selectedInsightAnnotations.some(a => a.id === d_data.data.data.actionInfo.id);
+                if (isSelected) return 3;
+              }
+              return 1.5;
+            })
+        })
+        .on('dblclick', (event, d) => {
+          // ezio: prevent dblclick from propagating to zoom
+          event.stopPropagation();
         })
         .on('click', (event, d) => {
-          if (d.data.type === 'annotation' && d.data.data) {
-            this.selectedAnnotation = d.data.data
-          }
+         // ezio: branch on active tool
+         if (this.isMultiSelectMode) {
+            if (clickTimeout) {
+              clearTimeout(clickTimeout);
+              clickTimeout = null;
+              // Double click logic
+              if (d.data.type === 'annotation' && d.data.data) {
+                 if (d.data.data.actionType === 'high_level_insight') {
+                   // Allow selecting high_level_insight in multi-select mode
+                   const id = d.data.data.actionInfo.id;
+                   const idx = this.selectedInsightAnnotations.findIndex(a => a.id === id);
+                   if (idx === -1) {
+                     this.selectedInsightAnnotations.push(d.data.data.actionInfo);
+                   } else {
+                     this.selectedInsightAnnotations.splice(idx, 1);
+                   }
+                   this.drawTree();
+                 } else if (d.data.data.actionInfo) {
+                   const id = d.data.data.actionInfo.id;
+                   const idx = this.selectedInsightAnnotations.findIndex(a => a.id === id);
+                   if (idx === -1) {
+                     this.selectedInsightAnnotations.push(d.data.data.actionInfo);
+                   } else {
+                     this.selectedInsightAnnotations.splice(idx, 1);
+                   }
+                   // re-render tree styles
+                   this.drawTree();
+                 }
+              }
+            } else {
+              // Single click logic (deferred)
+              clickTimeout = setTimeout(() => {
+                clickTimeout = null;
+                // If this is an insight node, show the insight details instead of normal annotation
+                if (d.data.type === 'annotation' && d.data.data) {
+                  if (d.data.data.actionType === 'high_level_insight') {
+                    this.selectedInsightToView = d.data.data;
+                  } else {
+                    this.selectedAnnotation = d.data.data.actionInfo || d.data.data;
+                  }
+                }
+              }, 250);
+            }
+         } else {
+            // Normal mode: Single click is immediate
+            if (d.data.type === 'annotation' && d.data.data) {
+              if (d.data.data.actionType === 'high_level_insight') {
+                this.selectedInsightToView = d.data.data;
+              } else {
+                this.selectedAnnotation = d.data.data.actionInfo || d.data.data;
+              }
+            }
+         }
         })
     }
   }
@@ -748,6 +987,95 @@ export default {
   z-index: 9999;
   max-width: 250px;
   word-wrap: break-word;
+}
+
+/* ezio: insight button styles */
+.insight-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.insight-btn:hover:not(:disabled) {
+  background: #edf2f7;
+}
+.insight-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.insight-btn.cancel-btn {
+  color: #e53e3e;
+  border-color: #feb2b2;
+  background: #fff5f5;
+}
+.insight-btn.cancel-btn:hover {
+  background: #fed7d7;
+}
+.insight-btn.confirm-btn {
+  color: #3182ce;
+  border-color: #bee3f8;
+  background: #ebf8ff;
+}
+.insight-btn.confirm-btn:hover:not(:disabled) {
+  background: #bee3f8;
+}
+
+.insight-popup {
+  max-width: 800px;
+}
+.insight-annotations-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px;
+  background: #f8fafc;
+}
+.insight-anno-item {
+  padding: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.insight-anno-item:last-child {
+  border-bottom: none;
+}
+.anno-time {
+  font-size: 11px;
+  color: #718096;
+  margin-bottom: 4px;
+}
+.anno-text {
+  font-size: 13px;
+  color: #2d3748;
+}
+.insight-input-area {
+  margin-top: 16px;
+}
+.insight-textarea {
+  width: 100%;
+  height: 100px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 14px;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.insight-textarea:focus {
+  border-color: #4a5568;
+}
+.popup-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 0 0 8px 8px;
 }
 
 /* ezio: annotation popup styles */

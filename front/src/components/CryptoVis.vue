@@ -111,6 +111,7 @@
                 v-show="activeBottomTab === 'tree'"
                 :actions="userActionSequence"
                 :annotations="annotationRecords"
+                @add-insight-annotation="handleAddInsightAnnotation"
                 style="height:100%;"
             />
           </div>
@@ -424,6 +425,19 @@ export default {
       // ezio: auto-switch to annotations tab when a new annotation arrives
       this.activeBottomTab = 'annotations'
     },
+    // ezio: handle insight annotation added from UserActionTree
+    handleAddInsightAnnotation(payload) {
+      const record = {
+        id: this._annotationSeqId++,
+        timestamp: new Date().toISOString(),
+        sourceView: payload.sourceView,
+        text: payload.text || '',
+        selectedItems: payload.selectedItems || [],
+        sketchDataUrl: null,
+        isInsight: true
+      }
+      this.annotationRecords.push(record)
+    },
 
     logUserAction(actionType, actionInfo = {}, userId = null) {
       // If it's a cancel hover action, clear the timer and return
@@ -566,13 +580,13 @@ export default {
       let targetView = 'system';
       
       // Infer source and target views based on action types
-      if (actionType.includes('kline_chart') || actionType === 'click_manipulation_card' || actionType === 'hover_manipulation_card' || actionType === 'click_kline_align_cards' || actionType === 'scroll_manipulation_cards' || actionType === 'hover_kline') {
+      if (actionType.includes('kline_chart') || actionType === 'click_manipulation_card' || actionType === 'hover_manipulation_card' || actionType === 'click_kline_align_cards' || actionType === 'scroll_manipulation_cards' || actionType === 'hover_kline' || actionType === 'change_kline_granularity') {
         sourceView = 'kline_chart';
         targetView = (actionType.includes('zoom') || actionType === 'scroll_manipulation_cards' || actionType === 'hover_kline') ? 'kline_chart' : (actionType.includes('click_manipulation_card') ? 'behavior_details' : 'kline_chart');
-      } else if (actionType.includes('behavior_chart') || actionType.includes('behavior_user_label') || actionType.includes('behavior_manipulation_box') || actionType.includes('toggle_show') || actionType === 'toggle_sequential_time') {
+      } else if (actionType.includes('behavior_chart') || actionType.includes('behavior_user_label') || actionType.includes('behavior_manipulation_box') || actionType === 'toggle_show_related_users' || actionType === 'toggle_show_manipulation_boxes' || actionType === 'toggle_sequential_time') {
         sourceView = 'behavior_details';
         targetView = 'behavior_details';
-      } else if (actionType.includes('token_distribution') || actionType === 'select_user_from_network') {
+      } else if (actionType.includes('token_distribution') || actionType === 'select_user_from_network' || actionType === 'toggle_show_links' || actionType === 'scale_change') {
         sourceView = 'token_distribution';
         targetView = actionType.includes('select') ? 'behavior_details' : 'token_distribution';
       } else if (actionType.includes('snapshot') || actionType.includes('detection')) {

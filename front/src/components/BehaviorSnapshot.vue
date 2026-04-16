@@ -342,12 +342,40 @@ export default {
       // Update x-axis
       svg.select('.x-axis').call(d3.axisTop(newXScale));
 
+      const data = this.snapshotData;
+      const xScale = this._xScale;
+
+      const getZoomedX = (dateObj) => {
+        if (!dateObj || isNaN(dateObj.getTime())) return 0;
+        const ts = dateObj.getTime();
+        
+        if (data.useSequentialTime && xScale.timeToIndex) {
+          if (xScale.timeToIndex.has(ts)) {
+            return newXScale(xScale.timeToIndex.get(ts));
+          }
+          const sorted = xScale.sortedTimestamps;
+          let closestIdx = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < sorted.length; i++) {
+             const diff = Math.abs(sorted[i] - ts);
+             if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+             }
+             if (sorted[i] > ts) break;
+          }
+          return newXScale(closestIdx);
+        } else {
+          return newXScale(dateObj);
+        }
+      }
+
       // Update balance areas
       const ep = this._eventBoxPadding;
       const bs = this._balanceScale;
       if (bs) {
         const newBalanceArea = d3.area()
-          .x(d => newXScale(new Date(d.date)))
+          .x(d => getZoomedX(new Date(d.date)))
           .y0(-ep)
           .y1(d => bs(d.balance) - ep)
           .curve(d3.curveStepAfter);
@@ -356,26 +384,26 @@ export default {
 
       // Update earning bars
       chartBody.selectAll('.earning-bar')
-        .attr('x', d => newXScale(new Date(d.date)) - 2);
+        .attr('x', d => getZoomedX(new Date(d.date)) - 2);
 
       // Update transfer lines
       chartBody.selectAll('.transfer-line')
-        .attr('x1', d => newXScale(d.cx_date))
-        .attr('x2', d => newXScale(d.cx_date));
+        .attr('x1', d => getZoomedX(d.cx_date))
+        .attr('x2', d => getZoomedX(d.cx_date));
 
       // Update event groups
       chartBody.selectAll('.event-group')
-        .attr('transform', d => `translate(${newXScale(d.date)}, 0)`);
+        .attr('transform', d => `translate(${getZoomedX(d.date)}, 0)`);
 
       // Update manipulation boxes
       chartBody.selectAll('.manipulation-box')
         .attr('x', d => {
-          let x1 = newXScale(d.startTs), x2 = newXScale(d.endTs);
+          let x1 = getZoomedX(d.startTs), x2 = getZoomedX(d.endTs);
           if (x2 - x1 < 10) return (x1 + x2) / 2 - 5;
           return x1;
         })
         .attr('width', d => {
-          let x1 = newXScale(d.startTs), x2 = newXScale(d.endTs);
+          let x1 = getZoomedX(d.startTs), x2 = getZoomedX(d.endTs);
           return Math.max(10, x2 - x1);
         });
 
@@ -383,7 +411,7 @@ export default {
       const margin = this._margin;
       this._selectableItems.forEach(item => {
         if (item.type === 'event') {
-          item.screenX = margin.left + newXScale(item._dataDate);
+          item.screenX = margin.left + getZoomedX(item._dataDate);
         }
         // user-track items span full width, screenX stays at margin.left
       });
@@ -434,6 +462,9 @@ export default {
       const earliestDate = new Date(data.timeDomain[0]);
       const snapshotDate = new Date(data.timeDomain[1]);
 
+      const timeToIndex = data.timeToIndex ? new Map(data.timeToIndex) : null;
+      const sortedTimestamps = data.sortedTimestamps || [];
+
       // Create SVG
       const rootSvg = d3.select(this.$refs.snapshotSvg)
         .attr('width', width)
@@ -459,9 +490,18 @@ export default {
         .padding(0.5);
 
       // X Scale
-      const xScale = d3.scaleTime()
-        .domain([earliestDate, snapshotDate])
-        .range([0, innerWidth]);
+      let xScale;
+      if (data.useSequentialTime && timeToIndex) {
+        xScale = d3.scaleLinear()
+          .domain([0, sortedTimestamps.length - 1])
+          .range([0, innerWidth]);
+        xScale.timeToIndex = timeToIndex;
+        xScale.sortedTimestamps = sortedTimestamps;
+      } else {
+        xScale = d3.scaleTime()
+          .domain([earliestDate, snapshotDate])
+          .range([0, innerWidth]);
+      }
 
       // X Axis
       svg.append('g')
@@ -475,6 +515,32 @@ export default {
 
       // Background group — inside chartBody for clipping
       const backgroundGroup = chartBody.append('g').attr('class', 'background-group');
+
+      // Helper function to get X coordinate regardless of scale type
+      const getX = (dateObj) => {
+        if (!dateObj || isNaN(dateObj.getTime())) return 0;
+        const ts = dateObj.getTime();
+        
+        if (data.useSequentialTime && xScale.timeToIndex) {
+          if (xScale.timeToIndex.has(ts)) {
+            return xScale(xScale.timeToIndex.get(ts));
+          }
+          const sorted = xScale.sortedTimestamps;
+          let closestIdx = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < sorted.length; i++) {
+             const diff = Math.abs(sorted[i] - ts);
+             if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+             }
+             if (sorted[i] > ts) break;
+          }
+          return xScale(closestIdx);
+        } else {
+          return xScale(dateObj);
+        }
+      }
 
       // Draw baselines
       backgroundGroup.selectAll('.balance-baseline')
@@ -516,8 +582,13 @@ export default {
           let endTs = new Date(endStr);
           if (isNaN(startTs) || isNaN(endTs)) return;
 
-          let x1 = xScale(startTs);
-          let x2 = xScale(endTs);
+          let x1 = getX(startTs);
+          let x2 = getX(endTs);
+          if (x1 > x2) {
+            const temp = x1;
+            x1 = x2;
+            x2 = temp;
+          }
           if (x2 - x1 < 10) {
             const center = (x1 + x2) / 2;
             x1 = center - 5;
@@ -642,7 +713,7 @@ export default {
           .range([0, maxAreaHeight]);
 
         const balanceArea = d3.area()
-          .x(d => xScale(new Date(d.date)))
+          .x(d => getX(new Date(d.date)))
           .y0(-eventBoxPadding)
           .y1(d => balanceScale(d.balance) - eventBoxPadding)
           .curve(d3.curveStepAfter);
@@ -693,7 +764,7 @@ export default {
               .enter()
               .append('rect')
               .attr('class', 'earning-bar')
-              .attr('x', d => xScale(new Date(d.date)) - barWidth / 2)
+              .attr('x', d => getX(new Date(d.date)) - barWidth / 2)
               .attr('y', eventBoxPadding)
               .attr('width', barWidth)
               .attr('height', d => earningScale(Math.abs(d.earning)))
@@ -704,7 +775,7 @@ export default {
           // Events
           events.forEach((event, eventIdx) => {
             const eventDate = new Date(event.timestamp);
-            const cx = xScale(eventDate);
+            const cx = getX(eventDate);
 
             // Transfer lines
             if (!event.isTrade) {

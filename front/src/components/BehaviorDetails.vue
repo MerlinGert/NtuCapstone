@@ -221,7 +221,12 @@ export default {
         // ezio: pass aspect ratio and original dimensions so snapshot can match proportions
         chartAspectRatio: originalWidth / originalHeight,
         originalWidth,
-        originalHeight
+        originalHeight,
+        useSequentialTime: this.useSequentialTime,
+        timeToIndex: this._chartState && this._chartState.xScale && this._chartState.xScale.timeToIndex ? Array.from(this._chartState.xScale.timeToIndex.entries()) : null,
+        sortedTimestamps: this._chartState && this._chartState.xScale && this._chartState.xScale.sortedTimestamps ? this._chartState.xScale.sortedTimestamps : null,
+        margin: this._chartState ? this._chartState.margin : { top: 30, right: 20, bottom: 25, left: 40 },
+        xScaleDomain: this._chartState && this._chartState.xScale ? this._chartState.xScale.domain() : null
       };
     },
     drawChart() {
@@ -1082,7 +1087,7 @@ export default {
           
           const domain = newXScale.domain()
           // Only emit to parent if the zoom was initiated by a user event to prevent infinite sync loops
-          if (event.sourceEvent) {
+          if (event.sourceEvent && !this.useSequentialTime) {
             this.$emit('time-window-changed', [domain[0], domain[1]])
           }
           // ezio: [1/3 DetailSnapshot initial state] persist zoom transform on every zoom event for snapshot reuse
@@ -1152,7 +1157,13 @@ export default {
         snapshotDate,
         xScale,
         zoom,
-        rootSvg
+        rootSvg,
+        yScale,
+        sortedUsers,
+        eventBoxPadding,
+        margin,
+        innerWidth,
+        innerHeight
       }
     },
     syncTimeWindow() {
