@@ -653,9 +653,9 @@ export default {
         // If this is the first capsule for this view in the current system branch, draw a label before it
         if (seg.isFirstInBranch) {
           let labelText = '';
-          if (seg.view === 'token_distribution') labelText = 'Token Distribution';
-          else if (seg.view === 'kline_chart') labelText = 'K-line Chart';
-          else if (seg.view === 'behavior_details') labelText = 'Behavior Details';
+          if (seg.view === 'token_distribution') labelText = 'TD';
+          else if (seg.view === 'kline_chart') labelText = 'KL';
+          else if (seg.view === 'behavior_details') labelText = 'BD';
           
           if (labelText) {
             bgGroup.append('text')
@@ -723,12 +723,33 @@ export default {
         .join('g')
         .attr('transform', d => `translate(${d.y},${d.x})`)
 
+      const getStrokeColor = d => {
+        if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
+          const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
+          if (isSelected) return '#e53e3e';
+        }
+        if (d.data.type === 'root') return '#2d3748'
+        if (d.data.type === 'annotation') return typeColors.annotation.border
+        if (d.data.type === 'view_branch') return typeColors.view_branch.border
+        const cat = getActionClass(d.data.data ? d.data.data.actionType : '')
+        return typeColors[cat] ? typeColors[cat].border : typeColors.default.border
+      };
+
+      const getStrokeWidth = d => {
+        if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
+          const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
+          if (isSelected) return 3;
+        }
+        return 1.5;
+      };
+
       // Node Rectangles based on type
       node.append('rect')
+        .attr('class', 'node-rect')
         .attr('x', -8)
-        .attr('y', -8)
+        .attr('y', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? -33 : -8)
         .attr('width', 16)
-        .attr('height', 16)
+        .attr('height', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? 66 : 16)
         .attr('rx', 4) // Rounded corners
         .attr('fill', d => {
           if (d.data.type === 'root') return '#4a5568'
@@ -737,24 +758,8 @@ export default {
           const cat = getActionClass(d.data.data ? d.data.data.actionType : '')
           return typeColors[cat] ? typeColors[cat].bg : typeColors.default.bg
         })
-        .attr('stroke', d => {
-          if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
-            const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
-            if (isSelected) return '#e53e3e';
-          }
-          if (d.data.type === 'root') return '#2d3748'
-          if (d.data.type === 'annotation') return typeColors.annotation.border
-          if (d.data.type === 'view_branch') return typeColors.view_branch.border
-          const cat = getActionClass(d.data.data ? d.data.data.actionType : '')
-          return typeColors[cat] ? typeColors[cat].border : typeColors.default.border
-        })
-        .attr('stroke-width', d => {
-          if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
-            const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
-            if (isSelected) return 3;
-          }
-          return 1.5;
-        })
+        .attr('stroke', getStrokeColor)
+        .attr('stroke-width', getStrokeWidth)
         .style('cursor', 'pointer')
 
       // Add a small icon/initial to view branches so they are recognizable
@@ -813,8 +818,50 @@ export default {
           tooltipDiv.html(content)
             .style('left', (event.clientX + 15) + 'px')
             .style('top', (event.clientY - 30) + 'px')
-            
-          d3.select(event.currentTarget).select('rect').attr('stroke', '#4a5568').attr('stroke-width', 2)
+
+          if (d.data.data && d.data.data.actionType === 'high_level_insight') {
+             const refIds = d.data.data.actionInfo.refAnnotations || [];
+             
+             // Recursively get all nested refIds
+             const getAllRefIds = (ids) => {
+                let all = [...ids];
+                ids.forEach(id => {
+                   const anno = this.annotations.find(a => a.id === id);
+                   if (anno && anno.isInsight && anno.selectedItems) {
+                      all = all.concat(getAllRefIds(anno.selectedItems));
+                   }
+                });
+                return all;
+             };
+             const allRefIds = getAllRefIds(refIds);
+
+             // Highlight all nested references
+             g.selectAll('.node-rect')
+               .attr('stroke', d_node => {
+                  const nodeActionId = d_node.data.data && d_node.data.data.actionInfo ? d_node.data.data.actionInfo.id : null;
+                  const nodeId = d_node.data.data ? d_node.data.data.id : null;
+                  
+                  if ((nodeActionId !== null && allRefIds.includes(nodeActionId)) || 
+                      (nodeId !== null && allRefIds.includes(nodeId))) {
+                     return '#e53e3e';
+                  }
+                  if (d_node === d) return '#4a5568';
+                  return getStrokeColor(d_node);
+               })
+               .attr('stroke-width', d_node => {
+                  const nodeActionId = d_node.data.data && d_node.data.data.actionInfo ? d_node.data.data.actionInfo.id : null;
+                  const nodeId = d_node.data.data ? d_node.data.data.id : null;
+                  
+                  if ((nodeActionId !== null && allRefIds.includes(nodeActionId)) || 
+                      (nodeId !== null && allRefIds.includes(nodeId))) {
+                     return 3;
+                  }
+                  if (d_node === d) return 2;
+                  return getStrokeWidth(d_node);
+               });
+          } else {
+             d3.select(event.currentTarget).select('.node-rect').attr('stroke', '#4a5568').attr('stroke-width', 2)
+          }
         })
         .on('mousemove', (event) => {
           tooltipDiv.style('left', (event.clientX + 15) + 'px')
@@ -823,25 +870,10 @@ export default {
         .on('mouseout', (event, d) => {
           tooltipDiv.transition().duration(200).style('opacity', 0)
             .on('end', () => tooltipDiv.style('display', 'none'))
-          d3.select(event.currentTarget).select('rect')
-            .attr('stroke', d_data => {
-              if (this.isMultiSelectMode && d_data.data.type === 'annotation' && d_data.data.data && d_data.data.data.actionInfo) {
-                const isSelected = this.selectedInsightAnnotations.some(a => a.id === d_data.data.data.actionInfo.id);
-                if (isSelected) return '#e53e3e';
-              }
-              if (d_data.data.type === 'root') return '#2d3748'
-              if (d_data.data.type === 'annotation') return typeColors.annotation.border
-              if (d_data.data.type === 'view_branch') return typeColors.view_branch.border
-              const cat = getActionClass(d_data.data.data ? d_data.data.data.actionType : '')
-              return typeColors[cat] ? typeColors[cat].border : typeColors.default.border
-            })
-            .attr('stroke-width', d_data => {
-              if (this.isMultiSelectMode && d_data.data.type === 'annotation' && d_data.data.data && d_data.data.data.actionInfo) {
-                const isSelected = this.selectedInsightAnnotations.some(a => a.id === d_data.data.data.actionInfo.id);
-                if (isSelected) return 3;
-              }
-              return 1.5;
-            })
+          
+          g.selectAll('.node-rect')
+            .attr('stroke', getStrokeColor)
+            .attr('stroke-width', getStrokeWidth);
         })
         .on('dblclick', (event, d) => {
           // ezio: prevent dblclick from propagating to zoom

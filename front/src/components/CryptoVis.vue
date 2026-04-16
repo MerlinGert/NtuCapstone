@@ -177,7 +177,6 @@
                 :manipulation-results="manipulation_detection_results"
                 :sync-target-time-window="klineTimeWindow"
                 @time-window-changed="handleBehaviorTimeWindowChanged"
-                @sequential-time-changed="handleSequentialTimeChanged"
                 @user-selected="handleBehaviorDetailUserSelect"
                 @log-action="logUserAction"
                 @snapshot-input="handleSnapshotAnnotation('behavior_details', $event)"
