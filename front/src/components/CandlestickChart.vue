@@ -1318,9 +1318,40 @@ export default {
       alignCard('bottomCardsContainer', this.bottomCards)
     },
     // ezio: open snapshot — screenshot the current view with html-to-image (faster than html2canvas for SVG-heavy DOM)
+    // ezio: fix scroll position not captured by html-to-image —
+    // html-to-image clones DOM without preserving scrollLeft, so we temporarily
+    // replace scroll with CSS translateX transforms before capture
     async openSnapshot() {
       const wrap = this.$refs.wrap
       if (!wrap) return
+
+      // ezio: compensate scrollable containers for html-to-image capture
+      const fixScroll = (containerRef, isTop) => {
+        const container = this.$refs[containerRef]
+        if (!container) return () => {}
+        const scrollLeft = container.scrollLeft
+        if (scrollLeft === 0) return () => {}
+
+        const children = container.children
+        const savedTransforms = []
+        for (let i = 0; i < children.length; i++) {
+          savedTransforms[i] = children[i].style.transform
+          const base = isTop ? 'rotateX(180deg) ' : ''
+          children[i].style.transform = `${base}translateX(-${scrollLeft}px)`
+        }
+        container.scrollLeft = 0
+
+        return () => {
+          for (let i = 0; i < children.length; i++) {
+            children[i].style.transform = savedTransforms[i] || ''
+          }
+          container.scrollLeft = scrollLeft
+        }
+      }
+
+      const restoreTop = fixScroll('topCardsContainer', true)
+      const restoreBottom = fixScroll('bottomCardsContainer', false)
+
       try {
         const dataUrl = await toPng(wrap, { backgroundColor: '#ffffff', pixelRatio: 1 })
         this.snapshotPayload = {
@@ -1332,6 +1363,9 @@ export default {
         this.showSnapshot = true
       } catch (e) {
         console.error('Snapshot capture failed', e)
+      } finally {
+        restoreTop()
+        restoreBottom()
       }
     },
   },

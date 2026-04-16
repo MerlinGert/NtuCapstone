@@ -9,6 +9,8 @@
         <!-- ezio: 可视化区域 + 浮动工具栏 -->
         <div class="vis-area" ref="svgContainer">
             <svg ref="snapshotSvg"></svg>
+            <!-- ezio: preserved hover tooltip from snapshot — matches original tooltip per node type -->
+            <div v-if="snapshotData.hoveredNode" ref="hoverTooltip" class="snapshot-tooltip" :style="tooltipStyle" v-html="hoveredTooltipHtml"></div>
             <canvas ref="lassoCanvas" class="lasso-overlay"
                 :class="'cursor-' + activeTool"></canvas>
             <!-- ezio: toolbar component -->
@@ -86,7 +88,12 @@ export default {
             // ezio: toolbar state
             activeTool: 'select',    // 'select' | 'pen' | 'eraser'
             penColor: 'rgba(255,60,60,0.7)',
-            sketchStrokes: []        // [{points, color, width}, ...]
+            sketchStrokes: [],       // [{points, color, width}, ...]
+            // ezio: hovered node screen position for tooltip
+            hoveredNodeScreenX: null,
+            hoveredNodeScreenY: null,
+            tooltipLeft: 0,
+            tooltipTop: 0,
         };
     },
     // ezio: redraw canvas when switching modes
@@ -94,6 +101,50 @@ export default {
         activeTool() {
             this.redrawCanvas();
         }
+    },
+    // ezio: computed tooltip for hovered node — mirrors original TokenDistribution tooltip per type
+    computed: {
+        tooltipStyle() {
+            if (this.hoveredNodeScreenX == null) return { display: 'none' };
+            return {
+                left: this.tooltipLeft + 'px',
+                top: this.tooltipTop + 'px',
+            };
+        },
+        hoveredTooltipHtml() {
+            const hn = this.snapshotData && this.snapshotData.hoveredNode;
+            if (!hn) return '';
+            if (hn.type === 'single') {
+                // ezio: matches single-node tooltip in TokenDistribution
+                let html = `<strong>Address:</strong> ${hn.id}<br/>`;
+                html += `<strong>Balance:</strong> ${hn.value.toFixed(2)}<br/>`;
+                if (hn.isRelated) html += '<strong>Type:</strong> Related User<br/>';
+                if (hn.detectionInfo) html += `<strong>Entity ID:</strong> ${hn.detectionInfo.entityId}<br/>`;
+                return html;
+            } else {
+                // ezio: matches group-member tooltip in TokenDistribution
+                let html = `Address: ${(hn.name || hn.id).substring(0, 6)}...<br>Balance: ${hn.value.toLocaleString()}`;
+                if (hn.suspicious) {
+                    html += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
+                    if (hn.suspicious.reasons && hn.suspicious.reasons.length > 0) {
+                        html += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                        hn.suspicious.reasons.forEach(r => { html += `<li style="font-size: 10px;">${r}</li>`; });
+                        html += '</ul>';
+                    } else {
+                        html += `<br>Diff: ${hn.suspicious.diff.toFixed(2)}`;
+                    }
+                }
+                if (hn.detectionInfo) {
+                    html += `<br><strong style="color:orange">Entity Group Detected</strong>`;
+                    if (hn.detectionInfo.reason && hn.detectionInfo.reason.length > 0) {
+                        html += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                        hn.detectionInfo.reason.forEach(r => { html += `<li style="font-size: 10px;">${r}</li>`; });
+                        html += '</ul>';
+                    }
+                }
+                return html;
+            }
+        },
     },
     mounted() {
         this.$nextTick(() => {
@@ -318,6 +369,66 @@ export default {
                     });
                 }
             });
+
+            // ezio: highlight hovered node and compute tooltip position (clamped to container)
+            if (data.hoveredNode) {
+                const hn = data.hoveredNode;
+                const matchNode = this._selectableNodes.find(n => n.id === hn.id);
+                if (matchNode) {
+                    // set raw position first so tooltip renders, then clamp in $nextTick
+                    this.hoveredNodeScreenX = matchNode.screenX;
+                    this.hoveredNodeScreenY = matchNode.screenY;
+                    this.tooltipLeft = matchNode.screenX + 15;
+                    this.tooltipTop = matchNode.screenY - 10;
+
+                    this.$nextTick(() => {
+                        const tip = this.$refs.hoverTooltip;
+                        const box = this.$refs.svgContainer;
+                        if (tip && box) {
+                            const tw = tip.offsetWidth;
+                            const th = tip.offsetHeight;
+                            const bw = box.offsetWidth;
+                            const bh = box.offsetHeight;
+                            let lx = matchNode.screenX + 15;
+                            let ly = matchNode.screenY - 10;
+                            // flip left if overflows right
+                            if (lx + tw > bw) lx = matchNode.screenX - tw - 10;
+                            // flip up if overflows bottom (reserve 50px for toolbar)
+                            if (ly + th > bh - 50) ly = bh - th - 50;
+                            // clamp to top/left edges
+                            if (lx < 5) lx = 5;
+                            if (ly < 5) ly = 5;
+                            this.tooltipLeft = lx;
+                            this.tooltipTop = ly;
+                        }
+                    });
+
+                    // find node radius for highlight ring
+                    let hx, hy, hr;
+                    for (const n of data.nodes) {
+                        if (n.type === 'single' && n.id === hn.id) {
+                            hx = n.x; hy = n.y; hr = n.r;
+                            break;
+                        }
+                        if (n.type === 'group' && n.children) {
+                            const child = n.children.find(c => c.id === hn.id);
+                            if (child) {
+                                hx = n.x + child.cx; hy = n.y + child.cy; hr = child.r;
+                                break;
+                            }
+                        }
+                    }
+                    if (hr != null) {
+                        bubbleGroup.append("circle")
+                            .attr("cx", hx).attr("cy", hy)
+                            .attr("r", hr + 3)
+                            .style("fill", "none")
+                            .style("stroke", "#fdd835")
+                            .style("stroke-width", 3)
+                            .style("stroke-dasharray", "4,2");
+                    }
+                }
+            }
         },
 
         // ezio: clear all sketch strokes
@@ -643,6 +754,24 @@ export default {
 
 .close-btn:hover {
     color: #000;
+}
+
+/* ezio: preserved hover tooltip — boundary-aware positioning */
+.snapshot-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 3;
+    pointer-events: none;
+    max-width: 280px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: normal;
+    word-break: break-word;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 /* ezio: floating toolbar positioning */

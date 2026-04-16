@@ -78,6 +78,8 @@ export default {
       showSnapshot: false,
       snapshotPayload: null,
       showLinks: true, // Controls visibility of links
+      // ezio: track hovered node for snapshot preservation
+      hoveredNode: null,
     }
   },
   props: {
@@ -274,6 +276,9 @@ export default {
           x: d.x,
           y: d.y,
           suspicious: d.suspicious || null,
+          // ezio: capture for hover tooltip in snapshot
+          isRelated: d.isRelated || false,
+          detectionInfo: d.detectionInfo || null,
           fill: d3.select(this).style('fill'),
           type: 'single',
         })
@@ -293,6 +298,8 @@ export default {
               cx: +d3.select(this).attr('cx'),
               cy: +d3.select(this).attr('cy'),
               suspicious: child.suspicious || null,
+              // ezio: capture for hover tooltip in snapshot
+              detectionInfo: child.detectionInfo || null,
               fill: d3.select(this).style('fill'),
             })
           })
@@ -364,6 +371,8 @@ export default {
         usersBalance,
         scaleFactor: this.scaleFactor,
         time: this.displayTime,
+        // ezio: preserve hover state at snapshot time
+        hoveredNode: this.hoveredNode ? { ...this.hoveredNode } : null,
       }
     },
 
@@ -852,7 +861,9 @@ export default {
         .style('stroke-width', (d) => (d.suspicious ? 3 : 2))
         .on('mouseover mouseenter pointerover', (event, d) => {
           this.$emit('log-action', 'hover_token_distribution_user', { targetUserId: d.id, balance: d.value, isRelated: d.isRelated })
-          
+          // ezio: track hovered node for snapshot
+          this.hoveredNode = { id: d.id, name: d.name, value: d.value, isRelated: d.isRelated || false, suspicious: d.suspicious || null, detectionInfo: d.detectionInfo || null, type: 'single' }
+
           const tooltip = d3.select(this.$refs.tooltip)
           tooltip.transition().duration(200).style('opacity', 0.9)
 
@@ -878,6 +889,8 @@ export default {
         })
         .on('mouseout mouseleave pointerout', (event, d) => {
           this.$emit('log-action', 'cancel_hover', { hoverType: 'hover_token_distribution_user' })
+          // ezio: clear hovered node
+          this.hoveredNode = null
           d3.select(this.$refs.tooltip)
             .transition()
             .duration(500)
@@ -952,7 +965,9 @@ export default {
         .selectAll('.member')
         .on('mouseover mouseenter pointerover', function (event, d) {
           self.$emit('log-action', 'hover_token_distribution_user', { targetUserId: d.id, balance: d.value, isRelated: d.isRelated, inGroup: true })
-          
+          // ezio: track hovered node for snapshot
+          self.hoveredNode = { id: d.id, name: d.name, value: d.value, isRelated: false, suspicious: d.suspicious || null, detectionInfo: d.detectionInfo || null, type: 'group-member' }
+
           d3.select(this).style('stroke', d.suspicious ? '#ff0000' : '#000')
           const tooltip = self.$refs.tooltip
           let content = `Address: ${d.name.substring(0, 6)}...<br>Balance: ${d.value.toLocaleString()}`
@@ -995,6 +1010,8 @@ export default {
         })
         .on('mouseout mouseleave pointerout', function (_event, d) {
           self.$emit('log-action', 'cancel_hover', { hoverType: 'hover_token_distribution_user' })
+          // ezio: clear hovered node
+          self.hoveredNode = null
           d3.select(this).style('stroke', d.suspicious ? '#ff0000' : '#5976ba')
           self.$refs.tooltip.style.opacity = 0
         })
