@@ -399,11 +399,28 @@ export default {
       chartBody.selectAll('.manipulation-box')
         .attr('x', d => {
           let x1 = getZoomedX(d.startTs), x2 = getZoomedX(d.endTs);
-          if (x2 - x1 < 10) return (x1 + x2) / 2 - 5;
+          if (x2 - x1 < 10) {
+             const center = (x1 + x2) / 2;
+             x1 = center - 5;
+             if (this.snapshotData.isFewUsers) x1 -= 6; // mimic sequential time logic from original chart if needed
+             return x1;
+          }
+          if (this.snapshotData.isFewUsers) return x1 - 6; // sequential time offset
           return x1;
         })
         .attr('width', d => {
           let x1 = getZoomedX(d.startTs), x2 = getZoomedX(d.endTs);
+          if (x2 - x1 < 10) {
+             const center = (x1 + x2) / 2;
+             x1 = center - 5;
+             x2 = center + 5;
+             if (this.snapshotData.isFewUsers) {
+                x1 -= 6;
+                x2 += 6;
+             }
+             return x2 - x1;
+          }
+          if (this.snapshotData.isFewUsers) return (x2 + 6) - (x1 - 6);
           return Math.max(10, x2 - x1);
         });
 
@@ -593,6 +610,15 @@ export default {
             const center = (x1 + x2) / 2;
             x1 = center - 5;
             x2 = center + 5;
+            if (data.isFewUsers) {
+               x1 -= 6;
+               x2 += 6;
+            }
+          } else {
+            if (data.isFewUsers) {
+               x1 -= 6;
+               x2 += 6;
+            }
           }
 
           involvedUsers.forEach(user => {

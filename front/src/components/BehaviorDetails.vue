@@ -675,6 +675,18 @@ export default {
             const center = (x1 + x2) / 2
             x1 = center - 5
             x2 = center + 5
+            if (this.useSequentialTime) {
+               x1 -= 6; 
+               x2 += 6;
+            }
+          } else {
+            // ezio: if sequential time is used, the box needs to expand to cover the dots
+            // since the timestamps map directly to index points, x1 is the exact center of the first dot
+            // and x2 is the exact center of the last dot. We add padding to wrap them nicely.
+            if (this.useSequentialTime) {
+               x1 -= 6; // slightly more than the radius (4) of the dots
+               x2 += 6;
+            }
           }
 
           // Format tooltip details
@@ -1087,8 +1099,21 @@ export default {
           
           const domain = newXScale.domain()
           // Only emit to parent if the zoom was initiated by a user event to prevent infinite sync loops
-          if (event.sourceEvent && !this.useSequentialTime) {
-            this.$emit('time-window-changed', [domain[0], domain[1]])
+          if (event.sourceEvent) {
+            if (!this.useSequentialTime) {
+              this.$emit('time-window-changed', [domain[0], domain[1]])
+            } else {
+              // For sequential time, we still want to log the zoom action even though we don't sync it
+              if (this._zoomLogTimeout) {
+                clearTimeout(this._zoomLogTimeout);
+              }
+              this._zoomLogTimeout = setTimeout(() => {
+                this.$emit('log-action', 'zoom_behavior_chart', { 
+                  timeWindow: [domain[0], domain[1]],
+                  isSequential: true
+                });
+              }, 500);
+            }
           }
           // ezio: [1/3 DetailSnapshot initial state] persist zoom transform on every zoom event for snapshot reuse
           this._currentZoomTransform = event.transform
@@ -1112,13 +1137,29 @@ export default {
             .attr('x', (d) => {
               let x1 = getZoomedX(d.startTs)
               let x2 = getZoomedX(d.endTs)
-              if (x2 - x1 < 10) return (x1 + x2) / 2 - 5
+              if (x2 - x1 < 10) {
+                 const center = (x1 + x2) / 2
+                 x1 = center - 5
+                 if (this.useSequentialTime) x1 -= 6;
+                 return x1;
+              }
+              if (this.useSequentialTime) return x1 - 6;
               return x1
             })
             .attr('width', (d) => {
               let x1 = getZoomedX(d.startTs)
               let x2 = getZoomedX(d.endTs)
-              if (x2 - x1 < 10) return 10
+              if (x2 - x1 < 10) {
+                 const center = (x1 + x2) / 2
+                 x1 = center - 5
+                 x2 = center + 5
+                 if (this.useSequentialTime) {
+                    x1 -= 6;
+                    x2 += 6;
+                 }
+                 return x2 - x1;
+              }
+              if (this.useSequentialTime) return (x2 + 6) - (x1 - 6);
               return x2 - x1
             })
 
