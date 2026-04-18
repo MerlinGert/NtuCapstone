@@ -31,7 +31,8 @@
 
         <!-- Chart -->
         <div style="flex:1;position:relative;overflow:hidden;height:0;min-height:0;" ref="chart_container">
-            <svg class="tokenDistribution"></svg>
+            <!-- ezio: data-snapshot-target marks the main chart SVG for viewSnapshot capture -->
+            <svg class="tokenDistribution" data-snapshot-target></svg>
             <div v-if="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">
                 Loading data...
             </div>

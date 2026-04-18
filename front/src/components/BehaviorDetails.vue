@@ -139,7 +139,9 @@ export default {
       useSequentialTime: false, // New property for Sequential Time
       // ezio: snapshot state
       showSnapshot: false,
-      snapshotPayload: null
+      snapshotPayload: null,
+      // ezio: track hovered element for snapshot preservation
+      hoveredElement: null,
     };
   },
   watch: {
@@ -226,7 +228,9 @@ export default {
         timeToIndex: this._chartState && this._chartState.xScale && this._chartState.xScale.timeToIndex ? Array.from(this._chartState.xScale.timeToIndex.entries()) : null,
         sortedTimestamps: this._chartState && this._chartState.xScale && this._chartState.xScale.sortedTimestamps ? this._chartState.xScale.sortedTimestamps : null,
         margin: this._chartState ? this._chartState.margin : { top: 30, right: 20, bottom: 25, left: 40 },
-        xScaleDomain: this._chartState && this._chartState.xScale ? this._chartState.xScale.domain() : null
+        xScaleDomain: this._chartState && this._chartState.xScale ? this._chartState.xScale.domain() : null,
+        // ezio: preserve hover state at snapshot time
+        hoveredElement: this.hoveredElement ? { ...this.hoveredElement } : null,
       };
     },
     drawChart() {
@@ -454,6 +458,8 @@ export default {
         .append('svg')
         .attr('width', width)
         .attr('height', height)
+        // ezio: mark as main-chart SVG for viewSnapshot capture (header contains icon SVGs)
+        .attr('data-snapshot-target', '')
 
       // Define clip path
       const defs = rootSvg.append('defs')
@@ -733,11 +739,13 @@ export default {
               .attr('ry', 4)
               .style('pointer-events', 'all')
               .on('mouseover mouseenter pointerover', function (event) {
-                self.$emit('log-action', 'hover_behavior_manipulation_box', { 
-                  method: result.detection_method, 
+                self.$emit('log-action', 'hover_behavior_manipulation_box', {
+                  method: result.detection_method,
                   time: `${startStr} - ${endStr}`,
                   usersCount: involvedUsers.length
                 })
+                // ezio: track hovered element for snapshot
+                self.hoveredElement = { type: 'manipulation-box', tooltipHtml: tooltipHtml }
                 d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.15)')
                 const tooltip = self.$refs.tooltip
                 tooltip.innerHTML = tooltipHtml
@@ -766,6 +774,8 @@ export default {
               })
               .on('mouseout mouseleave pointerout', function () {
                 self.$emit('log-action', 'cancel_hover', { hoverType: 'hover_behavior_manipulation_box' })
+                // ezio: clear hovered element
+                self.hoveredElement = null
                 d3.select(this).attr('fill', 'rgba(255, 0, 0, 0.05)')
                 const tooltip = self.$refs.tooltip
                 tooltip.style.opacity = 0
@@ -839,6 +849,8 @@ export default {
           else if (entityUsers.includes(d)) type = 'Entity Member'
           
           let htmlContent = `<strong>${type}:</strong><br/>${d}`
+          // ezio: track hovered element for snapshot
+          this.hoveredElement = { type: 'user-label', tooltipHtml: htmlContent }
 
           const [x, y] = d3.pointer(event, this.$refs.chartContainer)
           tooltip
@@ -854,6 +866,8 @@ export default {
         })
         .on('mouseout mouseleave pointerout', (event, d) => {
           this.$emit('log-action', 'cancel_hover', { hoverType: 'hover_behavior_user_label' })
+          // ezio: clear hovered element
+          this.hoveredElement = null
           d3.select(event.currentTarget).attr('font-weight', d === this.selectedUser ? 'bold' : 'normal')
           
           d3.select(this.$refs.tooltip)

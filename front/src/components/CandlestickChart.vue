@@ -1317,56 +1317,60 @@ export default {
       alignCard('topCardsContainer', this.topCards)
       alignCard('bottomCardsContainer', this.bottomCards)
     },
-    // ezio: open snapshot — screenshot the current view with html-to-image (faster than html2canvas for SVG-heavy DOM)
-    // ezio: fix scroll position not captured by html-to-image —
-    // html-to-image clones DOM without preserving scrollLeft, so we temporarily
-    // replace scroll with CSS translateX transforms before capture
-    async openSnapshot() {
-      const wrap = this.$refs.wrap
-      if (!wrap) return
+    // ezio: compensate scrollable containers for html-to-image capture.
+    // html-to-image clones DOM without preserving scrollLeft. The earlier approach applied
+    // translateX to each child, but inline transforms conflict with the `.scroll-top > *`
+    // rotateX rule and don't always survive cloning, so captures kept showing cards at
+    // scrollLeft=0. Instead, push the first child leftwards with a negative margin — a
+    // layout shift the clone reproduces faithfully, independent of any existing transforms.
+    _fixScroll(containerRef) {
+      const container = this.$refs[containerRef]
+      if (!container) return () => {}
+      const scrollLeft = container.scrollLeft
+      if (scrollLeft === 0) return () => {}
 
-      // ezio: compensate scrollable containers for html-to-image capture
-      const fixScroll = (containerRef, isTop) => {
-        const container = this.$refs[containerRef]
-        if (!container) return () => {}
-        const scrollLeft = container.scrollLeft
-        if (scrollLeft === 0) return () => {}
+      const firstChild = container.firstElementChild
+      if (!firstChild) return () => {}
 
-        const children = container.children
-        const savedTransforms = []
-        for (let i = 0; i < children.length; i++) {
-          savedTransforms[i] = children[i].style.transform
-          const base = isTop ? 'rotateX(180deg) ' : ''
-          children[i].style.transform = `${base}translateX(-${scrollLeft}px)`
-        }
-        container.scrollLeft = 0
+      const savedMarginLeft = firstChild.style.marginLeft
+      firstChild.style.marginLeft = `-${scrollLeft}px`
+      container.scrollLeft = 0
 
-        return () => {
-          for (let i = 0; i < children.length; i++) {
-            children[i].style.transform = savedTransforms[i] || ''
-          }
-          container.scrollLeft = scrollLeft
-        }
+      return () => {
+        firstChild.style.marginLeft = savedMarginLeft
+        container.scrollLeft = scrollLeft
       }
+    },
 
-      const restoreTop = fixScroll('topCardsContainer', true)
-      const restoreBottom = fixScroll('bottomCardsContainer', false)
-
+    // ezio: shared image capture — used by openSnapshot AND viewSnapshot utility
+    async captureImage(quality = 'full') {
+      const wrap = this.$refs.wrap
+      if (!wrap) return null
+      const pixelRatio = quality === 'full' ? 1 : 0.5
+      const restoreTop = this._fixScroll('topCardsContainer')
+      const restoreBottom = this._fixScroll('bottomCardsContainer')
       try {
-        const dataUrl = await toPng(wrap, { backgroundColor: '#ffffff', pixelRatio: 1 })
-        this.snapshotPayload = {
-          imageDataUrl: dataUrl,
-          currentCoin: this.currentCoin,
-          currentGranularity: this.currentGranularity,
-          time: new Date().toLocaleString(),
-        }
-        this.showSnapshot = true
+        return await toPng(wrap, { backgroundColor: '#ffffff', pixelRatio })
       } catch (e) {
-        console.error('Snapshot capture failed', e)
+        console.error('[CandlestickChart] capture failed', e)
+        return null
       } finally {
         restoreTop()
         restoreBottom()
       }
+    },
+
+    // ezio: open snapshot modal — uses captureImage at full quality
+    async openSnapshot() {
+      const dataUrl = await this.captureImage('full')
+      if (!dataUrl) return
+      this.snapshotPayload = {
+        imageDataUrl: dataUrl,
+        currentCoin: this.currentCoin,
+        currentGranularity: this.currentGranularity,
+        time: new Date().toLocaleString(),
+      }
+      this.showSnapshot = true
     },
   },
 }

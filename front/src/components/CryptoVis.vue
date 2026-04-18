@@ -13,6 +13,23 @@
               <input type="radio" v-model="currentCoin" value="PNUT" @change="handleCoinChange" /> PNUT
             </label>
           </div>
+          <!-- ezio: export/import session buttons -->
+          <div style="display: flex; gap: 6px; margin-left: 16px; border-left: 1px solid #e2e8f0; padding-left: 16px;">
+            <button class="session-io-btn" @click="onClickExport" title="Export Actions & Annotations as JSON">
+              Export
+            </button>
+            <!-- ezio: import disabled for now -->
+            <button class="session-io-btn" disabled title="Import is disabled">
+              Import
+            </button>
+            <input
+              ref="importFileInput"
+              type="file"
+              accept=".json,application/json"
+              style="display:none"
+              @change="onImportFileChosen"
+            />
+          </div>
         </div>
       </div>
   </n-layout-header>
@@ -100,6 +117,10 @@
             <UserActionTimeline
                 v-show="activeBottomTab === 'actions'"
                 :actions="userActionSequence"
+                :snapshot-categories="snapshotCategories"
+                :snapshot-quality="snapshotQuality"
+                @toggle-category="onSnapshotCategoryToggle"
+                @change-quality="onSnapshotQualityChange"
                 style="height:100%;"
             />
             <AnnotationTimeline
@@ -187,6 +208,65 @@
   </n-layout>
 
 </n-layout-content>
+
+<!-- ezio: export dialog -->
+<div v-if="showExportDialog" class="session-io-overlay" @click.self="showExportDialog = false">
+  <div class="session-io-dialog">
+    <div class="session-io-dialog-header">
+      <h3>Export Session</h3>
+      <button class="session-io-close" @click="showExportDialog = false">×</button>
+    </div>
+    <div class="session-io-dialog-body">
+      <div class="session-io-stats">
+        <div><strong>{{ userActionSequence.length }}</strong> actions</div>
+        <div><strong>{{ annotationRecords.length }}</strong> annotations</div>
+      </div>
+      <label class="session-io-checkbox">
+        <input type="checkbox" v-model="exportIncludeSnapshots" />
+        <span>Include snapshot images (base64)</span>
+      </label>
+      <div class="session-io-hint">
+        {{ exportIncludeSnapshots
+          ? 'File will include all screenshot / sketch images (larger).'
+          : 'File will contain metadata only. Sketches and view snapshots will be stripped.' }}
+      </div>
+    </div>
+    <div class="session-io-dialog-footer">
+      <button class="session-io-btn ghost" @click="showExportDialog = false">Cancel</button>
+      <button class="session-io-btn primary" @click="confirmExport">Download JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- ezio: import confirm (replace) dialog -->
+<div v-if="showImportConflictDialog" class="session-io-overlay" @click.self="cancelImport">
+  <div class="session-io-dialog">
+    <div class="session-io-dialog-header">
+      <h3>Import Session</h3>
+      <button class="session-io-close" @click="cancelImport">×</button>
+    </div>
+    <div class="session-io-dialog-body">
+      <div class="session-io-hint" style="margin-bottom:10px;">
+        Current session already has
+        <strong>{{ userActionSequence.length }}</strong> actions and
+        <strong>{{ annotationRecords.length }}</strong> annotations.
+      </div>
+      <div class="session-io-hint">
+        Incoming file contains
+        <strong>{{ pendingImportPayload ? pendingImportPayload.userActionSequence.length : 0 }}</strong> actions and
+        <strong>{{ pendingImportPayload ? pendingImportPayload.annotationRecords.length : 0 }}</strong> annotations.
+      </div>
+      <div style="margin-top:14px; color:#c53030;">
+        Import will <strong>replace</strong> the current session data. This cannot be undone — export first if you want to keep it.
+      </div>
+    </div>
+    <div class="session-io-dialog-footer">
+      <button class="session-io-btn ghost" @click="cancelImport">Cancel</button>
+      <button class="session-io-btn primary" @click="applyImport">Replace &amp; Import</button>
+    </div>
+  </div>
+</div>
+
 </n-layout>
 </template>
 
@@ -211,6 +291,14 @@ import UserActionTimeline from './UserActionTimeline.vue'
 import UserActionTree from './UserActionTree.vue'
 // ezio: import AnnotationTimeline for snapshot annotation display
 import AnnotationTimeline from './AnnotationTimeline.vue'
+// ezio: view screenshot utility
+import { captureViewByName, isCapturable } from '../utils/viewSnapshot'
+// ezio: session import/export helpers
+import {
+  buildExportPayload,
+  downloadJsonFile,
+  parseImportFile,
+} from '../utils/sessionIO'
 
 export default {
   components: {
@@ -380,12 +468,30 @@ export default {
       annotationRecords: [], // Array to store snapshot annotations
       activeBottomTab: 'tree', // 'actions' | 'annotations' | 'tree'
       _annotationSeqId: 0, // auto-increment ID for annotations
+      // ezio: action snapshot config — one switch per category
+      snapshotCategories: [
+        { key: 'hover',         label: 'Hover',           enabled: false, actions: ['hover_manipulation_card', 'hover_kline', 'hover_token_distribution_user', 'hover_behavior_manipulation_box', 'hover_behavior_user_label'] },
+        { key: 'zoom_scroll',   label: 'Zoom / Scroll',   enabled: false, actions: ['zoom_kline_chart', 'zoom_behavior_chart', 'scroll_manipulation_cards', 'sync_time_window'] },
+        { key: 'click_select',  label: 'Click / Select',  enabled: true,  actions: ['click_manipulation_card', 'click_kline_align_cards', 'select_user_from_network', 'select_user_from_behavior_details'] },
+        { key: 'change_toggle', label: 'Change / Toggle', enabled: true,  actions: ['change_coin', 'change_kline_granularity', 'scale_change', 'toggle_show_links', 'toggle_show_related_users', 'toggle_show_manipulation_boxes', 'toggle_sequential_time'] },
+        { key: 'system',        label: 'System',          enabled: true,  actions: ['run_entity_detection', 'run_manipulation_detection', 'update_snapshot', 'update_link_detection', 'high_level_insight'] },
+      ],
+      snapshotQuality: 'thumbnail', // 'thumbnail' | 'full'
+      _snapshotCaptureInFlight: false,
+      // ezio: awaited by _maybeCaptureSnapshots so target view is captured after its async redraw
+      _targetReadyPromise: null,
+      // ezio: export/import UI state
+      showExportDialog: false,
+      exportIncludeSnapshots: true,
+      showImportConflictDialog: false,
+      pendingImportPayload: null,
     }
   },
   watch: {
     selectedUser(newVal) {
       if (newVal) {
-        this.generateBehaviorDetailData()
+        // ezio: stash the in-flight promise so _maybeCaptureSnapshots can await target-view readiness
+        this._targetReadyPromise = this.generateBehaviorDetailData()
       } else {
         this.behaviorDetailData = null
         this.selectedEntityInfo = null
@@ -436,6 +542,86 @@ export default {
         isInsight: true
       }
       this.annotationRecords.push(record)
+    },
+
+    // ezio: open export dialog
+    onClickExport() {
+      this.showExportDialog = true
+    },
+    // ezio: build payload + trigger download
+    confirmExport() {
+      const payload = buildExportPayload({
+        coin: this.currentCoin,
+        userActionSequence: this.userActionSequence,
+        annotationRecords: this.annotationRecords,
+        snapshotCategories: this.snapshotCategories,
+        snapshotQuality: this.snapshotQuality,
+        annotationSeqId: this._annotationSeqId,
+        includeSnapshots: this.exportIncludeSnapshots,
+      })
+      downloadJsonFile(payload, this.currentCoin)
+      this.showExportDialog = false
+      this.logUserAction('export_session', {
+        actionCount: this.userActionSequence.length,
+        annotationCount: this.annotationRecords.length,
+        includeSnapshots: this.exportIncludeSnapshots,
+      })
+    },
+    // ezio: trigger hidden file input
+    onClickImport() {
+      if (this.$refs.importFileInput) {
+        this.$refs.importFileInput.value = ''
+        this.$refs.importFileInput.click()
+      }
+    },
+    // ezio: parse the selected JSON file
+    async onImportFileChosen(e) {
+      const file = e.target.files && e.target.files[0]
+      if (!file) return
+      try {
+        const parsed = await parseImportFile(file)
+        const isEmpty =
+          this.userActionSequence.length === 0 &&
+          this.annotationRecords.length === 0
+        if (isEmpty) {
+          this.pendingImportPayload = parsed
+          this.applyImport()
+        } else {
+          this.pendingImportPayload = parsed
+          this.showImportConflictDialog = true
+        }
+      } catch (err) {
+        window.alert('Invalid session file: ' + (err && err.message ? err.message : err))
+      } finally {
+        if (this.$refs.importFileInput) this.$refs.importFileInput.value = ''
+      }
+    },
+    // ezio: user cancelled import
+    cancelImport() {
+      this.showImportConflictDialog = false
+      this.pendingImportPayload = null
+    },
+    // ezio: replace current session with imported payload
+    applyImport() {
+      const parsed = this.pendingImportPayload
+      if (!parsed) return
+      this.userActionSequence = parsed.userActionSequence || []
+      this.annotationRecords = parsed.annotationRecords || []
+      const maxId = this.annotationRecords.reduce(
+        (m, a) => (Number.isFinite(a?.id) && a.id > m ? a.id : m),
+        -1
+      )
+      this._annotationSeqId = Math.max(
+        Number.isFinite(parsed.annotationSeqId) ? parsed.annotationSeqId : 0,
+        maxId + 1
+      )
+      this.showImportConflictDialog = false
+      this.pendingImportPayload = null
+      this.activeBottomTab = 'tree'
+      this.logUserAction('import_session', {
+        actionCount: this.userActionSequence.length,
+        annotationCount: this.annotationRecords.length,
+      })
     },
 
     logUserAction(actionType, actionInfo = {}, userId = null) {
@@ -543,7 +729,7 @@ export default {
           if (shouldMerge) {
             // Merge by accumulating the action's info and updating timestamp instead of pushing a new one
             lastAction.timestamp = currentTimestamp
-            
+
             // Convert actionInfo to an array to store continuous intermediate steps if it isn't already
             if (!Array.isArray(lastAction.actionInfo)) {
               lastAction.actionInfo = [lastAction.actionInfo]
@@ -552,10 +738,24 @@ export default {
               time: currentTimestamp,
               data: actionInfo
             })
-            
+
             // Update the view state as well
             lastAction.relatedViewWithViewState.klineTimeWindow = this.klineTimeWindow
             lastAction.relatedViewWithViewState.behaviorTimeWindow = this.behaviorTimeWindow
+
+            // ezio: for zoom / scroll merges, re-capture snapshot at the latest state; debounce
+            // so only the final frame of a rapid burst is captured, and overwrite so the card
+            // keeps only the latest screenshot instead of accumulating the whole burst
+            if (actionType === 'zoom_kline_chart' || actionType === 'zoom_behavior_chart' || actionType === 'scroll_manipulation_cards') {
+              if (this._snapshotRefreshTimer) clearTimeout(this._snapshotRefreshTimer)
+              this._snapshotRefreshTimer = setTimeout(() => {
+                this._maybeCaptureSnapshots(lastAction, { append: false })
+              }, 400)
+            }
+            // ezio: for hover merges, append a fresh snapshot so every merged hover has its own thumbnail
+            else if (isHoverAction) {
+              this._maybeCaptureSnapshots(lastAction, { append: true })
+            }
             return
           }
         }
@@ -612,9 +812,103 @@ export default {
 
       this.userActionSequence.push(actionRecord)
       console.log('User Action Logged:', actionRecord)
-      
+
+      // ezio: auto-capture screenshots if this action's category is enabled
+      this._maybeCaptureSnapshots(actionRecord)
+
       // Optional: Send to backend
       // fetch('/api/log_action', { method: 'POST', body: JSON.stringify(actionRecord) })
+    },
+
+    // ezio: lookup whether this actionType's category is currently enabled
+    _isActionSnapshotEnabled(actionType) {
+      for (const cat of this.snapshotCategories) {
+        if (cat.actions.includes(actionType)) return cat.enabled
+      }
+      return false
+    },
+
+    // ezio: async screenshot capture; sourceSnapshot/targetSnapshot are arrays — one entry per capture.
+    // append=true pushes onto the existing array (used for hover/zoom merges); otherwise overwrites with [snap].
+    // If targetView is 'all_views', we fan out and capture kline_chart + token_distribution + behavior_details,
+    // so actions like change_coin / run_*_detection / update_snapshot produce one thumbnail per view.
+    _maybeCaptureSnapshots(actionRecord, { append = false } = {}) {
+      if (!this._isActionSnapshotEnabled(actionRecord.actionType)) return
+      if (this._snapshotCaptureInFlight) return
+      const sourceCapturable = isCapturable(actionRecord.sourceView)
+      const isAllViewsTarget = actionRecord.targetView === 'all_views'
+      const targetCapturable = !isAllViewsTarget && actionRecord.targetView !== actionRecord.sourceView && isCapturable(actionRecord.targetView)
+      // ezio: all_views fan-out disabled — treat as no target, so early-return when source also missing
+      if (!sourceCapturable && !targetCapturable) return
+
+      this._snapshotCaptureInFlight = true
+      const run = async () => {
+        try {
+          // ezio: pass actionType so viewSnapshot can pick DOM vs SVG capture (hover needs tooltip in PNG)
+          const opts = { quality: this.snapshotQuality, candlestickRef: this.$refs.candlestickChart, actionType: actionRecord.actionType }
+          if (sourceCapturable) {
+            const snap = await captureViewByName(actionRecord.sourceView, opts)
+            if (snap) {
+              if (append && Array.isArray(actionRecord.sourceSnapshot)) {
+                actionRecord.sourceSnapshot.push(snap)
+              } else {
+                actionRecord.sourceSnapshot = [snap]
+              }
+            }
+          }
+          // ezio: wait for target view's async update (fetch + D3 redraw) before capturing,
+          // otherwise we snapshot the stale chart. 3s timeout guards against hung fetches.
+          const waitForTargetReady = async () => {
+            if (this._targetReadyPromise) {
+              const timeout = new Promise((resolve) => setTimeout(resolve, 3000))
+              await Promise.race([this._targetReadyPromise.catch(() => {}), timeout])
+              await this.$nextTick()
+            }
+          }
+          // ezio: disabled — all_views fan-out screenshot has a bug, keeping code for reference
+          // if (isAllViewsTarget) {
+          //   await waitForTargetReady()
+          //   // ezio: fan-out capture for all_views — one snapshot per view, order fixed so
+          //   // the timeline shows them consistently
+          //   const viewNames = ['kline_chart', 'token_distribution', 'behavior_details']
+          //   if (!append || !Array.isArray(actionRecord.targetSnapshot)) {
+          //     actionRecord.targetSnapshot = []
+          //   }
+          //   for (const viewName of viewNames) {
+          //     const snap = await captureViewByName(viewName, opts)
+          //     if (snap) actionRecord.targetSnapshot.push(snap)
+          //   }
+          // } else
+          if (targetCapturable) {
+            await waitForTargetReady()
+            const snap = await captureViewByName(actionRecord.targetView, opts)
+            if (snap) {
+              if (append && Array.isArray(actionRecord.targetSnapshot)) {
+                actionRecord.targetSnapshot.push(snap)
+              } else {
+                actionRecord.targetSnapshot = [snap]
+              }
+            }
+          }
+        } finally {
+          this._snapshotCaptureInFlight = false
+          this._targetReadyPromise = null // ezio: clear so next action starts fresh
+        }
+      }
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(run, { timeout: 500 })
+      } else {
+        setTimeout(run, 0)
+      }
+    },
+
+    // ezio: handlers for UI toggles in UserActionTimeline
+    onSnapshotCategoryToggle(key, enabled) {
+      const cat = this.snapshotCategories.find(c => c.key === key)
+      if (cat) cat.enabled = enabled
+    },
+    onSnapshotQualityChange(quality) {
+      this.snapshotQuality = quality
     },
     resetViewState() {
       this.selectedUser = null
@@ -654,8 +948,10 @@ export default {
       await this.loadSnapshotTimesForCurrentCoin()
       await this.handleUpdateSnapshot({ ...this.snapshot_configuration })
     },
+    // ezio: returns the fetch promise chain so callers can stash it on _targetReadyPromise;
+    // trailing nextTicks make it resolve only after BehaviorDetails' drawChart has run.
     generateBehaviorDetailData() {
-      if (!this.selectedUser) return
+      if (!this.selectedUser) return Promise.resolve()
       const userSet = new Set([this.selectedUser])
       this.selectedEntityInfo = null
 
@@ -690,7 +986,7 @@ export default {
       }
 
       // Fetch behavior sequences
-      fetch('/api/user_behavior/sequences', {
+      return fetch('/api/user_behavior/sequences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -716,6 +1012,10 @@ export default {
             this.behaviorDetailData,
           )
         })
+        // ezio: BehaviorDetails' watcher wraps drawChart in a $nextTick — wait two ticks so
+        // the promise only resolves once the new SVG is actually in the DOM.
+        .then(() => this.$nextTick())
+        .then(() => this.$nextTick())
         .catch((err) => {
           console.error(
             'CryptoVis: failed to fetch user behavior sequences',
@@ -772,13 +1072,11 @@ export default {
       this.selectedUser = null
       this.selectedEntityInfo = null // clear entity info when card is clicked
       this.selectedCardUsers = users || []
-      
-      this.logUserAction('click_manipulation_card', { cardUsers: users })
-      
+
       if (this.selectedCardUsers.length > 0) {
         const userSet = new Set(this.selectedCardUsers)
-        
-        fetch('/api/user_behavior/sequences', {
+        // ezio: stash promise BEFORE logUserAction so _maybeCaptureSnapshots can await target redraw
+        this._targetReadyPromise = fetch('/api/user_behavior/sequences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -802,6 +1100,9 @@ export default {
               this.behaviorDetailData,
             )
           })
+          // ezio: wait two ticks so BehaviorDetails' drawChart nextTick flushes before capture
+          .then(() => this.$nextTick())
+          .then(() => this.$nextTick())
           .catch((err) => {
             console.error(
               'CryptoVis: failed to fetch card user behavior sequences',
@@ -810,7 +1111,10 @@ export default {
           })
       } else {
         this.behaviorDetailData = null
+        this._targetReadyPromise = null // ezio: nothing to await when card has no users
       }
+
+      this.logUserAction('click_manipulation_card', { cardUsers: users })
     },
     rebuildEntityResults() {
       if (!this.link_generation_results) return
@@ -1713,5 +2017,116 @@ a {
 .dataset_label{
   font-size: 15px;
   margin-left: 15%;
+}
+
+/* ezio: session import/export UI */
+.session-io-btn {
+  padding: 4px 12px;
+  border: 1px solid #cbd5e0;
+  background: #fff;
+  color: #2d3748;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.session-io-btn:hover {
+  background: #edf2f7;
+  border-color: #a0aec0;
+}
+.session-io-btn:disabled {
+  color: #a0aec0;
+  background: #f7fafc;
+  border-color: #edf2f7;
+  cursor: not-allowed;
+}
+.session-io-btn:disabled:hover {
+  background: #f7fafc;
+  border-color: #edf2f7;
+}
+.session-io-btn.primary {
+  background: #3182ce;
+  color: #fff;
+  border-color: #3182ce;
+}
+.session-io-btn.primary:hover {
+  background: #2b6cb0;
+  border-color: #2b6cb0;
+}
+.session-io-btn.ghost {
+  background: transparent;
+  border-color: #e2e8f0;
+}
+.session-io-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.session-io-dialog {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  width: 420px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.session-io-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf2f7;
+}
+.session-io-dialog-header h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #2d3748;
+}
+.session-io-close {
+  border: none;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #718096;
+}
+.session-io-dialog-body {
+  padding: 16px;
+  color: #2d3748;
+  font-size: 13px;
+}
+.session-io-stats {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 12px;
+  color: #4a5568;
+}
+.session-io-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 0;
+}
+.session-io-hint {
+  color: #718096;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.session-io-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid #edf2f7;
+  background: #f8fafc;
 }
 </style>

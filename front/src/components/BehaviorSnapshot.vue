@@ -9,6 +9,10 @@
     <!-- Visualization area -->
     <div class="vis-area" ref="svgContainer">
       <svg ref="snapshotSvg"></svg>
+      <!-- ezio: preserved hover tooltip from snapshot -->
+      <div v-if="snapshotData.hoveredElement" ref="hoverTooltip"
+          class="snapshot-tooltip" :style="tooltipStyle"
+          v-html="snapshotData.hoveredElement.tooltipHtml"></div>
       <canvas ref="sketchCanvas" class="lasso-overlay"
           :class="'cursor-' + activeTool"></canvas>
       <!-- ezio: toolbar component -->
@@ -92,8 +96,22 @@ export default {
       penColor: 'rgba(255,60,60,0.7)',
       sketchStrokes: [],
       // ezio: operation recording
-      operationLog: []
+      operationLog: [],
+      // ezio: hover tooltip position for snapshot
+      tooltipLeft: 0,
+      tooltipTop: 0,
+      tooltipReady: false,
     };
+  },
+  // ezio: computed tooltip position for hovered element
+  computed: {
+    tooltipStyle() {
+      if (!this.tooltipReady) return { display: 'none' };
+      return {
+        left: this.tooltipLeft + 'px',
+        top: this.tooltipTop + 'px',
+      };
+    }
   },
   watch: {
     activeTool() {
@@ -926,6 +944,25 @@ export default {
       zoomRect.call(this._zoom);
       this._zoomRect = zoomRect;
       this._currentTransform = d3.zoomIdentity;
+
+      // ezio: position hover tooltip — bottom-right corner, clamped to container bounds
+      if (data.hoveredElement) {
+        this.tooltipReady = true;
+
+        this.$nextTick(() => {
+          const tip = this.$refs.hoverTooltip;
+          const box = this.$refs.svgContainer;
+          if (tip && box) {
+            const tw = tip.offsetWidth;
+            const th = tip.offsetHeight;
+            const bw = box.offsetWidth;
+            const bh = box.offsetHeight;
+            // bottom-right corner, reserve 50px for toolbar
+            this.tooltipLeft = bw - tw - 10;
+            this.tooltipTop = bh - th - 50;
+          }
+        });
+      }
     },
 
     setupInteraction() {
@@ -1260,6 +1297,25 @@ export default {
 
 .close-btn:hover {
   color: #000;
+}
+
+/* ezio: preserved hover tooltip — boundary-aware, matches BehaviorDetails .custom-tooltip style */
+.snapshot-tooltip {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #2d3748;
+  pointer-events: none;
+  z-index: 3;
+  max-width: 280px;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .vis-area {

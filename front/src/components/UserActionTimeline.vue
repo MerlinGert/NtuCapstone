@@ -3,8 +3,33 @@
     <div class="header-panel">
       <div class="panel-title">User Actions</div>
       <div class="count-badge">{{ actions.length }}</div>
+      <button class="settings-toggle-btn" @click="showSettings = !showSettings" :title="showSettings ? 'Hide capture settings' : 'Show capture settings'">
+        {{ showSettings ? '▾' : '⚙' }}
+      </button>
     </div>
-    
+
+    <!-- ezio: snapshot capture settings bar -->
+    <div v-if="showSettings" class="snapshot-settings">
+      <div class="settings-row">
+        <span class="settings-label">Auto-capture:</span>
+        <label v-for="cat in snapshotCategories" :key="cat.key" class="cat-toggle">
+          <input type="checkbox" :checked="cat.enabled" @change="$emit('toggle-category', cat.key, $event.target.checked)" />
+          <span>{{ cat.label }}</span>
+        </label>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Quality:</span>
+        <label class="quality-toggle">
+          <input type="radio" :checked="snapshotQuality === 'thumbnail'" @change="$emit('change-quality', 'thumbnail')" />
+          <span>Thumbnail</span>
+        </label>
+        <label class="quality-toggle">
+          <input type="radio" :checked="snapshotQuality === 'full'" @change="$emit('change-quality', 'full')" />
+          <span>Full</span>
+        </label>
+      </div>
+    </div>
+
     <div class="timeline-content" ref="scrollContainer">
       <div v-if="actions.length === 0" class="empty-state">
         No actions recorded yet.
@@ -49,6 +74,22 @@
               <div v-if="action.actionInfo" class="action-detail info-detail">
                 <span class="detail-value">{{ formatActionInfo(action.actionType, action.actionInfo) }}</span>
               </div>
+
+              <!-- ezio: snapshot thumbnails — sourceSnapshot/targetSnapshot are arrays (one entry per captured hover/zoom frame) -->
+              <div v-if="(action.sourceSnapshot && action.sourceSnapshot.length) || (action.targetSnapshot && action.targetSnapshot.length)" class="action-thumbnails" @click.stop>
+                <template v-if="action.sourceSnapshot">
+                  <div v-for="(snap, i) in action.sourceSnapshot" :key="'src-'+i" class="thumb-wrap" @click="openThumb(snap)">
+                    <img :src="snap.dataUrl" class="thumb" :alt="action.sourceView" />
+                    <div class="thumb-label">source · {{ formatViewName(action.sourceView) }}<span v-if="action.sourceSnapshot.length > 1"> #{{ i + 1 }}</span></div>
+                  </div>
+                </template>
+                <template v-if="action.targetSnapshot">
+                  <div v-for="(snap, i) in action.targetSnapshot" :key="'tgt-'+i" class="thumb-wrap" @click="openThumb(snap)">
+                    <img :src="snap.dataUrl" class="thumb" :alt="action.targetView" />
+                    <div class="thumb-label">target · {{ formatViewName(action.targetView) }}<span v-if="action.targetSnapshot.length > 1"> #{{ i + 1 }}</span></div>
+                  </div>
+                </template>
+              </div>
             </div>
 
             <!-- Expanded Details Area -->
@@ -77,11 +118,21 @@ export default {
     actions: {
       type: Array,
       default: () => []
+    },
+    // ezio: snapshot capture config passed from parent
+    snapshotCategories: {
+      type: Array,
+      default: () => []
+    },
+    snapshotQuality: {
+      type: String,
+      default: 'thumbnail'
     }
   },
   data() {
     return {
-      expandedStates: {}
+      expandedStates: {},
+      showSettings: false,
     }
   },
   watch: {
@@ -121,6 +172,12 @@ export default {
       if (container) {
         container.scrollTop = container.scrollHeight
       }
+    },
+    // ezio: open snapshot thumbnail in a new tab for full-size viewing
+    openThumb(snap) {
+      if (!snap || !snap.dataUrl) return
+      const w = window.open('', '_blank')
+      if (w) w.document.write(`<img src="${snap.dataUrl}" style="max-width:100%;" />`)
     },
     formatTime(isoString) {
       if (!isoString) return ''
@@ -256,6 +313,92 @@ export default {
   font-weight: bold;
   padding: 2px 6px;
   border-radius: 10px;
+}
+
+/* ezio: snapshot capture settings UI */
+.settings-toggle-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: #4a5568;
+  font-size: 12px;
+  line-height: 16px;
+}
+.settings-toggle-btn:hover {
+  background: #edf2f7;
+}
+.snapshot-settings {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  background: #f7fafc;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 11px;
+  color: #4a5568;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.settings-row:last-child { margin-bottom: 0; }
+.settings-label {
+  font-weight: 600;
+  color: #2d3748;
+  min-width: 80px;
+}
+.cat-toggle, .quality-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+.cat-toggle input, .quality-toggle input {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* ezio: snapshot thumbnails inside each action card */
+.action-thumbnails {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.thumb-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  cursor: zoom-in;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 2px;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+.thumb-wrap:hover {
+  border-color: #3182ce;
+}
+.thumb {
+  width: 100px;
+  height: 60px;
+  object-fit: contain;
+  background: #f8fafc;
+  display: block;
+}
+.thumb-label {
+  font-size: 9px;
+  color: #718096;
+  margin-top: 2px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .timeline-content {
