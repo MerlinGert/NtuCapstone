@@ -476,7 +476,7 @@ export default {
         { key: 'change_toggle', label: 'Change / Toggle', enabled: true,  actions: ['change_coin', 'change_kline_granularity', 'scale_change', 'toggle_show_links', 'toggle_show_related_users', 'toggle_show_manipulation_boxes', 'toggle_sequential_time'] },
         { key: 'system',        label: 'System',          enabled: true,  actions: ['run_entity_detection', 'run_manipulation_detection', 'update_snapshot', 'update_link_detection', 'high_level_insight'] },
       ],
-      snapshotQuality: 'thumbnail', // 'thumbnail' | 'full'
+      snapshotQuality: 'full', // ezio: default to full-res; 'thumbnail' | 'full'
       _snapshotCaptureInFlight: false,
       // ezio: awaited by _maybeCaptureSnapshots so target view is captured after its async redraw
       _targetReadyPromise: null,
@@ -838,8 +838,8 @@ export default {
       const sourceCapturable = isCapturable(actionRecord.sourceView)
       const isAllViewsTarget = actionRecord.targetView === 'all_views'
       const targetCapturable = !isAllViewsTarget && actionRecord.targetView !== actionRecord.sourceView && isCapturable(actionRecord.targetView)
-      // ezio: all_views fan-out disabled — treat as no target, so early-return when source also missing
-      if (!sourceCapturable && !targetCapturable) return
+      // ezio: all_views fan-out re-enabled — it counts as capturable on its own branch below
+      if (!sourceCapturable && !targetCapturable && !isAllViewsTarget) return
 
       this._snapshotCaptureInFlight = true
       const run = async () => {
@@ -857,29 +857,31 @@ export default {
             }
           }
           // ezio: wait for target view's async update (fetch + D3 redraw) before capturing,
-          // otherwise we snapshot the stale chart. 3s timeout guards against hung fetches.
+          // otherwise we snapshot the stale chart. System actions (all_views) chain 2-3 slow
+          // backend calls (snapshot → detection → manipulation) that routinely exceed 3s, so
+          // give them a 60s hang-guard. BehaviorDetails path keeps the original 3s.
           const waitForTargetReady = async () => {
             if (this._targetReadyPromise) {
-              const timeout = new Promise((resolve) => setTimeout(resolve, 3000))
+              const timeoutMs = isAllViewsTarget ? 60000 : 3000
+              const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs))
               await Promise.race([this._targetReadyPromise.catch(() => {}), timeout])
               await this.$nextTick()
             }
           }
-          // ezio: disabled — all_views fan-out screenshot has a bug, keeping code for reference
-          // if (isAllViewsTarget) {
-          //   await waitForTargetReady()
-          //   // ezio: fan-out capture for all_views — one snapshot per view, order fixed so
-          //   // the timeline shows them consistently
-          //   const viewNames = ['kline_chart', 'token_distribution', 'behavior_details']
-          //   if (!append || !Array.isArray(actionRecord.targetSnapshot)) {
-          //     actionRecord.targetSnapshot = []
-          //   }
-          //   for (const viewName of viewNames) {
-          //     const snap = await captureViewByName(viewName, opts)
-          //     if (snap) actionRecord.targetSnapshot.push(snap)
-          //   }
-          // } else
-          if (targetCapturable) {
+          // ezio: all_views fan-out re-enabled — handlers now stash their async work on
+          // _targetReadyPromise (chained through _awaitViewsSettled), so waitForTargetReady
+          // blocks until the backend chain + view redraws actually finish.
+          if (isAllViewsTarget) {
+            await waitForTargetReady()
+            const viewNames = ['kline_chart', 'token_distribution', 'behavior_details']
+            if (!append || !Array.isArray(actionRecord.targetSnapshot)) {
+              actionRecord.targetSnapshot = []
+            }
+            for (const viewName of viewNames) {
+              const snap = await captureViewByName(viewName, opts)
+              if (snap) actionRecord.targetSnapshot.push(snap)
+            }
+          } else if (targetCapturable) {
             await waitForTargetReady()
             const snap = await captureViewByName(actionRecord.targetView, opts)
             if (snap) {
@@ -1023,6 +1025,15 @@ export default {
           )
         })
     },
+    // ezio: resolves after Vue flushes the watcher (TokenDistribution/KlineChart redraw)
+    // and D3 force simulation has had ~1s to settle. Used to gate all_views screenshot
+    // capture for control-panel / change_coin actions so bubbles aren't still clumped
+    // mid-simulation when the thumbnail is taken.
+    _awaitViewsSettled() {
+      return this.$nextTick()
+        .then(() => this.$nextTick())
+        .then(() => new Promise((resolve) => setTimeout(resolve, 1000)))
+    },
     handleKlineTimeWindowChanged(event) {
       this.klineTimeWindow = event
       this.logUserAction('zoom_kline_chart', { timeWindow: event }, this.selectedUser)
@@ -1033,15 +1044,19 @@ export default {
     },
     async handleCoinChange() {
       console.log('CryptoVis: coin changed to', this.currentCoin)
-      this.logUserAction('change_coin', { coin: this.currentCoin })
+      // ezio: kick off the coin-init pipeline and stash the promise BEFORE logUserAction so
+      // _maybeCaptureSnapshots (scheduled via requestIdleCallback) can't race ahead and
+      // capture the blank / old chart. initializeForCurrentCoin → handleUpdateSnapshot will
+      // overwrite _targetReadyPromise with its own inner work promise — that's fine, either
+      // promise resolves after the same backend chain + view redraws.
       this.resetViewState()
-      try {
-        // 强制清空一下旧的时间列表，让它有重置的感觉
-        this.snapshotTimes = []
-        await this.initializeForCurrentCoin()
-      } catch (error) {
+      this.snapshotTimes = [] // 强制清空一下旧的时间列表，让它有重置的感觉
+      const work = this.initializeForCurrentCoin().catch((error) => {
         console.error('CryptoVis: Error switching coin:', error)
-      }
+      })
+      this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
+      this.logUserAction('change_coin', { coin: this.currentCoin })
+      await work
     },
     handleUserSelect(userId) {
       this.selectedCardUsers = [] // clear card mode
@@ -1501,66 +1516,137 @@ export default {
       if (newEntityConfig) {
         this.entity_detection_configuration = { ...newEntityConfig }
       }
-      this.logUserAction('run_entity_detection', { config: this.entity_detection_configuration })
-      this.loading = true
-      try {
-        // Prepare detection request
-        const balances = this.snapshot_data.balances || {}
-        const processedUsers = { ...balances.users }
-        delete processedUsers.Others
-        const relatedUsers = balances.related_users || {}
+      // ezio: wrap body in inner async fn + stash on _targetReadyPromise before logUserAction
+      // so the screenshot waits for the full detection + (optional) manipulation chain to finish.
+      const work = (async () => {
+        this.loading = true
+        try {
+          // Prepare detection request
+          const balances = this.snapshot_data.balances || {}
+          const processedUsers = { ...balances.users }
+          delete processedUsers.Others
+          const relatedUsers = balances.related_users || {}
 
-        const detectionRequest = {
-          target_users: processedUsers,
-          related_users: relatedUsers,
-          entity_detection_config: this.entity_detection_configuration,
-          link_detection_config: this.link_detection_configuration, // Keep it but we won't detect links
-          snapshot_time: this.snapshot_configuration.time,
-          detect_entity: true,
-          detect_link: false, // Disable link detection as requested
-          coin: this.currentCoin,
-        }
-
-        const detectionResponse = await fetch('/api/detection/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(detectionRequest),
-        })
-
-        if (!detectionResponse.ok)
-          throw new Error('Failed to run entity detection')
-
-        const detectionResults = await detectionResponse.json()
-        console.log(
-          'CryptoVis: Entity detection results received:',
-          detectionResults,
-        )
-
-        // Update entity results only
-        this.entity_detection_results = detectionResults.entity_results
-        // Update link_generation_results to hold relations if needed by entity detection
-        // The backend returns relations even if detect_link is false (it returns entity relations)
-        if (detectionResults.relations) {
-          this.link_generation_results = {
-            ...this.link_generation_results,
-            ...detectionResults.relations,
+          const detectionRequest = {
+            target_users: processedUsers,
+            related_users: relatedUsers,
+            entity_detection_config: this.entity_detection_configuration,
+            link_detection_config: this.link_detection_configuration, // Keep it but we won't detect links
+            snapshot_time: this.snapshot_configuration.time,
+            detect_entity: true,
+            detect_link: false, // Disable link detection as requested
+            coin: this.currentCoin,
           }
-        }
 
-        // Check if we need to re-run manipulation detection
-        // Only if (round_trip is enabled AND round_trip.entity_based is enabled) OR (same_direction is enabled AND same_direction.entity_based is enabled)
-        const config = this.manipulation_detection_configuration
-        const roundTripEntityEnabled =
-          config.enable_round_trip_detection &&
-          config.round_trip_params?.enable_entity_based
-        const sameDirectionEntityEnabled =
-          config.enable_same_direction_detection &&
-          config.same_direction_params?.enable_entity_based
+          const detectionResponse = await fetch('/api/detection/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(detectionRequest),
+          })
 
-        if (roundTripEntityEnabled || sameDirectionEntityEnabled) {
+          if (!detectionResponse.ok)
+            throw new Error('Failed to run entity detection')
+
+          const detectionResults = await detectionResponse.json()
           console.log(
-            'CryptoVis: Re-running manipulation detection with new entities...',
+            'CryptoVis: Entity detection results received:',
+            detectionResults,
           )
+
+          // Update entity results only
+          this.entity_detection_results = detectionResults.entity_results
+          // Update link_generation_results to hold relations if needed by entity detection
+          // The backend returns relations even if detect_link is false (it returns entity relations)
+          if (detectionResults.relations) {
+            this.link_generation_results = {
+              ...this.link_generation_results,
+              ...detectionResults.relations,
+            }
+          }
+
+          // Check if we need to re-run manipulation detection
+          // Only if (round_trip is enabled AND round_trip.entity_based is enabled) OR (same_direction is enabled AND same_direction.entity_based is enabled)
+          const config = this.manipulation_detection_configuration
+          const roundTripEntityEnabled =
+            config.enable_round_trip_detection &&
+            config.round_trip_params?.enable_entity_based
+          const sameDirectionEntityEnabled =
+            config.enable_same_direction_detection &&
+            config.same_direction_params?.enable_entity_based
+
+          if (roundTripEntityEnabled || sameDirectionEntityEnabled) {
+            console.log(
+              'CryptoVis: Re-running manipulation detection with new entities...',
+            )
+            const manipulationRequest = {
+              target_users: processedUsers,
+              related_users: relatedUsers,
+              entity_results: this.entity_detection_results,
+              manipulation_config: this.manipulation_detection_configuration,
+              coin: this.currentCoin,
+            }
+
+            const manipulationResponse = await fetch(
+              '/api/manipulation_service/detect',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(manipulationRequest),
+              },
+            )
+
+            if (manipulationResponse.ok) {
+              const manipulationResults = await manipulationResponse.json()
+              this.manipulation_detection_results = manipulationResults.results
+              console.log(
+                'CryptoVis: Manipulation detection results updated:',
+                this.manipulation_detection_results,
+              )
+            } else {
+              console.error(
+                'CryptoVis: Failed to update manipulation detection results',
+              )
+            }
+          } else {
+            console.log(
+              'CryptoVis: Skipping manipulation detection (entity-based detection not enabled).',
+            )
+          }
+
+          // Re-apply manipulation relations since link_generation_results might have been updated
+          this.processManipulationRelations()
+        } catch (error) {
+          console.error('CryptoVis: Error during entity detection:', error)
+        } finally {
+          this.loading = false
+        }
+      })()
+
+      this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
+
+      this.logUserAction('run_entity_detection', { config: this.entity_detection_configuration })
+
+      await work
+    },
+    async handleRequestManipulationDetection(newManipulationConfig) {
+      console.log(
+        'CryptoVis: Running manipulation detection only...',
+        newManipulationConfig,
+      )
+      if (newManipulationConfig) {
+        this.manipulation_detection_configuration = { ...newManipulationConfig }
+      }
+      // ezio: wrap body in inner async fn + stash on _targetReadyPromise before logUserAction
+      // so the screenshot waits for the manipulation backend + view redraws.
+      const work = (async () => {
+        this.detectingManipulation = true // Assuming there's a loading state for manipulation or reuse 'loading'
+
+        try {
+          const balances = this.snapshot_data.balances || {}
+          const processedUsers = { ...balances.users }
+          delete processedUsers.Others
+          const relatedUsers = balances.related_users || {}
+
           const manipulationRequest = {
             target_users: processedUsers,
             related_users: relatedUsers,
@@ -1585,183 +1671,141 @@ export default {
               'CryptoVis: Manipulation detection results updated:',
               this.manipulation_detection_results,
             )
+
+            // Add manipulation relations
+            this.processManipulationRelations()
           } else {
-            console.error(
-              'CryptoVis: Failed to update manipulation detection results',
-            )
+            console.error('CryptoVis: Failed to run manipulation detection')
           }
-        } else {
-          console.log(
-            'CryptoVis: Skipping manipulation detection (entity-based detection not enabled).',
-          )
+        } catch (error) {
+          console.error('CryptoVis: Error during manipulation detection:', error)
+        } finally {
+          this.detectingManipulation = false
         }
+      })()
 
-        // Re-apply manipulation relations since link_generation_results might have been updated
-        this.processManipulationRelations()
-      } catch (error) {
-        console.error('CryptoVis: Error during entity detection:', error)
-      } finally {
-        this.loading = false
-      }
-    },
-    async handleRequestManipulationDetection(newManipulationConfig) {
-      console.log(
-        'CryptoVis: Running manipulation detection only...',
-        newManipulationConfig,
-      )
-      if (newManipulationConfig) {
-        this.manipulation_detection_configuration = { ...newManipulationConfig }
-      }
+      this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
+
       this.logUserAction('run_manipulation_detection', { config: this.manipulation_detection_configuration })
-      this.detectingManipulation = true // Assuming there's a loading state for manipulation or reuse 'loading'
 
-      try {
-        const balances = this.snapshot_data.balances || {}
-        const processedUsers = { ...balances.users }
-        delete processedUsers.Others
-        const relatedUsers = balances.related_users || {}
-
-        const manipulationRequest = {
-          target_users: processedUsers,
-          related_users: relatedUsers,
-          entity_results: this.entity_detection_results,
-          manipulation_config: this.manipulation_detection_configuration,
-          coin: this.currentCoin,
-        }
-
-        const manipulationResponse = await fetch(
-          '/api/manipulation_service/detect',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(manipulationRequest),
-          },
-        )
-
-        if (manipulationResponse.ok) {
-          const manipulationResults = await manipulationResponse.json()
-          this.manipulation_detection_results = manipulationResults.results
-          console.log(
-            'CryptoVis: Manipulation detection results updated:',
-            this.manipulation_detection_results,
-          )
-
-          // Add manipulation relations
-          this.processManipulationRelations()
-        } else {
-          console.error('CryptoVis: Failed to run manipulation detection')
-        }
-      } catch (error) {
-        console.error('CryptoVis: Error during manipulation detection:', error)
-      } finally {
-        this.detectingManipulation = false
-      }
+      await work
     },
     async handleUpdateSnapshot(newSnapshotConfig) {
       if (newSnapshotConfig) {
         this.snapshot_configuration = { ...newSnapshotConfig }
       }
-      this.logUserAction('update_snapshot', { config: this.snapshot_configuration })
-      this.loading = true
-      try {
-        // 1. Fetch new snapshot data
-        console.log('CryptoVis: Fetching updated snapshot data...')
-        const response = await fetch('/api/snapshot/process', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            time: this.snapshot_configuration.time,
-            threshold: this.snapshot_configuration.top_holder_threshold,
-            related_user_threshold:
-              this.snapshot_configuration.related_user_threshold,
-            coin: this.currentCoin,
-          }),
-        })
-        if (!response.ok) throw new Error('Failed to fetch snapshot data')
-        const data = await response.json()
-        this.snapshot_data = data
-        this.snapshotTimes = data.all_times
-        if (data.time) {
-          this.snapshot_configuration.time = data.time
-        }
-        console.log(
-          'CryptoVis: Updated snapshot data loaded:',
-          this.snapshot_data,
-        )
-
-        // 2. Run detection service
-        const balances = this.snapshot_data.balances || {}
-        const processedUsers = { ...balances.users }
-        delete processedUsers.Others
-        const relatedUsers = balances.related_users || {}
-
-        const detectionRequest = {
-          target_users: processedUsers,
-          related_users: relatedUsers,
-          entity_detection_config: this.entity_detection_configuration,
-          link_detection_config: this.link_detection_configuration,
-          snapshot_time: this.snapshot_configuration.time,
-          detect_entity: true,
-          detect_link: true,
-          coin: this.currentCoin,
-        }
-
-        console.log('CryptoVis: Running unified detection...', detectionRequest)
-
-        const detectionResponse = await fetch('/api/detection/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(detectionRequest),
-        })
-
-        if (!detectionResponse.ok) throw new Error('Failed to run detection')
-
-        const detectionResults = await detectionResponse.json()
-        console.log('CryptoVis: Detection results received:', detectionResults)
-
-        this.entity_detection_results = detectionResults.entity_results
-        this.link_generation_results = detectionResults.relations
-
-        // 3. Run manipulation detection
-        console.log('CryptoVis: Running manipulation detection...')
-        const manipulationRequest = {
-          target_users: processedUsers,
-          related_users: relatedUsers,
-          entity_results: this.entity_detection_results,
-          manipulation_config: this.manipulation_detection_configuration,
-          coin: this.currentCoin,
-        }
-
-        const manipulationResponse = await fetch(
-          '/api/manipulation_service/detect',
-          {
+      // ezio: extract body into an inner async fn so we can stash the promise on
+      // _targetReadyPromise BEFORE logUserAction — screenshot capture will await the
+      // full backend chain + view redraws instead of racing ahead on stale state.
+      const work = (async () => {
+        this.loading = true
+        try {
+          // 1. Fetch new snapshot data
+          console.log('CryptoVis: Fetching updated snapshot data...')
+          const response = await fetch('/api/snapshot/process', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(manipulationRequest),
-          },
-        )
-
-        if (manipulationResponse.ok) {
-          const manipulationResults = await manipulationResponse.json()
-          this.manipulation_detection_results = manipulationResults.results
+            body: JSON.stringify({
+              time: this.snapshot_configuration.time,
+              threshold: this.snapshot_configuration.top_holder_threshold,
+              related_user_threshold:
+                this.snapshot_configuration.related_user_threshold,
+              coin: this.currentCoin,
+            }),
+          })
+          if (!response.ok) throw new Error('Failed to fetch snapshot data')
+          const data = await response.json()
+          this.snapshot_data = data
+          this.snapshotTimes = data.all_times
+          if (data.time) {
+            this.snapshot_configuration.time = data.time
+          }
           console.log(
-            'CryptoVis: Manipulation detection results updated:',
-            this.manipulation_detection_results,
+            'CryptoVis: Updated snapshot data loaded:',
+            this.snapshot_data,
           )
 
-          // Add manipulation relations
-          this.processManipulationRelations()
-        } else {
-          console.error('CryptoVis: Failed to run manipulation detection')
+          // 2. Run detection service
+          const balances = this.snapshot_data.balances || {}
+          const processedUsers = { ...balances.users }
+          delete processedUsers.Others
+          const relatedUsers = balances.related_users || {}
+
+          const detectionRequest = {
+            target_users: processedUsers,
+            related_users: relatedUsers,
+            entity_detection_config: this.entity_detection_configuration,
+            link_detection_config: this.link_detection_configuration,
+            snapshot_time: this.snapshot_configuration.time,
+            detect_entity: true,
+            detect_link: true,
+            coin: this.currentCoin,
+          }
+
+          console.log('CryptoVis: Running unified detection...', detectionRequest)
+
+          const detectionResponse = await fetch('/api/detection/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(detectionRequest),
+          })
+
+          if (!detectionResponse.ok) throw new Error('Failed to run detection')
+
+          const detectionResults = await detectionResponse.json()
+          console.log('CryptoVis: Detection results received:', detectionResults)
+
+          this.entity_detection_results = detectionResults.entity_results
+          this.link_generation_results = detectionResults.relations
+
+          // 3. Run manipulation detection
+          console.log('CryptoVis: Running manipulation detection...')
+          const manipulationRequest = {
+            target_users: processedUsers,
+            related_users: relatedUsers,
+            entity_results: this.entity_detection_results,
+            manipulation_config: this.manipulation_detection_configuration,
+            coin: this.currentCoin,
+          }
+
+          const manipulationResponse = await fetch(
+            '/api/manipulation_service/detect',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(manipulationRequest),
+            },
+          )
+
+          if (manipulationResponse.ok) {
+            const manipulationResults = await manipulationResponse.json()
+            this.manipulation_detection_results = manipulationResults.results
+            console.log(
+              'CryptoVis: Manipulation detection results updated:',
+              this.manipulation_detection_results,
+            )
+
+            // Add manipulation relations
+            this.processManipulationRelations()
+          } else {
+            console.error('CryptoVis: Failed to run manipulation detection')
+          }
+        } catch (error) {
+          console.error(
+            'CryptoVis: Error during snapshot update and detection:',
+            error,
+          )
+        } finally {
+          this.loading = false
         }
-      } catch (error) {
-        console.error(
-          'CryptoVis: Error during snapshot update and detection:',
-          error,
-        )
-      } finally {
-        this.loading = false
-      }
+      })()
+
+      // ezio: must be set BEFORE logUserAction so _maybeCaptureSnapshots sees the promise
+      this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
+
+      this.logUserAction('update_snapshot', { config: this.snapshot_configuration })
+
+      await work
     },
     handleDetectionComplete(count) {
       this.detecting = false
@@ -1772,51 +1816,60 @@ export default {
       if (newLinkConfig) {
         this.link_detection_configuration = { ...newLinkConfig }
       }
-      this.logUserAction('update_link_detection', { config: this.link_detection_configuration })
-      this.detectingLinks = true // Assuming 'detectingLinks' or 'loading' is used
+      // ezio: wrap body in inner async fn + stash on _targetReadyPromise before logUserAction
+      // so the screenshot waits for the link-detection backend + view redraws.
+      const work = (async () => {
+        this.detectingLinks = true // Assuming 'detectingLinks' or 'loading' is used
 
-      try {
-        const balances = this.snapshot_data.balances || {}
-        const processedUsers = { ...balances.users }
-        delete processedUsers.Others
-        const relatedUsers = balances.related_users || {}
+        try {
+          const balances = this.snapshot_data.balances || {}
+          const processedUsers = { ...balances.users }
+          delete processedUsers.Others
+          const relatedUsers = balances.related_users || {}
 
-        const detectionRequest = {
-          target_users: processedUsers,
-          related_users: relatedUsers,
-          entity_detection_config: this.entity_detection_configuration, // Keep it but we won't detect entities
-          link_detection_config: this.link_detection_configuration,
-          snapshot_time: this.snapshot_configuration.time,
-          detect_entity: false, // Disable entity detection
-          detect_link: true, // Enable link detection
-          coin: this.currentCoin,
+          const detectionRequest = {
+            target_users: processedUsers,
+            related_users: relatedUsers,
+            entity_detection_config: this.entity_detection_configuration, // Keep it but we won't detect entities
+            link_detection_config: this.link_detection_configuration,
+            snapshot_time: this.snapshot_configuration.time,
+            detect_entity: false, // Disable entity detection
+            detect_link: true, // Enable link detection
+            coin: this.currentCoin,
+          }
+
+          const detectionResponse = await fetch('/api/detection/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(detectionRequest),
+          })
+
+          if (!detectionResponse.ok)
+            throw new Error('Failed to run link detection')
+
+          const detectionResults = await detectionResponse.json()
+          console.log(
+            'CryptoVis: Link detection results received:',
+            detectionResults,
+          )
+
+          // Update link results only
+          this.link_generation_results = detectionResults.relations
+
+          // Add manipulation relations back in
+          this.processManipulationRelations()
+        } catch (error) {
+          console.error('CryptoVis: Error during link detection:', error)
+        } finally {
+          this.detectingLinks = false
         }
+      })()
 
-        const detectionResponse = await fetch('/api/detection/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(detectionRequest),
-        })
+      this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
 
-        if (!detectionResponse.ok)
-          throw new Error('Failed to run link detection')
+      this.logUserAction('update_link_detection', { config: this.link_detection_configuration })
 
-        const detectionResults = await detectionResponse.json()
-        console.log(
-          'CryptoVis: Link detection results received:',
-          detectionResults,
-        )
-
-        // Update link results only
-        this.link_generation_results = detectionResults.relations
-
-        // Add manipulation relations back in
-        this.processManipulationRelations()
-      } catch (error) {
-        console.error('CryptoVis: Error during link detection:', error)
-      } finally {
-        this.detectingLinks = false
-      }
+      await work
     },
     async fetchInitialSnapshotData() {
       console.log('CryptoVis: Fetching initial snapshot data...')
