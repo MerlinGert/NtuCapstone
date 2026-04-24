@@ -186,12 +186,12 @@ Entering text and clicking Annotate saves the annotation, closes the snapshot di
 
 ## Exporting A Session
 
-The Export button in the header opens an Export Session dialog. The dialog shows the current action count and annotation count. It also offers an **Include snapshot images (base64)** checkbox.
+The Export button in the header opens an Export Session dialog. The dialog shows the current action count and annotation count. It also offers an **Include snapshot images (PNG)** checkbox.
 
-- When the checkbox is enabled, the exported JSON includes action thumbnails and annotation sketch images. The file is larger but self-contained.
-- When the checkbox is disabled, the exported JSON keeps metadata but strips screenshot and sketch image payloads.
+- When the checkbox is enabled, the exported zip includes PNG files for action thumbnails and annotation sketches under `images/`. The JSON stores paths such as `images/action-0001-target-kline-chart-01.png` instead of inline image strings.
+- When the checkbox is disabled, the exported zip still contains the JSON file, but screenshot and sketch image payloads are stripped.
 
-Click **Download JSON** to save a file named like `maniscope-session-ACT-YYYYMMDD-HHMMSS.json`. The current Import button is disabled, so exported files are mainly for external review or later development workflows.
+Click **Download ZIP** to save a file named like `maniscope-session-ACT-YYYYMMDD-HHMMSS.zip`. Inside the archive, `session.json` contains the action and annotation metadata, and `images/` contains exported PNG files when image export is enabled. The current Import button is disabled, so exported files are mainly for external review or later development workflows.
 
 ## Coin Selector
 

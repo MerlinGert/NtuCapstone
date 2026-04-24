@@ -223,17 +223,17 @@
       </div>
       <label class="session-io-checkbox">
         <input type="checkbox" v-model="exportIncludeSnapshots" />
-        <span>Include snapshot images (base64)</span>
+        <span>Include snapshot images (PNG)</span>
       </label>
       <div class="session-io-hint">
         {{ exportIncludeSnapshots
-          ? 'File will include all screenshot / sketch images (larger).'
-          : 'File will contain metadata only. Sketches and view snapshots will be stripped.' }}
+          ? 'Zip will include all screenshot / sketch images as PNG files.'
+          : 'Zip will contain metadata only. Sketches and view snapshots will be stripped.' }}
       </div>
     </div>
     <div class="session-io-dialog-footer">
       <button class="session-io-btn ghost" @click="showExportDialog = false">Cancel</button>
-      <button class="session-io-btn primary" @click="confirmExport">Download JSON</button>
+      <button class="session-io-btn primary" @click="confirmExport">Download ZIP</button>
     </div>
   </div>
 </div>
@@ -295,8 +295,8 @@ import AnnotationTimeline from './AnnotationTimeline.vue'
 import { captureViewByName, isCapturable } from '../utils/viewSnapshot'
 // ezio: session import/export helpers
 import {
-  buildExportPayload,
-  downloadJsonFile,
+  buildExportArchive,
+  downloadZipArchive,
   parseImportFile,
 } from '../utils/sessionIO'
 
@@ -548,9 +548,9 @@ export default {
     onClickExport() {
       this.showExportDialog = true
     },
-    // ezio: build payload + trigger download
+    // ezio: build zip payload + trigger download
     confirmExport() {
-      const payload = buildExportPayload({
+      const archive = buildExportArchive({
         coin: this.currentCoin,
         userActionSequence: this.userActionSequence,
         annotationRecords: this.annotationRecords,
@@ -559,7 +559,7 @@ export default {
         annotationSeqId: this._annotationSeqId,
         includeSnapshots: this.exportIncludeSnapshots,
       })
-      downloadJsonFile(payload, this.currentCoin)
+      downloadZipArchive(archive, this.currentCoin)
       this.showExportDialog = false
       this.logUserAction('export_session', {
         actionCount: this.userActionSequence.length,

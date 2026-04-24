@@ -186,12 +186,12 @@ Token 快照可以选择持有者节点并显示选中节点细节。Behavior �
 
 ## 导出会话
 
-标题栏中的 Export 按钮会打开 Export Session 对话框。对话框显示当前动作数量和标注数量，并提供 **Include snapshot images (base64)** 复选框。
+标题栏中的 Export 按钮会打开 Export Session 对话框。对话框显示当前动作数量和标注数量，并提供 **Include snapshot images (PNG)** 复选框。
 
-- 启用该复选框时，导出的 JSON 会包含动作缩略图和标注草图图片。文件更大，但信息自包含。
-- 禁用该复选框时，导出的 JSON 保留元数据，但移除截图和草图图片内容。
+- 启用该复选框时，导出的 zip 会把动作缩略图和标注草图保存为 `images/` 目录下的 PNG 文件。JSON 中会保存类似 `images/action-0001-target-kline-chart-01.png` 的路径，而不是内联图片字符串。
+- 禁用该复选框时，导出的 zip 仍然包含 JSON 文件，但会移除截图和草图图片内容。
 
-点击 **Download JSON** 会保存一个类似 `maniscope-session-ACT-YYYYMMDD-HHMMSS.json` 的文件。当前 Import 按钮处于禁用状态，因此导出文件主要用于外部审阅或后续开发工作流。
+点击 **Download ZIP** 会保存一个类似 `maniscope-session-ACT-YYYYMMDD-HHMMSS.zip` 的文件。压缩包内的 `session.json` 包含动作和标注元数据；当启用图片导出时，`images/` 目录包含导出的 PNG 文件。当前 Import 按钮处于禁用状态，因此导出文件主要用于外部审阅或后续开发工作流。
 
 ## Coin Selector
 

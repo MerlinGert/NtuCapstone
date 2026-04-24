@@ -1,4 +1,5 @@
 // ezio: session import/export utility for action/annotation/tree data
+import { strToU8, zipSync } from 'fflate'
 
 const EXPORT_VERSION = '1.0'
 
@@ -15,7 +16,93 @@ function stripSketchFromAnnotations(annotations) {
   return annotations.map((a) => ({ ...a, sketchDataUrl: null }))
 }
 
-export function buildExportPayload({
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function normalizeNamePart(value) {
+  return String(value || 'unknown')
+    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'unknown'
+}
+
+function dataUrlToBytes(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null
+  const match = dataUrl.match(/^data:image\/png(;[^,]*)?,(.*)$/)
+  if (!match) return null
+  const metadata = match[1] || ''
+  const payload = match[2] || ''
+  let binary = ''
+  if (metadata.includes(';base64')) {
+    binary = atob(payload)
+  } else {
+    binary = decodeURIComponent(payload)
+  }
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
+function extractSnapshotImages(actions, images) {
+  return actions.map((action, actionIndex) => {
+    const copy = { ...action }
+    ;['sourceSnapshot', 'targetSnapshot'].forEach((field) => {
+      if (!Array.isArray(copy[field])) return
+      copy[field] = copy[field].map((snapshot, snapshotIndex) => {
+        if (!snapshot || !snapshot.dataUrl) return snapshot
+        const bytes = dataUrlToBytes(snapshot.dataUrl)
+        const imageName = [
+          'action',
+          String(actionIndex + 1).padStart(4, '0'),
+          field === 'sourceSnapshot' ? 'source' : 'target',
+          normalizeNamePart(snapshot.viewName || copy[field === 'sourceSnapshot' ? 'sourceView' : 'targetView']),
+          String(snapshotIndex + 1).padStart(2, '0'),
+        ].join('-') + '.png'
+        const imagePath = `images/${imageName}`
+        if (bytes) {
+          images.push({
+            path: imagePath,
+            bytes,
+            kind: field,
+            actionIndex,
+            snapshotIndex,
+          })
+        }
+        const snapshotCopy = { ...snapshot, imagePath }
+        delete snapshotCopy.dataUrl
+        return snapshotCopy
+      })
+    })
+    return copy
+  })
+}
+
+function extractAnnotationImages(annotations, images) {
+  return annotations.map((annotation, annotationIndex) => {
+    const copy = { ...annotation }
+    if (copy.sketchDataUrl) {
+      const bytes = dataUrlToBytes(copy.sketchDataUrl)
+      const idPart = copy.id !== undefined ? copy.id : annotationIndex + 1
+      const imagePath = `images/annotation-${String(idPart).padStart(4, '0')}-${normalizeNamePart(copy.sourceView)}.png`
+      if (bytes) {
+        images.push({
+          path: imagePath,
+          bytes,
+          kind: 'annotation',
+          annotationIndex,
+        })
+      }
+      copy.sketchImagePath = imagePath
+    }
+    delete copy.sketchDataUrl
+    return copy
+  })
+}
+
+export function buildExportArchive({
   coin,
   userActionSequence,
   annotationRecords,
@@ -24,21 +111,25 @@ export function buildExportPayload({
   annotationSeqId,
   includeSnapshots,
 }) {
+  const images = []
   const actions = includeSnapshots
-    ? JSON.parse(JSON.stringify(userActionSequence))
+    ? extractSnapshotImages(cloneJson(userActionSequence), images)
     : stripSnapshotsFromActions(userActionSequence)
   const annotations = includeSnapshots
-    ? JSON.parse(JSON.stringify(annotationRecords))
+    ? extractAnnotationImages(cloneJson(annotationRecords), images)
     : stripSketchFromAnnotations(annotationRecords)
 
-  return {
+  const payload = {
     exportVersion: EXPORT_VERSION,
+    exportFormat: 'zip-with-images',
     exportedAt: new Date().toISOString(),
     coin: coin || null,
     includesSnapshots: !!includeSnapshots,
+    imageDirectory: includeSnapshots ? 'images' : null,
+    imageCount: images.length,
     config: {
       snapshotCategories: snapshotCategories
-        ? JSON.parse(JSON.stringify(snapshotCategories))
+        ? cloneJson(snapshotCategories)
         : null,
       snapshotQuality: snapshotQuality || null,
     },
@@ -46,13 +137,15 @@ export function buildExportPayload({
     userActionSequence: actions,
     annotationRecords: annotations,
   }
+
+  return { payload, images }
 }
 
 function pad2(n) {
   return n < 10 ? '0' + n : '' + n
 }
 
-function buildFileName(coin) {
+function buildBaseFileName(coin) {
   const d = new Date()
   const stamp =
     d.getFullYear() +
@@ -63,20 +156,30 @@ function buildFileName(coin) {
     pad2(d.getMinutes()) +
     pad2(d.getSeconds())
   const coinPart = coin ? `-${coin}` : ''
-  return `maniscope-session${coinPart}-${stamp}.json`
+  return `maniscope-session${coinPart}-${stamp}`
 }
 
-export function downloadJsonFile(payload, coin) {
+function buildZipFileName(coin) {
+  return `${buildBaseFileName(coin)}.zip`
+}
+
+export function downloadZipArchive({ payload, images }, coin) {
   const json = JSON.stringify(payload, null, 2)
-  const blob = new Blob([json], { type: 'application/json' })
+  const files = {
+    'session.json': strToU8(json),
+  }
+  images.forEach((image) => {
+    files[image.path] = image.bytes
+  })
+  const zipped = zipSync(files, { level: 0 })
+  const blob = new Blob([zipped], { type: 'application/zip' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = buildFileName(coin)
+  a.download = buildZipFileName(coin)
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  // revoke after a tick so Safari can finish the download
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
@@ -122,4 +225,3 @@ export function parseImportFile(file) {
     reader.readAsText(file)
   })
 }
-
