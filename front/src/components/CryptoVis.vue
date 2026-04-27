@@ -38,7 +38,10 @@
         style="width:100%;height:100%;overflow:hidden"
         :content-style="{ display: 'flex', flexDirection: 'row', overflow: 'hidden', width: '100%', height: '100%', boxSizing: 'border-box' }"
       >
-<div style="flex: 3; min-width:0; overflow:hidden;">
+<!-- Left sidebar: ControlPanel (top) + drag handle + ChatBox (bottom) -->
+    <div style="flex: 3; min-width:0; overflow:hidden; display:flex; flex-direction:column;">
+      <!-- ControlPanel area -->
+      <div :style="{ height: leftPanelTopPct + '%', overflow: 'hidden', flexShrink: 0 }">
         <n-card
             size="small"
             style="width:100%;height:100%;"
@@ -64,6 +67,21 @@
                 @log-action="logUserAction"
             />
         </n-card>
+      </div>
+
+      <!-- Horizontal drag handle -->
+      <div
+        class="left-resize-handle"
+        @mousedown.prevent="startLeftResize"
+        title="Drag to resize"
+      >
+        <div class="left-resize-grip"></div>
+      </div>
+
+      <!-- ChatBox area -->
+      <div style="flex:1; min-height:0; overflow:hidden;">
+        <ChatBox />
+      </div>
     </div>
 
 <div style="flex: 6; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
@@ -299,6 +317,7 @@ import {
   downloadZipArchive,
   parseImportFile,
 } from '../utils/sessionIO'
+import ChatBox from './ChatBox.vue'
 
 export default {
   components: {
@@ -317,10 +336,13 @@ export default {
     UserActionTimeline,
     AnnotationTimeline,
     UserActionTree,
+    ChatBox,
   },
   data() {
     return {
       currentCoin: 'ACT', // Can be 'ACT' or 'PNUT'
+      // left panel vertical split (percentage for ControlPanel top section)
+      leftPanelTopPct: 70,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -499,6 +521,28 @@ export default {
     },
   },
   methods: {
+    // Left panel vertical resize
+    startLeftResize(e) {
+      const startY = e.clientY
+      const startPct = this.leftPanelTopPct
+      const parentEl = e.currentTarget.parentElement
+      const onMove = (ev) => {
+        const parentH = parentEl.getBoundingClientRect().height
+        const delta = ev.clientY - startY
+        const newPct = Math.min(85, Math.max(15, startPct + (delta / parentH) * 100))
+        this.leftPanelTopPct = newPct
+      }
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+      document.body.style.cursor = 'row-resize'
+      document.body.style.userSelect = 'none'
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
       const el = document.elementFromPoint(this._mouseX, this._mouseY);
@@ -2056,6 +2100,30 @@ a {
 .panel-card {
   border: none !important;
   box-shadow: 0 1px 8px rgba(0,0,0,0.12) !important;
+}
+
+/* Left panel vertical resize handle */
+.left-resize-handle {
+  height: 8px;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: background 0.15s;
+}
+.left-resize-handle:hover {
+  background: #e2e8f0;
+}
+.left-resize-grip {
+  width: 36px;
+  height: 3px;
+  background: #94a3b8;
+  border-radius: 2px;
 }
 /* 全局按钮面板和输入系样式覆盖 */
 .checkbox {
