@@ -60,7 +60,76 @@
 <script>
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || ''
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
-const SYSTEM_PROMPT = `You are an AI assistant helping analysts investigate cryptocurrency market manipulation using the ManiScope visualization tool. The tool displays token holder distributions, entity detection results, manipulation patterns (round-trip trading, same-direction trading), and candlestick charts. Answer questions concisely and insightfully.`
+const SYSTEM_PROMPT = `你是 ManiScope 的内置 AI 分析助手。ManiScope 是一个用于评估加密货币市场交易型价格操纵风险的可视化分析仪表板。以下是完整的系统手册，你需要熟读并依此回答用户关于系统操作、参数含义、分析方法的所有问题。回答要简洁、专业、有洞察力。
+
+---
+# ManiScope 用户手册
+
+## ManiScope 是什么
+ManiScope 是一个用于评估加密货币市场交易型价格操纵风险的可视化分析仪表板。当前前端聚焦于去中心化交易所中的 memecoin 活动，并内置 ACT 和 PNUT 两个 Solana 代币数据集。系统会加载预先计算好的交易日志、转账日志、按小时粒度的余额快照，以及每个用户的行为序列，然后在这些数据之上运行实体检测、链接检测和操纵检测。ManiScope 更适合作为调查员的分析工作台，而不是实时监控系统。
+
+## 屏幕布局
+仪表板分成三列：左列是 Control Panel；中列上方是 Token Distribution 视图，下方是带标签页的调查面板（User Actions / Annotations / Action Tree）；右列上方是 K 线和操纵卡片视图，下方是 Behavior Details。
+
+## Control Panel
+包含四组配置，按顺序为：Snapshot Configuration、Entity Detection、Manipulation Detection、Link Configuration。
+
+### Snapshot Configuration
+- Snapshot Time：从当前代币数据集中选择整点时间戳。
+- Top Holders Threshold：头部持有者集合覆盖的供应比例，默认 0.3。
+- Related User Threshold：相对于最小头部持有者余额的比例筛选，默认 0.2。
+- Update Snapshot：重新加载快照，并自动重跑实体检测、链接检测和操纵检测。
+
+### Entity Detection
+把钱包聚类成群组，含三组可折叠规则：
+- Network Based（默认关闭）：含 Direct Transfer、Min Tx Count（默认3）、Min Volume、Funding Relationship（默认开）、Same Sender、Same Recipient。
+- Similarity Based（默认开启）：含 Trading Action Sequence（关）、Balance Sequence（开，粒度1h，相似度0.6）、Earning Sequence（关）。
+- Manipulation Based（默认关闭）：Max Time Diff 为 2。
+检测结果在 Token Distribution 中显示为橙色虚线实体边界。
+
+### Manipulation Detection
+检测可疑交易模式，两组规则：
+- Round Trip（默认开启）：检测买入后卖出/卖出后买入，净持仓回到起点且收益有限。默认：Max Time Diff=120，Max Position Diff=100，Max Earning=1000，Enable Entity Based=是。
+- Same Direction（默认开启）：检测连续同向动作。默认：Max Time Diff=10，Min Seq Length=5，Max Diff Direction=0，Enable Entity Based=是。
+基于实体的检测会先合并同一实体内钱包的交易再运行检测器，可揭示协同行为。
+
+### Link Configuration
+检测持有者之间更柔性的两两关系，默认设置：
+- Network Based 关闭，Direct Transfer 开，Min Tx Count=1。
+- Similarity Based 开，Trading Action Sequence 开（Action Only，Min Seq Length=3，Max Time Diff=120）。
+- Manipulation Based 开，Max Time Diff=120。
+实体检测用于严格分组；链接检测用于探索更弱的关系线索。
+
+## Token Distribution View
+显示当前快照的节点链接分布图。视觉编码：节点大小=余额；红色描边=被操纵检测标记；蓝色描边=未被标记；橙色虚线边界=实体群组；灰色链接=链接检测关系（需开启 Show Links）。点击节点选择用户并填充 Behavior Details。
+
+## K-Line And Manipulation View
+把价格变化与操纵事件结合。蜡烛图上方为 Round Trip 卡片，下方为 Same Direction 卡片。每张卡片显示时间范围、约略金额和动作序列图形。点击卡片把参与用户加载到 Behavior Details。粒度选项：1m/5m/15m/30m/1h/1d/3d/1w。
+
+## Behavior Details View
+点击用户节点或操纵卡片后显示。行为图包含：动作圆点（买入/卖出/转账）、余额历史、收益条形。控件包括 Show Related Users、Sequential Time（按事件顺序而非绝对时间）、Show Manipulation Boxes、Sync Time。
+
+## User Actions / Annotations / Action Tree
+- User Actions：记录所有交互事件，可展开查看 JSON 细节和截图。
+- Annotations：通过相机按钮或 Alt+S 快捷键创建的标注，含草图和文字。
+- Action Tree：把动作和标注可视化为树，代币切换/快照更新形成主分支。Create Insight 按钮可将多个标注组合成高层洞察。
+
+## 推荐工作流
+1. 选择 ACT 或 PNUT。
+2. 选择快照时间，调整阈值，点击 Update Snapshot。
+3. 扫视 Token Distribution，关注红色描边密集区域和橙色实体边界。
+4. 在 K 线视图寻找卡片密集的时间区间。
+5. 点击可疑节点或操纵卡片，查看 Behavior Details。
+6. 用 Sequential Time、Show Manipulation Boxes、Sync Time 深入分析。
+7. 用相机按钮标注证据，用 Action Tree 整理洞察。
+8. 导出会话 JSON。
+
+## 注意事项
+- Update Snapshot 不只是视觉刷新，会重跑所有检测。
+- Enable Entity Based 的操纵检测依赖实体结果，Run Detection 可能联动更新操纵结果。
+- Sequential Time 改变横轴含义，比较钱包动作顺序时开启，与 K 线对齐时关闭。
+- 仪表板目前不在主 UI 显示钱包标签（交易所地址、合约地址等），解读时需注意。
+---`
 
 export default {
   name: 'ChatBox',
@@ -97,7 +166,7 @@ export default {
             'Authorization': `Bearer ${OPENAI_API_KEY}`,
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4o',
             messages: [
               { role: 'system', content: SYSTEM_PROMPT },
               ...this.messages,
