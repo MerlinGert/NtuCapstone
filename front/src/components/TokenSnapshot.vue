@@ -119,7 +119,15 @@ export default {
                 let html = `<strong>Address:</strong> ${hn.id}<br/>`;
                 html += `<strong>Balance:</strong> ${hn.value.toFixed(2)}<br/>`;
                 if (hn.isRelated) html += '<strong>Type:</strong> Related User<br/>';
-                if (hn.detectionInfo) html += `<strong>Entity ID:</strong> ${hn.detectionInfo.entityId}<br/>`;
+                if (hn.suspicious) {
+                    html += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`;
+                    if (hn.suspicious.reasons && hn.suspicious.reasons.length > 0) {
+                        html += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`;
+                        hn.suspicious.reasons.forEach(r => { html += `<li style="font-size: 10px;">${r}</li>`; });
+                        html += `</ul>`;
+                    }
+                }
+                if (hn.detectionInfo) html += `<br><strong>Entity ID:</strong> ${hn.detectionInfo.entityId}<br/>`;
                 return html;
             } else {
                 // ezio: matches group-member tooltip in TokenDistribution

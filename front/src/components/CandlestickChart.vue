@@ -255,7 +255,31 @@ export default {
 
       Object.keys(bins).forEach((idx) => {
         const bin = bins[idx]
-        const timeLabel = fmt(bin.date)
+        
+        // Find actual min and max timestamps from raw manipulations
+        const getRealTimeSpan = (manipulations) => {
+          let minTs = Infinity
+          let maxTs = -Infinity
+          manipulations.forEach(m => {
+            if (m.transactions) {
+              m.transactions.forEach(tx => {
+                const tsStr = tx.timestamp || tx.time
+                if (tsStr) {
+                  const ts = this.parseUtcDate(tsStr).getTime()
+                  if (ts < minTs) minTs = ts
+                  if (ts > maxTs) maxTs = ts
+                }
+              })
+            }
+          })
+          
+          if (minTs === Infinity) return fmt(bin.date)
+          
+          if (minTs === maxTs) {
+            return fmt(new Date(minTs))
+          }
+          return `${fmt(new Date(minTs))} - ${fmt(new Date(maxTs))}`
+        }
 
         if (bin.roundTrip.length > 0) {
           const uniqueUsers = new Set()
@@ -265,6 +289,7 @@ export default {
             })
           })
           const stats = computeStats(bin.roundTrip)
+          const timeLabel = getRealTimeSpan(bin.roundTrip)
           roundTripCards.push({
             timeLabel: timeLabel,
             timeSpan: stats.timeSpan,
@@ -288,6 +313,7 @@ export default {
             })
           })
           const stats = computeStats(bin.sameDirection)
+          const timeLabel = getRealTimeSpan(bin.sameDirection)
           sameDirectionCards.push({
             timeLabel: timeLabel,
             timeSpan: stats.timeSpan,
