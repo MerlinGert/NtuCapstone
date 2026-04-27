@@ -26,8 +26,7 @@
             <button class="session-io-btn" @click="onClickExport" title="Export Actions & Annotations as JSON">
               Export
             </button>
-            <!-- ezio: import disabled for now -->
-            <button class="session-io-btn" disabled title="Import is disabled">
+            <button class="session-io-btn" @click="$refs.importFileInput.click()" title="Import Session from JSON">
               Import
             </button>
             <input
@@ -160,6 +159,10 @@
                 :actions="userActionSequence"
                 :annotations="annotationRecords"
                 @add-insight-annotation="handleAddInsightAnnotation"
+                @delete-annotation="handleDeleteAnnotation"
+                @delete-action="handleDeleteAction"
+                @update-annotation="handleUpdateAnnotation"
+                @add-custom-annotation="handleAddCustomAnnotation"
                 style="height:100%;"
             />
           </div>
@@ -595,6 +598,41 @@ export default {
         selectedItems: payload.selectedItems || [],
         sketchDataUrl: null,
         isInsight: true
+      }
+      this.annotationRecords.push(record)
+    },
+
+    // ezio: delete annotation by id (from tree editor)
+    handleDeleteAnnotation(id) {
+      const idx = this.annotationRecords.findIndex(a => a.id === id)
+      if (idx !== -1) this.annotationRecords.splice(idx, 1)
+    },
+
+    // ezio: delete action by timestamp (from tree editor)
+    handleDeleteAction(timestamp) {
+      const idx = this.userActionSequence.findIndex(a => a.timestamp === timestamp)
+      if (idx !== -1) this.userActionSequence.splice(idx, 1)
+    },
+
+    // ezio: update annotation text/color/image (from tree editor)
+    handleUpdateAnnotation(payload) {
+      const ann = this.annotationRecords.find(a => a.id === payload.id)
+      if (!ann) return
+      if (payload.text !== undefined) ann.text = payload.text
+      if (payload.customColor !== undefined) ann.customColor = payload.customColor
+      if (payload.sketchDataUrl !== undefined) ann.sketchDataUrl = payload.sketchDataUrl
+    },
+
+    // ezio: add a custom annotation node (from tree editor)
+    handleAddCustomAnnotation(payload) {
+      const record = {
+        id: this._annotationSeqId++,
+        timestamp: new Date().toISOString(),
+        sourceView: payload.sourceView || 'token_distribution',
+        text: payload.text || '',
+        selectedItems: [],
+        sketchDataUrl: payload.sketchDataUrl || null,
+        customColor: payload.customColor || null,
       }
       this.annotationRecords.push(record)
     },
