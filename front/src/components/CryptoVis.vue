@@ -2,7 +2,15 @@
 <n-layout class="h-screen max-h-screen" :content-style="{ display: 'flex', flexDirection: 'column'}">
   <n-layout-header>
       <div class="techname font-bold" style="display: flex; align-items: center; justify-content: space-between; padding-right: 20px;">
-        <span style="padding-left: 20px;">ManiScope</span>
+        <div style="display:flex; align-items:center; gap:10px; padding-left:20px;">
+          <span>ManiScope</span>
+          <button
+            class="ai-chat-btn"
+            @click="chatBoxOpen = !chatBoxOpen"
+            :class="{ active: chatBoxOpen }"
+            title="AI Assistant"
+          >🤖</button>
+        </div>
         <div style="font-size: 14px; font-weight: normal; display: flex; align-items: center; gap: 10px; z-index: 1000;">
           <span style="color: #4a5568;">Coin:</span>
           <div style="display: flex; gap: 5px;">
@@ -41,7 +49,7 @@
 <!-- Left sidebar: ControlPanel (top) + drag handle + ChatBox (bottom) -->
     <div style="flex: 3; min-width:0; overflow:hidden; display:flex; flex-direction:column;">
       <!-- ControlPanel area -->
-      <div :style="{ height: leftPanelTopPct + '%', overflow: 'hidden', flexShrink: 0 }">
+      <div :style="{ flex: chatBoxOpen ? 'none' : '1', height: chatBoxOpen ? (leftPanelTopPct + '%') : '100%', overflow: 'hidden', flexShrink: 0 }">
         <n-card
             size="small"
             style="width:100%;height:100%;"
@@ -69,8 +77,9 @@
         </n-card>
       </div>
 
-      <!-- Horizontal drag handle -->
+      <!-- Horizontal drag handle (only shown when chat is open) -->
       <div
+        v-if="chatBoxOpen"
         class="left-resize-handle"
         @mousedown.prevent="startLeftResize"
         title="Drag to resize"
@@ -78,8 +87,8 @@
         <div class="left-resize-grip"></div>
       </div>
 
-      <!-- ChatBox area -->
-      <div style="flex:1; min-height:0; overflow:hidden;">
+      <!-- ChatBox area (collapsible) -->
+      <div v-if="chatBoxOpen" style="flex:1; min-height:0; overflow:hidden;">
         <ChatBox />
       </div>
     </div>
@@ -343,6 +352,8 @@ export default {
       currentCoin: 'ACT', // Can be 'ACT' or 'PNUT'
       // left panel vertical split (percentage for ControlPanel top section)
       leftPanelTopPct: 70,
+      // chatbox collapse state
+      chatBoxOpen: true,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -2100,6 +2111,59 @@ a {
 .panel-card {
   border: none !important;
   box-shadow: 0 1px 8px rgba(0,0,0,0.12) !important;
+}
+
+/* AI chat toggle button in header */
+.ai-chat-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+.ai-chat-btn:hover {
+  border-color: #3182ce;
+  background: #ebf8ff;
+}
+.ai-chat-btn.active {
+  border-color: #3182ce;
+  background: #3182ce;
+}
+
+/* ChatBox collapse toggle bar */
+.chatbox-toggle-bar {
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: #edf2f7;
+  border-top: 1px solid #e2e8f0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.chatbox-toggle-bar:hover {
+  background: #e2e8f0;
+}
+.chatbox-toggle-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4a5568;
+}
+.chatbox-toggle-icon {
+  font-size: 10px;
+  color: #718096;
 }
 
 /* Left panel vertical resize handle */
