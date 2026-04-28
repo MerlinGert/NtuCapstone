@@ -127,6 +127,9 @@
   <div v-if="contextMenu.visible" class="ctx-overlay" @click="hideContextMenu" @contextmenu.prevent="hideContextMenu"></div>
   <div v-if="contextMenu.visible" class="ctx-menu" :style="{left: contextMenu.x+'px', top: contextMenu.y+'px'}">
     <div v-if="contextMenu.node && contextMenu.node.data.type === 'annotation'" class="ctx-item" @click="openEditDialog">✏️ Edit</div>
+    <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="insertAfterContextNode">➕ Insert After</div>
+    <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="moveContextNode('up')">⬆️ Move Up</div>
+    <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="moveContextNode('down')">⬇️ Move Down</div>
     <div class="ctx-item ctx-danger" @click="deleteContextNode">🗑️ Delete</div>
   </div>
 
@@ -224,7 +227,7 @@ export default {
   components: {
     InsightAnnotationItem
   },
-  emits: ['add-insight-annotation', 'log-action', 'delete-action', 'delete-annotation', 'update-annotation', 'add-custom-annotation'],
+  emits: ['add-insight-annotation', 'log-action', 'delete-action', 'delete-annotation', 'update-annotation', 'add-custom-annotation', 'reorder-action'],
   props: {
     actions: {
       type: Array,
@@ -248,7 +251,7 @@ export default {
       // ezio: node editing state
       contextMenu: { visible: false, x: 0, y: 0, node: null },
       editDialog: { visible: false, annotationId: null, text: '', color: '#fde68a', imageUrl: null },
-      addNodeDialog: { visible: false, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null },
+      addNodeDialog: { visible: false, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: null },
       colorPresets: [
         { value: '#fde68a', label: 'Yellow' },
         { value: '#fee2e2', label: 'Red' },
@@ -398,7 +401,21 @@ export default {
 
     // ezio: add custom annotation node
     openAddNodeDialog() {
-      this.addNodeDialog = { visible: true, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null }
+      this.addNodeDialog = { visible: true, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: null }
+    },
+    insertAfterContextNode() {
+      const node = this.contextMenu.node
+      this.hideContextMenu()
+      if (!node || !node.data.data) return
+      const ts = node.data.data.timestamp
+      this.addNodeDialog = { visible: true, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: ts }
+    },
+    moveContextNode(direction) {
+      const node = this.contextMenu.node
+      this.hideContextMenu()
+      if (!node || !node.data.data) return
+      const ts = node.data.data.timestamp
+      this.$emit('reorder-action', { timestamp: ts, direction })
     },
     closeAddNodeDialog() {
       this.addNodeDialog.visible = false
@@ -416,7 +433,8 @@ export default {
         text: this.addNodeDialog.text,
         sourceView: this.addNodeDialog.sourceView,
         customColor: this.addNodeDialog.color,
-        sketchDataUrl: this.addNodeDialog.imageUrl || null
+        sketchDataUrl: this.addNodeDialog.imageUrl || null,
+        afterTimestamp: this.addNodeDialog.afterTimestamp || null
       })
       this.closeAddNodeDialog()
     },

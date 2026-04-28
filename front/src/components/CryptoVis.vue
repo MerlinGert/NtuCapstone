@@ -32,7 +32,7 @@
             <input
               ref="importFileInput"
               type="file"
-              accept=".json,application/json"
+              accept=".json,application/json,.zip,application/zip"
               style="display:none"
               @change="onImportFileChosen"
             />
@@ -163,6 +163,7 @@
                 @delete-action="handleDeleteAction"
                 @update-annotation="handleUpdateAnnotation"
                 @add-custom-annotation="handleAddCustomAnnotation"
+                @reorder-action="handleReorderAction"
                 style="height:100%;"
             />
           </div>
@@ -625,9 +626,23 @@ export default {
 
     // ezio: add a custom annotation node (from tree editor)
     handleAddCustomAnnotation(payload) {
+      let timestamp = new Date().toISOString()
+      if (payload.afterTimestamp) {
+        const allItems = [
+          ...this.userActionSequence,
+          ...this.annotationRecords
+        ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        const afterIdx = allItems.findIndex(a => a.timestamp === payload.afterTimestamp)
+        if (afterIdx !== -1) {
+          const afterTime = new Date(payload.afterTimestamp).getTime()
+          const nextItem = allItems[afterIdx + 1]
+          const nextTime = nextItem ? new Date(nextItem.timestamp).getTime() : afterTime + 2000
+          timestamp = new Date((afterTime + nextTime) / 2).toISOString()
+        }
+      }
       const record = {
         id: this._annotationSeqId++,
-        timestamp: new Date().toISOString(),
+        timestamp,
         sourceView: payload.sourceView || 'token_distribution',
         text: payload.text || '',
         selectedItems: [],
@@ -635,6 +650,22 @@ export default {
         customColor: payload.customColor || null,
       }
       this.annotationRecords.push(record)
+    },
+
+    // ezio: reorder actions/annotations by swapping timestamps
+    handleReorderAction({ timestamp, direction }) {
+      const allItems = [
+        ...this.userActionSequence,
+        ...this.annotationRecords
+      ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+      const idx = allItems.findIndex(a => a.timestamp === timestamp)
+      if (idx === -1) return
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= allItems.length) return
+      const tsA = allItems[idx].timestamp
+      const tsB = allItems[swapIdx].timestamp
+      allItems[idx].timestamp = tsB
+      allItems[swapIdx].timestamp = tsA
     },
 
     // ezio: open export dialog
