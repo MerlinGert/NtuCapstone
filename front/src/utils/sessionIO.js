@@ -1,5 +1,5 @@
 // ezio: session import/export utility for action/annotation/tree data
-import { strToU8, zipSync } from 'fflate'
+import { strToU8, zipSync, unzipSync } from 'fflate'
 
 const EXPORT_VERSION = '1.0'
 
@@ -196,10 +196,52 @@ export function parseImportFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.onload = () => {
+
+    const uint8ToBase64 = (bytes) => {
+      let binary = ''
+      const chunkSize = 8192
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+      }
+      return btoa(binary)
+    }
+
+    const processPayload = (parsed, imageFiles) => {
       try {
-        const parsed = JSON.parse(String(reader.result || ''))
         validatePayload(parsed)
+
+        // Restore image dataUrls from zip image files if available
+        if (imageFiles && Object.keys(imageFiles).length > 0) {
+          // Restore snapshots in actions
+          parsed.userActionSequence = parsed.userActionSequence.map((action) => {
+            const copy = { ...action }
+            ;['sourceSnapshot', 'targetSnapshot'].forEach((field) => {
+              if (!Array.isArray(copy[field])) return
+              copy[field] = copy[field].map((snapshot) => {
+                if (!snapshot || !snapshot.imagePath) return snapshot
+                const imgBytes = imageFiles[snapshot.imagePath]
+                if (!imgBytes) return snapshot
+                const b64 = uint8ToBase64(imgBytes)
+                const s = { ...snapshot, dataUrl: `data:image/png;base64,${b64}` }
+                delete s.imagePath
+                return s
+              })
+            })
+            return copy
+          })
+
+          // Restore sketchDataUrl in annotations
+          parsed.annotationRecords = parsed.annotationRecords.map((anno) => {
+            if (!anno.sketchImagePath) return anno
+            const imgBytes = imageFiles[anno.sketchImagePath]
+            if (!imgBytes) return anno
+            const b64 = uint8ToBase64(imgBytes)
+            const a = { ...anno, sketchDataUrl: `data:image/png;base64,${b64}` }
+            delete a.sketchImagePath
+            return a
+          })
+        }
+
         const maxAnnId = parsed.annotationRecords.reduce(
           (m, a) => (Number.isFinite(a?.id) && a.id > m ? a.id : m),
           -1
@@ -222,6 +264,43 @@ export function parseImportFile(file) {
         reject(err instanceof Error ? err : new Error(String(err)))
       }
     }
-    reader.readAsText(file)
+
+    if (file.name.endsWith('.zip') || file.type === 'application/zip') {
+      reader.onload = () => {
+        try {
+          const arrayBuffer = reader.result
+          const uint8 = new Uint8Array(arrayBuffer)
+          const unzipped = unzipSync(uint8)
+
+          const jsonEntry = unzipped['session.json']
+          if (!jsonEntry) throw new Error('Invalid zip: missing session.json')
+          const jsonText = new TextDecoder().decode(jsonEntry)
+          const parsed = JSON.parse(jsonText)
+
+          // Collect image files: keys that start with "images/"
+          const imageFiles = {}
+          Object.keys(unzipped).forEach((key) => {
+            if (key.startsWith('images/')) {
+              imageFiles[key] = unzipped[key]
+            }
+          })
+
+          processPayload(parsed, imageFiles)
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)))
+        }
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result || ''))
+          processPayload(parsed, {})
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)))
+        }
+      }
+      reader.readAsText(file)
+    }
   })
 }

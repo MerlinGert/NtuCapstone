@@ -2,7 +2,15 @@
 <n-layout class="h-screen max-h-screen" :content-style="{ display: 'flex', flexDirection: 'column'}">
   <n-layout-header>
       <div class="techname font-bold" style="display: flex; align-items: center; justify-content: space-between; padding-right: 20px;">
-        <span style="padding-left: 20px;">ManiScope</span>
+        <div style="display:flex; align-items:center; gap:10px; padding-left:20px;">
+          <span>ManiScope</span>
+          <button
+            class="ai-chat-btn"
+            @click="chatBoxOpen = !chatBoxOpen"
+            :class="{ active: chatBoxOpen }"
+            title="AI Assistant"
+          >🤖</button>
+        </div>
         <div style="font-size: 14px; font-weight: normal; display: flex; align-items: center; gap: 10px; z-index: 1000;">
           <span style="color: #4a5568;">Coin:</span>
           <div style="display: flex; gap: 5px;">
@@ -18,14 +26,13 @@
             <button class="session-io-btn" @click="onClickExport" title="Export Actions & Annotations as JSON">
               Export
             </button>
-            <!-- ezio: import disabled for now -->
-            <button class="session-io-btn" disabled title="Import is disabled">
+            <button class="session-io-btn" @click="$refs.importFileInput.click()" title="Import Session from JSON">
               Import
             </button>
             <input
               ref="importFileInput"
               type="file"
-              accept=".json,application/json"
+              accept=".json,application/json,.zip,application/zip"
               style="display:none"
               @change="onImportFileChosen"
             />
@@ -38,7 +45,10 @@
         style="width:100%;height:100%;overflow:hidden"
         :content-style="{ display: 'flex', flexDirection: 'row', overflow: 'hidden', width: '100%', height: '100%', boxSizing: 'border-box' }"
       >
-<div style="flex: 3; min-width:0; overflow:hidden;">
+<!-- Left sidebar: ControlPanel (top) + drag handle + ChatBox (bottom) -->
+    <div style="flex: 3; min-width:0; overflow:hidden; display:flex; flex-direction:column;">
+      <!-- ControlPanel area -->
+      <div :style="{ flex: chatBoxOpen ? 'none' : '1', height: chatBoxOpen ? (leftPanelTopPct + '%') : '100%', overflow: 'hidden', flexShrink: 0 }">
         <n-card
             size="small"
             style="width:100%;height:100%;"
@@ -64,6 +74,22 @@
                 @log-action="logUserAction"
             />
         </n-card>
+      </div>
+
+      <!-- Horizontal drag handle (only shown when chat is open) -->
+      <div
+        v-if="chatBoxOpen"
+        class="left-resize-handle"
+        @mousedown.prevent="startLeftResize"
+        title="Drag to resize"
+      >
+        <div class="left-resize-grip"></div>
+      </div>
+
+      <!-- ChatBox area (collapsible) -->
+      <div v-if="chatBoxOpen" style="flex:1; min-height:0; overflow:hidden;">
+        <ChatBox />
+      </div>
     </div>
 
 <div style="flex: 6; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
@@ -133,6 +159,11 @@
                 :actions="userActionSequence"
                 :annotations="annotationRecords"
                 @add-insight-annotation="handleAddInsightAnnotation"
+                @delete-annotation="handleDeleteAnnotation"
+                @delete-action="handleDeleteAction"
+                @update-annotation="handleUpdateAnnotation"
+                @add-custom-annotation="handleAddCustomAnnotation"
+                @reorder-action="handleReorderAction"
                 style="height:100%;"
             />
           </div>
@@ -299,6 +330,7 @@ import {
   downloadZipArchive,
   parseImportFile,
 } from '../utils/sessionIO'
+import ChatBox from './ChatBox.vue'
 
 export default {
   components: {
@@ -317,10 +349,15 @@ export default {
     UserActionTimeline,
     AnnotationTimeline,
     UserActionTree,
+    ChatBox,
   },
   data() {
     return {
       currentCoin: 'ACT', // Can be 'ACT' or 'PNUT'
+      // left panel vertical split (percentage for ControlPanel top section)
+      leftPanelTopPct: 70,
+      // chatbox collapse state
+      chatBoxOpen: true,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -499,6 +536,28 @@ export default {
     },
   },
   methods: {
+    // Left panel vertical resize
+    startLeftResize(e) {
+      const startY = e.clientY
+      const startPct = this.leftPanelTopPct
+      const parentEl = e.currentTarget.parentElement
+      const onMove = (ev) => {
+        const parentH = parentEl.getBoundingClientRect().height
+        const delta = ev.clientY - startY
+        const newPct = Math.min(85, Math.max(15, startPct + (delta / parentH) * 100))
+        this.leftPanelTopPct = newPct
+      }
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+      document.body.style.cursor = 'row-resize'
+      document.body.style.userSelect = 'none'
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
       const el = document.elementFromPoint(this._mouseX, this._mouseY);
@@ -542,6 +601,71 @@ export default {
         isInsight: true
       }
       this.annotationRecords.push(record)
+    },
+
+    // ezio: delete annotation by id (from tree editor)
+    handleDeleteAnnotation(id) {
+      const idx = this.annotationRecords.findIndex(a => a.id === id)
+      if (idx !== -1) this.annotationRecords.splice(idx, 1)
+    },
+
+    // ezio: delete action by timestamp (from tree editor)
+    handleDeleteAction(timestamp) {
+      const idx = this.userActionSequence.findIndex(a => a.timestamp === timestamp)
+      if (idx !== -1) this.userActionSequence.splice(idx, 1)
+    },
+
+    // ezio: update annotation text/color/image (from tree editor)
+    handleUpdateAnnotation(payload) {
+      const ann = this.annotationRecords.find(a => a.id === payload.id)
+      if (!ann) return
+      if (payload.text !== undefined) ann.text = payload.text
+      if (payload.customColor !== undefined) ann.customColor = payload.customColor
+      if (payload.sketchDataUrl !== undefined) ann.sketchDataUrl = payload.sketchDataUrl
+    },
+
+    // ezio: add a custom annotation node (from tree editor)
+    handleAddCustomAnnotation(payload) {
+      let timestamp = new Date().toISOString()
+      if (payload.afterTimestamp) {
+        const allItems = [
+          ...this.userActionSequence,
+          ...this.annotationRecords
+        ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+        const afterIdx = allItems.findIndex(a => a.timestamp === payload.afterTimestamp)
+        if (afterIdx !== -1) {
+          const afterTime = new Date(payload.afterTimestamp).getTime()
+          const nextItem = allItems[afterIdx + 1]
+          const nextTime = nextItem ? new Date(nextItem.timestamp).getTime() : afterTime + 2000
+          timestamp = new Date((afterTime + nextTime) / 2).toISOString()
+        }
+      }
+      const record = {
+        id: this._annotationSeqId++,
+        timestamp,
+        sourceView: payload.sourceView || 'token_distribution',
+        text: payload.text || '',
+        selectedItems: [],
+        sketchDataUrl: payload.sketchDataUrl || null,
+        customColor: payload.customColor || null,
+      }
+      this.annotationRecords.push(record)
+    },
+
+    // ezio: reorder actions/annotations by swapping timestamps
+    handleReorderAction({ timestamp, direction }) {
+      const allItems = [
+        ...this.userActionSequence,
+        ...this.annotationRecords
+      ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+      const idx = allItems.findIndex(a => a.timestamp === timestamp)
+      if (idx === -1) return
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= allItems.length) return
+      const tsA = allItems[idx].timestamp
+      const tsB = allItems[swapIdx].timestamp
+      allItems[idx].timestamp = tsB
+      allItems[swapIdx].timestamp = tsA
     },
 
     // ezio: open export dialog
@@ -2056,6 +2180,83 @@ a {
 .panel-card {
   border: none !important;
   box-shadow: 0 1px 8px rgba(0,0,0,0.12) !important;
+}
+
+/* AI chat toggle button in header */
+.ai-chat-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+.ai-chat-btn:hover {
+  border-color: #3182ce;
+  background: #ebf8ff;
+}
+.ai-chat-btn.active {
+  border-color: #3182ce;
+  background: #3182ce;
+}
+
+/* ChatBox collapse toggle bar */
+.chatbox-toggle-bar {
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: #edf2f7;
+  border-top: 1px solid #e2e8f0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.chatbox-toggle-bar:hover {
+  background: #e2e8f0;
+}
+.chatbox-toggle-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4a5568;
+}
+.chatbox-toggle-icon {
+  font-size: 10px;
+  color: #718096;
+}
+
+/* Left panel vertical resize handle */
+.left-resize-handle {
+  height: 8px;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: background 0.15s;
+}
+.left-resize-handle:hover {
+  background: #e2e8f0;
+}
+.left-resize-grip {
+  width: 36px;
+  height: 3px;
+  background: #94a3b8;
+  border-radius: 2px;
 }
 /* 全局按钮面板和输入系样式覆盖 */
 .checkbox {

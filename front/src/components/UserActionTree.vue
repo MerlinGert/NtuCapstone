@@ -17,6 +17,8 @@
         </template>
       </div>
 
+      <button class="insight-btn" @click="openAddNodeDialog" title="Add Custom Node" style="margin-left:8px;padding:2px 8px;font-size:11px;">+ Node</button>
+
       <div style="flex: 1"></div>
       <div class="tree-legend">
         <div class="legend-item"><div class="legend-box" style="background:#fee2e2; border-color:#fca5a5"></div>System</div>
@@ -120,6 +122,100 @@
     </div>
 
   </div>
+
+  <!-- Context Menu -->
+  <div v-if="contextMenu.visible" class="ctx-overlay" @click="hideContextMenu" @contextmenu.prevent="hideContextMenu"></div>
+  <div v-if="contextMenu.visible" class="ctx-menu" :style="{left: contextMenu.x+'px', top: contextMenu.y+'px'}">
+    <div v-if="contextMenu.node && contextMenu.node.data.type === 'annotation'" class="ctx-item" @click="openEditDialog">✏️ Edit</div>
+    <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="insertAfterContextNode">➕ Insert After</div>
+    <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="moveContextNode('up')">⬆️ Move Up</div>
+    <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="moveContextNode('down')">⬇️ Move Down</div>
+    <div class="ctx-item ctx-danger" @click="deleteContextNode">🗑️ Delete</div>
+  </div>
+
+  <!-- Edit Annotation Dialog -->
+  <div v-if="editDialog.visible" class="annotation-popup-overlay" @click.self="closeEditDialog">
+    <div class="annotation-popup">
+      <div class="popup-header">
+        <h3>Edit Annotation</h3>
+        <button class="close-btn" @click="closeEditDialog">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="edit-field">
+          <label class="edit-label">Text</label>
+          <textarea v-model="editDialog.text" class="insight-textarea" rows="4" placeholder="Annotation text..."></textarea>
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Node Color</label>
+          <div class="color-row">
+            <div v-for="c in colorPresets" :key="c.value" class="color-dot"
+              :style="{background: c.value, outline: editDialog.color === c.value ? '2px solid #2d3748' : 'none'}"
+              :title="c.label" @click="editDialog.color = c.value"></div>
+            <input type="color" v-model="editDialog.color" title="Custom color" style="width:28px;height:28px;border:none;cursor:pointer;border-radius:4px;" />
+          </div>
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Screenshot</label>
+          <input type="file" accept="image/*" @change="editDialog_onImageChange" />
+          <div v-if="editDialog.imageUrl" class="popup-image-container" style="margin-top:8px;">
+            <img :src="editDialog.imageUrl" class="popup-image" alt="Preview" />
+            <button class="insight-btn cancel-btn" style="margin-top:6px;font-size:11px;" @click="editDialog.imageUrl = null">Remove Image</button>
+          </div>
+        </div>
+      </div>
+      <div class="popup-footer">
+        <button class="insight-btn cancel-btn" @click="closeEditDialog">Cancel</button>
+        <button class="insight-btn confirm-btn" @click="saveEdit">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Custom Node Dialog -->
+  <div v-if="addNodeDialog.visible" class="annotation-popup-overlay" @click.self="closeAddNodeDialog">
+    <div class="annotation-popup">
+      <div class="popup-header">
+        <h3>Add Custom Node</h3>
+        <button class="close-btn" @click="closeAddNodeDialog">×</button>
+      </div>
+      <div class="popup-body">
+        <div class="edit-field">
+          <label class="edit-label">Text / Label</label>
+          <textarea v-model="addNodeDialog.text" class="insight-textarea" rows="3" placeholder="Enter annotation text..."></textarea>
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Source View</label>
+          <select v-model="addNodeDialog.sourceView" class="edit-select">
+            <option value="token_distribution">Token Distribution (TD)</option>
+            <option value="kline_chart">K-Line Chart (KL)</option>
+            <option value="behavior_details">Behavior Details (BD)</option>
+            <option value="system">System</option>
+          </select>
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Node Color</label>
+          <div class="color-row">
+            <div v-for="c in colorPresets" :key="c.value" class="color-dot"
+              :style="{background: c.value, outline: addNodeDialog.color === c.value ? '2px solid #2d3748' : 'none'}"
+              :title="c.label" @click="addNodeDialog.color = c.value"></div>
+            <input type="color" v-model="addNodeDialog.color" title="Custom color" style="width:28px;height:28px;border:none;cursor:pointer;border-radius:4px;" />
+          </div>
+        </div>
+        <div class="edit-field">
+          <label class="edit-label">Image (optional)</label>
+          <input type="file" accept="image/*" @change="addNode_onImageChange" />
+          <div v-if="addNodeDialog.imageUrl" class="popup-image-container" style="margin-top:8px;">
+            <img :src="addNodeDialog.imageUrl" class="popup-image" alt="Preview" />
+            <button class="insight-btn cancel-btn" style="margin-top:6px;font-size:11px;" @click="addNodeDialog.imageUrl = null">Remove Image</button>
+          </div>
+        </div>
+      </div>
+      <div class="popup-footer">
+        <button class="insight-btn cancel-btn" @click="closeAddNodeDialog">Cancel</button>
+        <button class="insight-btn confirm-btn" @click="saveNewNode" :disabled="!addNodeDialog.text.trim()">Add</button>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <script>
@@ -131,6 +227,7 @@ export default {
   components: {
     InsightAnnotationItem
   },
+  emits: ['add-insight-annotation', 'log-action', 'delete-action', 'delete-annotation', 'update-annotation', 'add-custom-annotation', 'reorder-action'],
   props: {
     actions: {
       type: Array,
@@ -150,7 +247,21 @@ export default {
       isMultiSelectMode: false,
       selectedInsightAnnotations: [],
       showInsightPopup: false,
-      insightText: ''
+      insightText: '',
+      // ezio: node editing state
+      contextMenu: { visible: false, x: 0, y: 0, node: null },
+      editDialog: { visible: false, annotationId: null, text: '', color: '#fde68a', imageUrl: null },
+      addNodeDialog: { visible: false, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: null },
+      colorPresets: [
+        { value: '#fde68a', label: 'Yellow' },
+        { value: '#fee2e2', label: 'Red' },
+        { value: '#dbeafe', label: 'Blue' },
+        { value: '#dcfce7', label: 'Green' },
+        { value: '#f3e8ff', label: 'Purple' },
+        { value: '#fbcfe8', label: 'Pink' },
+        { value: '#fed7aa', label: 'Orange' },
+        { value: '#b2f5ea', label: 'Teal' },
+      ],
     }
   },
   watch: {
@@ -228,6 +339,105 @@ export default {
       this.showInsightPopup = false
       this.cancelMultiSelect()
     },
+
+    // ezio: context menu helpers
+    hideContextMenu() {
+      this.contextMenu.visible = false
+    },
+    deleteContextNode() {
+      const node = this.contextMenu.node
+      this.hideContextMenu()
+      if (!node) return
+      const d = node.data
+      if (d.type === 'annotation' && d.data) {
+        const id = d.data.isAnnotation ? d.data.id : (d.data.actionInfo ? d.data.actionInfo.id : null)
+        if (id !== null && id !== undefined) {
+          this.$emit('delete-annotation', id)
+        } else {
+          // It's an action node — emit index to delete from userActionSequence
+          const ts = d.data.timestamp
+          this.$emit('delete-action', ts)
+        }
+      } else if (d.data) {
+        this.$emit('delete-action', d.data.timestamp)
+      }
+    },
+    openEditDialog() {
+      const node = this.contextMenu.node
+      this.hideContextMenu()
+      if (!node) return
+      const d = node.data
+      if (d.type === 'annotation' && d.data) {
+        const ann = d.data.isAnnotation ? d.data : d.data.actionInfo
+        if (!ann) return
+        this.editDialog = {
+          visible: true,
+          annotationId: ann.id,
+          text: ann.text || '',
+          color: ann.customColor || '#fde68a',
+          imageUrl: ann.sketchDataUrl || null
+        }
+      }
+    },
+    closeEditDialog() {
+      this.editDialog.visible = false
+    },
+    editDialog_onImageChange(e) {
+      const file = e.target.files && e.target.files[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = ev => { this.editDialog.imageUrl = ev.target.result }
+      reader.readAsDataURL(file)
+    },
+    saveEdit() {
+      this.$emit('update-annotation', {
+        id: this.editDialog.annotationId,
+        text: this.editDialog.text,
+        customColor: this.editDialog.color,
+        sketchDataUrl: this.editDialog.imageUrl
+      })
+      this.closeEditDialog()
+    },
+
+    // ezio: add custom annotation node
+    openAddNodeDialog() {
+      this.addNodeDialog = { visible: true, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: null }
+    },
+    insertAfterContextNode() {
+      const node = this.contextMenu.node
+      this.hideContextMenu()
+      if (!node || !node.data.data) return
+      const ts = node.data.data.timestamp
+      this.addNodeDialog = { visible: true, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: ts }
+    },
+    moveContextNode(direction) {
+      const node = this.contextMenu.node
+      this.hideContextMenu()
+      if (!node || !node.data.data) return
+      const ts = node.data.data.timestamp
+      this.$emit('reorder-action', { timestamp: ts, direction })
+    },
+    closeAddNodeDialog() {
+      this.addNodeDialog.visible = false
+    },
+    addNode_onImageChange(e) {
+      const file = e.target.files && e.target.files[0]
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = ev => { this.addNodeDialog.imageUrl = ev.target.result }
+      reader.readAsDataURL(file)
+    },
+    saveNewNode() {
+      if (!this.addNodeDialog.text.trim()) return
+      this.$emit('add-custom-annotation', {
+        text: this.addNodeDialog.text,
+        sourceView: this.addNodeDialog.sourceView,
+        customColor: this.addNodeDialog.color,
+        sketchDataUrl: this.addNodeDialog.imageUrl || null,
+        afterTimestamp: this.addNodeDialog.afterTimestamp || null
+      })
+      this.closeAddNodeDialog()
+    },
     getAnnotationById(id) {
       return this.annotations.find(a => a.id === id);
     },
@@ -243,6 +453,7 @@ export default {
         allEvents.push({
           ...anno,
           actionType: anno.isInsight ? 'high_level_insight' : 'annotation',
+          customColor: anno.customColor || null,
           actionInfo: { 
             id: anno.id, 
             text: anno.text, 
@@ -753,6 +964,7 @@ export default {
         .attr('rx', 4) // Rounded corners
         .attr('fill', d => {
           if (d.data.type === 'root') return '#4a5568'
+          if (d.data.data && d.data.data.customColor) return d.data.data.customColor
           if (d.data.type === 'annotation') return typeColors.annotation.bg
           if (d.data.type === 'view_branch') return typeColors.view_branch.bg
           const cat = getActionClass(d.data.data ? d.data.data.actionType : '')
@@ -784,6 +996,12 @@ export default {
 
       // Hover interactions
       node
+        .on('contextmenu', (event, d) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (d.data.type === 'root') return
+          this.contextMenu = { visible: true, x: event.clientX, y: event.clientY, node: d }
+        })
         .on('mouseover', (event, d) => {
           const typeLabel = d.data.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
           let content = `<strong>${d.data.name}</strong><br/>
@@ -1206,5 +1424,48 @@ export default {
   width: 100%;
   height: auto;
   display: block;
+}
+
+/* ezio: context menu */
+.ctx-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+}
+.ctx-menu {
+  position: fixed;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 3001;
+  min-width: 140px;
+  overflow: hidden;
+}
+.ctx-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #2d3748;
+  cursor: pointer;
+}
+.ctx-item:hover { background: #f1f5f9; }
+.ctx-danger { color: #e53e3e; }
+.ctx-danger:hover { background: #fff5f5; }
+
+/* ezio: edit dialog fields */
+.edit-field { display: flex; flex-direction: column; gap: 6px; }
+.edit-label { font-size: 12px; font-weight: 600; color: #4a5568; }
+.edit-select {
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+.color-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.color-dot {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  outline-offset: 2px;
 }
 </style>

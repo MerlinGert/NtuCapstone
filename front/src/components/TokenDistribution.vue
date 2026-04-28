@@ -201,7 +201,11 @@ export default {
             if (!suspiciousMap.has(addr)) {
               suspiciousMap.set(addr, { trader_id: addr, reasons: [] })
             }
-            suspiciousMap.get(addr).reasons.push(`Detected via: ${method}`)
+            const reason = `Detected via: ${method}`
+            const reasons = suspiciousMap.get(addr).reasons
+            if (!reasons.includes(reason)) {
+              reasons.push(reason)
+            }
           })
         }
       })
@@ -873,8 +877,19 @@ export default {
           if (d.isRelated)
             htmlContent += '<strong>Type:</strong> Related User<br/>'
 
+          if (d.suspicious) {
+            htmlContent += `<br><strong style="color:red">Suspicious Activity Detected!</strong>`
+            if (d.suspicious.reasons && d.suspicious.reasons.length > 0) {
+              htmlContent += `<ul style="margin: 5px 0; padding-left: 15px; text-align: left;">`
+              d.suspicious.reasons.forEach((r) => {
+                htmlContent += `<li style="font-size: 10px;">${r}</li>`
+              })
+              htmlContent += '</ul>'
+            }
+          }
+
           if (d.detectionInfo) {
-            htmlContent += `<strong>Entity ID:</strong> ${d.detectionInfo.entityId}<br/>`
+            htmlContent += `<br><strong>Entity ID:</strong> ${d.detectionInfo.entityId}<br/>`
           }
 
           const [x, y] = d3.pointer(event, this.$refs.chart_container)

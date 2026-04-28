@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ACT Token Market Manipulation Investigation Report v2</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; background: #0d1117; color: #e6edf3; line-height: 1.8; }
+    #container { max-width: 980px; margin: 0 auto; padding: 48px 28px 100px; }
+    h1 { font-size: 2.1rem; color: #79c0ff; border-bottom: 2px solid #30363d; padding-bottom: 14px; margin-bottom: 28px; }
+    h2 { font-size: 1.45rem; color: #58a6ff; margin: 52px 0 14px; border-left: 4px solid #388bfd; padding-left: 14px; }
+    h3 { font-size: 1.15rem; color: #a5d6ff; margin: 32px 0 10px; }
+    h4 { font-size: 1rem; color: #cae8ff; margin: 20px 0 8px; }
+    p { margin: 13px 0; color: #c9d1d9; }
+    blockquote { border-left: 4px solid #3fb950; padding: 10px 18px; margin: 18px 0; background: #161b22; border-radius: 0 6px 6px 0; color: #7ee787; font-style: italic; }
+    img { max-width: 100%; border-radius: 8px; margin: 20px 0; border: 1px solid #30363d; box-shadow: 0 4px 20px rgba(0,0,0,.6); display: block; }
+    table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.9rem; }
+    th { background: #21262d; color: #79c0ff; padding: 11px 16px; text-align: left; border: 1px solid #30363d; font-weight: 600; }
+    td { padding: 9px 16px; border: 1px solid #30363d; color: #c9d1d9; vertical-align: top; }
+    tr:nth-child(even) td { background: #161b22; }
+    tr:hover td { background: #1c2128; }
+    code { background: #161b22; color: #f0883e; padding: 2px 7px; border-radius: 4px; font-size: 0.87em; font-family: "Cascadia Code","Consolas",monospace; }
+    pre { background: #161b22; padding: 18px; border-radius: 8px; overflow-x: auto; border: 1px solid #30363d; margin: 16px 0; }
+    pre code { background: none; color: #e6edf3; font-size: 0.88rem; }
+    hr { border: none; border-top: 1px solid #30363d; margin: 44px 0; }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #ffa657; }
+    em { color: #a5d6ff; font-style: normal; }
+    ul, ol { margin: 10px 0 10px 24px; color: #c9d1d9; }
+    li { margin: 6px 0; }
+    #loading { text-align: center; padding: 100px; color: #8b949e; font-size: 1.1rem; }
+    .act-header { background: linear-gradient(135deg,#0d1117 0%,#1c2128 100%); border: 1px solid #30363d; border-radius: 10px; padding: 20px 28px; margin-bottom: 36px; }
+    .act-header p { color: #8b949e; font-size: 0.9rem; margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="loading">Loading report...</div>
+    <div id="content"></div>
+  </div>
+  <script>
+    fetch('./story_report_v2_en.md')
+      .then(r => { if (!r.ok) throw new Error('Failed to load story_report_v2_en.md'); return r.text(); })
+      .then(md => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').innerHTML = marked.parse(md);
+      })
+      .catch(err => {
+        document.getElementById('loading').textContent = 'Load failed: ' + err.message;
+      });
+  </script>
+</body>
+</html>
