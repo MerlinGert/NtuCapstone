@@ -24,6 +24,8 @@ Ask concise questions before deep analysis if the request leaves an important ch
 - Should external web evidence be used to verify market events such as listings, announcements, or news? If yes, browse and cite sources.
 - Are there known ground-truth events, labels, or hypotheses that should be checked against the trace?
 - Should the output include recommendations for product/UI improvement, investigation next steps, or both?
+- Should recommendations be organized as a top-down investigation plan with high-level goals, workstreams, and atomic actions?
+- Should atomic actions be grouped into Visual actions, Statistical actions, or another action taxonomy?
 
 If the user specifies the trace path and asks for an analysis, proceed without blocking unless one of these choices materially changes the expected output.
 
@@ -208,19 +210,49 @@ For every mid-level and high-level insight, include:
 - Rationale explaining how the insight follows from the evidence.
 - What would falsify or weaken the insight.
 
-### Step 5: Derive recommendation levels
+### Step 5: Build a top-down recommendation plan
 
-Use this hierarchy:
+Recommendations should be organized by investigation objective, not as a flat low/mid/high list.
 
-- **Low-level recommendations**: inspect a specific view, card, annotation, account, or toggle.
-- **Mid-level recommendations**: run entity/link checks, compare entity-based and non-entity detection, tabulate per-window trade flows, validate transfers and counterparties.
-- **High-level recommendations**: build a case timeline, prioritize bridge accounts, verify external market-event hypotheses, create control comparisons.
+Use this structure:
 
-For every mid-level and high-level recommendation, include:
+- **High-level objective**: the strategic reason for acting, such as building a case timeline, validating price impact, expanding a suspected component, or avoiding false positives.
+- **Why this matters**: concise rationale grounded in trace findings.
+- **Target outcome**: the concrete artifact or evidence state the investigation should produce.
+- **Mid-level workstreams**: coherent groups of work under the high-level objective, such as confirming core wallet roles, validating card windows, testing entity relationships, or classifying shared hubs.
+- **Atomic actions**: specific next actions that can be performed directly.
 
-- The recommendation.
-- Rationale grounded in the trace findings.
-- The expected evidence gained if the recommendation is followed.
+For atomic actions, always label the action type:
+
+- **Visual actions**: actions that require inspecting ManiScope GUI components or trace screenshots. This includes checking values or statistics displayed by the GUI, such as a displayed average, count, label, card amount, chart trend, entity boundary, related-user list, or manipulation box.
+- **Statistical actions**: actions that calculate statistics not displayed in the GUI and therefore require scripts, data queries, notebooks, or command-line analysis.
+
+Example atomic action types:
+
+- Visual: "Open Behavior Details for wallet X and inspect transfer arrows, manipulation boxes, and balance trend."
+- Visual: "Reopen the K-line screenshot and transcribe the clicked card's displayed time span and amount."
+- Statistical: "Calculate buy count, sell count, buy USD, sell USD, token inflow, token outflow, first action time, and final balance for wallet X."
+- Statistical: "Compute the cohort's share of market trade volume during the card window."
+
+Use low/mid/high levels inside the plan, but do not let levels become the organizing structure. The high-level objective should explain the "why"; workstreams should explain the plan; atomic actions should explain what to do next.
+
+Recommended high-level objective patterns:
+
+- **Build a role-based case timeline**: when the trace suggests different wallet roles such as passive whale, bridge actor, functional buyer, storage sink, accumulator, or round-trip-like actor.
+- **Validate manipulation windows and price impact**: when the trace links behavior details or manipulation cards to K-line movement.
+- **Expand a suspected component without overgeneralizing**: when the trace suggests a larger community or entity, but raw transfer or behavior validation is still needed.
+- **Verify external motive only after on-chain evidence is stable**: when the trace suggests a motive but does not prove it.
+
+For each high-level objective, include:
+
+- Objective ID, such as `R-H1`.
+- Why this matters.
+- Target outcome.
+- One or more workstream IDs, such as `R-H1.M1`.
+- A table of atomic actions with columns `Action Type`, `Atomic Action`, and `Expected Evidence`.
+- Optional priority ordering for the most important next actions.
+
+Preserve recommendation confidence and caveats. If an action is based on a weak hypothesis, state what would confirm or weaken it.
 
 ### Step 6: Build a trace-step map
 
@@ -231,7 +263,7 @@ Use this structure:
 - **Step nodes**: observable evidence bundles such as actions, annotations, screenshots, and view states.
 - **Intention nodes**: what the user appeared to be trying to do.
 - **Insight nodes**: what the user explicitly captured or what the analyst inferred.
-- **Recommendation nodes**: what should be done next because of the insight.
+- **Recommendation nodes**: high-level objectives, workstreams, or important atomic actions that follow from the insights.
 
 Step-node construction:
 
@@ -254,6 +286,7 @@ Recommendation mapping:
 - Put most investigation recommendations downstream of insights, not directly downstream of actions.
 - Link pure UI or trace-review recommendations directly to steps when the recommendation is to reopen a screenshot, compare a view state, or inspect an annotation.
 - Make high-level recommendations depend on high-level insights that aggregate multiple steps.
+- If the full report contains many atomic actions, map only the high-level objectives and the most important workstreams unless the user asks for an atomic-action graph.
 
 ## 5. Requirements For The Deliverables
 
@@ -278,7 +311,7 @@ TRACE/trace-step-map.md
 - Chronological reconstruction.
 - User intentions by level.
 - User and analyst-inferred insights by level.
-- Action recommendations by level.
+- Top-down action recommendations with high-level objectives, rationale, target outcomes, workstreams, and atomic actions grouped by `Visual` and `Statistical` action types.
 - Evidence tables for important users, groups, time windows, and screenshots.
 - Bottom line.
 
@@ -287,7 +320,7 @@ TRACE/trace-step-map.md
 - Purpose and relation to `analysis-report.md`.
 - Representation choice, usually a claim-traceability graph.
 - Step nodes table with step ID, evidence, what happened, and why it matters.
-- Claim nodes for intentions, insights, and recommendations, each with stable IDs and levels.
+- Claim nodes for intentions, insights, and mapped recommendations, each with stable IDs and levels.
 - Traceability matrix mapping steps to intention IDs, insight IDs, recommendation IDs, and rationale.
 - Mermaid graph linking steps to intentions, insights, and recommendations.
 - How to read the graph, including the strongest reasoning paths and weak or unverified paths.
@@ -303,6 +336,11 @@ TRACE/trace-step-map.md
 - Use concrete dates and times for market or session events.
 - State trace gaps clearly, such as state changes without matching logged clicks.
 - Mark external-event claims, such as exchange listing motives, as unverified unless verified with external sources.
+- Organize recommendations top-down, starting from the high-level "why" and ending with executable atomic actions.
+- Every atomic recommendation action must be labeled as `Visual` or `Statistical`.
+- Treat checking statistics already displayed in ManiScope as a `Visual` action.
+- Treat statistics that require scripts, command-line queries, notebooks, or custom calculations as `Statistical` actions.
+- For every high-level recommendation objective, include a target outcome and at least one mid-level workstream.
 - In `trace-step-map.md`, every graph node ID must also appear in a table.
 - In `trace-step-map.md`, high-level claims must be connected to multiple supporting steps unless the rationale explains otherwise.
 - In `trace-step-map.md`, graph edges should represent reasoning dependencies, not just chronological order.
@@ -327,6 +365,8 @@ TRACE/trace-step-map.md
 - Use step-level map nodes for insight analysis and reserve raw action-level graph nodes for usability analysis.
 - Keep the map's recommendations downstream of insights whenever possible. This makes it clear whether a recommendation follows from evidence or is just a generic next step.
 - Use graph weak points to improve the report. If a high-level insight only has one edge, either add missing evidence, lower the claim level, or mark it as a weak hypothesis.
+- Make recommendation sections read like an investigation plan, not a flat checklist: high-level reason, target outcome, workstreams, then atomic actions.
+- Separate GUI work from script work. This helps users decide whether the next step is a visual investigation in ManiScope or a statistical analysis outside the GUI.
 
 ## 7. Quality Checklist
 
@@ -336,7 +376,12 @@ Before delivering, verify:
 - For a full analysis, `trace-step-map.md` exists next to the report.
 - Every mid-level and high-level intention has evidence and rationale.
 - Every mid-level and high-level insight has evidence and rationale.
-- Every mid-level and high-level recommendation has rationale.
+- Every high-level recommendation objective has a "why this matters" rationale.
+- Every high-level recommendation objective has a target outcome.
+- Every high-level recommendation objective contains at least one mid-level workstream.
+- Every atomic recommendation action is labeled `Visual` or `Statistical`.
+- GUI-displayed statistics are classified as `Visual`, not `Statistical`.
+- Scripted or custom data calculations are classified as `Statistical`.
 - Key screenshots are linked and paths resolve.
 - Trace gaps are called out.
 - External claims are not overstated.
