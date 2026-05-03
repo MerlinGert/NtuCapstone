@@ -1,6 +1,9 @@
+import copy
 import json
 import logging
 import os
+import threading
+from collections import OrderedDict
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -41,6 +44,97 @@ def get_data_dir(coin: str) -> str:
     return os.path.join(BASE_DIR, "public", "data")
 
 
+DETECTION_RESULT_CACHE_MAX_SIZE = 64
+
+_cache_lock = threading.RLock()
+_csv_file_cache: Dict[str, pd.DataFrame] = {}
+_json_file_cache: Dict[str, Any] = {}
+_detection_result_cache: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+
+
+def _load_csv_file(path: str) -> Optional[pd.DataFrame]:
+    """Load a static CSV once per process and return a defensive copy."""
+    with _cache_lock:
+        cached = _csv_file_cache.get(path)
+        if cached is not None:
+            return cached.copy()
+
+    if not os.path.exists(path):
+        logger.warning(f"CSV file not found at {path}")
+        return None
+
+    try:
+        df = pd.read_csv(path)
+    except Exception as e:
+        logger.error(f"Error loading CSV file {path}: {e}")
+        return None
+
+    with _cache_lock:
+        cached = _csv_file_cache.setdefault(path, df)
+        return cached.copy()
+
+
+def _load_json_file(path: str, default=None):
+    """Load a static JSON file once per process."""
+    with _cache_lock:
+        if path in _json_file_cache:
+            return _json_file_cache[path]
+
+    if not os.path.exists(path):
+        logger.warning(f"JSON file not found at {path}")
+        return default
+
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading JSON file {path}: {e}")
+        return default
+
+    with _cache_lock:
+        return _json_file_cache.setdefault(path, data)
+
+
+def _make_detection_cache_key(
+    target_users: Dict[str, float],
+    related_users: Dict[str, float],
+    entity_detection_config: Dict[str, Any],
+    link_detection_config: Dict[str, Any],
+    snapshot_time: Optional[str],
+    detect_entity: bool,
+    detect_link: bool,
+    coin: str,
+) -> str:
+    payload = {
+        "coin": coin,
+        "snapshot_time": snapshot_time,
+        "detect_entity": detect_entity,
+        "detect_link": detect_link,
+        "target_users": target_users,
+        "related_users": related_users,
+        "entity_detection_config": entity_detection_config,
+        "link_detection_config": link_detection_config,
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _get_detection_result_from_cache(cache_key: str) -> Optional[Dict[str, Any]]:
+    with _cache_lock:
+        cached = _detection_result_cache.get(cache_key)
+        if cached is None:
+            return None
+        _detection_result_cache.move_to_end(cache_key)
+        return copy.deepcopy(cached)
+
+
+def _set_detection_result_cache(cache_key: str, result: Dict[str, Any]) -> None:
+    with _cache_lock:
+        _detection_result_cache[cache_key] = copy.deepcopy(result)
+        _detection_result_cache.move_to_end(cache_key)
+        while len(_detection_result_cache) > DETECTION_RESULT_CACHE_MAX_SIZE:
+            _detection_result_cache.popitem(last=False)
+
+
 @router.post("/run")
 async def run_detection(request: DetectionRequest):
     try:
@@ -61,6 +155,45 @@ async def run_detection(request: DetectionRequest):
 
 
 def process_detection(
+    target_users: Dict[str, float],
+    related_users: Dict[str, float],
+    entity_detection_config: Dict[str, Any],
+    link_detection_config: Dict[str, Any],
+    snapshot_time: Optional[str] = None,
+    detect_entity: bool = True,
+    detect_link: bool = True,
+    coin: str = "ACT",
+) -> Dict[str, Any]:
+    cache_key = _make_detection_cache_key(
+        target_users,
+        related_users,
+        entity_detection_config,
+        link_detection_config,
+        snapshot_time,
+        detect_entity,
+        detect_link,
+        coin,
+    )
+    cached = _get_detection_result_from_cache(cache_key)
+    if cached is not None:
+        logger.info("Detection result cache hit.")
+        return cached
+
+    result = _process_detection_uncached(
+        target_users,
+        related_users,
+        entity_detection_config,
+        link_detection_config,
+        snapshot_time,
+        detect_entity,
+        detect_link,
+        coin,
+    )
+    _set_detection_result_cache(cache_key, result)
+    return result
+
+
+def _process_detection_uncached(
     target_users: Dict[str, float],
     related_users: Dict[str, float],
     entity_detection_config: Dict[str, Any],
@@ -118,12 +251,12 @@ def process_detection(
             sorted_transfers_path = os.path.join(get_data_dir(coin), "sorted_transfers.csv")
             if os.path.exists(sorted_transfers_path):
                 # 0. Load Pre-sorted Data
-                df_transfers = pd.read_csv(sorted_transfers_path)
+                df_transfers = _load_csv_file(sorted_transfers_path)
 
                 # preprocess_data.py: timestamp, from_owner, from_owner_label, to_owner, to_owner_label, amount
                 # existing: block_time, from_owner, to_owner, amount_display
 
-                if snapshot_time and "timestamp" in df_transfers.columns:
+                if df_transfers is not None and snapshot_time and "timestamp" in df_transfers.columns:
                     try:
                         snap_dt = pd.to_datetime(snapshot_time)
                         df_transfers["timestamp_dt"] = pd.to_datetime(
@@ -338,11 +471,9 @@ def process_detection(
                 recipients = {}
 
                 USER_RELATIONS_PATH = os.path.join(get_data_dir(coin), "user_relations.json")
-                if os.path.exists(USER_RELATIONS_PATH):
+                user_relations = _load_json_file(USER_RELATIONS_PATH, {})
+                if user_relations:
                     try:
-                        with open(USER_RELATIONS_PATH, "r") as f:
-                            user_relations = json.load(f)
-
                         json_senders = user_relations.get("senders", {})
                         json_recipients = user_relations.get("recipients", {})
 
@@ -391,7 +522,7 @@ def process_detection(
                                     recipients[u] = [r["address"] for r in u_recipients]
 
                     except Exception as e:
-                        logger.error(f"Error loading user relations: {e}")
+                        logger.error(f"Error processing user relations: {e}")
                 else:
                     logger.warning(f"User relations file not found at {USER_RELATIONS_PATH}")
 
@@ -657,13 +788,7 @@ def process_detection(
 
         if need_action_sequence:
             # Load user actions
-            user_actions = {}
-            if os.path.exists(USER_ACTIONS_PATH):
-                try:
-                    with open(USER_ACTIONS_PATH, "r") as f:
-                        user_actions = json.load(f)
-                except Exception as e:
-                    logger.error(f"Error loading user actions: {e}")
+            user_actions = _load_json_file(USER_ACTIONS_PATH, {})
 
             if user_actions:
                 # Filter for relevant users
@@ -1194,17 +1319,10 @@ def detect_balance_sequence(
     filename = f"user_balance_{suffix}.json"
     filepath = os.path.join(get_data_dir(coin), filename)
 
-    if not os.path.exists(filepath):
-        logger.warning(f"Balance sequence file not found: {filepath}")
-        return {"tt": {}, "tr": {}}
-
     logger.info(f"Loading balance data from {filename} for granularity {granularity}")
 
-    try:
-        with open(filepath, "r") as f:
-            all_balances = json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading balance data: {e}")
+    all_balances = _load_json_file(filepath)
+    if not all_balances:
         return {"tt": {}, "tr": {}}
 
     # Filter relevant users
@@ -1275,17 +1393,10 @@ def detect_earning_sequence(
     filename = f"user_earnings_{suffix}.json"
     filepath = os.path.join(get_data_dir(coin), filename)
 
-    if not os.path.exists(filepath):
-        logger.warning(f"Earning sequence file not found: {filepath}")
-        return {"tt": {}, "tr": {}}
-
     logger.info(f"Loading earning data from {filename} for granularity {granularity}")
 
-    try:
-        with open(filepath, "r") as f:
-            all_earnings = json.load(f)
-    except Exception as e:
-        logger.error(f"Error loading earning data: {e}")
+    all_earnings = _load_json_file(filepath)
+    if not all_earnings:
         return {"tt": {}, "tr": {}}
 
     # Filter relevant users
