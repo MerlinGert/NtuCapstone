@@ -324,6 +324,14 @@ import UserActionTree from './UserActionTree.vue'
 import AnnotationTimeline from './AnnotationTimeline.vue'
 // ezio: view screenshot utility
 import { captureViewByName, isCapturable } from '../utils/viewSnapshot'
+import {
+  captureMajorVisualizationView,
+  captureMajorVisualizationViews,
+  createMajorViewApi,
+  getMajorViewDataDependencies,
+  getMajorViewRenderArgs as getMajorViewRenderArgsFromState,
+  renderMajorVisualizationView as renderMajorVisualizationViewFromArgs,
+} from '../utils/majorViewApi'
 // ezio: session import/export helpers
 import {
   buildExportArchive,
@@ -471,7 +479,7 @@ export default {
           enable_entity_based: true, //whether to enable entity based same direction detection
         },
       },
-      manipulation_detection_results: {}, //current manipulation detection results
+      manipulation_detection_results: [], //current manipulation detection results
 
       //old params
       detecting: false,
@@ -522,6 +530,7 @@ export default {
       exportIncludeSnapshots: true,
       showImportConflictDialog: false,
       pendingImportPayload: null,
+      majorViewApi: null,
     }
   },
   watch: {
@@ -574,6 +583,35 @@ export default {
       if (refName && this.$refs[refName] && typeof this.$refs[refName].openSnapshot === 'function') {
         this.$refs[refName].openSnapshot();
       }
+    },
+    getMajorViewDataDependencies(viewName, options = {}) {
+      return getMajorViewDataDependencies(this, viewName, options)
+    },
+    getMajorViewRenderArgs(viewName, options = {}) {
+      return getMajorViewRenderArgsFromState(this, viewName, options)
+    },
+    renderMajorVisualizationView(viewName, args, options = {}) {
+      return renderMajorVisualizationViewFromArgs(viewName, args, options)
+    },
+    captureMajorVisualizationView(viewName, options = {}) {
+      return captureMajorVisualizationView(this, viewName, options)
+    },
+    captureMajorVisualizationViews(viewNamesOrOptions, maybeOptions = {}) {
+      return captureMajorVisualizationViews(this, viewNamesOrOptions, maybeOptions)
+    },
+    installMajorViewApi() {
+      this.majorViewApi = createMajorViewApi(this)
+      if (typeof window !== 'undefined') {
+        window.maniScopeMajorViewApi = this.majorViewApi
+      }
+    },
+    cleanupGlobalHandlers() {
+      document.removeEventListener('mousemove', this._onMouseMove);
+      document.removeEventListener('keydown', this._onKeyDown);
+      if (typeof window !== 'undefined' && window.maniScopeMajorViewApi === this.majorViewApi) {
+        delete window.maniScopeMajorViewApi
+      }
+      this.majorViewApi = null
     },
     // ezio: handle annotation submission from snapshot modals
     handleSnapshotAnnotation(sourceView, payload) {
@@ -2142,6 +2180,7 @@ export default {
       }
     };
     document.addEventListener('keydown', this._onKeyDown);
+    this.installMajorViewApi()
 
     try {
       await this.initializeForCurrentCoin()
@@ -2150,9 +2189,11 @@ export default {
     }
   },
   // ezio: cleanup snapshot shortcut listeners
+  beforeUnmount() {
+    this.cleanupGlobalHandlers()
+  },
   beforeDestroy() {
-    document.removeEventListener('mousemove', this._onMouseMove);
-    document.removeEventListener('keydown', this._onKeyDown);
+    this.cleanupGlobalHandlers()
   },
   updated() {},
 }

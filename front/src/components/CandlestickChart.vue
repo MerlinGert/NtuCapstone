@@ -1,5 +1,5 @@
 <template>
-  <div class="candlestick-container">
+  <div class="candlestick-container" ref="container">
     <div class="header-panel">
       <div class="panel-title">
         {{ currentCoin }} K-Line
@@ -134,7 +134,11 @@ export default {
     isSequentialTime: {
       type: Boolean,
       default: false,
-    }
+    },
+    ohlcData: {
+      type: Object,
+      default: null,
+    },
   },
   data() {
     return {
@@ -156,7 +160,10 @@ export default {
       return Math.max(150, this.panelWidth / 3)
     },
     aggregatedCards() {
-      if (!this.manipulationResults || this.ohlc.length === 0)
+      const manipulationResults = Array.isArray(this.manipulationResults)
+        ? this.manipulationResults
+        : []
+      if (manipulationResults.length === 0 || this.ohlc.length === 0)
         return { roundTrip: [], sameDirection: [] }
 
       const fmtMap = {
@@ -215,7 +222,7 @@ export default {
 
       const bins = {}
 
-      this.manipulationResults.forEach((res) => {
+      manipulationResults.forEach((res) => {
         if (!res.manipulation_time || res.manipulation_time.length === 0) return
         // Use the end time (last element in manipulation_time) for grouping
         const endStr = res.manipulation_time[res.manipulation_time.length - 1]
@@ -358,6 +365,12 @@ export default {
     currentCoin() {
       this.loadData()
     },
+    ohlcData: {
+      deep: true,
+      handler() {
+        this.loadData()
+      },
+    },
   },
   mounted() {
     this.loadData()
@@ -378,6 +391,12 @@ export default {
 
     async loadData() {
       this.loading = true
+      if (this.ohlcData) {
+        this.actOhlc = this.ohlcData
+        this.loading = false
+        this.refresh()
+        return
+      }
       try {
         const dataDir = this.currentCoin === 'PNUT' ? 'data2' : 'data'
         const fileName =
@@ -1368,15 +1387,18 @@ export default {
       }
     },
 
-    // ezio: shared image capture — used by openSnapshot AND viewSnapshot utility
-    async captureImage(quality = 'full') {
-      const wrap = this.$refs.wrap
-      if (!wrap) return null
+    // ezio: shared image capture — used by openSnapshot, viewSnapshot, and majorViewApi
+    async captureImage(options = 'full') {
+      const captureOptions =
+        typeof options === 'string' ? { quality: options } : options || {}
+      const quality = captureOptions.quality || 'full'
+      const target = captureOptions.includeChrome ? this.$refs.container : this.$refs.wrap
+      if (!target) return null
       const pixelRatio = quality === 'full' ? 1 : 0.5
       const restoreTop = this._fixScroll('topCardsContainer')
       const restoreBottom = this._fixScroll('bottomCardsContainer')
       try {
-        return await toPng(wrap, { backgroundColor: '#ffffff', pixelRatio })
+        return await toPng(target, { backgroundColor: '#ffffff', pixelRatio })
       } catch (e) {
         console.error('[CandlestickChart] capture failed', e)
         return null

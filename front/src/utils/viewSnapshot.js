@@ -1,7 +1,8 @@
 // ezio: Unified view snapshot utility for auto-capturing view screenshots on user actions.
 // Dispatches by view type:
 //   - candlestick_chart: delegates to CandlestickChart.captureImage() (html-to-image; handles scroll)
-//   - token_distribution / behavior_details: SVG serialization + canvas composite (fast, SVG-only)
+//   - token_distribution / behavior_details: SVG serialization + canvas composite by default
+//     or full DOM panel capture when includeChrome is true
 // Always outputs PNG — lossless, preserves SVG text/lines; size controlled via pixelRatio.
 
 import { toPng } from 'html-to-image'
@@ -96,7 +97,12 @@ export async function captureViewByName(viewName, options = {}) {
   if (!isCapturable(viewName)) return null
   // ezio: actionType drives capture strategy — hover actions on TokenDistribution need DOM capture
   // so the HTML tooltip (sibling of the SVG) ends up in the PNG
-  const { quality = 'thumbnail', candlestickRef = null, actionType = null } = options
+  const {
+    quality = 'thumbnail',
+    candlestickRef = null,
+    actionType = null,
+    includeChrome = false,
+  } = options
   const domView = VIEW_NAME_MAP[viewName]
   const panel = findPanel(domView)
   if (!panel) {
@@ -107,14 +113,17 @@ export async function captureViewByName(viewName, options = {}) {
   let result = null
   if (domView === 'candlestick_chart') {
     if (candlestickRef && typeof candlestickRef.captureImage === 'function') {
-      const dataUrl = await candlestickRef.captureImage(quality)
+      const dataUrl = await candlestickRef.captureImage({ quality, includeChrome })
       if (dataUrl) {
-        const bbox = panel.getBoundingClientRect()
+        const target = includeChrome ? candlestickRef.$refs?.container || panel : panel
+        const bbox = target.getBoundingClientRect()
         result = { dataUrl, width: Math.round(bbox.width), height: Math.round(bbox.height) }
       }
     } else {
       result = await captureDomAsImage(panel, quality)
     }
+  } else if (includeChrome) {
+    result = await captureDomAsImage(panel, quality)
   } else if (domView === 'token_distribution' && actionType === 'hover_token_distribution_user') {
     // ezio: hover tooltip lives outside <svg>, so fall back to full-DOM capture
     result = await captureDomAsImage(panel, quality)
