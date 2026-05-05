@@ -107,6 +107,30 @@ function saveChatAttachments(sessionId, attachments) {
     .filter(Boolean)
 }
 
+function resolveSessionFile(sessionId, relativePath) {
+  if (!relativePath || path.isAbsolute(relativePath)) return null
+  const dir = sessionDir(sessionId)
+  const filePath = path.resolve(dir, relativePath)
+  const relative = path.relative(dir, filePath)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return null
+  if (!fs.existsSync(filePath)) return null
+  return filePath
+}
+
+function currentViewImagePaths(sessionId) {
+  const currentState = readJson(path.join(sessionDir(sessionId), 'current-state.json'), {})
+  const screenshots = currentState.majorViewScreenshots
+  if (!screenshots || typeof screenshots !== 'object') return []
+
+  return Object.values(screenshots)
+    .map((relativePath) => resolveSessionFile(sessionId, relativePath))
+    .filter(Boolean)
+}
+
+function uniquePaths(paths) {
+  return Array.from(new Set(paths))
+}
+
 function threadCachePath(sessionId) {
   return path.join(sessionDir(sessionId), 'codex-threads.json')
 }
@@ -159,6 +183,8 @@ Read these files first:
 
 Screenshots are under:
 - ${relativeSessionRoot}/images
+
+The latest major-view screenshots are also attached to this turn as image inputs when available.
 
 Generated artifacts should be written under:
 - ${relativeSessionRoot}/artifacts
@@ -280,6 +306,7 @@ async function handleChat(req, res, sessionId) {
   const message = String(body.message || '').trim()
   const threadKey = String(body.threadKey || 'trace-analysis')
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
+  const includeCurrentViews = body.includeCurrentViews !== false
   if (!message && attachments.length === 0) {
     sendJson(res, 400, { error: 'message or image attachment is required' })
     return
@@ -310,7 +337,11 @@ async function handleChat(req, res, sessionId) {
     res.end()
     return
   }
-  const input = buildInput(sessionId, threadKey, message, isNewThread, attachmentPaths)
+  const inputImagePaths = uniquePaths([
+    ...(includeCurrentViews ? currentViewImagePaths(sessionId) : []),
+    ...attachmentPaths,
+  ])
+  const input = buildInput(sessionId, threadKey, message, isNewThread, inputImagePaths)
 
   try {
     const { events } = await thread.runStreamed(input)

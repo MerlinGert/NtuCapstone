@@ -440,6 +440,8 @@ export default {
           threadKey: 'trace-analysis',
           message: content,
           attachments: codexAttachments,
+          includeCurrentTrace: true,
+          includeCurrentViews: true,
         }),
       })
 

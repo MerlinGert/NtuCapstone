@@ -116,6 +116,8 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
         "message": message,
         "threadKey": str(body.get("threadKey") or "trace-analysis"),
         "attachments": attachments,
+        "includeCurrentTrace": body.get("includeCurrentTrace", True),
+        "includeCurrentViews": body.get("includeCurrentViews", True),
     }
     return StreamingResponse(
         _stream_codex_response(session_id, payload),
