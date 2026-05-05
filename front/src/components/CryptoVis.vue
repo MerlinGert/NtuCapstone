@@ -53,11 +53,10 @@
         style="width:100%;height:100%;overflow:hidden"
         :content-style="{ display: 'flex', flexDirection: 'row', overflow: 'hidden', width: '100%', height: '100%', boxSizing: 'border-box' }"
       >
-<!-- Left sidebar: ControlPanel (top) + drag handle + ChatBox (bottom) -->
-    <div style="flex: 3; min-width:0; overflow:hidden; display:flex; flex-direction:column;">
-      <!-- ControlPanel area -->
-      <div :style="{ flex: chatBoxOpen ? 'none' : '1', height: chatBoxOpen ? (leftPanelTopPct + '%') : '100%', overflow: 'hidden', flexShrink: 0 }">
-        <n-card
+	<!-- Left sidebar: ControlPanel -->
+	    <div style="flex: 3; min-width:0; overflow:hidden; display:flex; flex-direction:column;">
+	      <div style="flex:1; height:100%; overflow:hidden; flex-shrink:0;">
+	        <n-card
             size="small"
             style="width:100%;height:100%;"
             class="panel-card"
@@ -80,25 +79,10 @@
                 @request-manipulation-detection="handleRequestManipulationDetection"
                 @update-links="handleUpdateLinks"
                 @log-action="logUserAction"
-            />
-        </n-card>
-      </div>
-
-      <!-- Horizontal drag handle (only shown when chat is open) -->
-      <div
-        v-if="chatBoxOpen"
-        class="left-resize-handle"
-        @mousedown.prevent="startLeftResize"
-        title="Drag to resize"
-      >
-        <div class="left-resize-grip"></div>
-      </div>
-
-      <!-- ChatBox area (collapsible) -->
-      <div v-if="chatBoxOpen" style="flex:1; min-height:0; overflow:hidden;">
-        <ChatBox />
-      </div>
-    </div>
+	            />
+	        </n-card>
+	      </div>
+	    </div>
 
 <div style="flex: 6; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
         <!-- ezio: snapshot shortcut marker -->
@@ -248,6 +232,15 @@
 
 </n-layout-content>
 
+<CodexChatSidebar
+  :open="chatBoxOpen"
+  :session-id="maniscopeSessionId"
+  :sync-in-flight="liveTraceSyncInFlight"
+  :last-sync-at="lastLiveTraceSyncAt"
+  :before-send="syncTraceForChat"
+  @close="chatBoxOpen = false"
+/>
+
 <!-- ezio: export dialog -->
 <div v-if="showExportDialog" class="session-io-overlay" @click.self="showExportDialog = false">
   <div class="session-io-dialog">
@@ -346,7 +339,7 @@ import {
   downloadZipArchive,
   parseImportFile,
 } from '../utils/sessionIO'
-import ChatBox from './ChatBox.vue'
+import CodexChatSidebar from './CodexChatSidebar.vue'
 
 export default {
   props: {
@@ -371,15 +364,13 @@ export default {
     UserActionTimeline,
     AnnotationTimeline,
     UserActionTree,
-    ChatBox,
+    CodexChatSidebar,
   },
   data() {
     return {
       currentCoin: 'ACT', // Can be 'ACT' or 'PNUT'
-      // left panel vertical split (percentage for ControlPanel top section)
-      leftPanelTopPct: 70,
-      // chatbox collapse state
-      chatBoxOpen: true,
+      // Codex chat sidebar state
+      chatBoxOpen: false,
       maniscopeSessionId: this.sessionId,
       sessionRestoreStatus: 'pending',
       lastLiveTraceSyncAt: null,
@@ -690,6 +681,9 @@ export default {
         this.liveTraceSyncInFlight = false
       }
     },
+    async syncTraceForChat() {
+      return this.syncCurrentTrace({ includeCurrentViews: true })
+    },
     scheduleLiveTraceSync(delay = 750) {
       if (!this.maniscopeSessionId) return
       if (this._liveTraceSyncTimer) clearTimeout(this._liveTraceSyncTimer)
@@ -705,28 +699,6 @@ export default {
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(url).catch(() => {})
       }
-    },
-    // Left panel vertical resize
-    startLeftResize(e) {
-      const startY = e.clientY
-      const startPct = this.leftPanelTopPct
-      const parentEl = e.currentTarget.parentElement
-      const onMove = (ev) => {
-        const parentH = parentEl.getBoundingClientRect().height
-        const delta = ev.clientY - startY
-        const newPct = Math.min(85, Math.max(15, startPct + (delta / parentH) * 100))
-        this.leftPanelTopPct = newPct
-      }
-      const onUp = () => {
-        document.removeEventListener('mousemove', onMove)
-        document.removeEventListener('mouseup', onUp)
-        document.body.style.cursor = ''
-        document.body.style.userSelect = ''
-      }
-      document.body.style.cursor = 'row-resize'
-      document.body.style.userSelect = 'none'
-      document.addEventListener('mousemove', onMove)
-      document.addEventListener('mouseup', onUp)
     },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
@@ -2448,56 +2420,6 @@ a {
   background: #3182ce;
 }
 
-/* ChatBox collapse toggle bar */
-.chatbox-toggle-bar {
-  height: 32px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  background: #edf2f7;
-  border-top: 1px solid #e2e8f0;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s;
-}
-.chatbox-toggle-bar:hover {
-  background: #e2e8f0;
-}
-.chatbox-toggle-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #4a5568;
-}
-.chatbox-toggle-icon {
-  font-size: 10px;
-  color: #718096;
-}
-
-/* Left panel vertical resize handle */
-.left-resize-handle {
-  height: 8px;
-  flex-shrink: 0;
-  background: #f1f5f9;
-  border-top: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
-  cursor: row-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
-  transition: background 0.15s;
-}
-.left-resize-handle:hover {
-  background: #e2e8f0;
-}
-.left-resize-grip {
-  width: 36px;
-  height: 3px;
-  background: #94a3b8;
-  border-radius: 2px;
-}
 /* 全局按钮面板和输入系样式覆盖 */
 .checkbox {
   --n-color-checked: #4a5568 !important;
