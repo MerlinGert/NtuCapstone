@@ -2,6 +2,7 @@ import os
 import sys
 
 import behavior_detection
+import chat_session_service
 import detection_service
 import entity_detection
 import fraudulent_activity_detection
@@ -32,6 +33,7 @@ app.include_router(fraudulent_activity_detection.router)
 app.include_router(detection_service.router)
 app.include_router(manipulation_detection_service.router)
 app.include_router(user_behavior_service.router)
+app.include_router(chat_session_service.router)
 
 
 @app.get("/")

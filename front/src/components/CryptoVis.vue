@@ -5,6 +5,14 @@
         <div style="display:flex; align-items:center; gap:10px; padding-left:20px;">
           <span>ManiScope</span>
           <button
+            v-if="maniscopeSessionId"
+            class="session-chip"
+            @click="copySessionLink"
+            :title="`Copy session link ${maniscopeSessionId}`"
+          >
+            Session {{ maniscopeSessionId }}
+          </button>
+          <button
             class="ai-chat-btn"
             @click="chatBoxOpen = !chatBoxOpen"
             :class="{ active: chatBoxOpen }"
@@ -341,6 +349,12 @@ import {
 import ChatBox from './ChatBox.vue'
 
 export default {
+  props: {
+    sessionId: {
+      type: String,
+      default: null,
+    },
+  },
   components: {
     NSelect,
     NCheckbox,
@@ -366,6 +380,12 @@ export default {
       leftPanelTopPct: 70,
       // chatbox collapse state
       chatBoxOpen: true,
+      maniscopeSessionId: this.sessionId,
+      sessionRestoreStatus: 'pending',
+      lastLiveTraceSyncAt: null,
+      liveTraceSyncInFlight: false,
+      liveTraceSyncError: '',
+      _liveTraceSyncTimer: null,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -545,6 +565,147 @@ export default {
     },
   },
   methods: {
+    async initializeManiScopeSession() {
+      if (!this.maniscopeSessionId) {
+        this.sessionRestoreStatus = 'missing'
+        return
+      }
+      try {
+        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}`)
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const payload = await response.json()
+        if (payload.liveSession) {
+          this.applyLiveSession(payload.liveSession)
+          this.sessionRestoreStatus = 'restored'
+        } else {
+          this.sessionRestoreStatus = 'new'
+        }
+        if (payload.currentState) {
+          this.applyCurrentState(payload.currentState)
+        }
+        this.lastLiveTraceSyncAt = payload.meta?.lastUpdatedAt || null
+      } catch (error) {
+        this.sessionRestoreStatus = 'error'
+        this.liveTraceSyncError = error && error.message ? error.message : String(error)
+        console.error('CryptoVis: failed to initialize ManiScope session', error)
+      }
+    },
+    applyLiveSession(liveSession) {
+      if (!liveSession || typeof liveSession !== 'object') return
+      if (liveSession.coin === 'ACT' || liveSession.coin === 'PNUT') {
+        this.currentCoin = liveSession.coin
+      }
+      this.userActionSequence = Array.isArray(liveSession.userActionSequence)
+        ? liveSession.userActionSequence
+        : []
+      this.annotationRecords = Array.isArray(liveSession.annotationRecords)
+        ? liveSession.annotationRecords
+        : []
+      this._annotationSeqId = Number.isFinite(liveSession.annotationSeqId)
+        ? liveSession.annotationSeqId
+        : this.annotationRecords.reduce(
+            (maxId, annotation) =>
+              Number.isFinite(annotation?.id) && annotation.id >= maxId ? annotation.id + 1 : maxId,
+            0,
+          )
+      if (Array.isArray(liveSession.config?.snapshotCategories)) {
+        this.snapshotCategories = liveSession.config.snapshotCategories
+      }
+      if (liveSession.config?.snapshotQuality) {
+        this.snapshotQuality = liveSession.config.snapshotQuality
+      }
+    },
+    applyCurrentState(currentState) {
+      if (!currentState || typeof currentState !== 'object') return
+      if (currentState.coin === 'ACT' || currentState.coin === 'PNUT') {
+        this.currentCoin = currentState.coin
+      }
+      if (currentState.activeBottomTab) {
+        this.activeBottomTab = currentState.activeBottomTab
+      }
+    },
+    buildCurrentState(majorViewScreenshots = null) {
+      return {
+        sessionId: this.maniscopeSessionId,
+        coin: this.currentCoin,
+        snapshotTime: this.snapshot_configuration.time,
+        selectedUser: this.selectedUser,
+        selectedCardUsers: this.selectedCardUsers,
+        klineTimeWindow: this.klineTimeWindow,
+        behaviorTimeWindow: this.behaviorTimeWindow,
+        activeBottomTab: this.activeBottomTab,
+        hasEntityResults: !!(this.entity_detection_results && this.entity_detection_results.length > 0),
+        hasManipulationResults: !!(this.manipulation_detection_results && this.manipulation_detection_results.length > 0),
+        majorViewScreenshots,
+      }
+    },
+    async captureCurrentMajorViewsForSession() {
+      try {
+        const captures = await captureMajorVisualizationViews(
+          this,
+          ['token_distribution', 'candlestick_chart', 'behavior_details'],
+          { quality: this.snapshotQuality, includeChrome: true },
+        )
+        return captures.reduce((acc, result) => {
+          if (result?.viewName && result?.image?.dataUrl) {
+            acc[result.viewName] = result.image.dataUrl
+          }
+          return acc
+        }, {})
+      } catch (error) {
+        console.warn('CryptoVis: failed to capture current major views for live trace', error)
+        return null
+      }
+    },
+    async syncCurrentTrace({ includeCurrentViews = false } = {}) {
+      if (!this.maniscopeSessionId || this.liveTraceSyncInFlight) return null
+      this.liveTraceSyncInFlight = true
+      this.liveTraceSyncError = ''
+      try {
+        const majorViewScreenshots = includeCurrentViews
+          ? await this.captureCurrentMajorViewsForSession()
+          : null
+        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            coin: this.currentCoin,
+            annotationSeqId: this._annotationSeqId,
+            snapshotCategories: this.snapshotCategories,
+            snapshotQuality: this.snapshotQuality,
+            userActionSequence: this.userActionSequence,
+            annotationRecords: this.annotationRecords,
+            currentState: this.buildCurrentState(majorViewScreenshots),
+          }),
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const payload = await response.json()
+        this.lastLiveTraceSyncAt = payload.lastUpdatedAt || new Date().toISOString()
+        return payload
+      } catch (error) {
+        this.liveTraceSyncError = error && error.message ? error.message : String(error)
+        console.error('CryptoVis: failed to sync live trace', error)
+        return null
+      } finally {
+        this.liveTraceSyncInFlight = false
+      }
+    },
+    scheduleLiveTraceSync(delay = 750) {
+      if (!this.maniscopeSessionId) return
+      if (this._liveTraceSyncTimer) clearTimeout(this._liveTraceSyncTimer)
+      this._liveTraceSyncTimer = setTimeout(() => {
+        this._liveTraceSyncTimer = null
+        this.syncCurrentTrace().catch((error) => {
+          console.error('CryptoVis: scheduled live trace sync failed', error)
+        })
+      }, delay)
+    },
+    copySessionLink() {
+      const url = `${window.location.origin}/${this.maniscopeSessionId}`
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(url).catch(() => {})
+      }
+    },
     // Left panel vertical resize
     startLeftResize(e) {
       const startY = e.clientY
@@ -623,10 +784,11 @@ export default {
         selectedItems: payload.selectedItems || payload.selectedIds || [],
         sketchDataUrl: payload.sketchDataUrl || null,
       }
-      this.annotationRecords.push(record)
-      // ezio: auto-switch to annotations tab when a new annotation arrives
-      this.activeBottomTab = 'annotations'
-    },
+	      this.annotationRecords.push(record)
+	      // ezio: auto-switch to annotations tab when a new annotation arrives
+	      this.activeBottomTab = 'annotations'
+	      this.scheduleLiveTraceSync()
+	    },
     // ezio: handle insight annotation added from UserActionTree
     handleAddInsightAnnotation(payload) {
       const record = {
@@ -637,30 +799,38 @@ export default {
         selectedItems: payload.selectedItems || [],
         sketchDataUrl: null,
         isInsight: true
-      }
-      this.annotationRecords.push(record)
-    },
+	      }
+	      this.annotationRecords.push(record)
+	      this.scheduleLiveTraceSync()
+	    },
 
     // ezio: delete annotation by id (from tree editor)
     handleDeleteAnnotation(id) {
-      const idx = this.annotationRecords.findIndex(a => a.id === id)
-      if (idx !== -1) this.annotationRecords.splice(idx, 1)
-    },
+	      const idx = this.annotationRecords.findIndex(a => a.id === id)
+	      if (idx !== -1) {
+	        this.annotationRecords.splice(idx, 1)
+	        this.scheduleLiveTraceSync()
+	      }
+	    },
 
     // ezio: delete action by timestamp (from tree editor)
     handleDeleteAction(timestamp) {
-      const idx = this.userActionSequence.findIndex(a => a.timestamp === timestamp)
-      if (idx !== -1) this.userActionSequence.splice(idx, 1)
-    },
+	      const idx = this.userActionSequence.findIndex(a => a.timestamp === timestamp)
+	      if (idx !== -1) {
+	        this.userActionSequence.splice(idx, 1)
+	        this.scheduleLiveTraceSync()
+	      }
+	    },
 
     // ezio: update annotation text/color/image (from tree editor)
     handleUpdateAnnotation(payload) {
       const ann = this.annotationRecords.find(a => a.id === payload.id)
       if (!ann) return
-      if (payload.text !== undefined) ann.text = payload.text
-      if (payload.customColor !== undefined) ann.customColor = payload.customColor
-      if (payload.sketchDataUrl !== undefined) ann.sketchDataUrl = payload.sketchDataUrl
-    },
+	      if (payload.text !== undefined) ann.text = payload.text
+	      if (payload.customColor !== undefined) ann.customColor = payload.customColor
+	      if (payload.sketchDataUrl !== undefined) ann.sketchDataUrl = payload.sketchDataUrl
+	      this.scheduleLiveTraceSync()
+	    },
 
     // ezio: add a custom annotation node (from tree editor)
     handleAddCustomAnnotation(payload) {
@@ -686,9 +856,10 @@ export default {
         selectedItems: [],
         sketchDataUrl: payload.sketchDataUrl || null,
         customColor: payload.customColor || null,
-      }
-      this.annotationRecords.push(record)
-    },
+	      }
+	      this.annotationRecords.push(record)
+	      this.scheduleLiveTraceSync()
+	    },
 
     // ezio: reorder actions/annotations by swapping timestamps
     handleReorderAction({ timestamp, direction }) {
@@ -700,11 +871,12 @@ export default {
       if (idx === -1) return
       const swapIdx = direction === 'up' ? idx - 1 : idx + 1
       if (swapIdx < 0 || swapIdx >= allItems.length) return
-      const tsA = allItems[idx].timestamp
-      const tsB = allItems[swapIdx].timestamp
-      allItems[idx].timestamp = tsB
-      allItems[swapIdx].timestamp = tsA
-    },
+	      const tsA = allItems[idx].timestamp
+	      const tsB = allItems[swapIdx].timestamp
+	      allItems[idx].timestamp = tsB
+	      allItems[swapIdx].timestamp = tsA
+	      this.scheduleLiveTraceSync()
+	    },
 
     // ezio: open export dialog
     onClickExport() {
@@ -780,11 +952,12 @@ export default {
       this.showImportConflictDialog = false
       this.pendingImportPayload = null
       this.activeBottomTab = 'tree'
-      this.logUserAction('import_session', {
-        actionCount: this.userActionSequence.length,
-        annotationCount: this.annotationRecords.length,
-      })
-    },
+	      this.logUserAction('import_session', {
+	        actionCount: this.userActionSequence.length,
+	        annotationCount: this.annotationRecords.length,
+	      })
+	      this.scheduleLiveTraceSync(0)
+	    },
 
     logUserAction(actionType, actionInfo = {}, userId = null) {
       // If it's a cancel hover action, clear the timer and return
@@ -915,11 +1088,12 @@ export default {
               }, 400)
             }
             // ezio: for hover merges, append a fresh snapshot so every merged hover has its own thumbnail
-            else if (isHoverAction) {
-              this._maybeCaptureSnapshots(lastAction, { append: true })
-            }
-            return
-          }
+	            else if (isHoverAction) {
+	              this._maybeCaptureSnapshots(lastAction, { append: true })
+	            }
+	            this.scheduleLiveTraceSync()
+	            return
+	          }
         }
       }
       
@@ -975,10 +1149,11 @@ export default {
       this.userActionSequence.push(actionRecord)
       console.log('User Action Logged:', actionRecord)
 
-      // ezio: auto-capture screenshots if this action's category is enabled
-      this._maybeCaptureSnapshots(actionRecord)
+	      // ezio: auto-capture screenshots if this action's category is enabled
+	      this._maybeCaptureSnapshots(actionRecord)
+	      this.scheduleLiveTraceSync()
 
-      // Optional: Send to backend
+	      // Optional: Send to backend
       // fetch('/api/log_action', { method: 'POST', body: JSON.stringify(actionRecord) })
     },
 
@@ -1054,11 +1229,12 @@ export default {
               }
             }
           }
-        } finally {
-          this._snapshotCaptureInFlight = false
-          this._targetReadyPromise = null // ezio: clear so next action starts fresh
-        }
-      }
+	        } finally {
+	          this._snapshotCaptureInFlight = false
+	          this._targetReadyPromise = null // ezio: clear so next action starts fresh
+	          this.scheduleLiveTraceSync()
+	        }
+	      }
       if (typeof window.requestIdleCallback === 'function') {
         window.requestIdleCallback(run, { timeout: 500 })
       } else {
@@ -1067,13 +1243,17 @@ export default {
     },
 
     // ezio: handlers for UI toggles in UserActionTimeline
-    onSnapshotCategoryToggle(key, enabled) {
-      const cat = this.snapshotCategories.find(c => c.key === key)
-      if (cat) cat.enabled = enabled
-    },
-    onSnapshotQualityChange(quality) {
-      this.snapshotQuality = quality
-    },
+	    onSnapshotCategoryToggle(key, enabled) {
+	      const cat = this.snapshotCategories.find(c => c.key === key)
+	      if (cat) {
+	        cat.enabled = enabled
+	        this.scheduleLiveTraceSync()
+	      }
+	    },
+	    onSnapshotQualityChange(quality) {
+	      this.snapshotQuality = quality
+	      this.scheduleLiveTraceSync()
+	    },
     resetViewState() {
       this.selectedUser = null
       this.selectedCardUsers = []
@@ -2180,21 +2360,25 @@ export default {
       }
     };
     document.addEventListener('keydown', this._onKeyDown);
-    this.installMajorViewApi()
+	    this.installMajorViewApi()
 
-    try {
-      await this.initializeForCurrentCoin()
-    } catch (error) {
-      console.error('CryptoVis: Error during initial load:', error)
-    }
+	    try {
+	      await this.initializeManiScopeSession()
+	      await this.initializeForCurrentCoin()
+	      this.scheduleLiveTraceSync(0)
+	    } catch (error) {
+	      console.error('CryptoVis: Error during initial load:', error)
+	    }
   },
   // ezio: cleanup snapshot shortcut listeners
-  beforeUnmount() {
-    this.cleanupGlobalHandlers()
-  },
-  beforeDestroy() {
-    this.cleanupGlobalHandlers()
-  },
+	  beforeUnmount() {
+	    if (this._liveTraceSyncTimer) clearTimeout(this._liveTraceSyncTimer)
+	    this.cleanupGlobalHandlers()
+	  },
+	  beforeDestroy() {
+	    if (this._liveTraceSyncTimer) clearTimeout(this._liveTraceSyncTimer)
+	    this.cleanupGlobalHandlers()
+	  },
   updated() {},
 }
 </script>
@@ -2224,6 +2408,21 @@ a {
 }
 
 /* AI chat toggle button in header */
+.session-chip {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #4a5568;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.session-chip:hover {
+  background: #edf2f7;
+  border-color: #a0aec0;
+}
+
 .ai-chat-btn {
   width: 28px;
   height: 28px;
