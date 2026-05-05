@@ -35,11 +35,21 @@
       >
         <div class="message-role">{{ message.role === 'user' ? 'You' : 'Codex' }}</div>
         <div class="message-bubble">
-          <div v-if="message.content" class="message-text">{{ message.content }}</div>
+          <div
+            v-if="message.content && message.role === 'assistant'"
+            class="message-markdown"
+            v-html="renderMarkdown(message.content)"
+          ></div>
+          <div v-else-if="message.content" class="message-text">{{ message.content }}</div>
           <div v-if="message.loading" class="message-loading">Codex is working...</div>
           <div v-if="message.activity && message.activity.length" class="message-activity">
-            <div v-for="activity in message.activity" :key="activity.id" class="activity-item">
-              {{ activity.text }}
+            <button type="button" class="activity-toggle" @click="message.activityOpen = !message.activityOpen">
+              Agent activity ({{ message.activity.length }})
+            </button>
+            <div v-if="message.activityOpen" class="activity-list">
+              <div v-for="activity in message.activity" :key="activity.id" class="activity-item">
+                {{ activity.text }}
+              </div>
             </div>
           </div>
           <div v-if="message.artifacts && message.artifacts.length" class="message-artifacts">
@@ -90,6 +100,15 @@
           Attach
         </button>
         <button
+          class="codex-chat-secondary"
+          type="button"
+          title="Clear this Codex thread"
+          :disabled="sending || messages.length === 0"
+          @click="clearChat"
+        >
+          Clear
+        </button>
+        <button
           class="codex-chat-send"
           type="button"
           :disabled="sending || (!draft.trim() && attachments.length === 0)"
@@ -111,6 +130,14 @@
 </template>
 
 <script>
+import DOMPurify from 'dompurify'
+import MarkdownIt from 'markdown-it'
+
+const markdown = new MarkdownIt({
+  breaks: true,
+  linkify: true,
+})
+
 export default {
   name: 'CodexChatSidebar',
   props: {
@@ -146,6 +173,7 @@ export default {
       nextMessageId: 1,
       nextAttachmentId: 1,
       nextActivityId: 1,
+      historyLoadedForSession: '',
     }
   },
   computed: {
@@ -158,7 +186,115 @@ export default {
   beforeUnmount() {
     this.attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
   },
+  watch: {
+    sessionId: {
+      immediate: true,
+      handler(sessionId) {
+        if (sessionId) {
+          this.loadChatHistory(sessionId)
+        } else {
+          this.messages = []
+          this.historyLoadedForSession = ''
+        }
+      },
+    },
+  },
   methods: {
+    renderMarkdown(content) {
+      return DOMPurify.sanitize(markdown.render(content || ''))
+    },
+    normalizeHistoryMessage(message, fallbackId) {
+      return {
+        id: Number(message.id) || fallbackId,
+        role: message.role === 'user' ? 'user' : 'assistant',
+        content: String(message.content || ''),
+        attachments: Array.isArray(message.attachments) ? message.attachments : [],
+        activity: Array.isArray(message.activity) ? message.activity : [],
+        artifacts: Array.isArray(message.artifacts) ? message.artifacts : [],
+        activityOpen: Boolean(message.activityOpen),
+        threadId: message.threadId || '',
+        createdAt: message.createdAt || '',
+        loading: false,
+      }
+    },
+    serializeMessages() {
+      return this.messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content || '',
+        attachments: message.attachments || [],
+        activity: message.activity || [],
+        artifacts: message.artifacts || [],
+        activityOpen: Boolean(message.activityOpen),
+        threadId: message.threadId || '',
+        createdAt: message.createdAt || '',
+      }))
+    },
+    async loadChatHistory(sessionId = this.sessionId) {
+      if (!sessionId || this.historyLoadedForSession === sessionId) return
+      try {
+        const response = await fetch(`/api/chat/${sessionId}/history?threadKey=trace-analysis`)
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const payload = await response.json()
+        const messages = Array.isArray(payload.messages) ? payload.messages : []
+        this.messages = messages.map((message, index) => this.normalizeHistoryMessage(message, index + 1))
+        this.nextMessageId = this.messages.reduce((maxId, message) => Math.max(maxId, message.id), 0) + 1
+        this.nextActivityId =
+          this.messages.reduce((maxId, message) => {
+            const activityMax = (message.activity || []).reduce(
+              (innerMax, activity) => Math.max(innerMax, Number(activity.id) || 0),
+              0,
+            )
+            return Math.max(maxId, activityMax)
+          }, 0) + 1
+        this.historyLoadedForSession = sessionId
+        this.scrollToBottom()
+      } catch (error) {
+        this.historyLoadedForSession = sessionId
+        this.messages = [
+          {
+            id: this.nextMessageId++,
+            role: 'assistant',
+            content: `Error loading chat history: ${error && error.message ? error.message : String(error)}`,
+            activity: [],
+            artifacts: [],
+          },
+        ]
+      }
+    },
+    async persistChatHistory() {
+      if (!this.sessionId) return
+      await fetch(`/api/chat/${this.sessionId}/history`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          threadKey: 'trace-analysis',
+          messages: this.serializeMessages(),
+        }),
+      })
+    },
+    async clearChat() {
+      if (this.sending) return
+      this.messages = []
+      this.nextMessageId = 1
+      this.nextActivityId = 1
+      if (!this.sessionId) return
+
+      const response = await fetch(`/api/chat/${this.sessionId}/threads/trace-analysis`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        this.messages.push({
+          id: this.nextMessageId++,
+          role: 'assistant',
+          content: `Error clearing chat: HTTP ${response.status}`,
+          activity: [],
+          artifacts: [],
+        })
+      }
+    },
     handleKeydown(event) {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault()
@@ -337,6 +473,7 @@ export default {
         role: 'user',
         content,
         attachments,
+        createdAt: new Date().toISOString(),
       })
       this.draft = ''
       this.sending = true
@@ -364,6 +501,8 @@ export default {
           loading: true,
           activity: [],
           artifacts: [],
+          activityOpen: false,
+          createdAt: new Date().toISOString(),
         }
         this.messages.push(assistantMessage)
         this.scrollToBottom()
@@ -377,9 +516,15 @@ export default {
           id: this.nextMessageId++,
           role: 'assistant',
           content: `Error: ${error && error.message ? error.message : String(error)}`,
+          activity: [],
+          artifacts: [],
+          createdAt: new Date().toISOString(),
         })
       } finally {
         if (assistantMessage) assistantMessage.loading = false
+        await this.persistChatHistory().catch((error) => {
+          console.error('CodexChatSidebar: failed to persist chat history', error)
+        })
         this.sending = false
         this.scrollToBottom()
       }
@@ -539,6 +684,38 @@ export default {
   white-space: pre-wrap;
 }
 
+.message-markdown {
+  overflow-wrap: anywhere;
+}
+
+.message-markdown :deep(p) {
+  margin: 0 0 8px;
+}
+
+.message-markdown :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.message-markdown :deep(ul),
+.message-markdown :deep(ol) {
+  margin: 6px 0 8px 18px;
+  padding: 0;
+}
+
+.message-markdown :deep(code) {
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 12px;
+}
+
+.message-markdown :deep(pre) {
+  overflow-x: auto;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 8px;
+}
+
 .message-loading {
   color: #64748b;
   font-size: 12px;
@@ -548,6 +725,20 @@ export default {
   margin-top: 7px;
   border-top: 1px solid #edf2f7;
   padding-top: 6px;
+}
+
+.activity-toggle {
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+}
+
+.activity-list {
+  margin-top: 5px;
 }
 
 .activity-item {
@@ -682,8 +873,9 @@ export default {
 }
 
 .codex-chat-actions {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
   gap: 8px;
   margin-top: 8px;
 }
@@ -705,8 +897,10 @@ export default {
 .codex-chat-send {
   background: #2b6cb0;
   color: #fff;
+  justify-self: end;
 }
 
+.codex-chat-secondary:disabled,
 .codex-chat-send:disabled {
   background: #cbd5e1;
   cursor: not-allowed;

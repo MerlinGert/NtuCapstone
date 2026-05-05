@@ -2,6 +2,8 @@ import json
 import os
 import re
 from collections.abc import Iterator
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -12,12 +14,59 @@ from fastapi.responses import StreamingResponse
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
+THREAD_KEY_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 CODEX_BRIDGE_URL = os.getenv("CODEX_BRIDGE_URL", "http://127.0.0.1:8787")
+BASE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BASE_DIR.parent.parent
+SESSIONS_DIR = REPO_ROOT / ".maniscope-chat" / "sessions"
 
 
 def _validate_session_id(session_id: str) -> None:
     if not SESSION_ID_RE.fullmatch(session_id):
         raise HTTPException(status_code=400, detail="Session ID must be 5 lowercase hex characters")
+
+
+def _validate_thread_key(thread_key: str) -> None:
+    if not THREAD_KEY_RE.fullmatch(thread_key):
+        raise HTTPException(status_code=400, detail="Thread key must use letters, numbers, underscores, or hyphens")
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _session_dir(session_id: str) -> Path:
+    _validate_session_id(session_id)
+    session_dir = SESSIONS_DIR / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / "images").mkdir(exist_ok=True)
+    (session_dir / "artifacts").mkdir(exist_ok=True)
+    return session_dir
+
+
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(tmp_path, path)
+
+
+def _read_json(path: Path, fallback: dict[str, Any] | None = None) -> dict[str, Any]:
+    if not path.exists():
+        return fallback or {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail=f"Invalid JSON in {path.name}")
+
+
+def _history_path(session_id: str, thread_key: str) -> Path:
+    _validate_thread_key(thread_key)
+    return _session_dir(session_id) / f"chat-history-{thread_key}.json"
+
+
+def _thread_cache_path(session_id: str) -> Path:
+    return _session_dir(session_id) / "codex-threads.json"
 
 
 def _sse_event(payload: dict[str, Any]) -> str:
@@ -73,6 +122,57 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache"},
     )
+
+
+@router.get("/{session_id}/history")
+def get_chat_history(session_id: str, threadKey: str = "trace-analysis") -> dict[str, Any]:
+    history = _read_json(_history_path(session_id, threadKey), {"messages": []})
+    return {
+        "sessionId": session_id,
+        "threadKey": threadKey,
+        "messages": history.get("messages", []),
+        "lastUpdatedAt": history.get("lastUpdatedAt"),
+    }
+
+
+@router.put("/{session_id}/history")
+def save_chat_history(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    thread_key = str(body.get("threadKey") or "trace-analysis")
+    messages = body.get("messages")
+    if not isinstance(messages, list):
+        raise HTTPException(status_code=400, detail="messages must be an array")
+
+    now = _now_iso()
+    payload = {
+        "sessionId": session_id,
+        "threadKey": thread_key,
+        "lastUpdatedAt": now,
+        "messages": messages,
+    }
+    _atomic_write_json(_history_path(session_id, thread_key), payload)
+    return {"sessionId": session_id, "threadKey": thread_key, "lastUpdatedAt": now}
+
+
+@router.delete("/{session_id}/threads/{thread_key}")
+def clear_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+    _validate_thread_key(thread_key)
+    history_path = _history_path(session_id, thread_key)
+    if history_path.exists():
+        history_path.unlink()
+
+    thread_cache_path = _thread_cache_path(session_id)
+    thread_cache = _read_json(thread_cache_path, {})
+    removed_thread = thread_cache.pop(thread_key, None)
+    if thread_cache:
+        _atomic_write_json(thread_cache_path, thread_cache)
+    elif thread_cache_path.exists():
+        thread_cache_path.unlink()
+
+    return {
+        "sessionId": session_id,
+        "threadKey": thread_key,
+        "removedThread": bool(removed_thread),
+    }
 
 
 @router.get("/health")
