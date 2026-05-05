@@ -36,6 +36,24 @@
         <div class="message-role">{{ message.role === 'user' ? 'You' : 'Codex' }}</div>
         <div class="message-bubble">
           <div v-if="message.content" class="message-text">{{ message.content }}</div>
+          <div v-if="message.loading" class="message-loading">Codex is working...</div>
+          <div v-if="message.activity && message.activity.length" class="message-activity">
+            <div v-for="activity in message.activity" :key="activity.id" class="activity-item">
+              {{ activity.text }}
+            </div>
+          </div>
+          <div v-if="message.artifacts && message.artifacts.length" class="message-artifacts">
+            <a
+              v-for="artifact in message.artifacts"
+              :key="artifact.id"
+              class="artifact-link"
+              :href="artifactHref(artifact)"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {{ artifact.title }}
+            </a>
+          </div>
           <div v-if="message.attachments && message.attachments.length" class="message-attachments">
             <div v-for="attachment in message.attachments" :key="attachment.id" class="attachment-pill">
               {{ attachment.name }}
@@ -127,6 +145,7 @@ export default {
       dragging: false,
       nextMessageId: 1,
       nextAttachmentId: 1,
+      nextActivityId: 1,
     }
   },
   computed: {
@@ -187,10 +206,126 @@ export default {
         if (el) el.scrollTop = el.scrollHeight
       })
     },
+    readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(reader.error || new Error('Failed to read image attachment'))
+        reader.readAsDataURL(file)
+      })
+    },
+    artifactHref(artifact) {
+      if (!this.sessionId || !artifact?.title) return '#'
+      return `/api/sessions/${this.sessionId}/artifacts/${encodeURIComponent(artifact.title)}`
+    },
+    addActivity(message, text) {
+      if (!text) return
+      message.activity.push({
+        id: this.nextActivityId++,
+        text,
+      })
+    },
+    handleCodexEvent(event, assistantMessage) {
+      if (!event || !event.type) return
+
+      if (event.type === 'agent_message') {
+        if (event.text) {
+          assistantMessage.content = assistantMessage.content
+            ? `${assistantMessage.content}\n\n${event.text}`
+            : event.text
+        }
+      } else if (event.type === 'reasoning') {
+        this.addActivity(assistantMessage, event.text ? `Reasoning: ${event.text}` : 'Reasoning update')
+      } else if (event.type === 'command') {
+        const status = event.status ? `${event.status}: ` : ''
+        this.addActivity(assistantMessage, `${status}${event.command || 'Command execution'}`)
+      } else if (event.type === 'file_change') {
+        const count = Array.isArray(event.changes) ? event.changes.length : 0
+        this.addActivity(assistantMessage, `File changes ${event.status || 'completed'} (${count})`)
+      } else if (event.type === 'web_search') {
+        this.addActivity(assistantMessage, `Web search: ${event.query || ''}`.trim())
+      } else if (event.type === 'todo_list') {
+        const items = Array.isArray(event.items) ? event.items : []
+        const completed = items.filter((item) => item.completed).length
+        this.addActivity(assistantMessage, `Plan progress: ${completed}/${items.length} items complete`)
+      } else if (event.type === 'mcp_tool_call') {
+        this.addActivity(assistantMessage, `${event.status || 'Tool'}: ${event.tool || 'MCP tool'}`)
+      } else if (event.type === 'artifact' && event.artifact) {
+        assistantMessage.artifacts.push(event.artifact)
+      } else if (event.type === 'error') {
+        assistantMessage.content = assistantMessage.content
+          ? `${assistantMessage.content}\n\nError: ${event.error}`
+          : `Error: ${event.error}`
+      } else if (event.type === 'thread') {
+        assistantMessage.threadId = event.threadId
+      } else if (event.type === 'done') {
+        assistantMessage.threadId = event.threadId || assistantMessage.threadId
+      }
+    },
+    async readSseStream(stream, onEvent) {
+      const reader = stream.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { value, done } = await reader.read()
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+        let boundary = buffer.indexOf('\n\n')
+        while (boundary !== -1) {
+          const rawEvent = buffer.slice(0, boundary)
+          buffer = buffer.slice(boundary + 2)
+          const data = rawEvent
+            .split('\n')
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trimStart())
+            .join('\n')
+
+          if (data) {
+            onEvent(JSON.parse(data))
+          }
+          boundary = buffer.indexOf('\n\n')
+        }
+
+        if (done) break
+      }
+    },
+    async sendToCodex(content, codexAttachments, assistantMessage) {
+      if (!this.sessionId) {
+        throw new Error('No ManiScope session is active yet.')
+      }
+
+      const response = await fetch(`/api/chat/${this.sessionId}/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          threadKey: 'trace-analysis',
+          message: content,
+          attachments: codexAttachments,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `Chat request failed with HTTP ${response.status}`)
+      }
+      if (!response.body) {
+        throw new Error('Chat response did not include a stream.')
+      }
+
+      await this.readSseStream(response.body, (event) => {
+        this.handleCodexEvent(event, assistantMessage)
+        this.scrollToBottom()
+      })
+    },
     async sendMessage() {
       const content = this.draft.trim()
       if (this.sending || (!content && this.attachments.length === 0)) return
 
+      let assistantMessage = null
+      const pendingAttachments = [...this.attachments]
       const attachments = this.attachments.map((attachment) => ({
         id: attachment.id,
         name: attachment.name,
@@ -204,21 +339,39 @@ export default {
         attachments,
       })
       this.draft = ''
-      this.attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
-      this.attachments = []
       this.sending = true
       this.scrollToBottom()
 
       try {
+        const codexAttachments = await Promise.all(
+          pendingAttachments.map(async (attachment) => ({
+            name: attachment.name,
+            type: attachment.file.type,
+            dataUrl: await this.readFileAsDataUrl(attachment.file),
+          })),
+        )
+        pendingAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
+        this.attachments = []
+
         if (this.beforeSend) {
           await this.beforeSend()
         }
         this.$emit('send', { content, attachments })
-        this.messages.push({
+        assistantMessage = {
           id: this.nextMessageId++,
           role: 'assistant',
-          content: 'The live trace is synced. Codex transport will connect in the next implementation slice.',
-        })
+          content: '',
+          loading: true,
+          activity: [],
+          artifacts: [],
+        }
+        this.messages.push(assistantMessage)
+        this.scrollToBottom()
+        await this.sendToCodex(content, codexAttachments, assistantMessage)
+        assistantMessage.loading = false
+        if (!assistantMessage.content && assistantMessage.artifacts.length > 0) {
+          assistantMessage.content = 'Generated artifacts are available below.'
+        }
       } catch (error) {
         this.messages.push({
           id: this.nextMessageId++,
@@ -226,6 +379,7 @@ export default {
           content: `Error: ${error && error.message ? error.message : String(error)}`,
         })
       } finally {
+        if (assistantMessage) assistantMessage.loading = false
         this.sending = false
         this.scrollToBottom()
       }
@@ -383,6 +537,47 @@ export default {
 
 .message-text {
   white-space: pre-wrap;
+}
+
+.message-loading {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.message-activity {
+  margin-top: 7px;
+  border-top: 1px solid #edf2f7;
+  padding-top: 6px;
+}
+
+.activity-item {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.message-artifacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.artifact-link {
+  color: #2b6cb0;
+  background: #ebf8ff;
+  border: 1px solid #bee3f8;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.artifact-link:hover {
+  background: #dbeafe;
 }
 
 .message-attachments {

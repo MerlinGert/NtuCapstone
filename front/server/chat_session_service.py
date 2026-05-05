@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import unquote_to_bytes
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -272,6 +273,24 @@ def get_session(session_id: str) -> dict[str, Any]:
         "liveSession": _hydrate_live_session_for_frontend(session_dir, live_session) if live_session else None,
         "currentState": current_state,
     }
+
+
+@router.get("/{session_id}/artifacts/{artifact_name}")
+def get_session_artifact(session_id: str, artifact_name: str) -> FileResponse:
+    session_dir = _session_dir(session_id)
+    artifact_path = (session_dir / "artifacts" / artifact_name).resolve()
+    try:
+        artifact_path.relative_to((session_dir / "artifacts").resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid artifact path")
+
+    allowed_suffixes = {".md", ".png", ".jpg", ".jpeg", ".webp"}
+    if artifact_path.suffix.lower() not in allowed_suffixes:
+        raise HTTPException(status_code=400, detail="Unsupported artifact type")
+    if not artifact_path.exists() or not artifact_path.is_file():
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    return FileResponse(artifact_path)
 
 
 @router.post("/{session_id}/sync")

@@ -682,7 +682,16 @@ export default {
       }
     },
     async syncTraceForChat() {
-      return this.syncCurrentTrace({ includeCurrentViews: true })
+      let waitsRemaining = 30
+      while (this.liveTraceSyncInFlight && waitsRemaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        waitsRemaining -= 1
+      }
+      const result = await this.syncCurrentTrace({ includeCurrentViews: true })
+      if (!result) {
+        throw new Error(this.liveTraceSyncError || 'Failed to sync the live trace before chat.')
+      }
+      return result
     },
     scheduleLiveTraceSync(delay = 750) {
       if (!this.maniscopeSessionId) return
