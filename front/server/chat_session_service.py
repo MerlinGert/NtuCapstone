@@ -12,6 +12,8 @@ from urllib.parse import unquote_to_bytes
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
+from session_git_service import SessionGitError, commit_trace_state, list_trace_versions
+
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
@@ -97,6 +99,15 @@ def _ensure_session(session_id: str, coin: str | None = None) -> tuple[Path, dic
     if meta is None:
         meta = _create_meta(session_id, coin=coin, restored=existed)
         _atomic_write_json(meta_path, meta)
+        _commit_trace_history(
+            session_dir=session_dir,
+            event_type="session_init",
+            session_id=session_id,
+            action_count=0,
+            annotation_count=0,
+            image_count=0,
+            updated_at=meta["createdAt"],
+        )
     return session_dir, meta, existed
 
 
@@ -296,6 +307,7 @@ def _write_trace_state(
     live_session: dict[str, Any],
     current_state: dict[str, Any] | None,
     event_type: str,
+    detail: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     actions, annotations = _normalize_trace_lists(live_session)
     image_count = 0
@@ -333,6 +345,16 @@ def _write_trace_state(
     _atomic_write_json(session_dir / "live-session.json", live_session)
     _atomic_write_json(session_dir / "current-state.json", current_state)
     _atomic_write_json(session_dir / "session-meta.json", meta)
+    git_result = _commit_trace_history(
+        session_dir=session_dir,
+        event_type=event_type,
+        session_id=session_id,
+        action_count=len(actions),
+        annotation_count=len(annotations),
+        image_count=image_count,
+        updated_at=now,
+        detail=detail,
+    )
 
     return {
         "sessionId": session_id,
@@ -341,6 +363,7 @@ def _write_trace_state(
         "actionCount": len(actions),
         "annotationCount": len(annotations),
         "lastUpdatedAt": now,
+        "git": git_result,
     }
 
 
@@ -350,6 +373,53 @@ def _event_session_state(session_id: str, body: dict[str, Any]) -> tuple[Path, d
     current_state = _read_json(session_dir / "current-state.json") or {}
     _apply_trace_context(live_session, current_state, _event_context_from_body(body))
     return session_dir, meta, live_session, current_state
+
+
+def _commit_trace_history(
+    session_dir: Path,
+    event_type: str,
+    session_id: str,
+    action_count: int,
+    annotation_count: int,
+    image_count: int,
+    updated_at: str,
+    detail: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    try:
+        return commit_trace_state(
+            session_dir=session_dir,
+            event_type=event_type,
+            session_id=session_id,
+            action_count=action_count,
+            annotation_count=annotation_count,
+            image_count=image_count,
+            updated_at=updated_at,
+            detail=detail,
+        )
+    except SessionGitError as error:
+        return {
+            "committed": False,
+            "error": str(error),
+        }
+
+
+def _action_detail(action: dict[str, Any], action_index: int | None = None) -> dict[str, Any]:
+    detail = {
+        "actionIndex": action_index,
+        "actionType": action.get("actionType"),
+        "sourceView": action.get("sourceView"),
+        "targetView": action.get("targetView"),
+    }
+    return {key: value for key, value in detail.items() if value is not None}
+
+
+def _annotation_detail(annotation: dict[str, Any] | None, annotation_id: int | None = None) -> dict[str, Any]:
+    annotation = annotation or {}
+    detail = {
+        "annotationId": annotation_id if annotation_id is not None else annotation.get("id"),
+        "sourceView": annotation.get("sourceView"),
+    }
+    return {key: value for key, value in detail.items() if value is not None}
 
 
 @router.post("")
@@ -368,7 +438,16 @@ def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
         (session_dir / "artifacts").mkdir()
         meta = _create_meta(session_id, coin=coin, restored=False)
         _atomic_write_json(session_dir / "session-meta.json", meta)
-        return {"sessionId": session_id, "meta": meta}
+        git_result = _commit_trace_history(
+            session_dir=session_dir,
+            event_type="session_init",
+            session_id=session_id,
+            action_count=0,
+            annotation_count=0,
+            image_count=0,
+            updated_at=meta["createdAt"],
+        )
+        return {"sessionId": session_id, "meta": meta, "git": git_result}
 
     raise HTTPException(status_code=503, detail="Unable to allocate a unique session ID")
 
@@ -404,6 +483,21 @@ def get_session_artifact(session_id: str, artifact_name: str) -> FileResponse:
     return FileResponse(artifact_path)
 
 
+@router.get("/{session_id}/versions")
+def get_session_versions(session_id: str, limit: int = 50) -> dict[str, Any]:
+    session_dir = _session_dir(session_id)
+    if not session_dir.exists():
+        raise HTTPException(status_code=404, detail="Session not found")
+    try:
+        versions = list_trace_versions(session_dir, limit=limit)
+    except SessionGitError as error:
+        raise HTTPException(status_code=500, detail=str(error))
+    return {
+        "sessionId": session_id,
+        "versions": versions,
+    }
+
+
 @router.post("/{session_id}/events/user-actions")
 def append_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     action = copy.deepcopy(body.get("action"))
@@ -413,7 +507,15 @@ def append_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str,
     session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
     actions, _ = _normalize_trace_lists(live_session)
     actions.append(action)
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "user_action_append")
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "user_action_append",
+        _action_detail(action, len(actions) - 1),
+    )
 
 
 @router.put("/{session_id}/events/user-actions/{action_index}")
@@ -432,7 +534,15 @@ def upsert_user_action_event(session_id: str, action_index: int, body: dict[str,
         actions.append(action)
     else:
         raise HTTPException(status_code=409, detail="action_index is beyond the current action sequence")
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "user_action_upsert")
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "user_action_upsert",
+        _action_detail(action, action_index),
+    )
 
 
 @router.delete("/{session_id}/events/user-actions/{action_index}")
@@ -445,8 +555,16 @@ def delete_user_action_event(session_id: str, action_index: int, body: dict[str,
     actions, _ = _normalize_trace_lists(live_session)
     if action_index >= len(actions):
         raise HTTPException(status_code=404, detail="action not found")
-    actions.pop(action_index)
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "user_action_delete")
+    action = actions.pop(action_index)
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "user_action_delete",
+        _action_detail(action if isinstance(action, dict) else {}, action_index),
+    )
 
 
 @router.post("/{session_id}/events/annotations")
@@ -458,7 +576,15 @@ def append_annotation_event(session_id: str, body: dict[str, Any]) -> dict[str, 
     session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
     _, annotations = _normalize_trace_lists(live_session)
     annotations.append(annotation)
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "annotation_append")
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "annotation_append",
+        _annotation_detail(annotation),
+    )
 
 
 @router.put("/{session_id}/events/annotations/{annotation_id}")
@@ -477,7 +603,15 @@ def upsert_annotation_event(session_id: str, annotation_id: int, body: dict[str,
         annotations.append(annotation)
     else:
         annotations[existing_index] = annotation
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "annotation_upsert")
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "annotation_upsert",
+        _annotation_detail(annotation, annotation_id),
+    )
 
 
 @router.delete("/{session_id}/events/annotations/{annotation_id}")
@@ -491,8 +625,16 @@ def delete_annotation_event(session_id: str, annotation_id: int, body: dict[str,
     )
     if existing_index is None:
         raise HTTPException(status_code=404, detail="annotation not found")
-    annotations.pop(existing_index)
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "annotation_delete")
+    annotation = annotations.pop(existing_index)
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "annotation_delete",
+        _annotation_detail(annotation if isinstance(annotation, dict) else {}, annotation_id),
+    )
 
 
 @router.post("/{session_id}/events/reorder")
@@ -507,13 +649,28 @@ def reorder_trace_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]
     session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
     live_session["userActionSequence"] = actions
     live_session["annotationRecords"] = annotations
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "trace_reorder")
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "trace_reorder",
+    )
 
 
 @router.post("/{session_id}/events/settings")
 def update_session_settings_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "settings_update")
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "settings_update",
+        {"coin": body.get("coin")},
+    )
 
 
 @router.post("/{session_id}/sync")
@@ -549,4 +706,12 @@ def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         "userActionSequence": actions,
         "annotationRecords": annotations,
     }
-    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "full_sync")
+    return _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        current_state,
+        "full_sync",
+        {"coin": body.get("coin")},
+    )

@@ -1,5 +1,6 @@
 /front/public
 front/src/assets/user_behavior_sequences.json
+.maniscope-chat/
 
 # OS files
 .DS_Store
