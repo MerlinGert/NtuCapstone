@@ -377,6 +377,7 @@ export default {
       liveTraceSyncInFlight: false,
       liveTraceSyncError: '',
       _liveTraceSyncTimer: null,
+      _sessionEventQueue: null,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -630,6 +631,82 @@ export default {
         majorViewScreenshots,
       }
     },
+    buildSessionEventBody(extra = {}) {
+      return {
+        coin: this.currentCoin,
+        annotationSeqId: this._annotationSeqId,
+        snapshotCategories: this.snapshotCategories,
+        snapshotQuality: this.snapshotQuality,
+        currentState: this.buildCurrentState(null),
+        ...extra,
+      }
+    },
+    queueSessionEvent(runEvent) {
+      if (!this.maniscopeSessionId) return Promise.resolve(null)
+      const previous = this._sessionEventQueue || Promise.resolve()
+      this._sessionEventQueue = previous
+        .catch(() => {})
+        .then(async () => {
+          try {
+            return await runEvent()
+          } catch (error) {
+            this.liveTraceSyncError = error && error.message ? error.message : String(error)
+            console.error('CryptoVis: failed to send live trace event', error)
+            this.scheduleLiveTraceSync()
+            return null
+          }
+        })
+      return this._sessionEventQueue
+    },
+    sendSessionEvent(endpoint, { method = 'POST', body = {} } = {}) {
+      return this.queueSessionEvent(async () => {
+        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}/events/${endpoint}`, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.buildSessionEventBody(body)),
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const payload = await response.json()
+        this.lastLiveTraceSyncAt = payload.lastUpdatedAt || new Date().toISOString()
+        return payload
+      })
+    },
+    upsertUserActionEvent(actionRecord, actionIndex = null) {
+      const index = Number.isInteger(actionIndex)
+        ? actionIndex
+        : this.userActionSequence.findIndex((action) => action === actionRecord)
+      if (index < 0) {
+        return this.sendSessionEvent('user-actions', { body: { action: actionRecord } })
+      }
+      return this.sendSessionEvent(`user-actions/${index}`, {
+        method: 'PUT',
+        body: { action: actionRecord },
+      })
+    },
+    deleteUserActionEvent(actionIndex) {
+      return this.sendSessionEvent(`user-actions/${actionIndex}`, { method: 'DELETE' })
+    },
+    upsertAnnotationEvent(annotation) {
+      if (!annotation || !Number.isFinite(annotation.id)) return Promise.resolve(null)
+      return this.sendSessionEvent(`annotations/${annotation.id}`, {
+        method: 'PUT',
+        body: { annotation },
+      })
+    },
+    deleteAnnotationEvent(annotationId) {
+      return this.sendSessionEvent(`annotations/${annotationId}`, { method: 'DELETE' })
+    },
+    reorderTraceEvent() {
+      return this.sendSessionEvent('reorder', {
+        body: {
+          userActionSequence: this.userActionSequence,
+          annotationRecords: this.annotationRecords,
+        },
+      })
+    },
+    updateSessionSettingsEvent() {
+      return this.sendSessionEvent('settings')
+    },
     async captureCurrentMajorViewsForSession() {
       try {
         const captures = await captureMajorVisualizationViews(
@@ -650,6 +727,9 @@ export default {
     },
     async syncCurrentTrace({ includeCurrentViews = false } = {}) {
       if (!this.maniscopeSessionId || this.liveTraceSyncInFlight) return null
+      if (this._sessionEventQueue) {
+        await this._sessionEventQueue.catch(() => {})
+      }
       this.liveTraceSyncInFlight = true
       this.liveTraceSyncError = ''
       try {
@@ -768,7 +848,7 @@ export default {
 	      this.annotationRecords.push(record)
 	      // ezio: auto-switch to annotations tab when a new annotation arrives
 	      this.activeBottomTab = 'annotations'
-	      this.scheduleLiveTraceSync()
+	      this.upsertAnnotationEvent(record)
 	    },
     // ezio: handle insight annotation added from UserActionTree
     handleAddInsightAnnotation(payload) {
@@ -782,7 +862,7 @@ export default {
         isInsight: true
 	      }
 	      this.annotationRecords.push(record)
-	      this.scheduleLiveTraceSync()
+	      this.upsertAnnotationEvent(record)
 	    },
 
     // ezio: delete annotation by id (from tree editor)
@@ -790,7 +870,7 @@ export default {
 	      const idx = this.annotationRecords.findIndex(a => a.id === id)
 	      if (idx !== -1) {
 	        this.annotationRecords.splice(idx, 1)
-	        this.scheduleLiveTraceSync()
+	        this.deleteAnnotationEvent(id)
 	      }
 	    },
 
@@ -799,7 +879,7 @@ export default {
 	      const idx = this.userActionSequence.findIndex(a => a.timestamp === timestamp)
 	      if (idx !== -1) {
 	        this.userActionSequence.splice(idx, 1)
-	        this.scheduleLiveTraceSync()
+	        this.deleteUserActionEvent(idx)
 	      }
 	    },
 
@@ -810,7 +890,7 @@ export default {
 	      if (payload.text !== undefined) ann.text = payload.text
 	      if (payload.customColor !== undefined) ann.customColor = payload.customColor
 	      if (payload.sketchDataUrl !== undefined) ann.sketchDataUrl = payload.sketchDataUrl
-	      this.scheduleLiveTraceSync()
+	      this.upsertAnnotationEvent(ann)
 	    },
 
     // ezio: add a custom annotation node (from tree editor)
@@ -839,7 +919,7 @@ export default {
         customColor: payload.customColor || null,
 	      }
 	      this.annotationRecords.push(record)
-	      this.scheduleLiveTraceSync()
+	      this.upsertAnnotationEvent(record)
 	    },
 
     // ezio: reorder actions/annotations by swapping timestamps
@@ -856,7 +936,7 @@ export default {
 	      const tsB = allItems[swapIdx].timestamp
 	      allItems[idx].timestamp = tsB
 	      allItems[swapIdx].timestamp = tsA
-	      this.scheduleLiveTraceSync()
+	      this.reorderTraceEvent()
 	    },
 
     // ezio: open export dialog
@@ -1069,10 +1149,10 @@ export default {
               }, 400)
             }
             // ezio: for hover merges, append a fresh snapshot so every merged hover has its own thumbnail
-	            else if (isHoverAction) {
-	              this._maybeCaptureSnapshots(lastAction, { append: true })
-	            }
-	            this.scheduleLiveTraceSync()
+            else if (isHoverAction) {
+              this._maybeCaptureSnapshots(lastAction, { append: true })
+            }
+	            this.upsertUserActionEvent(lastAction, this.userActionSequence.length - 1)
 	            return
 	          }
         }
@@ -1132,7 +1212,7 @@ export default {
 
 	      // ezio: auto-capture screenshots if this action's category is enabled
 	      this._maybeCaptureSnapshots(actionRecord)
-	      this.scheduleLiveTraceSync()
+	      this.upsertUserActionEvent(actionRecord, this.userActionSequence.length - 1)
 
 	      // Optional: Send to backend
       // fetch('/api/log_action', { method: 'POST', body: JSON.stringify(actionRecord) })
@@ -1213,7 +1293,7 @@ export default {
 	        } finally {
 	          this._snapshotCaptureInFlight = false
 	          this._targetReadyPromise = null // ezio: clear so next action starts fresh
-	          this.scheduleLiveTraceSync()
+	          this.upsertUserActionEvent(actionRecord)
 	        }
 	      }
       if (typeof window.requestIdleCallback === 'function') {
@@ -1228,12 +1308,12 @@ export default {
 	      const cat = this.snapshotCategories.find(c => c.key === key)
 	      if (cat) {
 	        cat.enabled = enabled
-	        this.scheduleLiveTraceSync()
+	        this.updateSessionSettingsEvent()
 	      }
 	    },
 	    onSnapshotQualityChange(quality) {
 	      this.snapshotQuality = quality
-	      this.scheduleLiveTraceSync()
+	      this.updateSessionSettingsEvent()
 	    },
     resetViewState() {
       this.selectedUser = null

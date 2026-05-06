@@ -241,6 +241,117 @@ def _hydrate_live_session_for_frontend(session_dir: Path, live_session: dict[str
     return hydrated
 
 
+def _load_live_session(session_dir: Path, session_id: str, coin: str | None = None) -> dict[str, Any]:
+    return _read_json(session_dir / "live-session.json") or _empty_live_session(session_id, coin=coin)
+
+
+def _normalize_trace_lists(live_session: dict[str, Any]) -> tuple[list[Any], list[Any]]:
+    actions = live_session.get("userActionSequence")
+    annotations = live_session.get("annotationRecords")
+    if not isinstance(actions, list):
+        actions = []
+        live_session["userActionSequence"] = actions
+    if not isinstance(annotations, list):
+        annotations = []
+        live_session["annotationRecords"] = annotations
+    return actions, annotations
+
+
+def _event_context_from_body(body: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "coin": body.get("coin"),
+        "annotationSeqId": body.get("annotationSeqId"),
+        "snapshotCategories": body.get("snapshotCategories"),
+        "snapshotQuality": body.get("snapshotQuality"),
+        "currentState": copy.deepcopy(body.get("currentState") or {}),
+    }
+
+
+def _apply_trace_context(
+    live_session: dict[str, Any],
+    current_state: dict[str, Any],
+    context: dict[str, Any],
+) -> None:
+    if context.get("coin") is not None:
+        live_session["coin"] = context["coin"]
+        current_state["coin"] = context["coin"]
+    if context.get("annotationSeqId") is not None:
+        live_session["annotationSeqId"] = context["annotationSeqId"]
+
+    config = live_session.setdefault("config", {})
+    if context.get("snapshotCategories") is not None:
+        config["snapshotCategories"] = context["snapshotCategories"]
+    if context.get("snapshotQuality") is not None:
+        config["snapshotQuality"] = context["snapshotQuality"]
+
+    body_current_state = context.get("currentState")
+    if isinstance(body_current_state, dict):
+        current_state.update(body_current_state)
+
+
+def _write_trace_state(
+    session_id: str,
+    session_dir: Path,
+    meta: dict[str, Any],
+    live_session: dict[str, Any],
+    current_state: dict[str, Any] | None,
+    event_type: str,
+) -> dict[str, Any]:
+    actions, annotations = _normalize_trace_lists(live_session)
+    image_count = 0
+    image_count += _process_action_images(session_dir, actions)
+    image_count += _process_annotation_images(session_dir, annotations)
+    if current_state is not None:
+        image_count += _process_current_state_images(session_dir, current_state)
+
+    now = _now_iso()
+    live_session.update(
+        {
+            "exportVersion": EXPORT_VERSION,
+            "exportFormat": "live-session",
+            "sessionId": session_id,
+            "exportedAt": None,
+            "lastUpdatedAt": now,
+            "includesSnapshots": True,
+            "imageDirectory": "images",
+            "imageCount": image_count,
+        }
+    )
+    live_session.setdefault("config", {})
+
+    if current_state is None:
+        current_state = _read_json(session_dir / "current-state.json") or {}
+    current_state["sessionId"] = session_id
+    current_state["lastUpdatedAt"] = now
+
+    meta.update(
+        {
+            "coin": live_session.get("coin"),
+            "lastUpdatedAt": now,
+        }
+    )
+    _atomic_write_json(session_dir / "live-session.json", live_session)
+    _atomic_write_json(session_dir / "current-state.json", current_state)
+    _atomic_write_json(session_dir / "session-meta.json", meta)
+
+    return {
+        "sessionId": session_id,
+        "eventType": event_type,
+        "imageCount": image_count,
+        "actionCount": len(actions),
+        "annotationCount": len(annotations),
+        "lastUpdatedAt": now,
+    }
+
+
+def _event_session_state(session_id: str, body: dict[str, Any]) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"))
+    live_session = _load_live_session(session_dir, session_id, coin=body.get("coin"))
+    current_state = _read_json(session_dir / "current-state.json") or {}
+    _apply_trace_context(live_session, current_state, _event_context_from_body(body))
+    return session_dir, meta, live_session, current_state
+
+
 @router.post("")
 def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
     coin = (body or {}).get("coin")
@@ -293,6 +404,118 @@ def get_session_artifact(session_id: str, artifact_name: str) -> FileResponse:
     return FileResponse(artifact_path)
 
 
+@router.post("/{session_id}/events/user-actions")
+def append_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    action = copy.deepcopy(body.get("action"))
+    if not isinstance(action, dict):
+        raise HTTPException(status_code=400, detail="action must be an object")
+
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    actions, _ = _normalize_trace_lists(live_session)
+    actions.append(action)
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "user_action_append")
+
+
+@router.put("/{session_id}/events/user-actions/{action_index}")
+def upsert_user_action_event(session_id: str, action_index: int, body: dict[str, Any]) -> dict[str, Any]:
+    if action_index < 0:
+        raise HTTPException(status_code=400, detail="action_index must be non-negative")
+    action = copy.deepcopy(body.get("action"))
+    if not isinstance(action, dict):
+        raise HTTPException(status_code=400, detail="action must be an object")
+
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    actions, _ = _normalize_trace_lists(live_session)
+    if action_index < len(actions):
+        actions[action_index] = action
+    elif action_index == len(actions):
+        actions.append(action)
+    else:
+        raise HTTPException(status_code=409, detail="action_index is beyond the current action sequence")
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "user_action_upsert")
+
+
+@router.delete("/{session_id}/events/user-actions/{action_index}")
+def delete_user_action_event(session_id: str, action_index: int, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    if action_index < 0:
+        raise HTTPException(status_code=400, detail="action_index must be non-negative")
+
+    body = body or {}
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    actions, _ = _normalize_trace_lists(live_session)
+    if action_index >= len(actions):
+        raise HTTPException(status_code=404, detail="action not found")
+    actions.pop(action_index)
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "user_action_delete")
+
+
+@router.post("/{session_id}/events/annotations")
+def append_annotation_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    annotation = copy.deepcopy(body.get("annotation"))
+    if not isinstance(annotation, dict):
+        raise HTTPException(status_code=400, detail="annotation must be an object")
+
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    _, annotations = _normalize_trace_lists(live_session)
+    annotations.append(annotation)
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "annotation_append")
+
+
+@router.put("/{session_id}/events/annotations/{annotation_id}")
+def upsert_annotation_event(session_id: str, annotation_id: int, body: dict[str, Any]) -> dict[str, Any]:
+    annotation = copy.deepcopy(body.get("annotation"))
+    if not isinstance(annotation, dict):
+        raise HTTPException(status_code=400, detail="annotation must be an object")
+
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    _, annotations = _normalize_trace_lists(live_session)
+    existing_index = next(
+        (index for index, item in enumerate(annotations) if isinstance(item, dict) and item.get("id") == annotation_id),
+        None,
+    )
+    if existing_index is None:
+        annotations.append(annotation)
+    else:
+        annotations[existing_index] = annotation
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "annotation_upsert")
+
+
+@router.delete("/{session_id}/events/annotations/{annotation_id}")
+def delete_annotation_event(session_id: str, annotation_id: int, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    body = body or {}
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    _, annotations = _normalize_trace_lists(live_session)
+    existing_index = next(
+        (index for index, item in enumerate(annotations) if isinstance(item, dict) and item.get("id") == annotation_id),
+        None,
+    )
+    if existing_index is None:
+        raise HTTPException(status_code=404, detail="annotation not found")
+    annotations.pop(existing_index)
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "annotation_delete")
+
+
+@router.post("/{session_id}/events/reorder")
+def reorder_trace_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    actions = copy.deepcopy(body.get("userActionSequence"))
+    annotations = copy.deepcopy(body.get("annotationRecords"))
+    if not isinstance(actions, list):
+        raise HTTPException(status_code=400, detail="userActionSequence must be an array")
+    if not isinstance(annotations, list):
+        raise HTTPException(status_code=400, detail="annotationRecords must be an array")
+
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    live_session["userActionSequence"] = actions
+    live_session["annotationRecords"] = annotations
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "trace_reorder")
+
+
+@router.post("/{session_id}/events/settings")
+def update_session_settings_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "settings_update")
+
+
 @router.post("/{session_id}/sync")
 def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"))
@@ -308,22 +531,16 @@ def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(current_state, dict):
         raise HTTPException(status_code=400, detail="currentState must be an object")
 
-    image_count = 0
-    image_count += _process_action_images(session_dir, actions)
-    image_count += _process_annotation_images(session_dir, annotations)
-    image_count += _process_current_state_images(session_dir, current_state)
-
-    now = _now_iso()
     live_session = {
         "exportVersion": EXPORT_VERSION,
         "exportFormat": "live-session",
         "sessionId": session_id,
         "exportedAt": None,
-        "lastUpdatedAt": now,
+        "lastUpdatedAt": None,
         "coin": body.get("coin"),
         "includesSnapshots": True,
         "imageDirectory": "images",
-        "imageCount": image_count,
+        "imageCount": 0,
         "config": {
             "snapshotCategories": body.get("snapshotCategories"),
             "snapshotQuality": body.get("snapshotQuality"),
@@ -332,24 +549,4 @@ def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         "userActionSequence": actions,
         "annotationRecords": annotations,
     }
-
-    current_state["sessionId"] = session_id
-    current_state["lastUpdatedAt"] = now
-
-    meta.update(
-        {
-            "coin": body.get("coin"),
-            "lastUpdatedAt": now,
-        }
-    )
-    _atomic_write_json(session_dir / "live-session.json", live_session)
-    _atomic_write_json(session_dir / "current-state.json", current_state)
-    _atomic_write_json(session_dir / "session-meta.json", meta)
-
-    return {
-        "sessionId": session_id,
-        "imageCount": image_count,
-        "actionCount": len(actions),
-        "annotationCount": len(annotations),
-        "lastUpdatedAt": now,
-    }
+    return _write_trace_state(session_id, session_dir, meta, live_session, current_state, "full_sync")
