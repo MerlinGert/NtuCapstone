@@ -293,9 +293,18 @@ For every mid-level Finding and high-level Insight, include:
 
 Recommendations should be organized as Investigation Strategies, not as a flat low/mid/high list or as generic next steps.
 
+Before writing strategies, classify the opportunity space into three recommendation classes:
+
+- **Continue the user's path**: complete, validate, or falsify the investigation the user was already pursuing. These strategies strengthen or weaken the current case by checking role timelines, manipulation windows, component membership, price impact, and false-positive alternatives.
+- **Similar new explorations**: ask what else resembles the user's trace. Derive a signature from the user's path, such as a wallet role, card cohort, time-window pattern, component shape, or transfer behavior, then search local data and screenshots for analogous groups, wallets, or windows.
+- **Hindsight opportunities**: identify important leads the user missed. These may be downstream sinks, post-window exits, sell-side behavior, peripheral wallets, weakly visible component members, threshold-sensitive model outputs, or market-wide statistics that were not visible in the trace. Treat these as exploration hypotheses until validated.
+
+When local data validation is allowed, use it to seed Similar new explorations and Hindsight opportunities. Keep the provenance clear: trace-observed leads are what the user actually saw; local data leads are analyst-discovered follow-up opportunities.
+
 Use this structure:
 
 - **Investigation Strategy**: the high-level plan for testing a Hypothesis, such as building a case timeline, validating price impact, expanding a suspected component, or avoiding false positives.
+- **Recommendation class**: Continue the user's path, Similar new exploration, or Hindsight opportunity.
 - **Why this matters**: concise rationale grounded in trace Findings and Insights.
 - **Target outcome**: the concrete artifact or evidence state the investigation should produce.
 - **Analytic Activities**: coherent mid-level analysis units under the Investigation Strategy, such as confirming core wallet roles, validating card windows, testing entity relationships, or classifying shared hubs.
@@ -331,11 +340,16 @@ Recommended Investigation Strategy patterns:
 - **Build a role-based case timeline**: when the trace suggests different wallet roles such as passive whale, bridge actor, functional buyer, storage sink, accumulator, or round-trip-like actor.
 - **Validate manipulation windows and price impact**: when the trace links behavior details or manipulation cards to K-line movement.
 - **Expand a suspected component without overgeneralizing**: when the trace suggests a larger community or entity, but raw transfer or behavior validation is still needed.
+- **Search for sibling windows or cohorts**: when the user investigated one manipulation card, time window, or card-user group and local data or nearby screenshots may reveal similar unclicked candidates.
+- **Search for role analogues**: when the user assigned roles to wallets and local data can find other wallets with similar trade, transfer, balance, or earning profiles.
+- **Follow overlooked downstream sinks or upstream funders**: when the trace shows a functional wallet, transfer arrows, or outgoing inventory movement that the user did not follow.
+- **Test post-window exits and profit-taking**: when the user focused on accumulation or price support but did not investigate later selling, transfers, or realized earnings.
 - **Verify external motive only after on-chain evidence is stable**: when the trace suggests a motive but does not prove it.
 
 For each Investigation Strategy, include:
 
 - Strategy ID, such as `S1`.
+- Recommendation class.
 - Target Hypothesis or Analytic Question.
 - Why this matters.
 - Target outcome.
@@ -344,6 +358,8 @@ For each Investigation Strategy, include:
 - Optional priority ordering for the most important Interactions or Analytic Activities.
 
 Preserve recommendation confidence and caveats. If an Investigation Strategy or Interaction is based on a weak Hypothesis, state what would confirm or weaken it.
+
+For crypto-investigator reports, do not limit recommendations to product or workflow improvements. Prefer executable investigation leads: wallets to open, components to recompute, windows to quantify, transfer chains to follow, and hypotheses to falsify.
 
 ### Step 6: Build a trace-step map
 
@@ -402,7 +418,7 @@ TRACE/trace-step-map.md
 - Chronological reconstruction.
 - Intention Space analysis: Tasks, Analytic Questions, and Hypotheses.
 - Finding Space analysis: user-authored and analyst-inferred Findings and Insights.
-- Top-down recommendations using Investigation Strategies, Analytic Activities, and Interactions. Analytic Activities must be typed as `Visual Analysis` or `Statistical Analysis`; Interactions must be typed as `Data Action`, `Model Action`, `Visualization Action`, or `Synthesis Action`.
+- Top-down recommendations using Investigation Strategies, Analytic Activities, and Interactions. Cover Continue the user's path, Similar new explorations, and Hindsight opportunities when the report includes action recommendations. Analytic Activities must be typed as `Visual Analysis` or `Statistical Analysis`; Interactions must be typed as `Data Action`, `Model Action`, `Visualization Action`, or `Synthesis Action`.
 - Evidence tables for important users, groups, time windows, and screenshots.
 - Bottom line.
 
@@ -427,7 +443,8 @@ TRACE/trace-step-map.md
 - Use concrete dates and times for market or session events.
 - State trace gaps clearly, such as state changes without matching logged clicks.
 - Mark external-event claims, such as exchange listing motives, as unverified unless verified with external sources.
-- Organize recommendations top-down, starting from the high-level Hypothesis and ending with executable Interactions.
+- Organize recommendations top-down, starting from the high-level Hypothesis or Analytic Question and ending with executable Interactions.
+- For action recommendations, cover the three recommendation classes unless the user asks for a narrower scope: Continue the user's path, Similar new explorations, and Hindsight opportunities.
 - Every recommended Interaction must be labeled as `Data Action`, `Model Action`, `Visualization Action`, or `Synthesis Action`.
 - Treat checking statistics already displayed in ManiScope as a `Visualization Action`.
 - Treat statistics that require scripts, command-line queries, notebooks, or custom calculations as `Data Action`.
@@ -452,6 +469,7 @@ TRACE/trace-step-map.md
 - Direct transfers among selected or repeated users can materially strengthen coordination hypotheses. Check `sorted_transfers.csv`.
 - Trade summaries by selected cohort and time window make qualitative screenshot claims more defensible. Check `sorted_trades.csv` after identifying candidate users and windows.
 - Use local data to validate amounts, timings, residual balances, and repeated activity, but do not imply the user saw those exact computed summaries unless the trace shows it.
+- Use local data to seed new opportunity recommendations when allowed. Good leads include analogous card windows, role-similar wallets, downstream sinks, upstream funders, post-window exits, and market-wide volume-share checks.
 - Create contact sheets for many screenshots, but inspect important screenshots individually at original resolution.
 - Include caveats for unverified motives. Trading patterns can support a manipulation hypothesis without proving why the users acted.
 - For future efficiency, produce reusable tables while analyzing: Interaction timeline, annotation timeline, image map, clicked card users, repeated users, transfer links, and per-window trade totals.
@@ -471,6 +489,7 @@ Before delivering, verify:
 - Every Analytic Question and Hypothesis has evidence and rationale.
 - Every mid-level Finding and high-level Insight has evidence and rationale.
 - Every Investigation Strategy has a "why this matters" rationale.
+- Action recommendations cover Continue the user's path, Similar new explorations, and Hindsight opportunities, or clearly explain why one class is out of scope.
 - Every Investigation Strategy has a target outcome.
 - Every Investigation Strategy contains at least one Analytic Activity.
 - Every recommended Analytic Activity is labeled `Visual Analysis` or `Statistical Analysis`.
