@@ -58,6 +58,19 @@ const REQUIRED_RENDER_ARGS = {
   ],
 }
 
+const OPTIONAL_RENDER_ARG_DEFAULTS = {
+  token_distribution: {},
+  candlestick_chart: {
+    visibleTimeWindow: null,
+    cardAlignment: 'scroll_offsets',
+    cardFocusTime: null,
+  },
+  behavior_details: {
+    visibleTimeWindow: null,
+    maxEventsPerUser: 1500,
+  },
+}
+
 const ARG_SOURCES = {
   token_distribution: {
     snapshotData: 'CryptoVis.snapshot_data',
@@ -79,6 +92,9 @@ const ARG_SOURCES = {
     zoomTransform: 'CandlestickChart.zoomTransform',
     topCardsScrollLeft: 'CandlestickChart.$refs.topCardsContainer.scrollLeft',
     bottomCardsScrollLeft: 'CandlestickChart.$refs.bottomCardsContainer.scrollLeft',
+    visibleTimeWindow: 'render argument',
+    cardAlignment: 'render argument',
+    cardFocusTime: 'render argument',
     width: 'render argument',
     height: 'render argument',
   },
@@ -93,6 +109,8 @@ const ARG_SOURCES = {
     showRelatedUsers: 'BehaviorDetails.showRelatedUsers',
     useSequentialTime: 'BehaviorDetails.useSequentialTime',
     showManipulationBoxes: 'BehaviorDetails.showManipulationBoxes',
+    visibleTimeWindow: 'render argument',
+    maxEventsPerUser: 'render argument',
     width: 'render argument',
     height: 'render argument',
   },
@@ -123,6 +141,13 @@ function assertRequiredArgs(viewName, args) {
   }
 }
 
+function applyOptionalRenderArgDefaults(viewName, args) {
+  return {
+    ...(OPTIONAL_RENDER_ARG_DEFAULTS[viewName] || {}),
+    ...args,
+  }
+}
+
 function cloneRenderArgs(args) {
   if (typeof structuredClone === 'function') {
     try {
@@ -136,8 +161,19 @@ function cloneRenderArgs(args) {
 }
 
 function prepareRenderArgs(viewName, args) {
-  assertRequiredArgs(viewName, args)
-  return cloneRenderArgs(args)
+  if (!args || typeof args !== 'object') {
+    throw new Error(`${viewName} render function requires an argument object`)
+  }
+  const argsWithDefaults = applyOptionalRenderArgDefaults(viewName, args)
+  assertRequiredArgs(viewName, argsWithDefaults)
+  return cloneRenderArgs(argsWithDefaults)
+}
+
+function renderArgKeys(viewName) {
+  return [
+    ...REQUIRED_RENDER_ARGS[viewName],
+    ...Object.keys(OPTIONAL_RENDER_ARG_DEFAULTS[viewName] || {}),
+  ]
 }
 
 function summarizeValue(value) {
@@ -180,7 +216,7 @@ function dependency(viewName, prop, value, includeRawData) {
 }
 
 function renderArgDependencies(viewName, args, includeRawData) {
-  return REQUIRED_RENDER_ARGS[viewName].map((key) =>
+  return renderArgKeys(viewName).map((key) =>
     dependency(viewName, key, args[key], includeRawData),
   )
 }
@@ -202,6 +238,81 @@ function restoreZoomTransform(transform) {
   const x = Number.isFinite(Number(transform.x)) ? Number(transform.x) : 0
   const y = Number.isFinite(Number(transform.y)) ? Number(transform.y) : 0
   return d3.zoomIdentity.translate(x, y).scale(k)
+}
+
+function parseRenderDate(value) {
+  if (!value) return new Date(NaN)
+  if (value instanceof Date) return value
+  if (typeof value === 'number') return new Date(value)
+  if (typeof value === 'string') {
+    const directDate = new Date(value)
+    if (!Number.isNaN(directDate.getTime())) return directDate
+
+    const normalized = value.includes('T')
+      ? value.replace(' UTC', 'Z')
+      : `${value.replace(' UTC', '').replace(' ', 'T')}Z`
+    return new Date(normalized)
+  }
+  return new Date(value)
+}
+
+function normalizeTimeWindow(timeWindow) {
+  if (!Array.isArray(timeWindow) || timeWindow.length !== 2) return null
+  const start = parseRenderDate(timeWindow[0])
+  const end = parseRenderDate(timeWindow[1])
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    start >= end
+  ) {
+    return null
+  }
+  return [start, end]
+}
+
+function parseOhlcDate(value) {
+  return parseRenderDate(value)
+}
+
+export function createKlineZoomTransform(args, visibleTimeWindow) {
+  const timeWindow = normalizeTimeWindow(visibleTimeWindow)
+  const granularity = args?.currentGranularity || '1H'
+  const rows = args?.ohlcData?.[granularity] || []
+  if (!timeWindow || rows.length === 0) return null
+
+  const [start, end] = timeWindow
+  const startTs = start.getTime()
+  const endTs = end.getTime()
+  const rowTimes = rows.map((row) => parseOhlcDate(row.t).getTime())
+  let startIdx = rowTimes.findIndex((ts) => Number.isFinite(ts) && ts >= startTs)
+  if (startIdx === -1) return null
+
+  let endIdx = -1
+  for (let i = rowTimes.length - 1; i >= 0; i -= 1) {
+    if (Number.isFinite(rowTimes[i]) && rowTimes[i] <= endTs) {
+      endIdx = i
+      break
+    }
+  }
+
+  if (startIdx > endIdx) return null
+
+  const width = Number(args?.width)
+  const innerWidth = (Number.isFinite(width) && width > 60 ? width : 400) - 60
+  const dataLength = rows.length
+  const baseIndexX = (idx) => (idx / Math.max(1, dataLength - 1)) * innerWidth
+  let k = (dataLength - 1) / Math.max(1, endIdx - startIdx)
+  const maxK = Math.max(1, dataLength / 10)
+  if (k > maxK) k = maxK
+
+  return {
+    k,
+    x: -k * baseIndexX(startIdx),
+    y: 0,
+    startIndex: startIdx,
+    endIndex: endIdx,
+    visibleTimeWindow: [start.toISOString(), end.toISOString()],
+  }
 }
 
 function elementBounds(selector) {
@@ -305,10 +416,15 @@ async function mountAndRender(Component, props, args, options = {}) {
       })
     }
 
+    const metadata = options.collectMetadata
+      ? options.collectMetadata(componentVm)
+      : null
+
     return {
       dataUrl,
       width,
       height,
+      metadata,
     }
   } finally {
     app.unmount()
@@ -318,17 +434,20 @@ async function mountAndRender(Component, props, args, options = {}) {
 
 function buildRenderResult(viewName, args, image, options = {}) {
   const includeRawData = !!options.includeRawData
+  const { metadata, ...imagePayload } = image || {}
   return {
     viewName,
     image: image
       ? {
-          ...image,
+          ...imagePayload,
           viewName,
         }
       : null,
+    renderMetadata: metadata || null,
     dependencies: {
       viewName,
       requiredArguments: [...REQUIRED_RENDER_ARGS[viewName]],
+      optionalArguments: Object.keys(OPTIONAL_RENDER_ARG_DEFAULTS[viewName] || {}),
       dataDependencies: renderArgDependencies(viewName, args, includeRawData),
     },
     renderArgs: includeRawData ? args : undefined,
@@ -368,6 +487,9 @@ export function getMajorViewRenderArgs(vm, viewName, options = {}) {
       zoomTransform: summarizeZoomTransform(ref?.zoomTransform),
       topCardsScrollLeft: ref?.$refs?.topCardsContainer?.scrollLeft || 0,
       bottomCardsScrollLeft: ref?.$refs?.bottomCardsContainer?.scrollLeft || 0,
+      visibleTimeWindow: null,
+      cardAlignment: 'scroll_offsets',
+      cardFocusTime: null,
       width: size.width,
       height: size.height,
     }
@@ -385,6 +507,8 @@ export function getMajorViewRenderArgs(vm, viewName, options = {}) {
     showRelatedUsers: ref?.showRelatedUsers ?? false,
     useSequentialTime: ref?.useSequentialTime ?? false,
     showManipulationBoxes: ref?.showManipulationBoxes ?? true,
+    visibleTimeWindow: null,
+    maxEventsPerUser: ref?.maxEventsPerUser ?? 1500,
     width: size.width,
     height: size.height,
   }
@@ -399,12 +523,114 @@ export function getMajorViewDataDependencies(vm, viewName, options = {}) {
   return {
     viewName: normalizedViewName,
     requiredArguments: [...REQUIRED_RENDER_ARGS[normalizedViewName]],
+    optionalArguments: Object.keys(OPTIONAL_RENDER_ARG_DEFAULTS[normalizedViewName] || {}),
     dataDependencies: renderArgDependencies(
       normalizedViewName,
       args,
       !!options.includeRawData,
     ),
   }
+}
+
+function chooseCardForAlignment(cards, timeWindow, focusDate) {
+  if (!Array.isArray(cards) || cards.length === 0) return null
+  const focusTs = focusDate?.getTime?.()
+  const windowStart = timeWindow?.[0]?.getTime?.()
+  const windowEnd = timeWindow?.[1]?.getTime?.()
+  const candidates =
+    timeWindow && Number.isFinite(windowStart) && Number.isFinite(windowEnd)
+      ? cards.filter((card) => card.ts >= windowStart && card.ts <= windowEnd)
+      : cards
+  const pool = candidates.length > 0 ? candidates : cards
+  if (!Number.isFinite(focusTs)) return pool[0]
+  return pool.reduce((best, card) =>
+    Math.abs(card.ts - focusTs) < Math.abs(best.ts - focusTs) ? card : best,
+  )
+}
+
+function alignCardContainer(componentVm, containerRef, cards, timeWindow, focusDate) {
+  const container = componentVm.$refs?.[containerRef]
+  if (!container) return false
+  const card = chooseCardForAlignment(cards, timeWindow, focusDate)
+  if (!card) return false
+  const targetIndex = cards.findIndex((item) => item.ts === card.ts)
+  const cardEls = container.querySelectorAll('.manipulation-card')
+  const targetEl = cardEls[targetIndex]
+  if (!targetEl) return false
+
+  let targetX = container.clientWidth / 2
+  const chartState = componentVm.chartState
+  const cardDate = new Date(card.ts)
+  if (chartState?.xScale && chartState?.m) {
+    const chartX = chartState.xScale(cardDate)
+    if (chartX !== undefined) {
+      targetX = chartState.m.left + chartX + chartState.xScale.bandwidth() / 2
+    }
+  }
+
+  const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth)
+  const nextScrollLeft = Math.min(
+    maxScrollLeft,
+    Math.max(0, targetEl.offsetLeft + targetEl.offsetWidth / 2 - targetX),
+  )
+  container.scrollLeft = nextScrollLeft
+  return true
+}
+
+function alignKlineCards(componentVm, renderArgs) {
+  if (!['visible_window', 'focus_time'].includes(renderArgs.cardAlignment)) return false
+  const timeWindow = normalizeTimeWindow(renderArgs.visibleTimeWindow)
+  const explicitFocusDate = parseRenderDate(renderArgs.cardFocusTime)
+  const focusDate = Number.isNaN(explicitFocusDate.getTime())
+    ? timeWindow
+      ? new Date((timeWindow[0].getTime() + timeWindow[1].getTime()) / 2)
+      : null
+    : explicitFocusDate
+  if (!timeWindow && !focusDate) return false
+
+  const topAligned = alignCardContainer(
+    componentVm,
+    'topCardsContainer',
+    componentVm.topCards,
+    timeWindow,
+    focusDate,
+  )
+  const bottomAligned = alignCardContainer(
+    componentVm,
+    'bottomCardsContainer',
+    componentVm.bottomCards,
+    timeWindow,
+    focusDate,
+  )
+  return topAligned || bottomAligned
+}
+
+function assertBehaviorDetailsRenderable(args) {
+  const selectedUsers = Array.isArray(args.selectedUsersList)
+    ? args.selectedUsersList
+    : []
+  const hasSelection = !!args.selectedUser || selectedUsers.length > 0
+  const hasBehaviorData =
+    args.behaviorData &&
+    typeof args.behaviorData === 'object' &&
+    Object.keys(args.behaviorData).length > 0
+
+  if (!hasSelection) {
+    throw new Error(
+      'behavior_details render requires selectedUser or a non-empty selectedUsersList',
+    )
+  }
+  if (!hasBehaviorData) {
+    throw new Error(
+      'behavior_details render requires behaviorData for the selected user or card users',
+    )
+  }
+}
+
+function shouldRequireRenderable(options = {}) {
+  if (options.allowEmpty) return false
+  if (typeof options.strict === 'boolean') return options.strict
+  return false
 }
 
 export async function renderTokenDistributionView(args, options = {}) {
@@ -453,6 +679,12 @@ export async function renderTokenDistributionView(args, options = {}) {
 export async function renderCandlestickView(args, options = {}) {
   const viewName = 'candlestick_chart'
   const renderArgs = prepareRenderArgs(viewName, args)
+  if (renderArgs.visibleTimeWindow) {
+    const zoomTransform = createKlineZoomTransform(renderArgs, renderArgs.visibleTimeWindow)
+    if (zoomTransform) {
+      renderArgs.zoomTransform = zoomTransform
+    }
+  }
   const image = await mountAndRender(
     CandlestickChart,
     {
@@ -474,10 +706,11 @@ export async function renderCandlestickView(args, options = {}) {
         componentVm.refresh()
       },
       afterSettle: async (componentVm) => {
-        if (componentVm.$refs?.topCardsContainer) {
+        const alignedCards = alignKlineCards(componentVm, renderArgs)
+        if (!alignedCards && componentVm.$refs?.topCardsContainer) {
           componentVm.$refs.topCardsContainer.scrollLeft = renderArgs.topCardsScrollLeft || 0
         }
-        if (componentVm.$refs?.bottomCardsContainer) {
+        if (!alignedCards && componentVm.$refs?.bottomCardsContainer) {
           componentVm.$refs.bottomCardsContainer.scrollLeft = renderArgs.bottomCardsScrollLeft || 0
         }
         if (typeof componentVm.drawBands === 'function') {
@@ -497,6 +730,9 @@ export async function renderCandlestickView(args, options = {}) {
 export async function renderBehaviorDetailsView(args, options = {}) {
   const viewName = 'behavior_details'
   const renderArgs = prepareRenderArgs(viewName, args)
+  if (shouldRequireRenderable(options)) {
+    assertBehaviorDetailsRenderable(renderArgs)
+  }
   const image = await mountAndRender(
     BehaviorDetails,
     {
@@ -509,6 +745,8 @@ export async function renderBehaviorDetailsView(args, options = {}) {
         ? renderArgs.manipulationResults
         : [],
       syncTargetTimeWindow: renderArgs.syncTargetTimeWindow,
+      visibleTimeWindow: renderArgs.visibleTimeWindow,
+      maxEventsPerUser: renderArgs.maxEventsPerUser,
     },
     renderArgs,
     {
@@ -522,6 +760,9 @@ export async function renderBehaviorDetailsView(args, options = {}) {
           componentVm.drawChart()
         }
       },
+      collectMetadata: (componentVm) => ({
+        behaviorDetails: componentVm._renderStats || null,
+      }),
     },
   )
   return buildRenderResult(viewName, renderArgs, image, options)
@@ -541,13 +782,65 @@ export async function renderMajorVisualizationView(viewName, args, options = {})
   return renderBehaviorDetailsView(args, options)
 }
 
-export async function captureMajorVisualizationView(vm, viewName, options = {}) {
+function isRenderArgsLike(viewName, value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const keys = renderArgKeys(viewName).filter((key) => key !== 'width' && key !== 'height')
+  return keys.some((key) => Object.prototype.hasOwnProperty.call(value, key))
+}
+
+function resolveCaptureArguments(vm, viewName, argsOrOptions = {}, maybeOptions = {}) {
+  if (argsOrOptions?.renderArgs) {
+    const { renderArgs, ...options } = argsOrOptions
+    return {
+      args: renderArgs,
+      options: {
+        ...options,
+        ...maybeOptions,
+      },
+    }
+  }
+
+  if (isRenderArgsLike(viewName, argsOrOptions)) {
+    return {
+      args: argsOrOptions,
+      options: maybeOptions || {},
+    }
+  }
+
+  const options = argsOrOptions || {}
+  return {
+    args: getMajorViewRenderArgs(vm, viewName, options),
+    options,
+  }
+}
+
+export async function captureMajorVisualizationView(
+  vm,
+  viewName,
+  argsOrOptions = {},
+  maybeOptions = {},
+) {
   const normalizedViewName = normalizeMajorViewName(viewName)
   if (!normalizedViewName) {
     throw new Error(`Unknown major visualization view: ${viewName}`)
   }
-  const args = getMajorViewRenderArgs(vm, normalizedViewName, options)
-  return renderMajorVisualizationView(normalizedViewName, args, options)
+  const { args, options } = resolveCaptureArguments(
+    vm,
+    normalizedViewName,
+    argsOrOptions,
+    maybeOptions,
+  )
+  const renderOptions = {
+    ...options,
+  }
+  if (
+    normalizedViewName === 'behavior_details' &&
+    renderOptions.strict == null &&
+    renderOptions.allowEmpty == null
+  ) {
+    renderOptions.strict = true
+  }
+  return renderMajorVisualizationView(normalizedViewName, args, renderOptions)
 }
 
 export async function captureMajorVisualizationViews(vm, viewNames = MAJOR_VIEW_NAMES, options = {}) {
@@ -557,6 +850,12 @@ export async function captureMajorVisualizationViews(vm, viewNames = MAJOR_VIEW_
   if (!Array.isArray(viewNames)) {
     names = MAJOR_VIEW_NAMES
     captureOptions = viewNames || {}
+  }
+  if (captureOptions.strict == null && captureOptions.allowEmpty == null) {
+    captureOptions = {
+      ...captureOptions,
+      allowEmpty: true,
+    }
   }
 
   const results = []
@@ -571,6 +870,14 @@ export function createMajorViewApi(vm) {
     views: [...MAJOR_VIEW_NAMES],
     aliases: { ...VIEW_ALIASES },
     requiredArguments: { ...REQUIRED_RENDER_ARGS },
+    optionalArguments: Object.fromEntries(
+      Object.entries(OPTIONAL_RENDER_ARG_DEFAULTS).map(([view, defaults]) => [
+        view,
+        Object.keys(defaults),
+      ]),
+    ),
+    optionalArgumentDefaults: { ...OPTIONAL_RENDER_ARG_DEFAULTS },
+    createKlineZoomTransform,
     getRenderArgs: (viewName, options = {}) => getMajorViewRenderArgs(vm, viewName, options),
     getDataDependencies: (viewName, options = {}) =>
       getMajorViewDataDependencies(vm, viewName, options),
@@ -581,8 +888,8 @@ export function createMajorViewApi(vm) {
     renderCandlestickView: (args, options = {}) => renderCandlestickView(args, options),
     renderBehaviorDetailsView: (args, options = {}) =>
       renderBehaviorDetailsView(args, options),
-    captureView: (viewName, options = {}) =>
-      captureMajorVisualizationView(vm, viewName, options),
+    captureView: (viewName, argsOrOptions = {}, maybeOptions = {}) =>
+      captureMajorVisualizationView(vm, viewName, argsOrOptions, maybeOptions),
     captureAllViews: (viewNamesOrOptions, maybeOptions = {}) =>
       captureMajorVisualizationViews(vm, viewNamesOrOptions, maybeOptions),
   }

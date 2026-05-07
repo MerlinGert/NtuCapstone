@@ -131,6 +131,14 @@ export default {
       type: Array,
       default: () => null,
     },
+    visibleTimeWindow: {
+      type: Array,
+      default: () => null,
+    },
+    maxEventsPerUser: {
+      type: Number,
+      default: 1500,
+    },
   },
   data() {
     return {
@@ -170,6 +178,19 @@ export default {
         })
       },
       deep: true,
+    },
+    visibleTimeWindow: {
+      handler() {
+        this.$nextTick(() => {
+          this.drawChart()
+        })
+      },
+      deep: true,
+    },
+    maxEventsPerUser() {
+      this.$nextTick(() => {
+        this.drawChart()
+      })
     },
   },
   mounted() {
@@ -315,7 +336,19 @@ export default {
 
       const filteredData = {}
       const sequenceData = {} // Store continuous balance and earning_usd sequences
-      const MAX_EVENTS_PER_USER = 1500 // Limit rendering to prevent browser freeze
+      const configuredMaxEvents = Number(this.maxEventsPerUser)
+      const MAX_EVENTS_PER_USER =
+        Number.isFinite(configuredMaxEvents) && configuredMaxEvents > 0
+          ? Math.floor(configuredMaxEvents)
+          : 1500
+      const renderStats = {
+        sampling: {
+          maxEventsPerUser: MAX_EVENTS_PER_USER,
+          users: [],
+        },
+        visibleTimeWindowApplied: null,
+      }
+      this._renderStats = renderStats
 
       sortedUsers.forEach((user) => {
         const events = this.behaviorData[user] || []
@@ -400,9 +433,17 @@ export default {
           )
           const step = Math.max(
             1,
-            Math.floor(validEvents.length / MAX_EVENTS_PER_USER),
+            Math.ceil(validEvents.length / MAX_EVENTS_PER_USER),
           )
+          const originalEvents = validEvents.length
           validEvents = validEvents.filter((_, index) => index % step === 0)
+          renderStats.sampling.users.push({
+            user,
+            kind: 'events',
+            originalCount: originalEvents,
+            renderedCount: validEvents.length,
+            step,
+          })
         }
 
         filteredData[user] = validEvents
@@ -412,11 +453,19 @@ export default {
         if (seq.length > MAX_EVENTS_PER_USER * 2) {
           const seqStep = Math.max(
             1,
-            Math.floor(seq.length / (MAX_EVENTS_PER_USER * 2)),
+            Math.ceil(seq.length / (MAX_EVENTS_PER_USER * 2)),
           )
+          const originalSeqPoints = seq.length
           finalSeq = seq.filter(
             (_, index) => index % seqStep === 0 || index === seq.length - 1,
           )
+          renderStats.sampling.users.push({
+            user,
+            kind: 'balanceSequence',
+            originalCount: originalSeqPoints,
+            renderedCount: finalSeq.length,
+            step: seqStep,
+          })
         }
 
         // Aggregate earning events that happen at the exact same time
@@ -451,6 +500,33 @@ export default {
       const margin = { top: 30, right: 20, bottom: 25, left: 40 } // Adjusted bottom margin
       const innerWidth = width - margin.left - margin.right
       const innerHeight = height - margin.top - margin.bottom
+
+      let displayStartDate = earliestDate
+      let displayEndDate = snapshotDate
+      if (
+        !this.useSequentialTime &&
+        Array.isArray(this.visibleTimeWindow) &&
+        this.visibleTimeWindow.length === 2
+      ) {
+        const candidateStart = parseDateSafe(this.visibleTimeWindow[0])
+        const candidateEnd = parseDateSafe(this.visibleTimeWindow[1])
+        if (
+          !Number.isNaN(candidateStart.getTime()) &&
+          !Number.isNaN(candidateEnd.getTime()) &&
+          candidateStart < candidateEnd
+        ) {
+          displayStartDate = candidateStart
+          displayEndDate = candidateEnd
+          renderStats.visibleTimeWindowApplied = [
+            displayStartDate.toISOString(),
+            displayEndDate.toISOString(),
+          ]
+        }
+      }
+      this._lastChartState.displayTimeDomain = [
+        displayStartDate.getTime(),
+        displayEndDate.getTime(),
+      ]
 
       // Create SVG
       const rootSvg = d3
@@ -543,7 +619,7 @@ export default {
         // Absolute Time (Default)
         xScale = d3
           .scaleTime()
-          .domain([earliestDate, snapshotDate])
+          .domain([displayStartDate, displayEndDate])
           .range([0, innerWidth])
           
         xAxis = d3.axisBottom(xScale)

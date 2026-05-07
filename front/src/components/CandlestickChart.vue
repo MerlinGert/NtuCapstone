@@ -255,8 +255,6 @@ export default {
           bins[binIdx].sameDirection.push(res)
         }
       })
-      console.log('bins', bins)
-
       const roundTripCards = []
       const sameDirectionCards = []
 
