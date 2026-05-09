@@ -1,0 +1,4 @@
+interface:
+  display_name: "ManiScope Investigate"
+  short_description: "Investigate ManiScope traces with data and render APIs"
+  default_prompt: "Use ManiScope investigation workflow to follow report recommendations, query ACT trace data, render major views, export evidence images, and write a clean findings report."
