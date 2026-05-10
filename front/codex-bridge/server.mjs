@@ -178,6 +178,7 @@ You must analyze the current live ManiScope trace for the active session.
 Read these files first:
 - docs/reports/user-manual.en.md
 - skills/user-trace-analysis.md
+- skills/maniscope-investigate/SKILL.md
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
 
@@ -189,13 +190,27 @@ The latest major-view screenshots are also attached to this turn as image inputs
 Generated artifacts should be written under:
 - ${relativeSessionRoot}/artifacts
 
-When the user asks for trace analysis, follow skills/user-trace-analysis.md.
+Use these two skills in sequence:
+
+1. For conversation about the user's current trace, trace summaries, intention/finding reconstruction, and report generation, follow skills/user-trace-analysis.md. Use its methodology and terminology:
+   - Intention Space: Task, Analytic Question, Hypothesis.
+   - Action Space: Interaction, Analytic Activity, Investigation Strategy.
+   - Finding Space: Finding and Insight.
+   - Map Intention -> Action Space unit -> Finding Space output, and keep rationale explicit.
+
+2. For autonomous follow-up investigation, first use the outputs of skills/user-trace-analysis.md, especially the recommendations, Findings, Insights, and trace-step map. Then follow skills/maniscope-investigate/SKILL.md to execute Investigation Strategies through concrete Analytic Activities and Interactions. Use local data, backend endpoints, and major-view render APIs when useful. Save rendered evidence images and reports under ${relativeSessionRoot}/artifacts.
+
 Produce or update:
 - ${relativeSessionRoot}/artifacts/analysis-report.md
 - ${relativeSessionRoot}/artifacts/trace-step-map.md
 
-Distinguish observed user actions, user-authored annotations, and your own inferred analysis.
-Use top-down recommendations and classify atomic actions as Visual or Statistical.
+When conducting autonomous investigation, also produce or update a follow-up report when useful:
+- ${relativeSessionRoot}/artifacts/investigation-report.md
+
+Distinguish observed logged Interactions, user-authored annotations, user-authored Findings or Insights, and your own inferred analysis.
+Use precise terms from the skills instead of generic "actions" or legacy "atomic actions".
+When the user asks for next steps, present them top-down as Investigation Strategies, Analytic Activities, and Interactions.
+When the user asks you to investigate, treat the latest analysis report and trace-step map as the starting plan, then execute the relevant Investigation Strategy using the investigation skill.
 
 ---
 
@@ -209,10 +224,10 @@ function buildInput(sessionId, threadKey, userMessage, isNewThread, attachmentPa
     'Please inspect the attached image input in the context of the current ManiScope session.'
 
   if (isNewThread && threadKey === 'trace-analysis') {
-    const initialPrompt = buildTraceAnalysisPrompt(sessionId, text)
-    if (attachmentPaths.length === 0) return initialPrompt
+    const promptText = buildTraceAnalysisPrompt(sessionId, text)
+    if (attachmentPaths.length === 0) return promptText
     return [
-      { type: 'text', text: initialPrompt },
+      { type: 'text', text: promptText },
       ...attachmentPaths.map((imagePath) => ({ type: 'local_image', path: imagePath })),
     ]
   }
