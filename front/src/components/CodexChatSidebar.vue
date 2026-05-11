@@ -706,7 +706,7 @@ export default {
           await this.beforeSend()
         }
         this.$emit('send', { content, attachments })
-        assistantMessage = {
+        const nextAssistantMessage = {
           id: this.nextMessageId++,
           role: 'assistant',
           content: '',
@@ -717,7 +717,8 @@ export default {
           ephemeralReasoning: '',
           createdAt: new Date().toISOString(),
         }
-        this.messages.push(assistantMessage)
+        this.messages.push(nextAssistantMessage)
+        assistantMessage = this.messages[this.messages.length - 1]
         this.scrollToBottom()
         await this.sendToCodex(content, codexAttachments, assistantMessage)
         assistantMessage.loading = false
