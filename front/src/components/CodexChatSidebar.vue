@@ -41,14 +41,36 @@
             v-html="renderMarkdown(message.content)"
           ></div>
           <div v-else-if="message.content" class="message-text">{{ message.content }}</div>
-          <div v-if="message.loading" class="message-loading">Codex is working...</div>
+          <div v-if="message.loading" class="message-loading">
+            <span class="loading-pulse"></span>
+            {{ stopRequested ? 'Stopping Codex...' : 'Codex is working...' }}
+          </div>
+          <div v-if="message.ephemeralReasoning" class="reasoning-bubble">
+            <div class="reasoning-label">Thinking</div>
+            <div class="reasoning-text">{{ message.ephemeralReasoning }}</div>
+          </div>
           <div v-if="message.activity && message.activity.length" class="message-activity">
-            <button type="button" class="activity-toggle" @click="message.activityOpen = !message.activityOpen">
-              Agent activity ({{ message.activity.length }})
-            </button>
-            <div v-if="message.activityOpen" class="activity-list">
-              <div v-for="activity in message.activity" :key="activity.id" class="activity-item">
-                {{ activity.text }}
+            <div class="activity-header">
+              <span>Agent activity</span>
+              <button type="button" class="activity-toggle" @click="message.activityOpen = !message.activityOpen">
+                {{ activityToggleLabel(message) }}
+              </button>
+            </div>
+            <div class="activity-list">
+              <div
+                v-for="activity in displayedActivities(message)"
+                :key="activity.id"
+                class="activity-item"
+                :class="activityClass(activity)"
+              >
+                <span class="activity-dot"></span>
+                <span class="activity-body">
+                  <span class="activity-title">{{ activity.title || activity.text }}</span>
+                  <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
+                  <span v-if="activity.output && message.activityOpen" class="activity-output">
+                    {{ activity.output }}
+                  </span>
+                </span>
               </div>
             </div>
           </div>
@@ -61,7 +83,13 @@
               target="_blank"
               rel="noreferrer"
             >
-              {{ artifact.title }}
+              <img
+                v-if="artifact.kind === 'image'"
+                class="artifact-thumb"
+                :src="artifactHref(artifact)"
+                :alt="artifact.title"
+              />
+              <span>{{ artifact.title }}</span>
             </a>
           </div>
           <div v-if="message.attachments && message.attachments.length" class="message-attachments">
@@ -107,6 +135,16 @@
           @click="clearChat"
         >
           Clear
+        </button>
+        <button
+          v-if="sending"
+          class="codex-chat-stop"
+          type="button"
+          title="Stop the current Codex turn"
+          :disabled="stopRequested"
+          @click="stopCodexTurn"
+        >
+          {{ stopRequested ? 'Stopping...' : 'Stop' }}
         </button>
         <button
           class="codex-chat-send"
@@ -169,6 +207,7 @@ export default {
       messages: [],
       attachments: [],
       sending: false,
+      stopRequested: false,
       dragging: false,
       nextMessageId: 1,
       nextAttachmentId: 1,
@@ -203,18 +242,55 @@ export default {
     renderMarkdown(content) {
       return DOMPurify.sanitize(markdown.render(content || ''))
     },
+    normalizeActivity(activity, fallbackId) {
+      if (typeof activity === 'string') {
+        return {
+          id: fallbackId,
+          text: activity,
+          title: activity,
+          detail: '',
+          output: '',
+          level: 'detail',
+          category: 'legacy',
+          status: '',
+          eventId: '',
+          ephemeral: false,
+        }
+      }
+
+      const payload = activity && typeof activity === 'object' ? activity : {}
+      const title = String(payload.title || payload.text || payload.command || payload.type || 'Activity')
+      const detail = String(payload.detail || '')
+      return {
+        id: payload.id || fallbackId,
+        text: String(payload.text || title),
+        title,
+        detail,
+        output: String(payload.output || ''),
+        level: ['primary', 'highlight', 'detail', 'debug', 'error', 'ephemeral'].includes(payload.level)
+          ? payload.level
+          : 'detail',
+        category: String(payload.category || payload.type || 'event'),
+        status: String(payload.status || ''),
+        eventId: String(payload.eventId || ''),
+        ephemeral: Boolean(payload.ephemeral),
+      }
+    },
     normalizeHistoryMessage(message, fallbackId) {
       return {
         id: Number(message.id) || fallbackId,
         role: message.role === 'user' ? 'user' : 'assistant',
         content: String(message.content || ''),
         attachments: Array.isArray(message.attachments) ? message.attachments : [],
-        activity: Array.isArray(message.activity) ? message.activity : [],
+        activity: Array.isArray(message.activity)
+          ? message.activity.map((activity, index) => this.normalizeActivity(activity, `${fallbackId}-${index + 1}`))
+          : [],
         artifacts: Array.isArray(message.artifacts) ? message.artifacts : [],
         activityOpen: Boolean(message.activityOpen),
         threadId: message.threadId || '',
         createdAt: message.createdAt || '',
         loading: false,
+        ephemeralReasoning: '',
       }
     },
     serializeMessages() {
@@ -223,7 +299,7 @@ export default {
         role: message.role,
         content: message.content || '',
         attachments: message.attachments || [],
-        activity: message.activity || [],
+        activity: (message.activity || []).filter((activity) => !activity.ephemeral),
         artifacts: message.artifacts || [],
         activityOpen: Boolean(message.activityOpen),
         threadId: message.threadId || '',
@@ -280,6 +356,7 @@ export default {
       this.messages = []
       this.nextMessageId = 1
       this.nextActivityId = 1
+      this.stopRequested = false
       if (!this.sessionId) return
 
       const response = await fetch(`/api/chat/${this.sessionId}/threads/trace-analysis`, {
@@ -354,48 +431,133 @@ export default {
       if (!this.sessionId || !artifact?.title) return '#'
       return `/api/sessions/${this.sessionId}/artifacts/${encodeURIComponent(artifact.title)}`
     },
-    addActivity(message, text) {
-      if (!text) return
-      message.activity.push({
-        id: this.nextActivityId++,
-        text,
-      })
+    displayedActivities(message) {
+      const activities = (message.activity || []).filter((activity) => !activity.ephemeral)
+      if (message.activityOpen) return activities
+      const visible = activities.filter((activity) => activity.level !== 'debug')
+      return visible.slice(Math.max(0, visible.length - 5))
+    },
+    activityToggleLabel(message) {
+      if (message.activityOpen) return 'Hide details'
+      return `${this.displayedActivities(message).length}/${(message.activity || []).length}`
+    },
+    activityClass(activity) {
+      return {
+        [`activity-${activity.level || 'detail'}`]: true,
+        'activity-running': ['running', 'in_progress', 'preparing', 'started'].includes(activity.status),
+      }
+    },
+    addActivity(message, activity) {
+      if (!activity || !message) return
+      if (!Array.isArray(message.activity)) message.activity = []
+
+      const normalized = this.normalizeActivity(activity, this.nextActivityId++)
+      if (normalized.ephemeral) return
+
+      if (normalized.eventId) {
+        const existingIndex = message.activity.findIndex(
+          (item) => item.eventId === normalized.eventId && item.category === normalized.category,
+        )
+        if (existingIndex !== -1) {
+          message.activity.splice(existingIndex, 1, {
+            ...message.activity[existingIndex],
+            ...normalized,
+            id: message.activity[existingIndex].id,
+          })
+          return
+        }
+      }
+      message.activity.push(normalized)
+    },
+    activeAssistantMessage() {
+      for (let index = this.messages.length - 1; index >= 0; index -= 1) {
+        const message = this.messages[index]
+        if (message.role === 'assistant' && message.loading) return message
+      }
+      return null
+    },
+    formatUsage(usage) {
+      if (!usage || typeof usage !== 'object') return ''
+      const input = Number(usage.input_tokens || 0)
+      const output = Number(usage.output_tokens || 0)
+      const reasoning = Number(usage.reasoning_output_tokens || 0)
+      return `${input} input, ${output} output, ${reasoning} reasoning tokens`
     },
     handleCodexEvent(event, assistantMessage) {
       if (!event || !event.type) return
 
       if (event.type === 'agent_message') {
         if (event.text) {
+          assistantMessage.ephemeralReasoning = ''
           assistantMessage.content = assistantMessage.content
             ? `${assistantMessage.content}\n\n${event.text}`
             : event.text
         }
       } else if (event.type === 'reasoning') {
-        this.addActivity(assistantMessage, event.text ? `Reasoning: ${event.text}` : 'Reasoning update')
+        assistantMessage.ephemeralReasoning = event.text || 'Working through the trace evidence...'
+      } else if (event.type === 'status') {
+        assistantMessage.ephemeralReasoning = event.detail || event.title || 'Codex is working...'
+        this.addActivity(assistantMessage, event)
       } else if (event.type === 'command') {
-        const status = event.status ? `${event.status}: ` : ''
-        this.addActivity(assistantMessage, `${status}${event.command || 'Command execution'}`)
+        assistantMessage.ephemeralReasoning = event.status
+          ? `${event.status}: ${event.command || event.title || 'Tool call'}`
+          : event.command || event.title || 'Using a tool...'
+        this.addActivity(assistantMessage, event)
       } else if (event.type === 'file_change') {
-        const count = Array.isArray(event.changes) ? event.changes.length : 0
-        this.addActivity(assistantMessage, `File changes ${event.status || 'completed'} (${count})`)
+        assistantMessage.ephemeralReasoning = event.detail || 'Updating an artifact...'
+        this.addActivity(assistantMessage, event)
       } else if (event.type === 'web_search') {
-        this.addActivity(assistantMessage, `Web search: ${event.query || ''}`.trim())
+        assistantMessage.ephemeralReasoning = event.detail || 'Searching...'
+        this.addActivity(assistantMessage, event)
       } else if (event.type === 'todo_list') {
-        const items = Array.isArray(event.items) ? event.items : []
-        const completed = items.filter((item) => item.completed).length
-        this.addActivity(assistantMessage, `Plan progress: ${completed}/${items.length} items complete`)
+        assistantMessage.ephemeralReasoning = event.detail || 'Updating the working plan...'
+        this.addActivity(assistantMessage, event)
       } else if (event.type === 'mcp_tool_call') {
-        this.addActivity(assistantMessage, `${event.status || 'Tool'}: ${event.tool || 'MCP tool'}`)
+        assistantMessage.ephemeralReasoning = event.detail || event.title || 'Calling a tool...'
+        this.addActivity(assistantMessage, event)
       } else if (event.type === 'artifact' && event.artifact) {
-        assistantMessage.artifacts.push(event.artifact)
+        const existing = assistantMessage.artifacts.some((artifact) => artifact.id === event.artifact.id)
+        if (!existing) assistantMessage.artifacts.push(event.artifact)
+        this.addActivity(assistantMessage, {
+          level: 'highlight',
+          category: 'artifact',
+          title: 'Artifact ready',
+          detail: event.artifact.title,
+        })
       } else if (event.type === 'error') {
+        this.addActivity(assistantMessage, {
+          level: 'error',
+          category: 'session',
+          title: event.title || 'Codex error',
+          detail: event.error || '',
+        })
         assistantMessage.content = assistantMessage.content
           ? `${assistantMessage.content}\n\nError: ${event.error}`
           : `Error: ${event.error}`
       } else if (event.type === 'thread') {
         assistantMessage.threadId = event.threadId
+        this.addActivity(assistantMessage, event)
+      } else if (event.type === 'usage') {
+        this.addActivity(assistantMessage, {
+          level: 'debug',
+          category: 'session',
+          title: 'Token usage',
+          detail: this.formatUsage(event.usage),
+        })
+      } else if (event.type === 'stopped') {
+        assistantMessage.ephemeralReasoning = ''
+        assistantMessage.loading = false
+        this.addActivity(assistantMessage, event)
+        if (!assistantMessage.content) assistantMessage.content = 'Stopped before completion.'
       } else if (event.type === 'done') {
+        assistantMessage.ephemeralReasoning = ''
         assistantMessage.threadId = event.threadId || assistantMessage.threadId
+        this.addActivity(assistantMessage, {
+          level: 'detail',
+          category: 'session',
+          title: 'Turn complete',
+          detail: 'Codex finished this turn.',
+        })
       }
     },
     async readSseStream(stream, onEvent) {
@@ -458,6 +620,53 @@ export default {
         this.scrollToBottom()
       })
     },
+    async stopCodexTurn() {
+      if (!this.sending || this.stopRequested || !this.sessionId) return
+
+      this.stopRequested = true
+      const assistantMessage = this.activeAssistantMessage()
+      if (assistantMessage) {
+        this.addActivity(assistantMessage, {
+          level: 'highlight',
+          category: 'session',
+          title: 'Stop requested',
+          detail: 'Asking Codex to stop the current turn.',
+          status: 'running',
+        })
+      }
+
+      try {
+        const response = await fetch(`/api/chat/${this.sessionId}/threads/trace-analysis/stop`, {
+          method: 'POST',
+        })
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(errorText || `Stop request failed with HTTP ${response.status}`)
+        }
+        const payload = await response.json().catch(() => ({}))
+        if (!payload.stopped) {
+          this.stopRequested = false
+          if (assistantMessage) {
+            this.addActivity(assistantMessage, {
+              level: 'detail',
+              category: 'session',
+              title: 'No active turn',
+              detail: 'The bridge did not have an active Codex turn to stop.',
+            })
+          }
+        }
+      } catch (error) {
+        this.stopRequested = false
+        if (assistantMessage) {
+          this.addActivity(assistantMessage, {
+            level: 'error',
+            category: 'session',
+            title: 'Stop failed',
+            detail: error && error.message ? error.message : String(error),
+          })
+        }
+      }
+    },
     async sendMessage() {
       const content = this.draft.trim()
       if (this.sending || (!content && this.attachments.length === 0)) return
@@ -479,6 +688,7 @@ export default {
       })
       this.draft = ''
       this.sending = true
+      this.stopRequested = false
       this.scrollToBottom()
 
       try {
@@ -504,30 +714,49 @@ export default {
           activity: [],
           artifacts: [],
           activityOpen: false,
+          ephemeralReasoning: '',
           createdAt: new Date().toISOString(),
         }
         this.messages.push(assistantMessage)
         this.scrollToBottom()
         await this.sendToCodex(content, codexAttachments, assistantMessage)
         assistantMessage.loading = false
+        assistantMessage.ephemeralReasoning = ''
         if (!assistantMessage.content && assistantMessage.artifacts.length > 0) {
           assistantMessage.content = 'Generated artifacts are available below.'
         }
       } catch (error) {
-        this.messages.push({
-          id: this.nextMessageId++,
-          role: 'assistant',
-          content: `Error: ${error && error.message ? error.message : String(error)}`,
-          activity: [],
-          artifacts: [],
-          createdAt: new Date().toISOString(),
-        })
+        const errorText = error && error.message ? error.message : String(error)
+        if (assistantMessage) {
+          assistantMessage.content = assistantMessage.content
+            ? `${assistantMessage.content}\n\nError: ${errorText}`
+            : `Error: ${errorText}`
+          this.addActivity(assistantMessage, {
+            level: 'error',
+            category: 'session',
+            title: 'Chat request failed',
+            detail: errorText,
+          })
+        } else {
+          this.messages.push({
+            id: this.nextMessageId++,
+            role: 'assistant',
+            content: `Error: ${errorText}`,
+            activity: [],
+            artifacts: [],
+            createdAt: new Date().toISOString(),
+          })
+        }
       } finally {
-        if (assistantMessage) assistantMessage.loading = false
+        if (assistantMessage) {
+          assistantMessage.loading = false
+          assistantMessage.ephemeralReasoning = ''
+        }
         await this.persistChatHistory().catch((error) => {
           console.error('CodexChatSidebar: failed to persist chat history', error)
         })
         this.sending = false
+        this.stopRequested = false
         this.scrollToBottom()
       }
     },
@@ -719,8 +948,44 @@ export default {
 }
 
 .message-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #64748b;
   font-size: 12px;
+}
+
+.loading-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3182ce;
+  box-shadow: 0 0 0 0 rgba(49, 130, 206, 0.45);
+  animation: codex-pulse 1.25s ease-out infinite;
+}
+
+.reasoning-bubble {
+  margin-top: 7px;
+  padding: 7px 8px;
+  border: 1px solid #bfdbfe;
+  border-left: 3px solid #3182ce;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #334155;
+}
+
+.reasoning-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2b6cb0;
+  text-transform: uppercase;
+}
+
+.reasoning-text {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: pre-wrap;
 }
 
 .message-activity {
@@ -729,10 +994,20 @@ export default {
   padding-top: 6px;
 }
 
+.activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .activity-toggle {
   border: none;
   background: transparent;
-  color: #475569;
+  color: #2b6cb0;
   font-size: 11px;
   font-weight: 700;
   padding: 0;
@@ -740,16 +1015,98 @@ export default {
 }
 
 .activity-list {
-  margin-top: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
 }
 
 .activity-item {
-  color: #64748b;
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  gap: 6px;
+  align-items: start;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 5px 6px;
+  background: #f8fafc;
+  color: #475569;
   font-size: 11px;
   line-height: 1.35;
-  white-space: nowrap;
+}
+
+.activity-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.activity-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.activity-title {
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-detail,
+.activity-output {
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-output {
+  max-height: 94px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+}
+
+.activity-highlight {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.activity-highlight .activity-dot {
+  background: #3182ce;
+}
+
+.activity-primary {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.activity-primary .activity-dot {
+  background: #38a169;
+}
+
+.activity-error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+}
+
+.activity-error .activity-dot {
+  background: #e53e3e;
+}
+
+.activity-debug {
+  opacity: 0.75;
+}
+
+.activity-running .activity-dot {
+  animation: codex-pulse 1.25s ease-out infinite;
 }
 
 .message-artifacts {
@@ -760,6 +1117,9 @@ export default {
 }
 
 .artifact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: #2b6cb0;
   background: #ebf8ff;
   border: 1px solid #bee3f8;
@@ -771,6 +1131,14 @@ export default {
 
 .artifact-link:hover {
   background: #dbeafe;
+}
+
+.artifact-thumb {
+  width: 54px;
+  height: 38px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid #bfdbfe;
 }
 
 .message-attachments {
@@ -875,14 +1243,14 @@ export default {
 }
 
 .codex-chat-actions {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
+  display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 8px;
 }
 
 .codex-chat-secondary,
+.codex-chat-stop,
 .codex-chat-send {
   border: none;
   border-radius: 6px;
@@ -896,16 +1264,35 @@ export default {
   color: #334155;
 }
 
+.codex-chat-stop {
+  background: #fff1f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
 .codex-chat-send {
   background: #2b6cb0;
   color: #fff;
-  justify-self: end;
+  margin-left: auto;
 }
 
 .codex-chat-secondary:disabled,
+.codex-chat-stop:disabled,
 .codex-chat-send:disabled {
   background: #cbd5e1;
   cursor: not-allowed;
+}
+
+@keyframes codex-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(49, 130, 206, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(49, 130, 206, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(49, 130, 206, 0);
+  }
 }
 
 @media (max-width: 760px) {

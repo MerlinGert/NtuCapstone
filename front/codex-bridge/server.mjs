@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
+const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FRONT_DIR = path.resolve(__dirname, '..')
 const REPO_ROOT = process.env.MANISCOPE_REPO_ROOT || path.resolve(FRONT_DIR, '..')
@@ -12,6 +13,7 @@ const CHAT_ROOT = path.join(REPO_ROOT, '.maniscope-chat')
 const SESSIONS_DIR = path.join(CHAT_ROOT, 'sessions')
 const PORT = Number(process.env.CODEX_BRIDGE_PORT || 8787)
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
+const activeTurns = new Map()
 
 function sessionDir(sessionId) {
   if (!SESSION_ID_RE.test(sessionId)) {
@@ -20,6 +22,19 @@ function sessionDir(sessionId) {
     throw error
   }
   return path.join(SESSIONS_DIR, sessionId)
+}
+
+function validateThreadKey(threadKey) {
+  if (!THREAD_KEY_RE.test(threadKey)) {
+    const error = new Error('Thread key must use letters, numbers, underscores, or hyphens')
+    error.statusCode = 400
+    throw error
+  }
+  return threadKey
+}
+
+function activeTurnKey(sessionId, threadKey) {
+  return `${sessionId}:${threadKey}`
 }
 
 function readJson(filePath, fallback) {
@@ -65,6 +80,41 @@ function sendJson(res, statusCode, payload) {
 
 function sendSse(res, event) {
   res.write(`data: ${JSON.stringify(event)}\n\n`)
+}
+
+function startProgressHeartbeat(res, shouldStop) {
+  const notes = [
+    {
+      title: 'Inspecting trace context',
+      detail: 'Reading the live trace, current state, and available screenshots.',
+    },
+    {
+      title: 'Mapping evidence',
+      detail: 'Relating observed Interactions to intentions, Findings, and possible Insights.',
+    },
+    {
+      title: 'Planning investigation',
+      detail: 'Checking which visual or statistical Analytic Activities are useful next.',
+    },
+    {
+      title: 'Waiting for Codex output',
+      detail: 'The agent is still working and will stream the next event when available.',
+    },
+  ]
+  let index = 0
+  return setInterval(() => {
+    if (shouldStop()) return
+    const note = notes[index % notes.length]
+    index += 1
+    sendSse(res, {
+      type: 'status',
+      status: 'working',
+      level: 'highlight',
+      category: 'progress',
+      title: note.title,
+      detail: note.detail,
+    })
+  }, 5000)
 }
 
 function safeNamePart(value) {
@@ -173,7 +223,9 @@ function buildTraceAnalysisPrompt(sessionId, userMessage) {
   const relativeSessionRoot = `.maniscope-chat/sessions/${sessionId}`
   return `You are a Codex agent collaborating with a user inside ManiScope.
 
-You must analyze the current live ManiScope trace for the active session.
+You are embedded in the active ManiScope session, so treat the live trace and
+current views as shared working context. The user is asking from inside the
+application and expects a collaborator, not a report generator by default.
 
 Read these files first:
 - docs/reports/user-manual.en.md
@@ -182,35 +234,40 @@ Read these files first:
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
 
-Screenshots are under:
+Screenshots and generated evidence are under:
 - ${relativeSessionRoot}/images
+- ${relativeSessionRoot}/artifacts
 
 The latest major-view screenshots are also attached to this turn as image inputs when available.
 
-Generated artifacts should be written under:
-- ${relativeSessionRoot}/artifacts
+Use the skills as methods, not as mandatory artifact recipes:
 
-Use these two skills in sequence:
+1. Use skills/user-trace-analysis.md when reading the user's live trace.
+   - Reconstruct Intention Space units: Task, Analytic Question, Hypothesis.
+   - Reconstruct Action Space units: Interaction, Analytic Activity, Investigation Strategy.
+   - Reconstruct Finding Space units: Finding and Insight.
+   - Map evidence from trace steps to those units and state the rationale when the conclusion is mid-level or high-level.
+   - Distinguish logged Interactions, user-authored annotations, user-authored Findings or Insights, and your own inferred analysis.
 
-1. For conversation about the user's current trace, trace summaries, intention/finding reconstruction, and report generation, follow skills/user-trace-analysis.md. Use its methodology and terminology:
-   - Intention Space: Task, Analytic Question, Hypothesis.
-   - Action Space: Interaction, Analytic Activity, Investigation Strategy.
-   - Finding Space: Finding and Insight.
-   - Map Intention -> Action Space unit -> Finding Space output, and keep rationale explicit.
+2. Use skills/maniscope-investigate/SKILL.md when the user asks you to investigate further or when a recommendation should be executed.
+   - Start from any existing analysis artifacts in ${relativeSessionRoot}/artifacts.
+   - Form a small Investigation Strategy, then execute concrete Analytic Activities and Interactions.
+   - Use local data, backend endpoints, and major-view rendering APIs when useful.
+   - Save evidence images or markdown artifacts only when the user asks for durable outputs or when they are necessary evidence for the answer.
 
-2. For autonomous follow-up investigation, first use the outputs of skills/user-trace-analysis.md, especially the recommendations, Findings, Insights, and trace-step map. Then follow skills/maniscope-investigate/SKILL.md to execute Investigation Strategies through concrete Analytic Activities and Interactions. Use local data, backend endpoints, and major-view render APIs when useful. Save rendered evidence images and reports under ${relativeSessionRoot}/artifacts.
+Scale your behavior to the request:
+- For lightweight chat, answer directly in the conversation using the live trace context.
+- For trace analysis, produce the requested synthesis in chat first; create or update analysis-report.md or trace-step-map.md only if the user asks for files or a durable report.
+- For autonomous investigation, explain the Investigation Strategy, run the needed visual or statistical Analytic Activities, then report Findings or Insights with evidence.
+- For next-step requests, present recommendations top-down as Investigation Strategies, Analytic Activities, and Interactions.
 
-Produce or update:
-- ${relativeSessionRoot}/artifacts/analysis-report.md
-- ${relativeSessionRoot}/artifacts/trace-step-map.md
+Be visibly collaborative while working:
+- Send concise progress updates as user-facing working notes when you start reading context, inspect trace evidence, run a command, render a view, save an artifact, or change investigation direction.
+- Keep those updates factual and short. Do not wait until the final answer if the task takes more than a moment.
+- Internal reasoning can be brief and ephemeral, but final conclusions must be grounded in trace evidence, data, or stated assumptions.
 
-When conducting autonomous investigation, also produce or update a follow-up report when useful:
-- ${relativeSessionRoot}/artifacts/investigation-report.md
-
-Distinguish observed logged Interactions, user-authored annotations, user-authored Findings or Insights, and your own inferred analysis.
+Use focused reads and queries. Avoid broad filesystem scans or dumping entire large files unless the user explicitly asks for exhaustive output.
 Use precise terms from the skills instead of generic "actions" or legacy "atomic actions".
-When the user asks for next steps, present them top-down as Investigation Strategies, Analytic Activities, and Interactions.
-When the user asks you to investigate, treat the latest analysis report and trace-step map as the starting plan, then execute the relevant Investigation Strategy using the investigation skill.
 
 ---
 
@@ -239,58 +296,281 @@ function buildInput(sessionId, threadKey, userMessage, isNewThread, attachmentPa
 }
 
 function normalizeEvent(event) {
+  if (!event || typeof event !== 'object') return null
+
   if (event.type === 'thread.started') {
-    return { type: 'thread', threadId: event.thread_id }
+    return {
+      type: 'thread',
+      threadId: event.thread_id || event.threadId,
+      level: 'detail',
+      category: 'session',
+      title: 'Codex thread ready',
+    }
+  }
+  if (event.type === 'turn.started') {
+    return {
+      type: 'status',
+      status: 'started',
+      level: 'highlight',
+      category: 'session',
+      title: 'Codex started',
+      detail: 'Reading the live trace and current view context.',
+    }
   }
   if (event.type === 'turn.completed') {
-    return { type: 'usage', usage: event.usage }
+    return {
+      type: 'usage',
+      usage: event.usage,
+      level: 'debug',
+      category: 'session',
+      title: 'Turn completed',
+    }
   }
   if (event.type === 'turn.failed') {
-    return { type: 'error', error: event.error?.message || 'Codex turn failed' }
+    return {
+      type: 'error',
+      error: event.error?.message || 'Codex turn failed',
+      level: 'error',
+      category: 'session',
+      title: 'Codex turn failed',
+    }
   }
   if (event.type === 'error') {
-    return { type: 'error', error: event.message || 'Codex stream failed' }
+    return {
+      type: 'error',
+      error: event.message || 'Codex stream failed',
+      level: 'error',
+      category: 'session',
+      title: 'Codex stream failed',
+    }
+  }
+  if (event.type === 'agent_message') {
+    return {
+      type: 'agent_message',
+      text: event.message || event.text || '',
+      level: 'primary',
+      category: 'message',
+      title: 'Codex response',
+    }
+  }
+  if (event.type === 'message') {
+    const text = extractMessageText(event)
+    if (text) {
+      return {
+        type: 'agent_message',
+        text,
+        level: 'primary',
+        category: 'message',
+        title: 'Codex response',
+      }
+    }
   }
   if (!event.item) return null
 
   const item = event.item
+  const eventId = item.id || item.call_id || item.callId || ''
+  const status = normalizeItemStatus(item, event.type)
   if (item.type === 'agent_message') {
-    return { type: 'agent_message', text: item.text }
+    return {
+      type: 'agent_message',
+      text: item.message || item.text || '',
+      level: 'primary',
+      category: 'message',
+      title: 'Codex response',
+      eventId,
+    }
+  }
+  if (item.type === 'message') {
+    const text = extractMessageText(item)
+    if (text) {
+      return {
+        type: 'agent_message',
+        text,
+        level: 'primary',
+        category: 'message',
+        title: 'Codex response',
+        eventId,
+      }
+    }
   }
   if (item.type === 'reasoning') {
-    return { type: 'reasoning', text: item.text }
+    return {
+      type: 'reasoning',
+      text: reasoningText(item),
+      level: 'ephemeral',
+      category: 'reasoning',
+      title: 'Thinking',
+      eventId,
+      ephemeral: true,
+    }
   }
   if (item.type === 'command_execution') {
     return {
       type: 'command',
+      level: levelForStatus(status, item.exit_code),
+      category: 'tool',
+      title: 'Shell command',
       command: item.command,
-      output: item.aggregated_output || '',
+      detail: item.command,
+      output: truncateText(item.aggregated_output || ''),
       exitCode: item.exit_code ?? null,
-      status: item.status,
+      status,
+      eventId,
+    }
+  }
+  if (item.type === 'function_call') {
+    const command = describeFunctionCall(item)
+    return {
+      type: 'command',
+      level: levelForStatus(status, null),
+      category: 'tool',
+      title: 'Tool call',
+      command,
+      detail: command,
+      status,
+      eventId,
+    }
+  }
+  if (item.type === 'function_call_output') {
+    return {
+      type: 'command',
+      level: levelForStatus(status, null),
+      category: 'tool',
+      title: 'Tool output',
+      command: 'Tool output received',
+      detail: 'Tool output received',
+      output: truncateText(item.output || ''),
+      status,
+      eventId,
     }
   }
   if (item.type === 'file_change') {
-    return { type: 'file_change', changes: item.changes || [], status: item.status }
+    const changes = item.changes || []
+    return {
+      type: 'file_change',
+      level: levelForStatus(status, null),
+      category: 'artifact',
+      title: 'File changes',
+      detail: `${status || 'completed'} (${changes.length})`,
+      changes,
+      status,
+      eventId,
+    }
   }
   if (item.type === 'web_search') {
-    return { type: 'web_search', query: item.query }
+    return {
+      type: 'web_search',
+      level: 'detail',
+      category: 'tool',
+      title: 'Web search',
+      detail: item.query || '',
+      query: item.query,
+      eventId,
+    }
   }
   if (item.type === 'todo_list') {
-    return { type: 'todo_list', items: item.items || [] }
+    const items = item.items || []
+    const completed = items.filter((todo) => todo.completed || todo.status === 'completed').length
+    return {
+      type: 'todo_list',
+      level: 'highlight',
+      category: 'plan',
+      title: 'Plan progress',
+      detail: `${completed}/${items.length} items complete`,
+      items,
+      eventId,
+    }
   }
   if (item.type === 'mcp_tool_call') {
     return {
       type: 'mcp_tool_call',
+      level: levelForStatus(status, item.error ? 1 : null),
+      category: 'tool',
+      title: item.tool || 'MCP tool',
+      detail: item.server ? `${item.server}${status ? `: ${status}` : ''}` : status,
       server: item.server,
       tool: item.tool,
-      status: item.status,
+      status,
       error: item.error?.message || null,
+      eventId,
     }
   }
   if (item.type === 'error') {
-    return { type: 'error', error: item.message }
+    return {
+      type: 'error',
+      error: item.message,
+      level: 'error',
+      category: 'session',
+      title: 'Codex error',
+      eventId,
+    }
   }
   return null
+}
+
+function normalizeItemStatus(item, eventType) {
+  if (item.status) return item.status
+  if (eventType === 'item.started') return 'running'
+  if (eventType === 'item.updated') return 'running'
+  if (eventType === 'item.completed') return 'completed'
+  return ''
+}
+
+function levelForStatus(status, exitCode) {
+  if (exitCode !== null && exitCode !== undefined && exitCode !== 0) return 'error'
+  if (status === 'failed' || status === 'error') return 'error'
+  if (status === 'completed' || status === 'succeeded') return 'detail'
+  if (status === 'running' || status === 'in_progress') return 'highlight'
+  return 'detail'
+}
+
+function truncateText(value, maxLength = 900) {
+  const text = String(value || '')
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, maxLength - 3)}...`
+}
+
+function reasoningText(item) {
+  if (typeof item.text === 'string') return item.text
+  if (typeof item.summary === 'string') return item.summary
+  if (Array.isArray(item.summary)) {
+    return item.summary
+      .map((part) => {
+        if (typeof part === 'string') return part
+        if (part && typeof part.text === 'string') return part.text
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+  }
+  return ''
+}
+
+function extractMessageText(item) {
+  if (typeof item.text === 'string') return item.text
+  if (typeof item.message === 'string') return item.message
+  if (!Array.isArray(item.content)) return ''
+  return item.content
+    .map((part) => {
+      if (!part || typeof part !== 'object') return ''
+      if (typeof part.text === 'string') return part.text
+      if (typeof part.output_text === 'string') return part.output_text
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+function describeFunctionCall(item) {
+  const name = item.name || item.tool || 'Tool call'
+  if (name !== 'exec_command') return name
+  try {
+    const args = typeof item.arguments === 'string' ? JSON.parse(item.arguments) : item.arguments
+    if (args?.cmd) return args.cmd
+  } catch {
+    // Fall through to the generic tool name.
+  }
+  return name
 }
 
 function listArtifacts(sessionId) {
@@ -319,7 +599,7 @@ function listArtifacts(sessionId) {
 async function handleChat(req, res, sessionId) {
   const body = await readBody(req)
   const message = String(body.message || '').trim()
-  const threadKey = String(body.threadKey || 'trace-analysis')
+  const threadKey = validateThreadKey(String(body.threadKey || 'trace-analysis'))
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
   const includeCurrentViews = body.includeCurrentViews !== false
   if (!message && attachments.length === 0) {
@@ -333,12 +613,6 @@ async function handleChat(req, res, sessionId) {
     return
   }
 
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-  })
-
   const codex = new Codex()
   const existing = getThreadEntry(sessionId, threadKey)
   const options = buildThreadOptions()
@@ -348,8 +622,7 @@ async function handleChat(req, res, sessionId) {
     : codex.resumeThread(existing.threadId, options)
   const attachmentPaths = saveChatAttachments(sessionId, attachments)
   if (!message && attachments.length > 0 && attachmentPaths.length === 0) {
-    sendSse(res, { type: 'error', error: 'No supported image attachments were provided.' })
-    res.end()
+    sendJson(res, 400, { error: 'No supported image attachments were provided.' })
     return
   }
   const inputImagePaths = uniquePaths([
@@ -357,10 +630,58 @@ async function handleChat(req, res, sessionId) {
     ...attachmentPaths,
   ])
   const input = buildInput(sessionId, threadKey, message, isNewThread, inputImagePaths)
+  const turnKey = activeTurnKey(sessionId, threadKey)
+  if (activeTurns.has(turnKey)) {
+    sendJson(res, 409, { error: 'A Codex turn is already running for this thread.' })
+    return
+  }
+
+  const controller = new AbortController()
+  activeTurns.set(turnKey, {
+    controller,
+    sessionId,
+    threadKey,
+    startedAt: new Date().toISOString(),
+  })
+
+  let streamClosed = false
+  const finishStream = () => {
+    if (streamClosed) return
+    streamClosed = true
+    res.end()
+  }
+  res.on('close', () => {
+    if (streamClosed) return
+    const activeTurn = activeTurns.get(turnKey)
+    if (activeTurn?.controller === controller) {
+      controller.abort()
+    }
+  })
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'X-Accel-Buffering': 'no',
+    Connection: 'keep-alive',
+  })
+  res.flushHeaders?.()
+  sendSse(res, {
+    type: 'status',
+    status: 'preparing',
+    level: 'highlight',
+    category: 'session',
+    title: 'Preparing Codex context',
+    detail: 'Syncing trace files and attaching current view screenshots.',
+  })
+  const progressHeartbeat = startProgressHeartbeat(
+    res,
+    () => streamClosed || controller.signal.aborted,
+  )
 
   try {
-    const { events } = await thread.runStreamed(input)
+    const { events } = await thread.runStreamed(input, { signal: controller.signal })
     for await (const event of events) {
+      if (controller.signal.aborted) break
       const normalized = normalizeEvent(event)
       if (normalized) sendSse(res, normalized)
     }
@@ -372,17 +693,63 @@ async function handleChat(req, res, sessionId) {
     for (const artifact of listArtifacts(sessionId)) {
       sendSse(res, { type: 'artifact', artifact })
     }
-    sendSse(res, { type: 'done', threadId })
-    res.end()
+    if (controller.signal.aborted) {
+      sendSse(res, {
+        type: 'stopped',
+        level: 'highlight',
+        category: 'session',
+        title: 'Codex stopped',
+        detail: 'The current turn was stopped before completion.',
+      })
+    } else {
+      sendSse(res, { type: 'done', threadId })
+    }
   } catch (error) {
-    sendSse(res, { type: 'error', error: error?.message || String(error) })
-    res.end()
+    if (controller.signal.aborted) {
+      sendSse(res, {
+        type: 'stopped',
+        level: 'highlight',
+        category: 'session',
+        title: 'Codex stopped',
+        detail: 'The current turn was stopped before completion.',
+      })
+    } else {
+      sendSse(res, {
+        type: 'error',
+        error: error?.message || String(error),
+        level: 'error',
+        category: 'session',
+        title: 'Codex error',
+      })
+    }
+  } finally {
+    clearInterval(progressHeartbeat)
+    const activeTurn = activeTurns.get(turnKey)
+    if (activeTurn?.controller === controller) activeTurns.delete(turnKey)
+    finishStream()
   }
+}
+
+async function handleStop(req, res, sessionId, threadKey) {
+  validateThreadKey(threadKey)
+  sessionDir(sessionId)
+  await readBody(req).catch(() => ({}))
+
+  const turnKey = activeTurnKey(sessionId, threadKey)
+  const activeTurn = activeTurns.get(turnKey)
+  if (!activeTurn) {
+    sendJson(res, 200, { sessionId, threadKey, stopped: false })
+    return
+  }
+
+  activeTurn.controller.abort()
+  sendJson(res, 200, { sessionId, threadKey, stopped: true })
 }
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`)
   const chatMatch = url.pathname.match(/^\/chat\/([0-9a-f]{5})\/message$/)
+  const stopMatch = url.pathname.match(/^\/chat\/([0-9a-f]{5})\/threads\/([a-zA-Z0-9_-]{1,64})\/stop$/)
 
   if (req.method === 'GET' && url.pathname === '/health') {
     sendJson(res, 200, { ok: true })
@@ -391,6 +758,13 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && chatMatch) {
     handleChat(req, res, chatMatch[1]).catch((error) => {
+      sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
+    })
+    return
+  }
+
+  if (req.method === 'POST' && stopMatch) {
+    handleStop(req, res, stopMatch[1], stopMatch[2]).catch((error) => {
       sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
     })
     return

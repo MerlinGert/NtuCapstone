@@ -10,7 +10,6 @@ import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
@@ -77,6 +76,7 @@ def _stream_codex_response(session_id: str, payload: dict[str, Any]) -> Iterator
     url = f"{CODEX_BRIDGE_URL.rstrip('/')}/chat/{session_id}/message"
     try:
         with requests.post(url, json=payload, stream=True, timeout=(3, None)) as response:
+            response.encoding = "utf-8"
             if response.status_code != 200:
                 detail = response.text.strip() or response.reason
                 yield _sse_event(
@@ -87,9 +87,8 @@ def _stream_codex_response(session_id: str, payload: dict[str, Any]) -> Iterator
                 )
                 return
 
-            for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
-                if chunk:
-                    yield chunk
+            for line in response.iter_lines(chunk_size=1, decode_unicode=True):
+                yield f"{line}\n"
     except requests.ConnectionError:
         yield _sse_event(
             {
@@ -103,6 +102,26 @@ def _stream_codex_response(session_id: str, payload: dict[str, Any]) -> Iterator
         yield _sse_event({"type": "error", "error": f"Codex bridge request failed: {exc}"})
 
 
+def _stop_codex_turn(session_id: str, thread_key: str) -> dict[str, Any]:
+    url = f"{CODEX_BRIDGE_URL.rstrip('/')}/chat/{session_id}/threads/{thread_key}/stop"
+    try:
+        response = requests.post(url, json={}, timeout=5)
+    except requests.ConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail="Codex bridge is not running. Start it with `bun run codex-bridge` in front/.",
+        )
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="Timed out while stopping the Codex turn.")
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Codex bridge stop request failed: {exc}")
+
+    if not response.ok:
+        detail = response.text.strip() or response.reason
+        raise HTTPException(status_code=response.status_code, detail=detail)
+    return response.json()
+
+
 @router.post("/{session_id}/message")
 def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingResponse:
     _validate_session_id(session_id)
@@ -112,9 +131,12 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
     if not message and not attachments:
         raise HTTPException(status_code=400, detail="message or image attachment is required")
 
+    thread_key = str(body.get("threadKey") or "trace-analysis")
+    _validate_thread_key(thread_key)
+
     payload = {
         "message": message,
-        "threadKey": str(body.get("threadKey") or "trace-analysis"),
+        "threadKey": thread_key,
         "attachments": attachments,
         "includeCurrentTrace": body.get("includeCurrentTrace", True),
         "includeCurrentViews": body.get("includeCurrentViews", True),
@@ -122,7 +144,7 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
     return StreamingResponse(
         _stream_codex_response(session_id, payload),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache"},
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
@@ -175,6 +197,13 @@ def clear_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
         "threadKey": thread_key,
         "removedThread": bool(removed_thread),
     }
+
+
+@router.post("/{session_id}/threads/{thread_key}/stop")
+def stop_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+    _validate_session_id(session_id)
+    _validate_thread_key(thread_key)
+    return _stop_codex_turn(session_id, thread_key)
 
 
 @router.get("/health")
