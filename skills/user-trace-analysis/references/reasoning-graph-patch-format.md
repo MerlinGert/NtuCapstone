@@ -93,7 +93,7 @@ Use `update_node` only for small metadata updates, such as confidence or provena
 
 ## Add Root
 
-Use `add_root` when a Hypothesis Expansion follow-up creates an evidence-backed new Hypothesis.
+Use `add_root` when a Hypothesis Expansion follow-up creates an evidence-backed new Hypothesis. Do this whenever an adjacent Hypothesis is supported strongly enough to become a separate reasoning tree. If the follow-up does not support the proposed adjacent Hypothesis, do not add a root; document the rejection or deferral in the follow-up report and, when evidence supports it, add a `Finding` or `Insight` that `contradicts` or `refines` the proposed direction.
 
 ```json
 {

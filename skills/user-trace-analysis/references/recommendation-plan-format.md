@@ -179,6 +179,7 @@ After the plan is executed:
 
 - Keep `ExpectedFinding` nodes in the plan artifacts.
 - Create real `Finding` or `Insight` nodes only in a Reasoning Graph Patch.
+- For every executed `Hypothesis Expansion` branch, explicitly resolve the proposed Hypothesis. Promote it into a new evidence-backed Hypothesis root when supported, or record a rejected, deferred, or unsupported outcome when not supported.
 - Link actual evidence back to `ExpectedFinding`, `RecommendedInteraction`, `AnalyticActivity`, and `InvestigationStrategy` through `planRef`.
 
 ## Generating The Forest

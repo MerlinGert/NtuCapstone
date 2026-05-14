@@ -253,7 +253,7 @@ Do not stop after producing a Recommendation Plan Forest in a full trace analysi
 
 For **Evidence Completion Recommendations**, attach the plan to an existing Reasoning Gap. After execution, create real Interaction, Finding, or Insight nodes with `actor: "agent"` and `source: "followup_investigation"`, then patch them into the original graph with `supports`, `refines`, or `contradicts` edges to the original target node.
 
-For **Hypothesis Expansion Recommendations**, the plan may propose a new Hypothesis. After execution, create a follow-up reasoning graph or graph patch with the new Hypothesis as a root, then generate both a focused Follow-up Investigation Forest and, when useful, an Augmented Reasoning Forest that includes the new root.
+For **Hypothesis Expansion Recommendations**, the plan proposes an adjacent Hypothesis. After execution, explicitly resolve that adjacent Hypothesis instead of folding the result silently into the original Hypothesis. If follow-up evidence supports it, create a new evidence-backed `Hypothesis` node, connect the supporting Findings or Insights to it, add it as a graph root, and regenerate the Augmented Reasoning Forest with a separate tree for that adjacent Hypothesis. If follow-up evidence rejects or does not substantiate it, record the rejection or deferral in `continued-investigation-report.md` and add a `Finding` or `Insight` that `contradicts` or `refines` the proposed direction when evidence is strong enough.
 
 Complete follow-up means attempt every recommended Investigation Strategy in the Recommendation Plan Forest. If a branch cannot be executed because required data, services, render APIs, or permissions are unavailable, mark that branch as blocked in `continued-investigation-report.md` with the exact blocker and any partial evidence. Do not silently omit blocked branches.
 
@@ -528,6 +528,7 @@ Execution requirements:
 - Attempt every Investigation Strategy in `recommendation-plan-forest.md`.
 - Convert each Recommended Interaction into an executable visual or statistical check.
 - Save rendered visualization evidence as trace-local PNG files whenever a visual check supports a Finding, Insight, Hypothesis, recommendation, or patch node.
+- For every executed Hypothesis Expansion branch, either promote the proposed adjacent Hypothesis into a new evidence-backed graph root with `add_root`, or explicitly mark it rejected, deferred, or unsupported in `continued-investigation-report.md`. Do not only attach its evidence to the original Hypothesis.
 - Write `continued-investigation-report.md` with executed checks, blocked checks, evidence, Findings, Insights, and bottom line.
 - Create `reasoning-graph-patch-001.json` for all evidence-backed follow-up results. If all branches are blocked and no new evidence exists, write the report and explicitly state why no patch was produced.
 - Apply the patch and regenerate augmented artifacts whenever at least one evidence-backed follow-up node exists.
