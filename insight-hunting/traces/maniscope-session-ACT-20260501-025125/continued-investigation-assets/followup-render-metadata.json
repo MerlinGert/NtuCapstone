@@ -1,0 +1,751 @@
+[
+  {
+    "name": "followup-kline-oct26-oct27-1h.png",
+    "image": {
+      "viewName": "candlestick_chart",
+      "width": 1700,
+      "height": 920
+    },
+    "dependencies": {
+      "viewName": "candlestick_chart",
+      "requiredArguments": [
+        "currentCoin",
+        "ohlcData",
+        "manipulationResults",
+        "syncTargetTimeWindow",
+        "isSequentialTime",
+        "currentGranularity",
+        "zoomTransform",
+        "topCardsScrollLeft",
+        "bottomCardsScrollLeft",
+        "width",
+        "height"
+      ],
+      "optionalArguments": [
+        "visibleTimeWindow",
+        "cardAlignment",
+        "cardFocusTime"
+      ],
+      "dataDependencies": [
+        {
+          "prop": "currentCoin",
+          "source": "CryptoVis.currentCoin",
+          "summary": {
+            "type": "string",
+            "value": "ACT"
+          }
+        },
+        {
+          "prop": "ohlcData",
+          "source": "CandlestickChart.actOhlc",
+          "summary": {
+            "type": "object",
+            "keyCount": 8,
+            "sampleKeys": [
+              "1min",
+              "5min",
+              "15min",
+              "30min",
+              "1H",
+              "1D",
+              "3D",
+              "1W"
+            ]
+          }
+        },
+        {
+          "prop": "manipulationResults",
+          "source": "CryptoVis.manipulation_detection_results",
+          "summary": {
+            "type": "array",
+            "length": 106
+          }
+        },
+        {
+          "prop": "syncTargetTimeWindow",
+          "source": "CryptoVis.behaviorTimeWindow",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "isSequentialTime",
+          "source": "CryptoVis.behaviorSequentialTime",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "currentGranularity",
+          "source": "CandlestickChart.currentGranularity",
+          "summary": {
+            "type": "string",
+            "value": "1H"
+          }
+        },
+        {
+          "prop": "zoomTransform",
+          "source": "CandlestickChart.zoomTransform",
+          "summary": {
+            "type": "object",
+            "keyCount": 6,
+            "sampleKeys": [
+              "k",
+              "x",
+              "y",
+              "startIndex",
+              "endIndex",
+              "visibleTimeWindow"
+            ]
+          }
+        },
+        {
+          "prop": "topCardsScrollLeft",
+          "source": "CandlestickChart.$refs.topCardsContainer.scrollLeft",
+          "summary": {
+            "type": "number",
+            "value": 0
+          }
+        },
+        {
+          "prop": "bottomCardsScrollLeft",
+          "source": "CandlestickChart.$refs.bottomCardsContainer.scrollLeft",
+          "summary": {
+            "type": "number",
+            "value": 0
+          }
+        },
+        {
+          "prop": "width",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 1700
+          }
+        },
+        {
+          "prop": "height",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 920
+          }
+        },
+        {
+          "prop": "visibleTimeWindow",
+          "source": "render argument",
+          "summary": {
+            "type": "array",
+            "length": 2
+          }
+        },
+        {
+          "prop": "cardAlignment",
+          "source": "render argument",
+          "summary": {
+            "type": "string",
+            "value": "visible_window"
+          }
+        },
+        {
+          "prop": "cardFocusTime",
+          "source": "render argument",
+          "summary": {
+            "type": "null"
+          }
+        }
+      ]
+    },
+    "renderMetadata": null,
+    "relativePath": "continued-investigation-assets/followup-kline-oct26-oct27-1h.png"
+  },
+  {
+    "name": "followup-token-distribution-links.png",
+    "image": {
+      "viewName": "token_distribution",
+      "width": 1100,
+      "height": 820
+    },
+    "dependencies": {
+      "viewName": "token_distribution",
+      "requiredArguments": [
+        "snapshotData",
+        "entityDetectionResults",
+        "linkDetectionResults",
+        "manipulationDetectionResults",
+        "scaleFactor",
+        "showLinks",
+        "width",
+        "height"
+      ],
+      "optionalArguments": [],
+      "dataDependencies": [
+        {
+          "prop": "snapshotData",
+          "source": "CryptoVis.snapshot_data",
+          "summary": {
+            "type": "object",
+            "keyCount": 4,
+            "sampleKeys": [
+              "time",
+              "all_times",
+              "statistics",
+              "balances"
+            ]
+          }
+        },
+        {
+          "prop": "entityDetectionResults",
+          "source": "CryptoVis.entity_detection_results",
+          "summary": {
+            "type": "array",
+            "length": 3
+          }
+        },
+        {
+          "prop": "linkDetectionResults",
+          "source": "CryptoVis.link_generation_results",
+          "summary": {
+            "type": "object",
+            "keyCount": 4,
+            "sampleKeys": [
+              "target_relations_for_entity",
+              "target_relations_for_links",
+              "target_related_relations_for_entity",
+              "target_related_relations_for_links"
+            ]
+          }
+        },
+        {
+          "prop": "manipulationDetectionResults",
+          "source": "CryptoVis.manipulation_detection_results",
+          "summary": {
+            "type": "array",
+            "length": 106
+          }
+        },
+        {
+          "prop": "scaleFactor",
+          "source": "TokenDistribution.scaleFactor",
+          "summary": {
+            "type": "number",
+            "value": 0.4
+          }
+        },
+        {
+          "prop": "showLinks",
+          "source": "TokenDistribution.showLinks",
+          "summary": {
+            "type": "boolean",
+            "value": true
+          }
+        },
+        {
+          "prop": "width",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 1100
+          }
+        },
+        {
+          "prop": "height",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 820
+          }
+        }
+      ]
+    },
+    "renderMetadata": null,
+    "relativePath": "continued-investigation-assets/followup-token-distribution-links.png"
+  },
+  {
+    "name": "followup-behavior-a13-card-users.png",
+    "image": {
+      "viewName": "behavior_details",
+      "width": 1700,
+      "height": 650
+    },
+    "dependencies": {
+      "viewName": "behavior_details",
+      "requiredArguments": [
+        "selectedUser",
+        "selectedUsersList",
+        "behaviorData",
+        "entityInfo",
+        "snapshotTime",
+        "manipulationResults",
+        "syncTargetTimeWindow",
+        "showRelatedUsers",
+        "useSequentialTime",
+        "showManipulationBoxes",
+        "width",
+        "height"
+      ],
+      "optionalArguments": [
+        "visibleTimeWindow",
+        "maxEventsPerUser"
+      ],
+      "dataDependencies": [
+        {
+          "prop": "selectedUser",
+          "source": "CryptoVis.selectedUser",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "selectedUsersList",
+          "source": "CryptoVis.selectedCardUsers",
+          "summary": {
+            "type": "array",
+            "length": 9
+          }
+        },
+        {
+          "prop": "behaviorData",
+          "source": "CryptoVis.behaviorDetailData",
+          "summary": {
+            "type": "object",
+            "keyCount": 9,
+            "sampleKeys": [
+              "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+              "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+              "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+              "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+              "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+              "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+              "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+              "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+              "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+            ]
+          }
+        },
+        {
+          "prop": "entityInfo",
+          "source": "CryptoVis.selectedEntityInfo",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "snapshotTime",
+          "source": "CryptoVis.snapshot_configuration.time",
+          "summary": {
+            "type": "string",
+            "value": "2024-11-09 23:00:00 UTC"
+          }
+        },
+        {
+          "prop": "manipulationResults",
+          "source": "CryptoVis.manipulation_detection_results",
+          "summary": {
+            "type": "array",
+            "length": 106
+          }
+        },
+        {
+          "prop": "syncTargetTimeWindow",
+          "source": "CryptoVis.klineTimeWindow",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "showRelatedUsers",
+          "source": "BehaviorDetails.showRelatedUsers",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "useSequentialTime",
+          "source": "BehaviorDetails.useSequentialTime",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "showManipulationBoxes",
+          "source": "BehaviorDetails.showManipulationBoxes",
+          "summary": {
+            "type": "boolean",
+            "value": true
+          }
+        },
+        {
+          "prop": "width",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 1700
+          }
+        },
+        {
+          "prop": "height",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 650
+          }
+        },
+        {
+          "prop": "visibleTimeWindow",
+          "source": "render argument",
+          "summary": {
+            "type": "array",
+            "length": 2
+          }
+        },
+        {
+          "prop": "maxEventsPerUser",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 5000
+          }
+        }
+      ]
+    },
+    "renderMetadata": {
+      "behaviorDetails": {
+        "sampling": {
+          "maxEventsPerUser": 5000,
+          "users": []
+        },
+        "visibleTimeWindowApplied": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ]
+      }
+    },
+    "relativePath": "continued-investigation-assets/followup-behavior-a13-card-users.png"
+  },
+  {
+    "name": "followup-behavior-a16-card-users.png",
+    "image": {
+      "viewName": "behavior_details",
+      "width": 1700,
+      "height": 650
+    },
+    "dependencies": {
+      "viewName": "behavior_details",
+      "requiredArguments": [
+        "selectedUser",
+        "selectedUsersList",
+        "behaviorData",
+        "entityInfo",
+        "snapshotTime",
+        "manipulationResults",
+        "syncTargetTimeWindow",
+        "showRelatedUsers",
+        "useSequentialTime",
+        "showManipulationBoxes",
+        "width",
+        "height"
+      ],
+      "optionalArguments": [
+        "visibleTimeWindow",
+        "maxEventsPerUser"
+      ],
+      "dataDependencies": [
+        {
+          "prop": "selectedUser",
+          "source": "CryptoVis.selectedUser",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "selectedUsersList",
+          "source": "CryptoVis.selectedCardUsers",
+          "summary": {
+            "type": "array",
+            "length": 9
+          }
+        },
+        {
+          "prop": "behaviorData",
+          "source": "CryptoVis.behaviorDetailData",
+          "summary": {
+            "type": "object",
+            "keyCount": 9,
+            "sampleKeys": [
+              "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+              "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+              "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+              "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+              "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+              "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+              "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+              "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+              "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh"
+            ]
+          }
+        },
+        {
+          "prop": "entityInfo",
+          "source": "CryptoVis.selectedEntityInfo",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "snapshotTime",
+          "source": "CryptoVis.snapshot_configuration.time",
+          "summary": {
+            "type": "string",
+            "value": "2024-11-09 23:00:00 UTC"
+          }
+        },
+        {
+          "prop": "manipulationResults",
+          "source": "CryptoVis.manipulation_detection_results",
+          "summary": {
+            "type": "array",
+            "length": 106
+          }
+        },
+        {
+          "prop": "syncTargetTimeWindow",
+          "source": "CryptoVis.klineTimeWindow",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "showRelatedUsers",
+          "source": "BehaviorDetails.showRelatedUsers",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "useSequentialTime",
+          "source": "BehaviorDetails.useSequentialTime",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "showManipulationBoxes",
+          "source": "BehaviorDetails.showManipulationBoxes",
+          "summary": {
+            "type": "boolean",
+            "value": true
+          }
+        },
+        {
+          "prop": "width",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 1700
+          }
+        },
+        {
+          "prop": "height",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 650
+          }
+        },
+        {
+          "prop": "visibleTimeWindow",
+          "source": "render argument",
+          "summary": {
+            "type": "array",
+            "length": 2
+          }
+        },
+        {
+          "prop": "maxEventsPerUser",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 5000
+          }
+        }
+      ]
+    },
+    "renderMetadata": {
+      "behaviorDetails": {
+        "sampling": {
+          "maxEventsPerUser": 5000,
+          "users": []
+        },
+        "visibleTimeWindowApplied": [
+          "2024-10-23T09:24:40.531Z",
+          "2024-10-30T17:21:37.239Z"
+        ]
+      }
+    },
+    "relativePath": "continued-investigation-assets/followup-behavior-a16-card-users.png"
+  },
+  {
+    "name": "followup-behavior-a21-card-users.png",
+    "image": {
+      "viewName": "behavior_details",
+      "width": 1700,
+      "height": 650
+    },
+    "dependencies": {
+      "viewName": "behavior_details",
+      "requiredArguments": [
+        "selectedUser",
+        "selectedUsersList",
+        "behaviorData",
+        "entityInfo",
+        "snapshotTime",
+        "manipulationResults",
+        "syncTargetTimeWindow",
+        "showRelatedUsers",
+        "useSequentialTime",
+        "showManipulationBoxes",
+        "width",
+        "height"
+      ],
+      "optionalArguments": [
+        "visibleTimeWindow",
+        "maxEventsPerUser"
+      ],
+      "dataDependencies": [
+        {
+          "prop": "selectedUser",
+          "source": "CryptoVis.selectedUser",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "selectedUsersList",
+          "source": "CryptoVis.selectedCardUsers",
+          "summary": {
+            "type": "array",
+            "length": 3
+          }
+        },
+        {
+          "prop": "behaviorData",
+          "source": "CryptoVis.behaviorDetailData",
+          "summary": {
+            "type": "object",
+            "keyCount": 3,
+            "sampleKeys": [
+              "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+              "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+              "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+            ]
+          }
+        },
+        {
+          "prop": "entityInfo",
+          "source": "CryptoVis.selectedEntityInfo",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "snapshotTime",
+          "source": "CryptoVis.snapshot_configuration.time",
+          "summary": {
+            "type": "string",
+            "value": "2024-11-09 23:00:00 UTC"
+          }
+        },
+        {
+          "prop": "manipulationResults",
+          "source": "CryptoVis.manipulation_detection_results",
+          "summary": {
+            "type": "array",
+            "length": 106
+          }
+        },
+        {
+          "prop": "syncTargetTimeWindow",
+          "source": "CryptoVis.klineTimeWindow",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "showRelatedUsers",
+          "source": "BehaviorDetails.showRelatedUsers",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "useSequentialTime",
+          "source": "BehaviorDetails.useSequentialTime",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "showManipulationBoxes",
+          "source": "BehaviorDetails.showManipulationBoxes",
+          "summary": {
+            "type": "boolean",
+            "value": true
+          }
+        },
+        {
+          "prop": "width",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 1700
+          }
+        },
+        {
+          "prop": "height",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 650
+          }
+        },
+        {
+          "prop": "visibleTimeWindow",
+          "source": "render argument",
+          "summary": {
+            "type": "array",
+            "length": 2
+          }
+        },
+        {
+          "prop": "maxEventsPerUser",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 5000
+          }
+        }
+      ]
+    },
+    "renderMetadata": {
+      "behaviorDetails": {
+        "sampling": {
+          "maxEventsPerUser": 5000,
+          "users": []
+        },
+        "visibleTimeWindowApplied": [
+          "2024-10-23T09:24:40.531Z",
+          "2024-10-30T17:21:37.239Z"
+        ]
+      }
+    },
+    "relativePath": "continued-investigation-assets/followup-behavior-a21-card-users.png"
+  }
+]

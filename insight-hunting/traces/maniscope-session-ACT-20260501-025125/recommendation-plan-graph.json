@@ -1,0 +1,363 @@
+{
+  "version": 1,
+  "trace": "maniscope-session-ACT-20260501-025125",
+  "roots": [
+    "SRC_H3",
+    "SRC_IN16",
+    "SRC_F12"
+  ],
+  "nodes": [
+    {
+      "id": "SRC_H3",
+      "kind": "SourceNode",
+      "canonicalId": "H3",
+      "label": "Oct. 26-27 same-direction card coordination hypothesis",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "RG1",
+      "kind": "ReasoningGap",
+      "targetNodeId": "H3",
+      "gapType": "missing_statistical_validation",
+      "desiredSupport": "Quantified trade totals, active users, and price movement for the clicked card cohorts.",
+      "label": "Clicked-card volume and price-impact validation is missing",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "RS1",
+      "kind": "InvestigationStrategy",
+      "label": "Quantify and render the Oct. 26-27 clicked-card evidence",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PAA1",
+      "kind": "AnalyticActivity",
+      "activityType": "Statistical Analysis",
+      "label": "Compute clicked-cohort trade totals and price movement from local ACT data",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PRI1",
+      "kind": "RecommendedInteraction",
+      "interactionType": "Data Action",
+      "label": "Calculate A13/A16/A21 buy/sell counts, token amounts, USD totals, and 1-minute OHLC price changes",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PEF1",
+      "kind": "ExpectedFinding",
+      "expectedOnly": true,
+      "label": "Clicked cohorts have measurable same-direction volume and visible price movement in the marked windows",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PAA2",
+      "kind": "AnalyticActivity",
+      "activityType": "Visual Analysis",
+      "label": "Render K-line and Behavior Details views for clicked cohorts",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PRI2",
+      "kind": "RecommendedInteraction",
+      "interactionType": "Visualization Action",
+      "label": "Use ManiScope render API to capture Oct. 26-27 K-line and card-user Behavior Details views",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PEF2",
+      "kind": "ExpectedFinding",
+      "expectedOnly": true,
+      "label": "Rendered views show dense manipulation-card and behavior-timeline evidence for the clicked windows",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "SRC_IN16",
+      "kind": "SourceNode",
+      "canonicalId": "IN16",
+      "label": "User insight that selected addresses form a large colluding component",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "RG2",
+      "kind": "ReasoningGap",
+      "targetNodeId": "IN16",
+      "gapType": "unclear_relation_basis",
+      "desiredSupport": "A finding that distinguishes model-link/entity/component evidence from direct transfer evidence.",
+      "label": "Component membership basis is under-specified",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "RS2",
+      "kind": "InvestigationStrategy",
+      "label": "Verify entity, link-component, and direct-transfer evidence for the clicked users",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PAA3",
+      "kind": "AnalyticActivity",
+      "activityType": "Statistical Analysis",
+      "label": "Compare render API link components with raw transfer edges",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PRI3",
+      "kind": "RecommendedInteraction",
+      "interactionType": "Data Action",
+      "label": "Extract entity groups, link edges, link components, and direct transfers among selected/clicked users",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PEF3",
+      "kind": "ExpectedFinding",
+      "expectedOnly": true,
+      "label": "The colluding-component claim is supported by model-derived links, direct transfers, or both",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PAA4",
+      "kind": "AnalyticActivity",
+      "activityType": "Visual Analysis",
+      "label": "Render Token Distribution with links enabled",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PRI4",
+      "kind": "RecommendedInteraction",
+      "interactionType": "Visualization Action",
+      "label": "Capture the Token Distribution view showing entities and links at the analyzed snapshot",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "PEF4",
+      "kind": "ExpectedFinding",
+      "expectedOnly": true,
+      "label": "Rendered Token Distribution preserves the visual basis for the component interpretation",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "SRC_F12",
+      "kind": "SourceNode",
+      "canonicalId": "F12",
+      "label": "User finding that same-direction activity alternates between buys and sells",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "PH1",
+      "kind": "Hypothesis",
+      "hypothesisStatus": "proposed",
+      "label": "The larger group contains differentiated roles such as accumulators, sellers, round-trip actors, and functional transfer accounts",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "ER1",
+      "kind": "ExpansionRationale",
+      "sourceNodeId": "F12",
+      "label": "Alternating same-direction buys and sells suggest role differentiation rather than one uniform manipulation behavior",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "RS3",
+      "kind": "InvestigationStrategy",
+      "label": "Test role differentiation in A16 and A21 card users",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "PAA5",
+      "kind": "AnalyticActivity",
+      "activityType": "Statistical Analysis",
+      "label": "Compute per-user buy/sell role summaries for A16 and A21",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "PRI5",
+      "kind": "RecommendedInteraction",
+      "interactionType": "Data Action",
+      "label": "Classify per-user trade count, buy/sell token amount, and USD direction in the broad card windows",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "PEF5",
+      "kind": "ExpectedFinding",
+      "expectedOnly": true,
+      "label": "A16/A21 users show differentiated roles rather than identical same-direction behavior",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "PAA6",
+      "kind": "AnalyticActivity",
+      "activityType": "Visual Analysis",
+      "label": "Render A16 and A21 Behavior Details for qualitative role comparison",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "PRI6",
+      "kind": "RecommendedInteraction",
+      "interactionType": "Visualization Action",
+      "label": "Capture Behavior Details timelines for the second 9-user card and the 3-user card",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    },
+    {
+      "id": "PEF6",
+      "kind": "ExpectedFinding",
+      "expectedOnly": true,
+      "label": "Behavior Details views show role-differentiated timing, accumulation, selling, or round-trip-like patterns",
+      "recommendationType": "Hypothesis Expansion",
+      "status": "planned"
+    }
+  ],
+  "edges": [
+    {
+      "source": "SRC_H3",
+      "target": "RG1",
+      "relation": "has_gap"
+    },
+    {
+      "source": "RG1",
+      "target": "RS1",
+      "relation": "addressed_by"
+    },
+    {
+      "source": "RS1",
+      "target": "PAA1",
+      "relation": "contains"
+    },
+    {
+      "source": "PAA1",
+      "target": "PRI1",
+      "relation": "contains"
+    },
+    {
+      "source": "PRI1",
+      "target": "PEF1",
+      "relation": "expects"
+    },
+    {
+      "source": "RS1",
+      "target": "PAA2",
+      "relation": "contains"
+    },
+    {
+      "source": "PAA2",
+      "target": "PRI2",
+      "relation": "contains"
+    },
+    {
+      "source": "PRI2",
+      "target": "PEF2",
+      "relation": "expects"
+    },
+    {
+      "source": "SRC_IN16",
+      "target": "RG2",
+      "relation": "has_gap"
+    },
+    {
+      "source": "RG2",
+      "target": "RS2",
+      "relation": "addressed_by"
+    },
+    {
+      "source": "RS2",
+      "target": "PAA3",
+      "relation": "contains"
+    },
+    {
+      "source": "PAA3",
+      "target": "PRI3",
+      "relation": "contains"
+    },
+    {
+      "source": "PRI3",
+      "target": "PEF3",
+      "relation": "expects"
+    },
+    {
+      "source": "RS2",
+      "target": "PAA4",
+      "relation": "contains"
+    },
+    {
+      "source": "PAA4",
+      "target": "PRI4",
+      "relation": "contains"
+    },
+    {
+      "source": "PRI4",
+      "target": "PEF4",
+      "relation": "expects"
+    },
+    {
+      "source": "SRC_F12",
+      "target": "PH1",
+      "relation": "expands_from"
+    },
+    {
+      "source": "PH1",
+      "target": "ER1",
+      "relation": "has_rationale"
+    },
+    {
+      "source": "PH1",
+      "target": "RS3",
+      "relation": "tested_by"
+    },
+    {
+      "source": "RS3",
+      "target": "PAA5",
+      "relation": "contains"
+    },
+    {
+      "source": "PAA5",
+      "target": "PRI5",
+      "relation": "contains"
+    },
+    {
+      "source": "PRI5",
+      "target": "PEF5",
+      "relation": "expects"
+    },
+    {
+      "source": "RS3",
+      "target": "PAA6",
+      "relation": "contains"
+    },
+    {
+      "source": "PAA6",
+      "target": "PRI6",
+      "relation": "contains"
+    },
+    {
+      "source": "PRI6",
+      "target": "PEF6",
+      "relation": "expects"
+    }
+  ]
+}

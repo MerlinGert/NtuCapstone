@@ -1,0 +1,604 @@
+{
+  "version": 1,
+  "sourceTrace": "maniscope-session-ACT-20260501-025125",
+  "sourcePlanVersion": 1,
+  "trees": [
+    {
+      "root": "SRC_H3",
+      "rootLabel": "Oct. 26-27 same-direction card coordination hypothesis",
+      "nodes": [
+        {
+          "instanceId": "SRC_H3",
+          "canonicalId": "SRC_H3",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "Oct. 26-27 same-direction card coordination hypothesis",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "H3"
+        },
+        {
+          "instanceId": "RG1@SRC_H3.1",
+          "canonicalId": "RG1",
+          "parentInstanceId": "SRC_H3",
+          "relationToParent": "has_gap",
+          "kind": "ReasoningGap",
+          "label": "Clicked-card volume and price-impact validation is missing",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": "H3",
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS1@SRC_H3.1.1",
+          "canonicalId": "RS1",
+          "parentInstanceId": "RG1@SRC_H3.1",
+          "relationToParent": "addressed_by",
+          "kind": "InvestigationStrategy",
+          "label": "Quantify and render the Oct. 26-27 clicked-card evidence",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA1@SRC_H3.1.1.1",
+          "canonicalId": "PAA1",
+          "parentInstanceId": "RS1@SRC_H3.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Compute clicked-cohort trade totals and price movement from local ACT data",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI1@SRC_H3.1.1.1.1",
+          "canonicalId": "PRI1",
+          "parentInstanceId": "PAA1@SRC_H3.1.1.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Calculate A13/A16/A21 buy/sell counts, token amounts, USD totals, and 1-minute OHLC price changes",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PEF1@SRC_H3.1.1.1.1.1",
+          "canonicalId": "PEF1",
+          "parentInstanceId": "PRI1@SRC_H3.1.1.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Clicked cohorts have measurable same-direction volume and visible price movement in the marked windows",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA2@SRC_H3.1.1.2",
+          "canonicalId": "PAA2",
+          "parentInstanceId": "RS1@SRC_H3.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Render K-line and Behavior Details views for clicked cohorts",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Visual Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI2@SRC_H3.1.1.2.1",
+          "canonicalId": "PRI2",
+          "parentInstanceId": "PAA2@SRC_H3.1.1.2",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Use ManiScope render API to capture Oct. 26-27 K-line and card-user Behavior Details views",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Visualization Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PEF2@SRC_H3.1.1.2.1.1",
+          "canonicalId": "PEF2",
+          "parentInstanceId": "PRI2@SRC_H3.1.1.2.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Rendered views show dense manipulation-card and behavior-timeline evidence for the clicked windows",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_H3",
+          "target": "RG1@SRC_H3.1",
+          "relation": "has_gap"
+        },
+        {
+          "source": "RG1@SRC_H3.1",
+          "target": "RS1@SRC_H3.1.1",
+          "relation": "addressed_by"
+        },
+        {
+          "source": "RS1@SRC_H3.1.1",
+          "target": "PAA1@SRC_H3.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA1@SRC_H3.1.1.1",
+          "target": "PRI1@SRC_H3.1.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI1@SRC_H3.1.1.1.1",
+          "target": "PEF1@SRC_H3.1.1.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "RS1@SRC_H3.1.1",
+          "target": "PAA2@SRC_H3.1.1.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA2@SRC_H3.1.1.2",
+          "target": "PRI2@SRC_H3.1.1.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI2@SRC_H3.1.1.2.1",
+          "target": "PEF2@SRC_H3.1.1.2.1.1",
+          "relation": "expects"
+        }
+      ]
+    },
+    {
+      "root": "SRC_IN16",
+      "rootLabel": "User insight that selected addresses form a large colluding component",
+      "nodes": [
+        {
+          "instanceId": "SRC_IN16",
+          "canonicalId": "SRC_IN16",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "User insight that selected addresses form a large colluding component",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "IN16"
+        },
+        {
+          "instanceId": "RG2@SRC_IN16.1",
+          "canonicalId": "RG2",
+          "parentInstanceId": "SRC_IN16",
+          "relationToParent": "has_gap",
+          "kind": "ReasoningGap",
+          "label": "Component membership basis is under-specified",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": "IN16",
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS2@SRC_IN16.1.1",
+          "canonicalId": "RS2",
+          "parentInstanceId": "RG2@SRC_IN16.1",
+          "relationToParent": "addressed_by",
+          "kind": "InvestigationStrategy",
+          "label": "Verify entity, link-component, and direct-transfer evidence for the clicked users",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA3@SRC_IN16.1.1.1",
+          "canonicalId": "PAA3",
+          "parentInstanceId": "RS2@SRC_IN16.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Compare render API link components with raw transfer edges",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI3@SRC_IN16.1.1.1.1",
+          "canonicalId": "PRI3",
+          "parentInstanceId": "PAA3@SRC_IN16.1.1.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Extract entity groups, link edges, link components, and direct transfers among selected/clicked users",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PEF3@SRC_IN16.1.1.1.1.1",
+          "canonicalId": "PEF3",
+          "parentInstanceId": "PRI3@SRC_IN16.1.1.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "The colluding-component claim is supported by model-derived links, direct transfers, or both",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA4@SRC_IN16.1.1.2",
+          "canonicalId": "PAA4",
+          "parentInstanceId": "RS2@SRC_IN16.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Render Token Distribution with links enabled",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Visual Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI4@SRC_IN16.1.1.2.1",
+          "canonicalId": "PRI4",
+          "parentInstanceId": "PAA4@SRC_IN16.1.1.2",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Capture the Token Distribution view showing entities and links at the analyzed snapshot",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Visualization Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PEF4@SRC_IN16.1.1.2.1.1",
+          "canonicalId": "PEF4",
+          "parentInstanceId": "PRI4@SRC_IN16.1.1.2.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Rendered Token Distribution preserves the visual basis for the component interpretation",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_IN16",
+          "target": "RG2@SRC_IN16.1",
+          "relation": "has_gap"
+        },
+        {
+          "source": "RG2@SRC_IN16.1",
+          "target": "RS2@SRC_IN16.1.1",
+          "relation": "addressed_by"
+        },
+        {
+          "source": "RS2@SRC_IN16.1.1",
+          "target": "PAA3@SRC_IN16.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA3@SRC_IN16.1.1.1",
+          "target": "PRI3@SRC_IN16.1.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI3@SRC_IN16.1.1.1.1",
+          "target": "PEF3@SRC_IN16.1.1.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "RS2@SRC_IN16.1.1",
+          "target": "PAA4@SRC_IN16.1.1.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA4@SRC_IN16.1.1.2",
+          "target": "PRI4@SRC_IN16.1.1.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI4@SRC_IN16.1.1.2.1",
+          "target": "PEF4@SRC_IN16.1.1.2.1.1",
+          "relation": "expects"
+        }
+      ]
+    },
+    {
+      "root": "SRC_F12",
+      "rootLabel": "User finding that same-direction activity alternates between buys and sells",
+      "nodes": [
+        {
+          "instanceId": "SRC_F12",
+          "canonicalId": "SRC_F12",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "User finding that same-direction activity alternates between buys and sells",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "F12"
+        },
+        {
+          "instanceId": "PH1@SRC_F12.1",
+          "canonicalId": "PH1",
+          "parentInstanceId": "SRC_F12",
+          "relationToParent": "expands_from",
+          "kind": "Hypothesis",
+          "label": "The larger group contains differentiated roles such as accumulators, sellers, round-trip actors, and functional transfer accounts",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "ER1@SRC_F12.1.1",
+          "canonicalId": "ER1",
+          "parentInstanceId": "PH1@SRC_F12.1",
+          "relationToParent": "has_rationale",
+          "kind": "ExpansionRationale",
+          "label": "Alternating same-direction buys and sells suggest role differentiation rather than one uniform manipulation behavior",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": "F12",
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS3@SRC_F12.1.2",
+          "canonicalId": "RS3",
+          "parentInstanceId": "PH1@SRC_F12.1",
+          "relationToParent": "tested_by",
+          "kind": "InvestigationStrategy",
+          "label": "Test role differentiation in A16 and A21 card users",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA5@SRC_F12.1.2.1",
+          "canonicalId": "PAA5",
+          "parentInstanceId": "RS3@SRC_F12.1.2",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Compute per-user buy/sell role summaries for A16 and A21",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI5@SRC_F12.1.2.1.1",
+          "canonicalId": "PRI5",
+          "parentInstanceId": "PAA5@SRC_F12.1.2.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Classify per-user trade count, buy/sell token amount, and USD direction in the broad card windows",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PEF5@SRC_F12.1.2.1.1.1",
+          "canonicalId": "PEF5",
+          "parentInstanceId": "PRI5@SRC_F12.1.2.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "A16/A21 users show differentiated roles rather than identical same-direction behavior",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA6@SRC_F12.1.2.2",
+          "canonicalId": "PAA6",
+          "parentInstanceId": "RS3@SRC_F12.1.2",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Render A16 and A21 Behavior Details for qualitative role comparison",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": "Visual Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI6@SRC_F12.1.2.2.1",
+          "canonicalId": "PRI6",
+          "parentInstanceId": "PAA6@SRC_F12.1.2.2",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Capture Behavior Details timelines for the second 9-user card and the 3-user card",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Visualization Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PEF6@SRC_F12.1.2.2.1.1",
+          "canonicalId": "PEF6",
+          "parentInstanceId": "PRI6@SRC_F12.1.2.2.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Behavior Details views show role-differentiated timing, accumulation, selling, or round-trip-like patterns",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_F12",
+          "target": "PH1@SRC_F12.1",
+          "relation": "expands_from"
+        },
+        {
+          "source": "PH1@SRC_F12.1",
+          "target": "ER1@SRC_F12.1.1",
+          "relation": "has_rationale"
+        },
+        {
+          "source": "PH1@SRC_F12.1",
+          "target": "RS3@SRC_F12.1.2",
+          "relation": "tested_by"
+        },
+        {
+          "source": "RS3@SRC_F12.1.2",
+          "target": "PAA5@SRC_F12.1.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA5@SRC_F12.1.2.1",
+          "target": "PRI5@SRC_F12.1.2.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI5@SRC_F12.1.2.1.1",
+          "target": "PEF5@SRC_F12.1.2.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "RS3@SRC_F12.1.2",
+          "target": "PAA6@SRC_F12.1.2.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA6@SRC_F12.1.2.2",
+          "target": "PRI6@SRC_F12.1.2.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI6@SRC_F12.1.2.2.1",
+          "target": "PEF6@SRC_F12.1.2.2.1.1",
+          "relation": "expects"
+        }
+      ]
+    }
+  ]
+}

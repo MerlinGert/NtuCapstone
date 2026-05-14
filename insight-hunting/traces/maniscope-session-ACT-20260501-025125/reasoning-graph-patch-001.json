@@ -1,0 +1,851 @@
+{
+  "version": 1,
+  "runId": "investigation-run-001",
+  "description": "Executed all Recommendation Plan Forest branches for the ACT ManiScope trace.",
+  "operations": [
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AIS1",
+        "kind": "InvestigationStrategy",
+        "space": "Action",
+        "scope": "High",
+        "label": "Execute all Recommendation Plan Forest branches for the ACT trace follow-up",
+        "provenance": [
+          "data:continued-investigation-assets/followup-data-summary.json",
+          "render:continued-investigation-assets/followup-kline-oct26-oct27-1h.png"
+        ],
+        "confidence": "Direct follow-up execution record",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "gapId": "RG1"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AAA1",
+        "kind": "AnalyticActivity",
+        "space": "Action",
+        "scope": "Mid",
+        "label": "Compute clicked-card trade and OHLC statistics",
+        "provenance": [
+          "data:front/public/data/sorted_trades.csv",
+          "data:front/public/data/ACT_OHLC.json",
+          "data:continued-investigation-assets/followup-data-summary.json"
+        ],
+        "confidence": "Direct raw-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "PAA1",
+          "recommendedInteractionId": "PRI1",
+          "expectedFindingId": "PEF1",
+          "gapId": "RG1"
+        },
+        "activityType": "Statistical Analysis"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AI1",
+        "kind": "Interaction",
+        "space": "Action",
+        "scope": "Low",
+        "label": "Calculate A13, A16, and A21 buy/sell totals and price-window changes from ACT raw data",
+        "provenance": [
+          "data:front/public/data/sorted_trades.csv",
+          "data:front/public/data/ACT_OHLC.json",
+          "data:continued-investigation-assets/followup-data-summary.json"
+        ],
+        "confidence": "Direct raw-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "PAA1",
+          "recommendedInteractionId": "PRI1",
+          "expectedFindingId": "PEF1",
+          "gapId": "RG1"
+        },
+        "interactionType": "Data Action",
+        "salience": "primary"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AF1",
+        "kind": "Finding",
+        "space": "Finding",
+        "scope": "Mid",
+        "label": "A13 has 49 trades by 5 of 9 users in the user-selected behavior window: 9.95M tokens bought, 8.30M sold, and the 1-minute price path ranged from +45.0% to -49.8% before closing -23.1%.",
+        "provenance": [
+          "data:continued-investigation-assets/followup-data-summary.json"
+        ],
+        "confidence": "Direct raw-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "PAA1",
+          "recommendedInteractionId": "PRI1",
+          "expectedFindingId": "PEF1",
+          "gapId": "RG1"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AAA2",
+        "kind": "AnalyticActivity",
+        "space": "Action",
+        "scope": "Mid",
+        "label": "Render K-line and A13 Behavior Details for follow-up visual evidence",
+        "provenance": [
+          "render:continued-investigation-assets/followup-kline-oct26-oct27-1h.png",
+          "render:continued-investigation-assets/followup-behavior-a13-card-users.png"
+        ],
+        "confidence": "Direct rendered evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "PAA2",
+          "recommendedInteractionId": "PRI2",
+          "expectedFindingId": "PEF2",
+          "gapId": "RG1"
+        },
+        "activityType": "Visual Analysis"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AI2",
+        "kind": "Interaction",
+        "space": "Action",
+        "scope": "Low",
+        "label": "Capture follow-up K-line and A13 Behavior Details views with the ManiScope render API",
+        "provenance": [
+          "render:continued-investigation-assets/followup-kline-oct26-oct27-1h.png",
+          "render:continued-investigation-assets/followup-behavior-a13-card-users.png"
+        ],
+        "confidence": "Direct rendered evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "PAA2",
+          "recommendedInteractionId": "PRI2",
+          "expectedFindingId": "PEF2",
+          "gapId": "RG1"
+        },
+        "interactionType": "Visualization Action",
+        "salience": "primary"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AF2",
+        "kind": "Finding",
+        "space": "Finding",
+        "scope": "Mid",
+        "label": "Rendered K-line and Behavior Details confirm dense same-direction card and row-level activity around Oct. 26-27, including hourly cards with 15.85M, 9.83M, and 2.51M token card totals.",
+        "provenance": [
+          "render:continued-investigation-assets/followup-kline-oct26-oct27-1h.png",
+          "render:continued-investigation-assets/followup-behavior-a13-card-users.png",
+          "data:continued-investigation-assets/followup-render-data-summary.json"
+        ],
+        "confidence": "Direct rendered evidence plus render metadata",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "PAA2",
+          "recommendedInteractionId": "PRI2",
+          "expectedFindingId": "PEF2",
+          "gapId": "RG1"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AAA3",
+        "kind": "AnalyticActivity",
+        "space": "Action",
+        "scope": "Mid",
+        "label": "Extract entity, link-component, and direct-transfer evidence for selected users",
+        "provenance": [
+          "data:continued-investigation-assets/followup-render-data-summary.json",
+          "data:front/public/data/sorted_transfers.csv"
+        ],
+        "confidence": "Direct render API data and raw-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS2",
+          "activityId": "PAA3",
+          "recommendedInteractionId": "PRI3",
+          "expectedFindingId": "PEF3",
+          "gapId": "RG2"
+        },
+        "activityType": "Statistical Analysis"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AI3",
+        "kind": "Interaction",
+        "space": "Action",
+        "scope": "Low",
+        "label": "Compare render API link components with raw transfer edges among selected and clicked users",
+        "provenance": [
+          "data:continued-investigation-assets/followup-render-data-summary.json",
+          "data:front/public/data/sorted_transfers.csv",
+          "data:continued-investigation-assets/followup-data-summary.json"
+        ],
+        "confidence": "Direct raw-data and render-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS2",
+          "activityId": "PAA3",
+          "recommendedInteractionId": "PRI3",
+          "expectedFindingId": "PEF3",
+          "gapId": "RG2"
+        },
+        "interactionType": "Data Action",
+        "salience": "primary"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AF3",
+        "kind": "Finding",
+        "space": "Finding",
+        "scope": "Mid",
+        "label": "The current link-derived component connects 16 of 17 selected/clicked follow-up users while CqW remains isolated; raw transfers show only one direct internal transfer among those users, 7Sm to Eu4 for 5.56M tokens on Oct. 23.",
+        "provenance": [
+          "data:continued-investigation-assets/followup-render-data-summary.json",
+          "data:continued-investigation-assets/followup-data-summary.json"
+        ],
+        "confidence": "Direct render API data and raw transfer computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS2",
+          "activityId": "PAA3",
+          "recommendedInteractionId": "PRI3",
+          "expectedFindingId": "PEF3",
+          "gapId": "RG2"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AAA4",
+        "kind": "AnalyticActivity",
+        "space": "Action",
+        "scope": "Mid",
+        "label": "Render Token Distribution with links enabled for component evidence",
+        "provenance": [
+          "render:continued-investigation-assets/followup-token-distribution-links.png"
+        ],
+        "confidence": "Direct rendered evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS2",
+          "activityId": "PAA4",
+          "recommendedInteractionId": "PRI4",
+          "expectedFindingId": "PEF4",
+          "gapId": "RG2"
+        },
+        "activityType": "Visual Analysis"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AI4",
+        "kind": "Interaction",
+        "space": "Action",
+        "scope": "Low",
+        "label": "Capture Token Distribution with links enabled at the analyzed snapshot",
+        "provenance": [
+          "render:continued-investigation-assets/followup-token-distribution-links.png"
+        ],
+        "confidence": "Direct rendered evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS2",
+          "activityId": "PAA4",
+          "recommendedInteractionId": "PRI4",
+          "expectedFindingId": "PEF4",
+          "gapId": "RG2"
+        },
+        "interactionType": "Visualization Action",
+        "salience": "supporting"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AF4",
+        "kind": "Finding",
+        "space": "Finding",
+        "scope": "Mid",
+        "label": "Rendered Token Distribution preserves the visual component basis: 49 processed top users cover 30.29% of user-held balance, with three balance-sequence entity groups and visible link overlays.",
+        "provenance": [
+          "render:continued-investigation-assets/followup-token-distribution-links.png",
+          "data:continued-investigation-assets/followup-render-data-summary.json"
+        ],
+        "confidence": "Direct rendered evidence plus render API data",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS2",
+          "activityId": "PAA4",
+          "recommendedInteractionId": "PRI4",
+          "expectedFindingId": "PEF4",
+          "gapId": "RG2"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AAA5",
+        "kind": "AnalyticActivity",
+        "space": "Action",
+        "scope": "Mid",
+        "label": "Compute role summaries for A16 and A21 card users",
+        "provenance": [
+          "data:continued-investigation-assets/followup-data-summary.json"
+        ],
+        "confidence": "Direct raw-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS3",
+          "activityId": "PAA5",
+          "recommendedInteractionId": "PRI5",
+          "expectedFindingId": "PEF5",
+          "sourceNodeId": "F12"
+        },
+        "activityType": "Statistical Analysis"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AI5",
+        "kind": "Interaction",
+        "space": "Action",
+        "scope": "Low",
+        "label": "Classify A16 and A21 users by trade count, buy/sell amount, and USD direction",
+        "provenance": [
+          "data:continued-investigation-assets/followup-data-summary.json",
+          "data:front/public/data/sorted_trades.csv"
+        ],
+        "confidence": "Direct raw-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS3",
+          "activityId": "PAA5",
+          "recommendedInteractionId": "PRI5",
+          "expectedFindingId": "PEF5",
+          "sourceNodeId": "F12"
+        },
+        "interactionType": "Data Action",
+        "salience": "primary"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AF5",
+        "kind": "Finding",
+        "space": "Finding",
+        "scope": "Mid",
+        "label": "A16 contains 377 trades by all 9 users, with 37.93M tokens bought and 34.47M sold; A21 contains 150 trades by 3 users, with DmJ high-frequency net buying, GCDE round-trip-like equal token buy/sell volume, and 7Sm net selling.",
+        "provenance": [
+          "data:continued-investigation-assets/followup-data-summary.json"
+        ],
+        "confidence": "Direct raw-data computation",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS3",
+          "activityId": "PAA5",
+          "recommendedInteractionId": "PRI5",
+          "expectedFindingId": "PEF5",
+          "sourceNodeId": "F12"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AAA6",
+        "kind": "AnalyticActivity",
+        "space": "Action",
+        "scope": "Mid",
+        "label": "Render A16 and A21 Behavior Details for role comparison",
+        "provenance": [
+          "render:continued-investigation-assets/followup-behavior-a16-card-users.png",
+          "render:continued-investigation-assets/followup-behavior-a21-card-users.png"
+        ],
+        "confidence": "Direct rendered evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS3",
+          "activityId": "PAA6",
+          "recommendedInteractionId": "PRI6",
+          "expectedFindingId": "PEF6",
+          "sourceNodeId": "F12"
+        },
+        "activityType": "Visual Analysis"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AI6",
+        "kind": "Interaction",
+        "space": "Action",
+        "scope": "Low",
+        "label": "Capture A16 and A21 Behavior Details views for role comparison",
+        "provenance": [
+          "render:continued-investigation-assets/followup-behavior-a16-card-users.png",
+          "render:continued-investigation-assets/followup-behavior-a21-card-users.png"
+        ],
+        "confidence": "Direct rendered evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS3",
+          "activityId": "PAA6",
+          "recommendedInteractionId": "PRI6",
+          "expectedFindingId": "PEF6",
+          "sourceNodeId": "F12"
+        },
+        "interactionType": "Visualization Action",
+        "salience": "primary"
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AF6",
+        "kind": "Finding",
+        "space": "Finding",
+        "scope": "Mid",
+        "label": "Rendered A16 and A21 Behavior Details show role-differentiated timing and alternating buy/sell clusters rather than a uniform same-direction pattern.",
+        "provenance": [
+          "render:continued-investigation-assets/followup-behavior-a16-card-users.png",
+          "render:continued-investigation-assets/followup-behavior-a21-card-users.png"
+        ],
+        "confidence": "Direct rendered evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS3",
+          "activityId": "PAA6",
+          "recommendedInteractionId": "PRI6",
+          "expectedFindingId": "PEF6",
+          "sourceNodeId": "F12"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AIN1",
+        "kind": "Insight",
+        "space": "Finding",
+        "scope": "High",
+        "label": "Follow-up evidence supports a core coordinated-manipulation interpretation, but it refines the user insight: the strongest support is link/model timing plus role-differentiated trade behavior, not direct-transfer proof or equal participation by every clicked user.",
+        "provenance": [
+          "data:continued-investigation-assets/followup-data-summary.json",
+          "data:continued-investigation-assets/followup-render-data-summary.json",
+          "render:continued-investigation-assets/followup-kline-oct26-oct27-1h.png",
+          "render:continued-investigation-assets/followup-behavior-a16-card-users.png"
+        ],
+        "confidence": "Strong follow-up synthesis",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "gapId": "RG1"
+        }
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIS1",
+        "target": "AAA1",
+        "relation": "contains",
+        "rationale": "The follow-up strategy executed this planned analytic activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIS1",
+        "target": "AAA2",
+        "relation": "contains",
+        "rationale": "The follow-up strategy executed this planned analytic activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIS1",
+        "target": "AAA3",
+        "relation": "contains",
+        "rationale": "The follow-up strategy executed this planned analytic activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIS1",
+        "target": "AAA4",
+        "relation": "contains",
+        "rationale": "The follow-up strategy executed this planned analytic activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIS1",
+        "target": "AAA5",
+        "relation": "contains",
+        "rationale": "The follow-up strategy executed this planned analytic activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIS1",
+        "target": "AAA6",
+        "relation": "contains",
+        "rationale": "The follow-up strategy executed this planned analytic activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA1",
+        "target": "AI1",
+        "relation": "contains",
+        "rationale": "This raw agent interaction executed the follow-up activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA2",
+        "target": "AI2",
+        "relation": "contains",
+        "rationale": "This raw agent interaction executed the follow-up activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA3",
+        "target": "AI3",
+        "relation": "contains",
+        "rationale": "This raw agent interaction executed the follow-up activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA4",
+        "target": "AI4",
+        "relation": "contains",
+        "rationale": "This raw agent interaction executed the follow-up activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA5",
+        "target": "AI5",
+        "relation": "contains",
+        "rationale": "This raw agent interaction executed the follow-up activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA6",
+        "target": "AI6",
+        "relation": "contains",
+        "rationale": "This raw agent interaction executed the follow-up activity."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA1",
+        "target": "AF1",
+        "relation": "produces",
+        "rationale": "The follow-up activity produced this evidence-backed finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA2",
+        "target": "AF2",
+        "relation": "produces",
+        "rationale": "The follow-up activity produced this evidence-backed finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA3",
+        "target": "AF3",
+        "relation": "produces",
+        "rationale": "The follow-up activity produced this evidence-backed finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA4",
+        "target": "AF4",
+        "relation": "produces",
+        "rationale": "The follow-up activity produced this evidence-backed finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA5",
+        "target": "AF5",
+        "relation": "produces",
+        "rationale": "The follow-up activity produced this evidence-backed finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AAA6",
+        "target": "AF6",
+        "relation": "produces",
+        "rationale": "The follow-up activity produced this evidence-backed finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AI1",
+        "target": "AF1",
+        "relation": "produces",
+        "rationale": "The specific follow-up interaction produced this finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AI2",
+        "target": "AF2",
+        "relation": "produces",
+        "rationale": "The specific follow-up interaction produced this finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AI3",
+        "target": "AF3",
+        "relation": "produces",
+        "rationale": "The specific follow-up interaction produced this finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AI4",
+        "target": "AF4",
+        "relation": "produces",
+        "rationale": "The specific follow-up interaction produced this finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AI5",
+        "target": "AF5",
+        "relation": "produces",
+        "rationale": "The specific follow-up interaction produced this finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AI6",
+        "target": "AF6",
+        "relation": "produces",
+        "rationale": "The specific follow-up interaction produced this finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIS1",
+        "target": "AIN1",
+        "relation": "produces",
+        "rationale": "Executing all plan branches produced the synthesized follow-up insight."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF1",
+        "target": "AIN1",
+        "relation": "supports",
+        "rationale": "This follow-up finding supports the synthesized follow-up insight."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF2",
+        "target": "AIN1",
+        "relation": "supports",
+        "rationale": "This follow-up finding supports the synthesized follow-up insight."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF3",
+        "target": "AIN1",
+        "relation": "supports",
+        "rationale": "This follow-up finding supports the synthesized follow-up insight."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF4",
+        "target": "AIN1",
+        "relation": "supports",
+        "rationale": "This follow-up finding supports the synthesized follow-up insight."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF5",
+        "target": "AIN1",
+        "relation": "supports",
+        "rationale": "This follow-up finding supports the synthesized follow-up insight."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF6",
+        "target": "AIN1",
+        "relation": "supports",
+        "rationale": "This follow-up finding supports the synthesized follow-up insight."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF1",
+        "target": "F11",
+        "relation": "supports",
+        "rationale": "The trade and price statistics validate the original Oct. 26-27 same-direction card finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF2",
+        "target": "F11",
+        "relation": "supports",
+        "rationale": "The rendered K-line and behavior views validate the original card-timing finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF3",
+        "target": "IN16",
+        "relation": "supports",
+        "rationale": "The link-component and raw-transfer check supports the colluding-group insight while separating model-link support from direct-transfer evidence."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF4",
+        "target": "H1",
+        "relation": "supports",
+        "rationale": "The rendered token distribution and exact snapshot statistics support the holder-structure hypothesis."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF5",
+        "target": "F12",
+        "relation": "supports",
+        "rationale": "The role statistics support the original alternating buy/sell and round-trip-like finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AF6",
+        "target": "F12",
+        "relation": "supports",
+        "rationale": "The rendered behavior timelines visually support the role-differentiation finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIN1",
+        "target": "H3",
+        "relation": "supports",
+        "rationale": "The follow-up synthesis strengthens the coordination hypothesis while recording its limits."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AIN1",
+        "target": "H2",
+        "relation": "supports",
+        "rationale": "The follow-up synthesis also supports role differentiation across suspicious users."
+      }
+    }
+  ]
+}

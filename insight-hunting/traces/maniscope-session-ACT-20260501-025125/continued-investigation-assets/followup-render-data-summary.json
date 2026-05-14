@@ -1,0 +1,566 @@
+{
+  "snapshotStats": {
+    "threshold_percentage": 30,
+    "total_supply": 948321124.5625716,
+    "users": {
+      "count": 20633,
+      "processed_count": 49,
+      "total_balance": 719374611.9221776,
+      "top_users_balance": 217872545.90412408,
+      "top_users_percentage": 30.286382406791652,
+      "others_balance": 501502066.0180535,
+      "others_percentage": 69.71361759320835,
+      "percentage": 75.85770192074975
+    },
+    "contracts": {
+      "count": 838,
+      "total_balance": 96655057.97331405,
+      "percentage": 10.192228715552208
+    },
+    "exchanges": {
+      "count": 8,
+      "total_balance": 132291454.66708004,
+      "percentage": 13.950069363698042
+    }
+  },
+  "entityGroups": [
+    {
+      "id": "entity_0",
+      "users": [
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+        "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+      ],
+      "relationTypes": [
+        "balance_sequence"
+      ]
+    },
+    {
+      "id": "entity_1",
+      "users": [
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "4B3QRDxTAXaJkJLbBopuicxwv6KEhwBcRyvMpthXeyV7",
+        "HEHuAEtncBvNrojE3UBUpnWN8R6UWfqBTbra8vjXpmpb"
+      ],
+      "relationTypes": [
+        "balance_sequence"
+      ]
+    },
+    {
+      "id": "entity_2",
+      "users": [
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+        "CmqKfh2CjoR8jCjRo39cfp9mUGgRLwLUjzcRA7SGpvWd"
+      ],
+      "relationTypes": [
+        "balance_sequence"
+      ]
+    }
+  ],
+  "entityMembership": {
+    "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH": "entity_0",
+    "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon": "entity_0",
+    "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv": "entity_0",
+    "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb": "entity_1",
+    "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3": "entity_2"
+  },
+  "linkEdges": [
+    {
+      "a": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 23.30m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "b": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 99.93m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "trading_action_sequence",
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Found matching sequence (trading_action_sequence): buy,buy,buy,buy...",
+        "Manipulation time proximity. Diff: 60.53m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "trading_action_sequence",
+        "manipulation_same_group",
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Found matching sequence (trading_action_sequence): buy,buy,buy...",
+        "Participated in same manipulation group. Method: same_direction_entity_group. Time: 2024-10-26 02:20:49 - 2024-10-26 02:26:35"
+      ]
+    },
+    {
+      "a": "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "trading_action_sequence"
+      ],
+      "descriptions": [
+        "Found matching sequence (trading_action_sequence): buy,buy,buy..."
+      ]
+    },
+    {
+      "a": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "b": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+      "types": [
+        "trading_action_sequence",
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Found matching sequence (trading_action_sequence): buy,buy,buy,buy...",
+        "Manipulation time proximity. Diff: 37.63m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+      "b": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+      "types": [
+        "trading_action_sequence",
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Found matching sequence (trading_action_sequence): buy,buy,buy,buy...",
+        "Manipulation time proximity. Diff: 5.08m (Overlap). Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "b": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+      "types": [
+        "trading_action_sequence",
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Found matching sequence (trading_action_sequence): buy,buy,buy...",
+        "Manipulation time proximity. Diff: 6.95m (Overlap). Methods: same_direction, round_trip."
+      ]
+    },
+    {
+      "a": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 119.63m. Methods: round_trip, same_direction."
+      ]
+    },
+    {
+      "a": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "b": "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 47.70m. Methods: same_direction, same_direction_entity_group."
+      ]
+    },
+    {
+      "a": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "b": "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 108.30m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+      "b": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 101.35m. Methods: round_trip, same_direction."
+      ]
+    },
+    {
+      "a": "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+      "b": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 108.43m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "b": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 19.53m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "b": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 63.62m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "b": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 104.62m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+      "b": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 107.30m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+      "b": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 7.37m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+      "b": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 117.65m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 15.93m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+      "b": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 110.28m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+      "b": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 115.37m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 94.35m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 99.43m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+      "b": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 94.35m. Methods: same_direction_entity_group, same_direction."
+      ]
+    },
+    {
+      "a": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+      "b": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 99.43m. Methods: same_direction_entity_group, same_direction."
+      ]
+    },
+    {
+      "a": "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+      "b": "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 3.15m (Overlap). Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+      "b": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 95.75m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+      "b": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 107.35m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+      "b": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 11.60m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+      "b": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 26.45m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "b": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 44.28m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "b": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 20.45m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "b": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 58.08m. Methods: same_direction, same_direction."
+      ]
+    },
+    {
+      "a": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "b": "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 62.42m. Methods: same_direction, same_direction_entity_group."
+      ]
+    },
+    {
+      "a": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "b": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 46.02m. Methods: same_direction_entity_group, same_direction."
+      ]
+    },
+    {
+      "a": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "b": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 65.55m. Methods: same_direction_entity_group, same_direction."
+      ]
+    },
+    {
+      "a": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "b": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+      "types": [
+        "manipulation_time_proximity"
+      ],
+      "descriptions": [
+        "Manipulation time proximity. Diff: 5.13m. Methods: same_direction, same_direction_entity_group."
+      ]
+    }
+  ],
+  "linkComponents": [
+    [
+      "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+      "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+      "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+      "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+      "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+      "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+      "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+      "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+      "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+      "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+      "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+      "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+    ],
+    [
+      "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV"
+    ]
+  ],
+  "currentKlineGranularity": "1H",
+  "relevantBottomCards": [
+    {
+      "i": 25,
+      "text": "10/26 00:32 - 10/26 00:37\n10/26 00:31:23 - 10/26 00:38:44 | $2.00M\nEu4..",
+      "title": "1 manipulations\nUsers: Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh\nTime Range: 10/26 00:31:23 - 10/26 00:38:44\nAmount: 2.00M"
+    },
+    {
+      "i": 26,
+      "text": "10/26 00:51 - 10/26 01:50\n10/26 00:48:58 - 10/26 01:53:32 | $7.31M\n2br..\nDmJ..",
+      "title": "3 manipulations\nUsers: 2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN, DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH\nTime Range: 10/26 00:48:58 - 10/26 01:53:32\nAmount: 7.31M"
+    },
+    {
+      "i": 27,
+      "text": "10/26 02:36 - 10/26 02:37\n10/26 02:35:32 - 10/26 02:38:59 | $707.88K\nDNL..",
+      "title": "1 manipulations\nUsers: DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji\nTime Range: 10/26 02:35:32 - 10/26 02:38:59\nAmount: 707.88K"
+    },
+    {
+      "i": 28,
+      "text": "10/26 03:15 - 10/26 03:42\n10/26 03:13:36 - 10/26 03:44:13 | $378.94K\n2br..",
+      "title": "1 manipulations\nUsers: 2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN\nTime Range: 10/26 03:13:36 - 10/26 03:44:13\nAmount: 378.94K"
+    },
+    {
+      "i": 29,
+      "text": "10/26 05:09 - 10/26 05:20\n10/26 05:08:07 - 10/26 05:21:21 | $1.42M\nDNL..",
+      "title": "1 manipulations\nUsers: DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji\nTime Range: 10/26 05:08:07 - 10/26 05:21:21\nAmount: 1.42M"
+    },
+    {
+      "i": 30,
+      "text": "10/26 07:16 - 10/26 07:27\n10/26 07:15:43 - 10/26 07:28:31 | $550.11K\n5YP..",
+      "title": "1 manipulations\nUsers: 5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv\nTime Range: 10/26 07:15:43 - 10/26 07:28:31\nAmount: 550.11K"
+    },
+    {
+      "i": 31,
+      "text": "10/26 08:17 - 10/26 08:26\n10/26 08:16:35 - 10/26 08:27:03 | $354.62K\n5YP..",
+      "title": "1 manipulations\nUsers: 5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv\nTime Range: 10/26 08:16:35 - 10/26 08:27:03\nAmount: 354.62K"
+    },
+    {
+      "i": 32,
+      "text": "10/26 09:57 - 10/26 10:26\n10/26 09:56:03 - 10/26 10:28:02 | $15.85M\n5YP..\nDmJ..\nBgB..\n35N..",
+      "title": "5 manipulations\nUsers: 5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv, DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH, BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon, 35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ\nTime Range: 10/26 09:56:03 - 10/26 10:28:02\nAmount: 15.85M"
+    },
+    {
+      "i": 33,
+      "text": "10/26 11:55 - 10/26 12:14\n10/26 11:54:10 - 10/26 12:15:40 | $9.83M\n22J..\n5RA..",
+      "title": "2 manipulations\nUsers: 22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm, 5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz\nTime Range: 10/26 11:54:10 - 10/26 12:15:40\nAmount: 9.83M"
+    },
+    {
+      "i": 34,
+      "text": "10/26 16:51 - 10/26 17:01\n10/26 16:50:13 - 10/26 17:02:17 | $675.19K\n5RA..",
+      "title": "1 manipulations\nUsers: 5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz\nTime Range: 10/26 16:50:13 - 10/26 17:02:17\nAmount: 675.19K"
+    },
+    {
+      "i": 35,
+      "text": "10/27 01:23 - 10/27 01:33\n10/27 01:22:55 - 10/27 01:34:55 | $575.45K\nEnM..\n5WF..",
+      "title": "2 manipulations\nUsers: EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3, 5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw\nTime Range: 10/27 01:22:55 - 10/27 01:34:55\nAmount: 575.45K"
+    },
+    {
+      "i": 36,
+      "text": "10/27 06:09 - 10/27 06:35\n10/27 06:08:25 - 10/27 06:36:48 | $2.51M\nCqW..",
+      "title": "1 manipulations\nUsers: CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV\nTime Range: 10/27 06:08:25 - 10/27 06:36:48\nAmount: 2.51M"
+    },
+    {
+      "i": 37,
+      "text": "10/27 10:47 - 10/27 10:48\n10/27 10:46:00 - 10/27 10:49:07 | $900.00K\nErA..",
+      "title": "1 manipulations\nUsers: ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU\nTime Range: 10/27 10:46:00 - 10/27 10:49:07\nAmount: 900.00K"
+    },
+    {
+      "i": 38,
+      "text": "10/27 12:54 - 10/27 13:08\n10/27 12:53:39 - 10/27 13:09:07 | $548.46K\n5RA..",
+      "title": "1 manipulations\nUsers: 5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz\nTime Range: 10/27 12:53:39 - 10/27 13:09:07\nAmount: 548.46K"
+    },
+    {
+      "i": 39,
+      "text": "10/28 01:25 - 10/28 01:38\n10/28 01:24:41 - 10/28 01:39:30 | $1.88M\nDmJ..",
+      "title": "1 manipulations\nUsers: DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH\nTime Range: 10/28 01:24:41 - 10/28 01:39:30\nAmount: 1.88M"
+    },
+    {
+      "i": 40,
+      "text": "10/28 18:57 - 10/28 18:59\n10/28 18:56:39 - 10/28 19:00:55 | $517.65K\nGCD..",
+      "title": "1 manipulations\nUsers: GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz\nTime Range: 10/28 18:56:39 - 10/28 19:00:55\nAmount: 517.65K"
+    }
+  ]
+}
