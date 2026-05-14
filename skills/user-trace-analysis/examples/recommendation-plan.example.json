@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "trace": "example-trace",
+  "nodes": [
+    {
+      "id": "SRC_H1",
+      "kind": "SourceNode",
+      "canonicalId": "H1",
+      "label": "Oct 25-27 behavior reflects coordinated price activity",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "RG1",
+      "kind": "ReasoningGap",
+      "targetNodeId": "H1",
+      "gapType": "missing_statistical_validation",
+      "desiredSupport": "A Finding that quantifies clicked cohort buy/sell volume.",
+      "label": "Exact clicked-cohort volume is missing",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "RS1",
+      "kind": "InvestigationStrategy",
+      "label": "Quantify clicked cohort behavior",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "AA1",
+      "kind": "AnalyticActivity",
+      "activityType": "Statistical Analysis",
+      "label": "Compute cohort trade totals",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "RI1",
+      "kind": "RecommendedInteraction",
+      "interactionType": "Data Action",
+      "label": "Calculate buy/sell counts and USD volume for clicked cohort",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    },
+    {
+      "id": "EF1",
+      "kind": "ExpectedFinding",
+      "expectedOnly": true,
+      "label": "Clicked cohort has synchronized net buying during the marked window",
+      "recommendationType": "Evidence Completion",
+      "status": "planned"
+    }
+  ],
+  "edges": [
+    {
+      "source": "SRC_H1",
+      "target": "RG1",
+      "relation": "has_gap"
+    },
+    {
+      "source": "RG1",
+      "target": "RS1",
+      "relation": "addressed_by"
+    },
+    {
+      "source": "RS1",
+      "target": "AA1",
+      "relation": "contains"
+    },
+    {
+      "source": "AA1",
+      "target": "RI1",
+      "relation": "contains"
+    },
+    {
+      "source": "RI1",
+      "target": "EF1",
+      "relation": "expects"
+    }
+  ],
+  "roots": ["SRC_H1"]
+}

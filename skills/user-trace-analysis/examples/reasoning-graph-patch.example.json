@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "runId": "investigation-run-001",
+  "description": "Example follow-up evidence patch for clicked cohort quantification.",
+  "operations": [
+    {
+      "op": "add_node",
+      "node": {
+        "id": "AI2",
+        "kind": "Interaction",
+        "space": "Action",
+        "scope": "Low",
+        "label": "Compute clicked cohort buy/sell counts and USD volume",
+        "interactionType": "Data Action",
+        "salience": "primary",
+        "provenance": ["data:front/public/data/sorted_trades.csv"],
+        "confidence": "Direct evidence",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "AA1",
+          "recommendedInteractionId": "RI1",
+          "expectedFindingId": "EF1",
+          "gapId": "RG1"
+        }
+      }
+    },
+    {
+      "op": "add_node",
+      "node": {
+        "id": "F2",
+        "kind": "Finding",
+        "space": "Finding",
+        "scope": "Mid",
+        "label": "Clicked cohort has synchronized net buying during the marked window",
+        "provenance": ["data:front/public/data/sorted_trades.csv"],
+        "confidence": "Strong inference",
+        "actor": "agent",
+        "source": "followup_investigation",
+        "planRef": {
+          "strategyId": "RS1",
+          "activityId": "AA1",
+          "recommendedInteractionId": "RI1",
+          "expectedFindingId": "EF1",
+          "gapId": "RG1"
+        }
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "AI2",
+        "target": "F2",
+        "relation": "produces",
+        "rationale": "The follow-up calculation produced the cohort-volume finding."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "F2",
+        "target": "H1",
+        "relation": "supports",
+        "rationale": "The quantified cohort behavior supports the coordinated price-activity hypothesis."
+      }
+    }
+  ]
+}

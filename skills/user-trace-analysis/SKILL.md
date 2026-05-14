@@ -1,6 +1,6 @@
 ---
 name: user-trace-analysis
-description: Use when analyzing a ManiScope exported or live user-interaction trace to reconstruct Tasks, Analytic Questions, Hypotheses, Interactions, Analytic Activities, Investigation Strategies, Findings, Insights, trace-step maps, reasoning graphs, and User Reasoning Forests.
+description: Use when analyzing a ManiScope exported or live user-interaction trace to reconstruct Tasks, Analytic Questions, Hypotheses, Interactions, Analytic Activities, Investigation Strategies, Findings, Insights, trace-step maps, reasoning graphs, User Reasoning Forests, Recommendation Plan Forests, follow-up investigation patches, and augmented reasoning forests.
 ---
 
 # User Trace Analysis Skill
@@ -16,6 +16,14 @@ For a full trace analysis, produce these artifacts unless the user asks for a li
 - `TRACE/user-reasoning-forest.json`: machine-readable derived forest when using the transformer script.
 
 For the canonical graph schema, relation taxonomy, salience field, and forest transformation rules, read `references/reasoning-graph-format.md`. Use `scripts/reasoning_graph_to_forest.py` to mechanically derive `user-reasoning-forest.json` and `user-reasoning-forest.md` from `reasoning-graph.json`.
+
+When the task includes recommendations or follow-up investigation, also read:
+
+- `references/recommendation-plan-format.md`: Recommendation Plan Graph and Recommendation Plan Forest schema.
+- `references/reasoning-graph-patch-format.md`: patch format for adding agent follow-up evidence back into the canonical reasoning graph.
+
+Use `scripts/recommendation_plan_to_forest.py` to mechanically derive `recommendation-plan-forest.json` and `recommendation-plan-forest.md` from `recommendation-plan-graph.json`.
+Use `scripts/apply_reasoning_graph_patch.py` to apply a follow-up evidence patch to `reasoning-graph.json`, producing `augmented-reasoning-graph.json` and regenerated `augmented-reasoning-forest.md`.
 
 ## 1. Clarify The Task When Needed
 
@@ -185,6 +193,12 @@ Use these terms when building traceability outputs:
 - **Reasoning Gap**: a missing, weak, contradictory, or under-supported path below an existing Finding, Insight, or Hypothesis.
 - **Evidence Completion Recommendation**: an Investigation Strategy that fills a Reasoning Gap in an existing User Reasoning Forest.
 - **Hypothesis Expansion Recommendation**: an Investigation Strategy that proposes a related new Hypothesis and grows a new tree or branch.
+- **Recommendation Plan Graph**: a prescriptive graph of Reasoning Gaps, Expansion Rationales, Investigation Strategies, Analytic Activities, Recommended Interactions, and Expected Findings.
+- **Recommendation Plan Forest**: a readable prescriptive tree view generated from the Recommendation Plan Graph.
+- **Expected Finding**: a planned target outcome, not evidence. Convert it to a real Finding only after follow-up investigation produces evidence.
+- **Follow-up Investigation Forest**: a descriptive forest for evidence produced by executing a Recommendation Plan Forest.
+- **Reasoning Graph Patch**: a machine-readable set of additions or updates that merges follow-up evidence into the canonical Reasoning Support Graph.
+- **Augmented Reasoning Forest**: the regenerated reasoning forest after applying one or more Reasoning Graph Patches.
 
 Use this relation taxonomy in `reasoning-graph.json`:
 
@@ -205,6 +219,34 @@ Every Interaction node in `reasoning-graph.json` should include `salience`:
 - `low`: logged but weakly relevant, such as incidental hover, scroll, or layout navigation.
 
 The User Reasoning Forest must use raw Interaction leaves by default. Do not replace Interactions with compact Step nodes in the forest unless the user explicitly asks for a compact view.
+
+### Recommendation and Follow-up Lifecycle
+
+Keep the epistemic boundary clear:
+
+- **User Reasoning Forest** is descriptive and reconstructs what the user trace supports.
+- **Recommendation Plan Forest** is prescriptive and describes what should be investigated next.
+- **Follow-up Investigation Forest** is descriptive and records what an agent found after executing the plan.
+- **Augmented Reasoning Forest** is the original reasoning graph plus follow-up evidence, regenerated mechanically.
+
+Recommended lifecycle:
+
+```text
+reasoning-graph.json
+  -> user-reasoning-forest.md
+  -> recommendation-plan-graph.json
+  -> recommendation-plan-forest.md
+  -> agent executes recommended Interactions
+  -> reasoning-graph-patch-001.json
+  -> augmented-reasoning-graph.json
+  -> augmented-reasoning-forest.md
+```
+
+For **Evidence Completion Recommendations**, attach the plan to an existing Reasoning Gap. After execution, create real Interaction, Finding, or Insight nodes with `actor: "agent"` and `source: "followup_investigation"`, then patch them into the original graph with `supports`, `refines`, or `contradicts` edges to the original target node.
+
+For **Hypothesis Expansion Recommendations**, the plan may propose a new Hypothesis. After execution, create a follow-up reasoning graph or graph patch with the new Hypothesis as a root, then generate both a focused Follow-up Investigation Forest and, when useful, an Augmented Reasoning Forest that includes the new root.
+
+Do not treat Expected Findings from a Recommendation Plan Forest as real Findings. Expected Findings become Findings only after evidence is produced by follow-up investigation.
 
 ## 4. Efficient Inspection Commands
 
@@ -446,6 +488,38 @@ python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py TRACE/rea
 
 The generated `user-reasoning-forest.md` should show one bottom-up reasoning support tree per Hypothesis. Duplicate shared canonical nodes mechanically so each tree node instance has at most one parent.
 
+### Step 7: Build a Recommendation Plan Forest when recommendations are requested
+
+Create `recommendation-plan-graph.json` and `recommendation-plan-forest.md` when the user asks for recommendations, next steps, autonomous investigation plans, or evidence-gap analysis.
+
+Use two recommendation types:
+
+- **Evidence Completion**: fills a Reasoning Gap inside an existing User Reasoning Forest.
+- **Hypothesis Expansion**: proposes a new related Hypothesis from an existing Finding, Insight, or Hypothesis.
+
+Use the format in `references/recommendation-plan-format.md`. Recommendation Plan Forest nodes are plans, not evidence. Keep Expected Findings visually and semantically separate from actual Findings.
+
+Then run:
+
+```bash
+python skills/user-trace-analysis/scripts/recommendation_plan_to_forest.py \
+  TRACE/recommendation-plan-graph.json
+```
+
+### Step 8: Patch the reasoning graph after follow-up investigation
+
+When an agent executes a Recommendation Plan Forest, record the new evidence as a Reasoning Graph Patch instead of editing the old forest by hand.
+
+Patch flow:
+
+```bash
+python skills/user-trace-analysis/scripts/apply_reasoning_graph_patch.py \
+  TRACE/reasoning-graph.json \
+  TRACE/reasoning-graph-patch-001.json
+```
+
+The patch script writes `augmented-reasoning-graph.json`, `augmented-reasoning-forest.json`, and `augmented-reasoning-forest.md` by default. Use the patch format in `references/reasoning-graph-patch-format.md`.
+
 ## 6. Requirements For The Deliverables
 
 The primary report should be a Markdown file unless the user requests otherwise. Prefer placing it next to the trace folder, for example:
@@ -460,6 +534,16 @@ For a full analysis, also create:
 TRACE/trace-step-map.md
 TRACE/reasoning-graph.json
 TRACE/user-reasoning-forest.md
+```
+
+For recommendation or follow-up work, also create the relevant artifacts:
+
+```text
+TRACE/recommendation-plan-graph.json
+TRACE/recommendation-plan-forest.md
+TRACE/reasoning-graph-patch-001.json
+TRACE/augmented-reasoning-graph.json
+TRACE/augmented-reasoning-forest.md
 ```
 
 ### `analysis-report.md` required sections
@@ -503,6 +587,14 @@ TRACE/user-reasoning-forest.md
 - A Mermaid `flowchart BT` tree for each Hypothesis.
 - A short reading guide explaining the strongest support paths, weak support paths, contradictions, and Reasoning Gaps.
 
+### Recommendation and follow-up artifacts
+
+- `recommendation-plan-graph.json`: prescriptive plan graph. It must distinguish Evidence Completion from Hypothesis Expansion.
+- `recommendation-plan-forest.md`: readable plan forest. It must show Reasoning Gaps or Expansion Rationales above Investigation Strategies, Analytic Activities, Recommended Interactions, and Expected Findings.
+- `reasoning-graph-patch-*.json`: follow-up evidence patch. New evidence nodes must include `actor`, `source`, and `planRef`.
+- `augmented-reasoning-graph.json`: canonical reasoning graph after patch application.
+- `augmented-reasoning-forest.md`: regenerated forest from the augmented graph. It may include both original user evidence and agent follow-up evidence.
+
 ### Hard requirements
 
 - Include analysis and rationale, not only conclusions.
@@ -530,6 +622,9 @@ TRACE/user-reasoning-forest.md
 - Every `user-reasoning-forest.md` tree must be rooted at one Hypothesis.
 - The User Reasoning Forest must preserve raw Interaction leaves by default.
 - Shared canonical nodes should be duplicated mechanically in the forest and retain `canonicalId`.
+- Recommendation Plan Forests must not present Expected Findings as evidence-backed Findings.
+- Follow-up evidence should be merged through `reasoning-graph-patch-*.json`, not by manually editing generated forests.
+- Agent-added follow-up nodes must include `actor`, `source`, and `planRef`.
 
 ## 7. Lessons Learned
 
@@ -553,6 +648,8 @@ TRACE/user-reasoning-forest.md
 - Keep Investigation Strategies downstream of Insights whenever possible. This makes it clear whether a recommendation follows from evidence or is just a generic next step.
 - Use graph weak points to improve the report. If a high-level insight only has one edge, either add missing evidence, lower the claim level, or mark it as a weak hypothesis.
 - Make recommendation sections read like an investigation plan, not a flat checklist: Hypothesis, Investigation Strategy, target outcome, Analytic Activities, then Interactions.
+- Keep Expected Findings out of the evidence-backed reasoning graph until follow-up work actually produces evidence.
+- Use Reasoning Graph Patches to merge follow-up investigation evidence. This keeps the original user trace reasoning auditable.
 - Separate Visual Analysis from Statistical Analysis. This helps users decide whether the next step is a visual investigation in ManiScope or a script-side analysis outside the GUI.
 
 ## 8. Quality Checklist
@@ -576,6 +673,12 @@ Before delivering, verify:
 - External claims are not overstated.
 - The bottom line states the strongest supported conclusion and the weakest unresolved claim.
 - The trace-step map has step nodes, claim nodes, a traceability matrix, and a Mermaid graph.
+- `reasoning-graph.json` validates with `scripts/reasoning_graph_to_forest.py`.
+- `user-reasoning-forest.md` is generated from `reasoning-graph.json`, not manually edited.
+- Recommendation plans distinguish Evidence Completion from Hypothesis Expansion.
+- Expected Findings are labeled as expected-only plan targets, not evidence.
+- Follow-up evidence patches validate with `scripts/apply_reasoning_graph_patch.py` when present.
+- Augmented forests are regenerated from patched graphs, not manually edited.
 - Every step node includes logged Interaction or annotation evidence.
 - Every ID used in the graph also appears in the claim-node tables.
 - Mermaid syntax is simple enough to render in common Markdown viewers.
