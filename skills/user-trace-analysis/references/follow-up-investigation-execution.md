@@ -20,8 +20,10 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
 
 1. **Orient from the plan**
    - Start from `recommendation-plan-graph.json` or the relevant recommendation section.
+   - In a full trace analysis, execute every top-level Recommendation Plan Forest branch unless the user explicitly requested analysis-only, recommendation-only, or planning-only output.
    - Identify whether the branch is `Evidence Completion` or `Hypothesis Expansion`.
    - Convert each Recommended Interaction into an executable check, such as cohort overlap, transfer paths, sibling windows, post-window exits, role comparisons, or rendered view inspection.
+   - If a branch cannot be executed, mark it as blocked in `continued-investigation-report.md` with the exact blocker. Do not silently omit it.
 
 2. **Check local services**
    - Reuse running services when possible. Verify with `curl` or browser navigation before starting new processes.
@@ -57,6 +59,7 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
    - New follow-up evidence nodes must include `actor`, `source`, and `planRef`.
    - Use `supports`, `refines`, or `contradicts` edges to attach new Findings or Insights to existing or new Hypotheses.
    - Apply the patch with `scripts/apply_reasoning_graph_patch.py` and regenerate the augmented forest.
+   - If every branch is blocked and no new evidence exists, write `continued-investigation-report.md` and explicitly state why no patch was produced.
 
 ## Render API Pattern
 

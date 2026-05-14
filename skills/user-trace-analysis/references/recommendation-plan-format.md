@@ -1,6 +1,6 @@
 # Recommendation Plan Format
 
-Use `recommendation-plan-graph.json` and `recommendation-plan-forest.md` when trace analysis produces recommendations. These artifacts are prescriptive. They describe what should be investigated next, not what has already been proven.
+Use `recommendation-plan-graph.json` and `recommendation-plan-forest.md` when trace analysis produces recommendations. These artifacts are prescriptive. They describe what should be investigated next, not what has already been proven. In a full trace analysis, producing the plan is not sufficient: execute the plan next unless the user explicitly requested analysis-only, recommendation-only, or planning-only output.
 
 ## Conceptual Role
 
@@ -172,6 +172,8 @@ SourceNode
 ```
 
 ## Execution Boundary
+
+For a full trace analysis, execute every Recommendation Plan Forest branch after generating the plan. If a branch cannot be executed, mark it as blocked with the exact blocker in `continued-investigation-report.md`.
 
 After the plan is executed:
 
