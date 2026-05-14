@@ -81,6 +81,8 @@ Every node must include a non-empty `label`, `confidence`, and `provenance` list
 - `render:<relative-path>`
 - `inference:<short-note>`
 
+`render:<relative-path>` must point to a saved trace-local PNG produced by the ManiScope render API. Do not use transient browser data URLs as durable provenance.
+
 ## Edge Schema
 
 Each edge must have:

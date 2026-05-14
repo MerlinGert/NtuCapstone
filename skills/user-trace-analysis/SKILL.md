@@ -603,6 +603,7 @@ TRACE/augmented-reasoning-forest.md
 - Include analysis and rationale, not only conclusions.
 - Separate observed facts from inferred claims.
 - Keep screenshots linked by relative path.
+- When render APIs generate visualization evidence used for a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save the rendered PNG in a trace-local assets folder and cite it with `render:<relative-path>` provenance. Do not rely on transient data URLs as evidence.
 - Preserve exact wallet addresses in evidence tables unless the user asks for anonymization.
 - Use shortened addresses in prose for readability.
 - Use concrete dates and times for market or session events.

@@ -34,6 +34,7 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
    - Use raw trace data, local JSON/CSV data, or backend endpoints for exact counts, amounts, timestamps, and transfer relations.
    - Use `/api/user_behavior/sequences` to build `behaviorData` for Behavior Details renders.
    - Treat rendered images as visual evidence for timing, density, grouping, and qualitative role comparison.
+   - If a rendered image supports a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save it as a trace-local PNG asset and cite it with `render:<relative-path>` provenance. Do not leave supporting visual evidence only as a transient browser data URL.
    - Do not infer exact event counts from Behavior Details dots when the row may be sampled. Use sequence payloads and render metadata for exact counts.
 
 4. **Render focused views**
@@ -43,6 +44,7 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
    - For Behavior Details, pass full `behaviorData`, `selectedUser` or `selectedUsersList`, `visibleTimeWindow`, and `maxEventsPerUser`.
    - Use `strict: true` for Behavior Details captures that should fail instead of producing an empty prompt.
    - Use larger dimensions or full-quality captures when labels, card text, or timelines matter.
+   - Exploratory renders that are not used as evidence may be discarded, but every render used as evidence must be saved and linked from the relevant report, graph node, or patch node.
 
 5. **Analyze by role and time window**
    - Compare wallets inside the same visible time window before assigning role labels.
@@ -140,6 +142,7 @@ Keep the report focused on investigation content:
 Asset rules:
 
 - Save only images that support a report claim.
+- Save every rendered visualization used as evidence for a claim, Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch.
 - Put kept assets in `continued-investigation-assets/` or another trace-local assets folder named by the user.
 - Use evidence-oriented filenames, for example `kline-core-window.png`, `behavior-selected-wallets.png`, or `token-distribution-sibling-wallets.png`.
 - Delete unused intermediate captures before finishing.
