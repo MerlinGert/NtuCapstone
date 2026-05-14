@@ -1,0 +1,1009 @@
+{
+  "version": 1,
+  "sourceTrace": "maniscope-session-ACT-20260501-025125",
+  "sourcePlanVersion": 1,
+  "trees": [
+    {
+      "root": "SRC_H3_A",
+      "rootLabel": "H3 coordinated connected group around Oct 25 to Oct 27",
+      "nodes": [
+        {
+          "instanceId": "SRC_H3_A",
+          "canonicalId": "SRC_H3_A",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "H3 coordinated connected group around Oct 25 to Oct 27",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "H3"
+        },
+        {
+          "instanceId": "RG1@SRC_H3_A.1",
+          "canonicalId": "RG1",
+          "parentInstanceId": "SRC_H3_A",
+          "relationToParent": "has_gap",
+          "kind": "ReasoningGap",
+          "label": "Clicked-card volumes and price impact are not quantified",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": "H3",
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS1@SRC_H3_A.1.1",
+          "canonicalId": "RS1",
+          "parentInstanceId": "RG1@SRC_H3_A.1",
+          "relationToParent": "addressed_by",
+          "kind": "InvestigationStrategy",
+          "label": "Quantify clicked manipulation windows and price impact",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA1@SRC_H3_A.1.1.1",
+          "canonicalId": "PAA1",
+          "parentInstanceId": "RS1@SRC_H3_A.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Compute cohort trade totals and price-window statistics",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI1@SRC_H3_A.1.1.1.1",
+          "canonicalId": "PRI1",
+          "parentInstanceId": "PAA1@SRC_H3_A.1.1.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Calculate buy/sell counts, USD volume, token net, and active-user count for each clicked cohort over card windows",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF1@SRC_H3_A.1.1.1.1.1",
+          "canonicalId": "EF1",
+          "parentInstanceId": "PRI1@SRC_H3_A.1.1.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Each clicked cohort has quantified volume, market share, and price-window context",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI2@SRC_H3_A.1.1.1.2",
+          "canonicalId": "PRI2",
+          "parentInstanceId": "PAA1@SRC_H3_A.1.1.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Compare cohort volume with total market volume and hourly OHLC movement in the same windows",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF1@SRC_H3_A.1.1.1.2.1",
+          "canonicalId": "EF1",
+          "parentInstanceId": "PRI2@SRC_H3_A.1.1.1.2",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Each clicked cohort has quantified volume, market share, and price-window context",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_H3_A",
+          "target": "RG1@SRC_H3_A.1",
+          "relation": "has_gap"
+        },
+        {
+          "source": "RG1@SRC_H3_A.1",
+          "target": "RS1@SRC_H3_A.1.1",
+          "relation": "addressed_by"
+        },
+        {
+          "source": "RS1@SRC_H3_A.1.1",
+          "target": "PAA1@SRC_H3_A.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA1@SRC_H3_A.1.1.1",
+          "target": "PRI1@SRC_H3_A.1.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI1@SRC_H3_A.1.1.1.1",
+          "target": "EF1@SRC_H3_A.1.1.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "PAA1@SRC_H3_A.1.1.1",
+          "target": "PRI2@SRC_H3_A.1.1.1.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI2@SRC_H3_A.1.1.1.2",
+          "target": "EF1@SRC_H3_A.1.1.1.2.1",
+          "relation": "expects"
+        }
+      ]
+    },
+    {
+      "root": "SRC_H3_B",
+      "rootLabel": "H3 component-membership claim",
+      "nodes": [
+        {
+          "instanceId": "SRC_H3_B",
+          "canonicalId": "SRC_H3_B",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "H3 component-membership claim",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "H3"
+        },
+        {
+          "instanceId": "RG2@SRC_H3_B.1",
+          "canonicalId": "RG2",
+          "parentInstanceId": "SRC_H3_B",
+          "relationToParent": "has_gap",
+          "kind": "ReasoningGap",
+          "label": "Component membership is visual but relation paths are not enumerated",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": "IN2",
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS2@SRC_H3_B.1.1",
+          "canonicalId": "RS2",
+          "parentInstanceId": "RG2@SRC_H3_B.1",
+          "relationToParent": "addressed_by",
+          "kind": "InvestigationStrategy",
+          "label": "Validate component membership and transfer or funding links",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA2@SRC_H3_B.1.1.1",
+          "canonicalId": "PAA2",
+          "parentInstanceId": "RS2@SRC_H3_B.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Build pairwise relation matrix for clicked-card users",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI3@SRC_H3_B.1.1.1.1",
+          "canonicalId": "PRI3",
+          "parentInstanceId": "PAA2@SRC_H3_B.1.1.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Query transfers and relation files for every clicked-card pair and connected counterparty",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF2@SRC_H3_B.1.1.1.1.1",
+          "canonicalId": "EF2",
+          "parentInstanceId": "PRI3@SRC_H3_B.1.1.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Clicked-card users have explicit component-membership evidence or documented exceptions",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA3@SRC_H3_B.1.1.2",
+          "canonicalId": "PAA3",
+          "parentInstanceId": "RS2@SRC_H3_B.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Reopen or render component view for selected users",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Visual Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI4@SRC_H3_B.1.1.2.1",
+          "canonicalId": "PRI4",
+          "parentInstanceId": "PAA3@SRC_H3_B.1.1.2",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Capture Token Distribution with clicked users highlighted together, saving a trace-local PNG if used as evidence",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Visualization Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF2@SRC_H3_B.1.1.2.1.1",
+          "canonicalId": "EF2",
+          "parentInstanceId": "PRI4@SRC_H3_B.1.1.2.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "Clicked-card users have explicit component-membership evidence or documented exceptions",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_H3_B",
+          "target": "RG2@SRC_H3_B.1",
+          "relation": "has_gap"
+        },
+        {
+          "source": "RG2@SRC_H3_B.1",
+          "target": "RS2@SRC_H3_B.1.1",
+          "relation": "addressed_by"
+        },
+        {
+          "source": "RS2@SRC_H3_B.1.1",
+          "target": "PAA2@SRC_H3_B.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA2@SRC_H3_B.1.1.1",
+          "target": "PRI3@SRC_H3_B.1.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI3@SRC_H3_B.1.1.1.1",
+          "target": "EF2@SRC_H3_B.1.1.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "RS2@SRC_H3_B.1.1",
+          "target": "PAA3@SRC_H3_B.1.1.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA3@SRC_H3_B.1.1.2",
+          "target": "PRI4@SRC_H3_B.1.1.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI4@SRC_H3_B.1.1.2.1",
+          "target": "EF2@SRC_H3_B.1.1.2.1.1",
+          "relation": "expects"
+        }
+      ]
+    },
+    {
+      "root": "SRC_IN2",
+      "rootLabel": "IN2 large-colluding-group pattern",
+      "nodes": [
+        {
+          "instanceId": "SRC_IN2",
+          "canonicalId": "SRC_IN2",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "IN2 large-colluding-group pattern",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "IN2"
+        },
+        {
+          "instanceId": "PH1@SRC_IN2.1",
+          "canonicalId": "PH1",
+          "parentInstanceId": "SRC_IN2",
+          "relationToParent": "expands_from",
+          "kind": "Hypothesis",
+          "label": "Sibling manipulation windows share wallet overlap or role structure with the clicked cohorts",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "ER1@SRC_IN2.1.1",
+          "canonicalId": "ER1",
+          "parentInstanceId": "PH1@SRC_IN2.1",
+          "relationToParent": "has_rationale",
+          "kind": "ExpansionRationale",
+          "label": "The K-line screenshots show nearby unclicked manipulation cards around Oct 23, Oct 24, Oct 28, and Oct 30 to Oct 31",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": "SRC_IN2",
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS3@SRC_IN2.1.2",
+          "canonicalId": "RS3",
+          "parentInstanceId": "PH1@SRC_IN2.1",
+          "relationToParent": "tested_by",
+          "kind": "InvestigationStrategy",
+          "label": "Search for sibling manipulation windows",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA4@SRC_IN2.1.2.1",
+          "canonicalId": "PAA4",
+          "parentInstanceId": "RS3@SRC_IN2.1.2",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Mine similar windows from manipulation outputs and local traces",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI5@SRC_IN2.1.2.1.1",
+          "canonicalId": "PRI5",
+          "parentInstanceId": "PAA4@SRC_IN2.1.2.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Search for cards sharing DmJ, 7Sm, 5YP, or the same connected component",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF3@SRC_IN2.1.2.1.1.1",
+          "canonicalId": "EF3",
+          "parentInstanceId": "PRI5@SRC_IN2.1.2.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "A prioritized sibling-window list identifies similar unclicked cohorts or rejects the expansion",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI6@SRC_IN2.1.2.1.2",
+          "canonicalId": "PRI6",
+          "parentInstanceId": "PAA4@SRC_IN2.1.2.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Rank candidates by overlap, USD volume, net direction, and price-window movement",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF3@SRC_IN2.1.2.1.2.1",
+          "canonicalId": "EF3",
+          "parentInstanceId": "PRI6@SRC_IN2.1.2.1.2",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "A prioritized sibling-window list identifies similar unclicked cohorts or rejects the expansion",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_IN2",
+          "target": "PH1@SRC_IN2.1",
+          "relation": "expands_from"
+        },
+        {
+          "source": "PH1@SRC_IN2.1",
+          "target": "ER1@SRC_IN2.1.1",
+          "relation": "has_rationale"
+        },
+        {
+          "source": "PH1@SRC_IN2.1",
+          "target": "RS3@SRC_IN2.1.2",
+          "relation": "tested_by"
+        },
+        {
+          "source": "RS3@SRC_IN2.1.2",
+          "target": "PAA4@SRC_IN2.1.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA4@SRC_IN2.1.2.1",
+          "target": "PRI5@SRC_IN2.1.2.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI5@SRC_IN2.1.2.1.1",
+          "target": "EF3@SRC_IN2.1.2.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "PAA4@SRC_IN2.1.2.1",
+          "target": "PRI6@SRC_IN2.1.2.1.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI6@SRC_IN2.1.2.1.2",
+          "target": "EF3@SRC_IN2.1.2.1.2.1",
+          "relation": "expects"
+        }
+      ]
+    },
+    {
+      "root": "SRC_F6",
+      "rootLabel": "F6 DNL functional transfer account",
+      "nodes": [
+        {
+          "instanceId": "SRC_F6",
+          "canonicalId": "SRC_F6",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "F6 DNL functional transfer account",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "F6"
+        },
+        {
+          "instanceId": "PH2@SRC_F6.1",
+          "canonicalId": "PH2",
+          "parentInstanceId": "SRC_F6",
+          "relationToParent": "expands_from",
+          "kind": "Hypothesis",
+          "label": "Downstream sinks and upstream funders extend the clicked-card group beyond the wallets the user inspected",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "ER2@SRC_F6.1.1",
+          "canonicalId": "ER2",
+          "parentInstanceId": "PH2@SRC_F6.1",
+          "relationToParent": "has_rationale",
+          "kind": "ExpansionRationale",
+          "label": "The trace observed DNL transfer behavior, and local validation found large transfers to GvZkn...DZHD",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": "SRC_F6",
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS4@SRC_F6.1.2",
+          "canonicalId": "RS4",
+          "parentInstanceId": "PH2@SRC_F6.1",
+          "relationToParent": "tested_by",
+          "kind": "InvestigationStrategy",
+          "label": "Follow overlooked downstream sinks and upstream funders",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA5@SRC_F6.1.2.1",
+          "canonicalId": "PAA5",
+          "parentInstanceId": "RS4@SRC_F6.1.2",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Trace transfer chains for selected wallets and clicked-card users",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI7@SRC_F6.1.2.1.1",
+          "canonicalId": "PRI7",
+          "parentInstanceId": "PAA5@SRC_F6.1.2.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "For DNL, DmJ, and clicked cohort users, compute top transfer counterparties and align them with trades",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF4@SRC_F6.1.2.1.1.1",
+          "canonicalId": "EF4",
+          "parentInstanceId": "PRI7@SRC_F6.1.2.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "A role-expansion map identifies sinks or funders worth adding to the case, or rejects them",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA6@SRC_F6.1.2.2",
+          "canonicalId": "PAA6",
+          "parentInstanceId": "RS4@SRC_F6.1.2",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Inspect role timelines for top counterparties",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": "Visual Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI8@SRC_F6.1.2.2.1",
+          "canonicalId": "PRI8",
+          "parentInstanceId": "PAA6@SRC_F6.1.2.2",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Open or render Behavior Details for top counterparties with clicked users in the same time window",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Visualization Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF4@SRC_F6.1.2.2.1.1",
+          "canonicalId": "EF4",
+          "parentInstanceId": "PRI8@SRC_F6.1.2.2.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "A role-expansion map identifies sinks or funders worth adding to the case, or rejects them",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI9@SRC_F6.1.2.2.2",
+          "canonicalId": "PRI9",
+          "parentInstanceId": "PAA6@SRC_F6.1.2.2",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Summarize whether each counterparty is a storage sink, funder, active trader, or unrelated address",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Synthesis Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF4@SRC_F6.1.2.2.2.1",
+          "canonicalId": "EF4",
+          "parentInstanceId": "PRI9@SRC_F6.1.2.2.2",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "A role-expansion map identifies sinks or funders worth adding to the case, or rejects them",
+          "recommendationType": "Hypothesis Expansion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_F6",
+          "target": "PH2@SRC_F6.1",
+          "relation": "expands_from"
+        },
+        {
+          "source": "PH2@SRC_F6.1",
+          "target": "ER2@SRC_F6.1.1",
+          "relation": "has_rationale"
+        },
+        {
+          "source": "PH2@SRC_F6.1",
+          "target": "RS4@SRC_F6.1.2",
+          "relation": "tested_by"
+        },
+        {
+          "source": "RS4@SRC_F6.1.2",
+          "target": "PAA5@SRC_F6.1.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA5@SRC_F6.1.2.1",
+          "target": "PRI7@SRC_F6.1.2.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI7@SRC_F6.1.2.1.1",
+          "target": "EF4@SRC_F6.1.2.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "RS4@SRC_F6.1.2",
+          "target": "PAA6@SRC_F6.1.2.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA6@SRC_F6.1.2.2",
+          "target": "PRI8@SRC_F6.1.2.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI8@SRC_F6.1.2.2.1",
+          "target": "EF4@SRC_F6.1.2.2.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "PAA6@SRC_F6.1.2.2",
+          "target": "PRI9@SRC_F6.1.2.2.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI9@SRC_F6.1.2.2.2",
+          "target": "EF4@SRC_F6.1.2.2.2.1",
+          "relation": "expects"
+        }
+      ]
+    },
+    {
+      "root": "SRC_H2",
+      "rootLabel": "H2 role-differentiation hypothesis",
+      "nodes": [
+        {
+          "instanceId": "SRC_H2",
+          "canonicalId": "SRC_H2",
+          "parentInstanceId": null,
+          "relationToParent": null,
+          "kind": "SourceNode",
+          "label": "H2 role-differentiation hypothesis",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": "H2"
+        },
+        {
+          "instanceId": "RG3@SRC_H2.1",
+          "canonicalId": "RG3",
+          "parentInstanceId": "SRC_H2",
+          "relationToParent": "has_gap",
+          "kind": "ReasoningGap",
+          "label": "False-positive alternatives were checked for only a few wallets",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": "H2",
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "RS5@SRC_H2.1.1",
+          "canonicalId": "RS5",
+          "parentInstanceId": "RG3@SRC_H2.1",
+          "relationToParent": "addressed_by",
+          "kind": "InvestigationStrategy",
+          "label": "Test false-positive alternatives before escalating motive claims",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA7@SRC_H2.1.1.1",
+          "canonicalId": "PAA7",
+          "parentInstanceId": "RS5@SRC_H2.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Classify selected wallets with trade and transfer statistics",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Statistical Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI10@SRC_H2.1.1.1.1",
+          "canonicalId": "PRI10",
+          "parentInstanceId": "PAA7@SRC_H2.1.1.1",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Compute trade count, buy/sell ratio, net token change, transfer-only status, and realized sell behavior for selected large holders",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Data Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF5@SRC_H2.1.1.1.1.1",
+          "canonicalId": "EF5",
+          "parentInstanceId": "PRI10@SRC_H2.1.1.1.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "High-balance and red-stroked wallets have explicit role classifications and caveats",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PAA8@SRC_H2.1.1.2",
+          "canonicalId": "PAA8",
+          "parentInstanceId": "RS5@SRC_H2.1.1",
+          "relationToParent": "contains",
+          "kind": "AnalyticActivity",
+          "label": "Check visual timelines for borderline wallets",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": "Visual Analysis",
+          "interactionType": null,
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "PRI11@SRC_H2.1.1.2.1",
+          "canonicalId": "PRI11",
+          "parentInstanceId": "PAA8@SRC_H2.1.1.2",
+          "relationToParent": "contains",
+          "kind": "RecommendedInteraction",
+          "label": "Inspect Behavior Details for borderline wallets to confirm meaningful manipulation or benign accumulation",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": "Visualization Action",
+          "expectedOnly": null,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        },
+        {
+          "instanceId": "EF5@SRC_H2.1.1.2.1.1",
+          "canonicalId": "EF5",
+          "parentInstanceId": "PRI11@SRC_H2.1.1.2.1",
+          "relationToParent": "expects",
+          "kind": "ExpectedFinding",
+          "label": "High-balance and red-stroked wallets have explicit role classifications and caveats",
+          "recommendationType": "Evidence Completion",
+          "status": "planned",
+          "activityType": null,
+          "interactionType": null,
+          "expectedOnly": true,
+          "sourceNodeId": null,
+          "targetNodeId": null,
+          "canonicalSourceId": null
+        }
+      ],
+      "edges": [
+        {
+          "source": "SRC_H2",
+          "target": "RG3@SRC_H2.1",
+          "relation": "has_gap"
+        },
+        {
+          "source": "RG3@SRC_H2.1",
+          "target": "RS5@SRC_H2.1.1",
+          "relation": "addressed_by"
+        },
+        {
+          "source": "RS5@SRC_H2.1.1",
+          "target": "PAA7@SRC_H2.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA7@SRC_H2.1.1.1",
+          "target": "PRI10@SRC_H2.1.1.1.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI10@SRC_H2.1.1.1.1",
+          "target": "EF5@SRC_H2.1.1.1.1.1",
+          "relation": "expects"
+        },
+        {
+          "source": "RS5@SRC_H2.1.1",
+          "target": "PAA8@SRC_H2.1.1.2",
+          "relation": "contains"
+        },
+        {
+          "source": "PAA8@SRC_H2.1.1.2",
+          "target": "PRI11@SRC_H2.1.1.2.1",
+          "relation": "contains"
+        },
+        {
+          "source": "PRI11@SRC_H2.1.1.2.1",
+          "target": "EF5@SRC_H2.1.1.2.1.1",
+          "relation": "expects"
+        }
+      ]
+    }
+  ]
+}
