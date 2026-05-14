@@ -21,6 +21,7 @@ When the task includes recommendations or follow-up investigation, also read:
 
 - `references/recommendation-plan-format.md`: Recommendation Plan Graph and Recommendation Plan Forest schema.
 - `references/reasoning-graph-patch-format.md`: patch format for adding agent follow-up evidence back into the canonical reasoning graph.
+- `references/follow-up-investigation-execution.md`: practical workflow for executing Recommendation Plan Forests with local data, backend endpoints, rendered ManiScope views, evidence images, and follow-up reports.
 
 Use `scripts/recommendation_plan_to_forest.py` to mechanically derive `recommendation-plan-forest.json` and `recommendation-plan-forest.md` from `recommendation-plan-graph.json`.
 Use `scripts/apply_reasoning_graph_patch.py` to apply a follow-up evidence patch to `reasoning-graph.json`, producing `augmented-reasoning-graph.json` and regenerated `augmented-reasoning-forest.md`.
@@ -509,6 +510,8 @@ python skills/user-trace-analysis/scripts/recommendation_plan_to_forest.py \
 ### Step 8: Patch the reasoning graph after follow-up investigation
 
 When an agent executes a Recommendation Plan Forest, record the new evidence as a Reasoning Graph Patch instead of editing the old forest by hand.
+
+Before executing follow-up work, read `references/follow-up-investigation-execution.md` for local service checks, render API usage, raw-data validation, image asset hygiene, and report conventions.
 
 Patch flow:
 
