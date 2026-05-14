@@ -44,40 +44,70 @@ Avoid implementation notes, API debugging details, and fix history unless the us
 
 ## Render API Pattern
 
-Open the frontend and wait until `window.maniScopeMajorViewApi` is available after `CryptoVis` mounts. Use the docs in `major-view-render-api.md` as the source of truth, but this pattern is usually enough for focused captures:
+Open the frontend and wait until `window.maniScopeMajorViewApi` is available after `CryptoVis` mounts. Use the docs in `major-view-render-api.md` as the source of truth, but this browser-side pattern is usually enough for focused captures:
 
 ```js
-const api = window.maniScopeMajorViewApi;
-const args = api.getRenderArgs('KLineChart', { width: 1200, height: 720 });
+// Run inside the page context, for example through page.evaluate.
+const api = window.maniScopeMajorViewApi
+const klineArgs = api.getRenderArgs('kline_chart', { width: 1500, height: 850 })
 
-Object.assign(args, {
-  selectedToken: 'PNUT',
+Object.assign(klineArgs, {
   visibleTimeWindow: ['2024-11-03T00:00:00Z', '2024-11-04T00:00:00Z'],
   cardAlignment: 'visible_window',
-});
+})
 
-await api.captureMajorView('KLineChart', args, {
-  outputPath: '/absolute/path/to/continued-investigation-assets/kline-window.png',
-});
+const klineCapture = await api.captureView('kline_chart', klineArgs, {
+  quality: 'full',
+})
+```
+
+The current browser API returns an image data URL; it does not accept an `outputPath`. Return the capture result from the page context, then save the PNG from the Node or automation layer that called `page.evaluate`. Do not call `fs` from inside the browser page context.
+
+```js
+// Run outside the page context after page.evaluate returns the capture object.
+async function saveCapturePng(capture, outputPath) {
+  const fs = await import('node:fs/promises')
+  const base64 = capture.image.dataUrl.replace(/^data:image\/png;base64,/, '')
+  await fs.writeFile(outputPath, Buffer.from(base64, 'base64'))
+}
+
+await saveCapturePng(
+  klineCapture,
+  '/absolute/path/to/continued-investigation-assets/kline-window.png',
+)
 ```
 
 For Behavior Details, first fetch or construct full `behaviorData`, then pass an explicit wallet selection and window:
 
 ```js
-const args = api.getRenderArgs('BehaviorDetails', { width: 1400, height: 900 });
+// Run inside the page context.
+const users = ['DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH']
+const behaviorData = await fetch('/api/user_behavior/sequences', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ users, coin: 'ACT' }),
+}).then((res) => res.json())
 
-Object.assign(args, {
+const behaviorArgs = api.getRenderArgs('behavior_details', {
+  width: 1500,
+  height: 520,
+})
+
+Object.assign(behaviorArgs, {
+  selectedUser: users[0],
+  selectedUsersList: [],
   behaviorData,
-  selectedUsersList: selectedWallets,
   visibleTimeWindow: ['2024-11-03T00:00:00Z', '2024-11-04T00:00:00Z'],
-  maxEventsPerUser: 400,
-});
+  maxEventsPerUser: 3000,
+})
 
-await api.captureMajorView('BehaviorDetails', args, {
-  outputPath: '/absolute/path/to/continued-investigation-assets/behavior-wallets.png',
+const behaviorCapture = await api.captureView('behavior_details', behaviorArgs, {
+  quality: 'full',
   strict: true,
-});
+})
 ```
+
+The available view names are `token_distribution`, `candlestick_chart`, and `behavior_details`. The alias `kline_chart` is accepted for the K-line view. Use `captureView(viewName, args, options)` for one view and `captureAllViews()` for a broad context pass.
 
 ## Analysis Checklist
 
