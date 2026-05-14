@@ -1,0 +1,4 @@
+interface:
+  display_name: "Trace Analysis HTML Viewer"
+  short_description: "Build local HTML trace viewers"
+  default_prompt: "Use $trace-analysis-html-viewer to create a standalone HTML viewer for this ManiScope trace analysis."
