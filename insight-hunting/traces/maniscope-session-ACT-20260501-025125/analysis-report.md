@@ -13,7 +13,7 @@ Trace and documentation:
 - `session.json`
 - `images/*.png`
 - `docs/reports/user-manual.en.md`
-- `skills/user-trace-analysis.md`
+- `skills/user-trace-analysis/SKILL.md`
 
 Frontend semantics:
 

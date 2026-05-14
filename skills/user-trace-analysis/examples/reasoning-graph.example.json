@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "trace": "example-trace",
+  "roots": ["H1"],
+  "nodes": [
+    {
+      "id": "I1",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Click first 9-user manipulation card",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": ["action:14", "screenshot:images/action-0014-source-kline_chart-01.png"],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "T1",
+      "kind": "Task",
+      "space": "Intention",
+      "scope": "Low",
+      "label": "Inspect card-user cohort",
+      "provenance": ["action:14"],
+      "confidence": "Strong inference"
+    },
+    {
+      "id": "F1",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Low",
+      "label": "The 9-user cohort shows same-direction buying",
+      "provenance": ["annotation:13", "action:14"],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "IN1",
+      "kind": "Insight",
+      "space": "Finding",
+      "scope": "High",
+      "label": "The clicked cohort may be part of coordinated price activity",
+      "provenance": ["inference:F1 plus K-line alignment"],
+      "confidence": "Strong inference"
+    },
+    {
+      "id": "H1",
+      "kind": "Hypothesis",
+      "space": "Intention",
+      "scope": "High",
+      "label": "Oct 25-27 behavior reflects coordinated price activity",
+      "provenance": ["inference:trace synthesis"],
+      "confidence": "Weak hypothesis"
+    }
+  ],
+  "edges": [
+    {
+      "source": "T1",
+      "target": "I1",
+      "relation": "motivates",
+      "rationale": "The cohort-inspection task explains the card click."
+    },
+    {
+      "source": "I1",
+      "target": "F1",
+      "relation": "produces",
+      "rationale": "The card click and resulting Behavior Details view produced the cohort finding."
+    },
+    {
+      "source": "F1",
+      "target": "IN1",
+      "relation": "supports",
+      "rationale": "The local finding contributes to a higher-level coordination insight."
+    },
+    {
+      "source": "IN1",
+      "target": "H1",
+      "relation": "supports",
+      "rationale": "The coordination insight supports the price-activity hypothesis."
+    },
+    {
+      "source": "H1",
+      "target": "T1",
+      "relation": "contains",
+      "rationale": "The cohort-inspection task is part of the hypothesis-centered reasoning tree."
+    }
+  ]
+}

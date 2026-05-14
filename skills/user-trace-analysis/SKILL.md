@@ -1,11 +1,21 @@
+---
+name: user-trace-analysis
+description: Use when analyzing a ManiScope exported or live user-interaction trace to reconstruct Tasks, Analytic Questions, Hypotheses, Interactions, Analytic Activities, Investigation Strategies, Findings, Insights, trace-step maps, reasoning graphs, and User Reasoning Forests.
+---
+
 # User Trace Analysis Skill
 
 Use this skill when analyzing a ManiScope exported user-interaction trace, especially a folder containing `session.json` plus screenshot images. The goal is to reconstruct what the user was trying to do, what findings or insights they explicitly captured or implicitly discovered, what follow-up Investigation Strategies, Analytic Activities, and Interactions follow, and how those claims map back to trace steps.
 
-For a full trace analysis, produce two Markdown artifacts unless the user asks for a lighter output:
+For a full trace analysis, produce these artifacts unless the user asks for a lighter output:
 
 - `TRACE/analysis-report.md`: narrative analysis with evidence, rationale, caveats, intentions, findings, insights, and recommendations.
 - `TRACE/trace-step-map.md`: traceability map linking logged Interactions and annotations to intentions, findings, insights, and recommendations.
+- `TRACE/reasoning-graph.json`: canonical shared-node graph for the trace. This is the source of truth for reasoning support.
+- `TRACE/user-reasoning-forest.md`: readable derived forest rooted at user Hypotheses.
+- `TRACE/user-reasoning-forest.json`: machine-readable derived forest when using the transformer script.
+
+For the canonical graph schema, relation taxonomy, salience field, and forest transformation rules, read `references/reasoning-graph-format.md`. Use `scripts/reasoning_graph_to_forest.py` to mechanically derive `user-reasoning-forest.json` and `user-reasoning-forest.md` from `reasoning-graph.json`.
 
 ## 1. Clarify The Task When Needed
 
@@ -162,6 +172,39 @@ Examples:
 - `model -> visualization -> finding`: change detector config, inspect grouping, record visual stability.
 - `model output -> data -> finding`: compute overlap between old and new groups.
 - `findings -> insight`: synthesize timing, roles, and price impact into a coordination Insight.
+
+### Reasoning Graph and Forest Terms
+
+Use these terms when building traceability outputs:
+
+- **Reasoning Support Graph**: the canonical directed graph with shared nodes. Nodes are Interactions, Tasks, Analytic Questions, Analytic Activities, Findings, Insights, Hypotheses, and Investigation Strategies. Edges encode reasoning relations.
+- **User Reasoning Forest**: a derived readable tree view of the Reasoning Support Graph. Each tree is rooted at one user-authored or analyst-inferred Hypothesis.
+- **Canonical Node**: the original graph node, such as `F7`.
+- **Tree Node Instance**: a duplicated tree node that points back to a canonical node, such as `F7@H1.2`.
+- **Shared Node**: a canonical node with more than one parent in the support projection.
+- **Reasoning Gap**: a missing, weak, contradictory, or under-supported path below an existing Finding, Insight, or Hypothesis.
+- **Evidence Completion Recommendation**: an Investigation Strategy that fills a Reasoning Gap in an existing User Reasoning Forest.
+- **Hypothesis Expansion Recommendation**: an Investigation Strategy that proposes a related new Hypothesis and grows a new tree or branch.
+
+Use this relation taxonomy in `reasoning-graph.json`:
+
+| Relation | Direction | Meaning |
+|---|---|---|
+| `motivates` | Intention -> Action Space unit | A Task, Analytic Question, or Hypothesis explains why an Interaction, Analytic Activity, or Investigation Strategy happened. |
+| `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding or Insight. |
+| `supports` | Finding Space output -> Finding Space output or Intention | A Finding or Insight strengthens another Finding, an Insight, a Task interpretation, an Analytic Question, or a Hypothesis. |
+| `refines` | Finding Space output -> Intention | A Finding or Insight changes or narrows the intention. |
+| `contradicts` | Finding Space output -> Intention | A Finding or Insight weakens or falsifies the intention. |
+| `contains` | Higher-level unit -> lower-level unit | A Hypothesis contains Analytic Questions, an Analytic Activity contains Interactions, or another hierarchical containment relation is useful. |
+| `derived_from` | Analyst-inferred node -> evidence node | A node was inferred from raw trace evidence, screenshots, annotations, local data, or rendered visual evidence. |
+
+Every Interaction node in `reasoning-graph.json` should include `salience`:
+
+- `primary`: directly supports a major Finding, Insight, or Hypothesis.
+- `supporting`: provides context or strengthens a reasoning path.
+- `low`: logged but weakly relevant, such as incidental hover, scroll, or layout navigation.
+
+The User Reasoning Forest must use raw Interaction leaves by default. Do not replace Interactions with compact Step nodes in the forest unless the user explicitly asks for a compact view.
 
 ## 4. Efficient Inspection Commands
 
@@ -363,7 +406,7 @@ For crypto-investigator reports, do not limit recommendations to product or work
 
 ### Step 6: Build a trace-step map
 
-Create a separate traceability artifact after the narrative analysis. Prefer compact analytical step nodes over raw Interaction nodes unless the user asks for micro-interaction analysis. Raw Interaction graphs become noisy when hover, scroll, and view-state updates are logged as separate events.
+Create a separate traceability artifact after the narrative analysis. The trace-step map may use compact analytical step nodes for readability, but the canonical `reasoning-graph.json` and derived User Reasoning Forest should preserve raw Interaction nodes as leaves.
 
 Use this structure:
 
@@ -395,6 +438,14 @@ Recommendation mapping:
 - Make Investigation Strategies depend on Insights that aggregate multiple Findings.
 - If the full report contains many Interactions, map only the Investigation Strategies and the most important Analytic Activities unless the user asks for an Interaction-level graph.
 
+After building `trace-step-map.md`, produce `reasoning-graph.json` using the schema in `references/reasoning-graph-format.md`. Then run:
+
+```bash
+python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py TRACE/reasoning-graph.json
+```
+
+The generated `user-reasoning-forest.md` should show one bottom-up reasoning support tree per Hypothesis. Duplicate shared canonical nodes mechanically so each tree node instance has at most one parent.
+
 ## 6. Requirements For The Deliverables
 
 The primary report should be a Markdown file unless the user requests otherwise. Prefer placing it next to the trace folder, for example:
@@ -407,6 +458,8 @@ For a full analysis, also create:
 
 ```text
 TRACE/trace-step-map.md
+TRACE/reasoning-graph.json
+TRACE/user-reasoning-forest.md
 ```
 
 ### `analysis-report.md` required sections
@@ -433,6 +486,23 @@ TRACE/trace-step-map.md
 - How to read the graph, including the strongest reasoning paths and weak or unverified paths.
 - Suggestions for future trace analysis when the map reveals trace gaps, missing data, or useful follow-up checks.
 
+### `reasoning-graph.json` required content
+
+- `version`, `trace`, `nodes`, `edges`, and `roots`.
+- One canonical node for every Interaction, Task, Analytic Question, Analytic Activity, Finding, Insight, Hypothesis, and Investigation Strategy used in the trace-step map.
+- Relation types limited to `motivates`, `produces`, `supports`, `refines`, `contradicts`, `contains`, and `derived_from`.
+- Every Interaction node must include `interactionType` and `salience`.
+- Every Analytic Activity node must include `activityType`.
+- Every node should include provenance such as action indices, annotation indices, screenshots, local data checks, or rendered visual evidence.
+
+### `user-reasoning-forest.md` required sections
+
+- Purpose and relation to `reasoning-graph.json`.
+- Forest construction rule: one tree per Hypothesis root, with shared canonical nodes duplicated into separate tree node instances.
+- A node table with tree instance ID, canonical node ID, kind, scope, salience where relevant, confidence, and label.
+- A Mermaid `flowchart BT` tree for each Hypothesis.
+- A short reading guide explaining the strongest support paths, weak support paths, contradictions, and Reasoning Gaps.
+
 ### Hard requirements
 
 - Include analysis and rationale, not only conclusions.
@@ -455,6 +525,11 @@ TRACE/trace-step-map.md
 - In `trace-step-map.md`, every graph node ID must also appear in a table.
 - In `trace-step-map.md`, high-level claims must be connected to multiple supporting steps unless the rationale explains otherwise.
 - In `trace-step-map.md`, graph edges should represent reasoning dependencies, not just chronological order.
+- `reasoning-graph.json` must validate with `scripts/reasoning_graph_to_forest.py`.
+- Every Interaction node in `reasoning-graph.json` must have `salience`.
+- Every `user-reasoning-forest.md` tree must be rooted at one Hypothesis.
+- The User Reasoning Forest must preserve raw Interaction leaves by default.
+- Shared canonical nodes should be duplicated mechanically in the forest and retain `canonicalId`.
 
 ## 7. Lessons Learned
 
