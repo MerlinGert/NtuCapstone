@@ -32,6 +32,8 @@ Build an actual analysis artifact browser, not a decorative page.
 - Provide search and forest filtering when both user and plan forests are available.
 - Put node details in a modal opened by clicking a node. Do not rely on a table below the graph for primary details.
 - If node provenance contains `screenshot:<relative-path>` or `render:<relative-path>`, show the actual image in the modal and keep the path as caption text.
+- When `reasoning-graph-patch-*.json` or augmented graph metadata identifies agent-created follow-up nodes, make those patch nodes visually distinct in the tree and show patch file, patch run, actor, source, and `planRef` in the modal. Users should not need to infer patched nodes from naming conventions alone.
+- If an augmented graph contains new agent-created Hypothesis roots, do not duplicate those roots in the general augmented user forest. Show the general augmented forest as original user roots with patch nodes mixed in, and show new agent-created roots only in a separate executed adjacent hypothesis forest.
 - Keep evidence/provenance visible by default. Do not hide it behind a toggle unless the user asks.
 - Support zoom buttons, trackpad pinch where supported, and `Cmd/Ctrl + scroll` zoom inside the tree viewport.
 - Set initial zoom by fitting the smaller tree dimension to the viewport, leaving the larger dimension scrollable.
