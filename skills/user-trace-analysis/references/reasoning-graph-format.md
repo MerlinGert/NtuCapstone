@@ -83,6 +83,15 @@ Every node must include a non-empty `label`, `confidence`, and `provenance` list
 
 `screenshot:<relative-path>` and `render:<relative-path>` should be durable relative paths from `TRACE/analysis-results/`. Original trace screenshots usually use `screenshot:../images/...`. Rendered follow-up images should be saved under an assets folder inside `analysis-results`, usually `render:continued-investigation-assets/...`. Do not use transient browser data URLs as durable provenance.
 
+Rich detail fields keep compact graph labels understandable in HTML viewers and downstream follow-up work:
+
+- `explanation`: what the node means in human-readable terms.
+- `evidenceSummary`: the concrete evidence used for the node.
+- `reasoningRole`: how the node contributes to its parent, tree, or reasoning gap.
+- `patchRationale`: why an agent-created follow-up node was added to the original reasoning graph.
+
+Require `explanation` for every `Hypothesis`, `Insight`, `Finding`, `AnalyticQuestion`, `Task`, `InvestigationStrategy`, and `AnalyticActivity`. For `Interaction`, require `explanation` when `salience` is `primary` or the node was created by an agent follow-up. Low-salience logged interactions may stay compact when their label and provenance are sufficient.
+
 ## Edge Schema
 
 Each edge must have:
@@ -162,6 +171,8 @@ The script should fail if:
 - `trace` is missing,
 - node IDs are duplicated,
 - a node is missing `id`, `kind`, `space`, `scope`, `label`, `confidence`, or `provenance`,
+- a non-trivial reasoning node is missing `explanation`,
+- a primary or agent-created Interaction node is missing `explanation`,
 - a node uses an unknown `kind`, `space`, or `scope`,
 - a node uses a `space` or `scope` that does not match its `kind`,
 - an edge references a missing node,

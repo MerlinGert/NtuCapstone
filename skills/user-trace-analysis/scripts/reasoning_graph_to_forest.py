@@ -96,6 +96,30 @@ KIND_ORDER = {
     "Interaction": 7,
 }
 
+REQUIRED_EXPLANATION_KINDS = {
+    "Hypothesis",
+    "Insight",
+    "Finding",
+    "AnalyticQuestion",
+    "Task",
+    "InvestigationStrategy",
+    "AnalyticActivity",
+}
+
+DETAIL_FIELDS = (
+    "explanation",
+    "evidenceSummary",
+    "reasoningRole",
+    "patchRationale",
+)
+
+FOREST_NODE_OPTIONAL_FIELDS = (
+    "actor",
+    "source",
+    "planRef",
+    *DETAIL_FIELDS,
+)
+
 
 class GraphError(Exception):
     """Raised when a reasoning graph cannot be transformed safely."""
@@ -125,6 +149,12 @@ def require_string_list(value: Any, path: str) -> list[str]:
         if not isinstance(item, str) or not item.strip():
             raise GraphError(f"{path}[{index}] must be a non-empty string")
     return value
+
+
+def validate_optional_detail_fields(node: dict[str, Any], node_id: str) -> None:
+    for field in DETAIL_FIELDS:
+        if field in node and node[field] is not None:
+            require_string(node.get(field), f"node {node_id}.{field}")
 
 
 def validate_node(node: dict[str, Any], index: int, nodes: dict[str, dict[str, Any]]) -> None:
@@ -172,6 +202,14 @@ def validate_node(node: dict[str, Any], index: int, nodes: dict[str, dict[str, A
             raise GraphError(
                 f"AnalyticActivity node {node_id} has unknown activityType: {activity_type}"
             )
+
+    requires_explanation = kind in REQUIRED_EXPLANATION_KINDS or (
+        kind == "Interaction"
+        and (node.get("salience") == "primary" or node.get("actor") == "agent")
+    )
+    if requires_explanation:
+        require_string(node.get("explanation"), f"node {node_id}.explanation")
+    validate_optional_detail_fields(node, node_id)
 
 
 def validate_relation_direction(
@@ -352,23 +390,25 @@ def build_forest(
                 instance_id = f"{canonical_id}@{root}.{suffix}"
 
             node = nodes[canonical_id]
-            tree_nodes.append(
-                {
-                    "instanceId": instance_id,
-                    "canonicalId": canonical_id,
-                    "parentInstanceId": parent_instance_id,
-                    "relationToParent": relation_to_parent,
-                    "kind": node.get("kind"),
-                    "space": node.get("space"),
-                    "scope": node.get("scope"),
-                    "label": node.get("label", canonical_id),
-                    "confidence": node.get("confidence"),
-                    "salience": node.get("salience"),
-                    "interactionType": node.get("interactionType"),
-                    "activityType": node.get("activityType"),
-                    "provenance": node.get("provenance", []),
-                }
-            )
+            tree_node = {
+                "instanceId": instance_id,
+                "canonicalId": canonical_id,
+                "parentInstanceId": parent_instance_id,
+                "relationToParent": relation_to_parent,
+                "kind": node.get("kind"),
+                "space": node.get("space"),
+                "scope": node.get("scope"),
+                "label": node.get("label", canonical_id),
+                "confidence": node.get("confidence"),
+                "salience": node.get("salience"),
+                "interactionType": node.get("interactionType"),
+                "activityType": node.get("activityType"),
+                "provenance": node.get("provenance", []),
+            }
+            for field in FOREST_NODE_OPTIONAL_FIELDS:
+                if field in node and node[field] is not None:
+                    tree_node[field] = node[field]
+            tree_nodes.append(tree_node)
             if parent_instance_id is not None and relation_to_parent is not None:
                 tree_edges.append(
                     {
@@ -460,8 +500,8 @@ def render_markdown(forest: dict[str, Any]) -> str:
         lines.extend([f"## Tree {tree_index}: {root}", "", root_label, ""])
         lines.extend(
             [
-                "| Instance ID | Canonical ID | Parent | Relation | Kind | Scope | Salience | Confidence | Label |",
-                "|---|---|---|---|---|---|---|---|---|",
+                "| Instance ID | Canonical ID | Parent | Relation | Kind | Scope | Salience | Confidence | Label | Explanation | Evidence Summary | Reasoning Role |",
+                "|---|---|---|---|---|---|---|---|---|---|---|---|",
             ]
         )
         for node in tree["nodes"]:
@@ -479,6 +519,9 @@ def render_markdown(forest: dict[str, Any]) -> str:
                         node.get("salience") or "",
                         node.get("confidence") or "",
                         node.get("label") or "",
+                        node.get("explanation") or "",
+                        node.get("evidenceSummary") or "",
+                        node.get("reasoningRole") or "",
                     ]
                 )
                 + " |"

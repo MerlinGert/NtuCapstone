@@ -21,7 +21,15 @@ from reasoning_graph_to_forest import (
 
 ALLOWED_OPS = {"add_node", "add_edge", "update_node", "add_root"}
 ALLOWED_ACTORS = {"agent", "user", "system"}
-REQUIRED_PATCH_NODE_FIELDS = {"actor", "source", "planRef"}
+REQUIRED_PATCH_NODE_FIELDS = {
+    "actor",
+    "source",
+    "planRef",
+    "explanation",
+    "evidenceSummary",
+    "reasoningRole",
+    "patchRationale",
+}
 
 
 def require_string(value: Any, path: str) -> str:
@@ -55,6 +63,10 @@ def validate_patch_node(node: dict[str, Any], index: int) -> None:
         raise GraphError(f"add_node {node_id}.actor must be one of {sorted(ALLOWED_ACTORS)}")
 
     require_string(node.get("source"), f"add_node {node_id}.source")
+    require_string(node.get("explanation"), f"add_node {node_id}.explanation")
+    require_string(node.get("evidenceSummary"), f"add_node {node_id}.evidenceSummary")
+    require_string(node.get("reasoningRole"), f"add_node {node_id}.reasoningRole")
+    require_string(node.get("patchRationale"), f"add_node {node_id}.patchRationale")
     plan_ref = require_object(node.get("planRef"), f"add_node {node_id}.planRef")
     if not plan_ref:
         raise GraphError(f"add_node {node_id}.planRef must not be empty")

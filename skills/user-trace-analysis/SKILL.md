@@ -172,6 +172,15 @@ Each Investigation Strategy should have both:
 
 The `explanation` should expand opaque IDs and shorthand references with human-readable provenance. Prefer phrases such as "the 9-user Behavior Details card selected around interaction 16 (A16)" instead of using `A16` alone.
 
+Use rich detail fields on graph nodes that need to be read outside the compact tree label:
+
+- `explanation`: what the node means in human-readable terms.
+- `evidenceSummary`: concrete evidence used or expected.
+- `reasoningRole`: how the node supports, refines, motivates, or completes a reasoning path.
+- `patchRationale`: required on agent-created follow-up patch nodes to explain why the node was added to the augmented reasoning graph.
+
+Require `explanation` for every `Hypothesis`, `Insight`, `Finding`, `AnalyticQuestion`, `Task`, `InvestigationStrategy`, and `AnalyticActivity`. For `Interaction`, require `explanation` when it is `primary` or agent-created. In Recommendation Plan Forests, provide context-rich explanations for `ReasoningGap`, `InvestigationStrategy`, proposed or existing plan `Hypothesis`, `ExpansionRationale`, and `ExpectedFinding`.
+
 ### Mapping Rule
 
 Map the spaces with these reasoning edges:
@@ -648,10 +657,10 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 
 ### Recommendation and follow-up artifacts
 
-- `recommendation-plan-graph.json`: prescriptive plan graph. It must distinguish Evidence Completion from Hypothesis Expansion. Every Investigation Strategy must include a compact `label` and a context-rich `explanation`; include optional `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, and `falsificationCriteria` when they help execution.
+- `recommendation-plan-graph.json`: prescriptive plan graph. It must distinguish Evidence Completion from Hypothesis Expansion. Every Reasoning Gap, Investigation Strategy, plan Hypothesis, Expansion Rationale, and Expected Finding must include a compact `label` and a context-rich `explanation`; include optional `evidenceSummary`, `reasoningRole`, `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, and `falsificationCriteria` when they help execution.
 - `recommendation-plan-forest.md`: readable plan forest. It must show Reasoning Gaps or Expansion Rationales above Investigation Strategies, Analytic Activities, Recommended Interactions, and Expected Findings.
 - `continued-investigation-report.md`: execution report for every recommendation branch, including completed checks, blocked checks, evidence, Findings, Insights, and unresolved gaps.
-- `reasoning-graph-patch-*.json`: follow-up evidence patch. New evidence nodes must include `actor`, `source`, and `planRef`.
+- `reasoning-graph-patch-*.json`: follow-up evidence patch. New evidence nodes must include `actor`, `source`, `planRef`, `explanation`, `evidenceSummary`, `reasoningRole`, and `patchRationale`.
 - `augmented-reasoning-graph.json`: canonical reasoning graph after patch application.
 - `augmented-reasoning-forest.json`: machine-readable regenerated forest from the augmented graph.
 - `augmented-reasoning-forest.md`: regenerated forest from the augmented graph. It may include both original user evidence and agent follow-up evidence.
@@ -671,6 +680,8 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - For action recommendations, cover the three recommendation classes unless the user asks for a narrower scope: Continue the user's path, Similar new explorations, and Hindsight opportunities.
 - Every Investigation Strategy must include a compact label and a context-rich explanation.
 - Investigation Strategy explanations must expand opaque IDs and shorthand references, for example "the 9-user Behavior Details card selected around interaction 16 (A16)".
+- Every non-trivial reasoning graph node must include enough detail to be understandable from a tree-view modal: `explanation` for all non-Interaction reasoning nodes, `explanation` for primary or agent-created Interactions, and `evidenceSummary` plus `reasoningRole` whenever the compact label does not make the evidence and purpose obvious.
+- Every agent-created patch node must include `explanation`, `evidenceSummary`, `reasoningRole`, and `patchRationale`.
 - Investigation Strategies must operationalize a Hypothesis into evidence-seeking work through concrete targets, analytic contrasts, search concepts, decision criteria, or falsification criteria. Do not merely restate the Hypothesis.
 - Every recommended Interaction must be labeled as `Data Action`, `Model Action`, `Visualization Action`, or `Synthesis Action`.
 - Treat checking statistics already displayed in ManiScope as a `Visualization Action`.
@@ -728,6 +739,8 @@ Before delivering, verify:
 - Every mid-level Finding and high-level Insight has evidence and rationale.
 - Every Investigation Strategy has a "why this matters" rationale.
 - Every Investigation Strategy has a context-rich explanation that expands shorthand IDs and is understandable without reading unrelated files.
+- Every non-trivial graph node has a context-rich `explanation`, and every primary or agent-created Interaction has one as well.
+- Every agent-created patch node has `explanation`, `evidenceSummary`, `reasoningRole`, and `patchRationale`.
 - Every Investigation Strategy operationalizes the Hypothesis rather than repeating it.
 - Action recommendations cover Continue the user's path, Similar new explorations, and Hindsight opportunities, or clearly explain why one class is out of scope.
 - Every Investigation Strategy has a target outcome.

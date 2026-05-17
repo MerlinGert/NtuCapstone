@@ -53,6 +53,12 @@ Kind-specific fields:
 - `RecommendedInteraction`: include `interactionType`.
 - `ExpectedFinding`: include `expectedOnly: true`.
 
+Rich detail fields keep plan labels compact while making the plan executable:
+
+- `explanation`: required for `ReasoningGap`, `InvestigationStrategy`, proposed or existing plan `Hypothesis`, `ExpansionRationale`, and `ExpectedFinding`.
+- `evidenceSummary`: existing evidence or trace context that motivates the plan node.
+- `reasoningRole`: how the node functions in the Recommendation Plan Forest.
+
 `InvestigationStrategy.label` should stay compact for tree display. `InvestigationStrategy.explanation` should provide enough context for a human or follow-up agent to understand and execute the strategy without chasing shorthand IDs through other files. Expand opaque references in the explanation, such as "the 9-user Behavior Details card selected around interaction 16 (A16)" instead of only `A16`.
 
 An `InvestigationStrategy` should operationalize a Hypothesis into an evidence-seeking direction. Valid patterns include role classification, targeted role discovery, cohort comparison, mechanism tracing, anomaly search, and falsification. Do not use an `InvestigationStrategy` that only restates the Hypothesis in plan language.
@@ -130,6 +136,9 @@ SourceNode
       "gapType": "missing_statistical_validation",
       "desiredSupport": "A Finding that quantifies clicked cohort buy/sell volume.",
       "label": "Exact clicked-cohort volume is missing",
+      "explanation": "The trace shows the clicked manipulation-card cohort visually, but the graph does not yet quantify its exact buy/sell volume.",
+      "evidenceSummary": "The source Hypothesis is supported by Behavior Details screenshots and annotations, not by a computed trade table.",
+      "reasoningRole": "Marks the missing evidence that the downstream Investigation Strategy must fill.",
       "recommendationType": "Evidence Completion",
       "status": "planned"
     },
@@ -138,6 +147,8 @@ SourceNode
       "kind": "InvestigationStrategy",
       "label": "Quantify clicked cohort behavior",
       "explanation": "The user treated the clicked cohort as evidence for coordinated ACT behavior. Quantify the cohort's buy/sell volume, timing, and net direction so the existing Hypothesis is supported or weakened by concrete trade evidence rather than only by visual card inspection.",
+      "evidenceSummary": "Inputs are the clicked Behavior Details cohort and local ACT trade records.",
+      "reasoningRole": "Turns the Reasoning Gap into executable statistical analysis.",
       "targetContext": "Clicked manipulation-card cohort from the trace",
       "analyticContrast": "coordinated same-window behavior versus incidental co-occurrence",
       "searchConcepts": ["buy/sell imbalance", "trade timing", "volume concentration"],
@@ -167,6 +178,9 @@ SourceNode
       "kind": "ExpectedFinding",
       "expectedOnly": true,
       "label": "Clicked cohort has synchronized net buying during the marked window",
+      "explanation": "This is the target outcome the recommended calculation is expected to confirm or reject.",
+      "evidenceSummary": "No evidence yet; it becomes evidence only if the follow-up investigation produces a real Finding node.",
+      "reasoningRole": "Defines the evidence shape needed to complete the plan branch.",
       "recommendationType": "Evidence Completion",
       "status": "planned"
     }
@@ -207,4 +221,4 @@ By default, the script writes:
 
 The generated forest uses `flowchart TD` because it is a top-down plan, unlike the bottom-up evidence support view used by `user-reasoning-forest.md`.
 
-When `InvestigationStrategy` nodes include `explanation`, `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, or `falsificationCriteria`, the generated Markdown includes a `Strategy Context` table so the compact tree labels remain readable while the plan remains executable.
+When plan nodes include `explanation`, `evidenceSummary`, or `reasoningRole`, the generated Markdown includes a `Node Detail Context` table. When `InvestigationStrategy` nodes include `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, or `falsificationCriteria`, it also includes a `Strategy Context` table so compact tree labels remain readable while the plan remains executable.

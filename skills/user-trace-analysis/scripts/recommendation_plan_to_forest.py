@@ -51,6 +51,25 @@ KIND_ORDER = {
     "ExpectedFinding": 7,
 }
 
+REQUIRED_EXPLANATION_KINDS = {
+    "Hypothesis",
+    "ReasoningGap",
+    "ExpansionRationale",
+    "InvestigationStrategy",
+    "ExpectedFinding",
+}
+
+DETAIL_FIELDS = (
+    "explanation",
+    "evidenceSummary",
+    "reasoningRole",
+    "targetContext",
+    "analyticContrast",
+    "searchConcepts",
+    "decisionCriteria",
+    "falsificationCriteria",
+)
+
 
 class PlanError(Exception):
     """Raised when a recommendation plan graph is invalid."""
@@ -77,6 +96,25 @@ def require_bool(value: Any, path: str) -> bool:
     if not isinstance(value, bool):
         raise PlanError(f"{path} must be a boolean")
     return value
+
+
+def require_string_list(value: Any, path: str) -> list[str]:
+    if not isinstance(value, list):
+        raise PlanError(f"{path} must be a list of non-empty strings")
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item.strip():
+            raise PlanError(f"{path}[{index}] must be a non-empty string")
+    return value
+
+
+def validate_optional_detail_fields(node: dict[str, Any], node_id: str) -> None:
+    for field in DETAIL_FIELDS:
+        if field not in node or node[field] is None:
+            continue
+        if field == "searchConcepts":
+            require_string_list(node[field], f"node {node_id}.{field}")
+        else:
+            require_string(node[field], f"node {node_id}.{field}")
 
 
 def validate_node(node: dict[str, Any], index: int, nodes: dict[str, dict[str, Any]]) -> None:
@@ -130,6 +168,10 @@ def validate_node(node: dict[str, Any], index: int, nodes: dict[str, dict[str, A
         expected_only = require_bool(node.get("expectedOnly"), f"node {node_id}.expectedOnly")
         if expected_only is not True:
             raise PlanError(f"node {node_id}.expectedOnly must be true")
+
+    if kind in REQUIRED_EXPLANATION_KINDS:
+        require_string(node.get("explanation"), f"node {node_id}.explanation")
+    validate_optional_detail_fields(node, node_id)
 
 
 def validate_relation(edge: dict[str, Any], index: int, nodes: dict[str, dict[str, Any]]) -> None:
@@ -285,6 +327,8 @@ def build_forest(
                     "targetNodeId": node.get("targetNodeId"),
                     "canonicalSourceId": node.get("canonicalId"),
                     "explanation": node.get("explanation"),
+                    "evidenceSummary": node.get("evidenceSummary"),
+                    "reasoningRole": node.get("reasoningRole"),
                     "targetContext": node.get("targetContext"),
                     "analyticContrast": node.get("analyticContrast"),
                     "searchConcepts": node.get("searchConcepts"),
@@ -383,6 +427,35 @@ def render_markdown(forest: dict[str, Any]) -> str:
                 )
                 + " |"
             )
+        detail_nodes = [
+            node
+            for node in tree["nodes"]
+            if any(node.get(field) for field in ["explanation", "evidenceSummary", "reasoningRole"])
+        ]
+        if detail_nodes:
+            lines.extend(
+                [
+                    "",
+                    "### Node Detail Context",
+                    "",
+                    "| Node | Explanation | Evidence Summary | Reasoning Role |",
+                    "|---|---|---|---|",
+                ]
+            )
+            for node in detail_nodes:
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        markdown_cell(value)
+                        for value in [
+                            node["canonicalId"],
+                            node.get("explanation") or "",
+                            node.get("evidenceSummary") or "",
+                            node.get("reasoningRole") or "",
+                        ]
+                    )
+                    + " |"
+                )
         strategy_nodes = [
             node
             for node in tree["nodes"]

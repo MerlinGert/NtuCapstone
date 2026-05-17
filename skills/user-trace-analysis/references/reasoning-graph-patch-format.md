@@ -29,6 +29,10 @@ New follow-up evidence nodes must include all normal `reasoning-graph.json` node
 - `actor`: usually `agent`.
 - `source`: usually `followup_investigation`.
 - `planRef`: object linking the new node to the plan that produced it.
+- `explanation`: human-readable meaning of the added node.
+- `evidenceSummary`: concrete evidence produced by the follow-up investigation.
+- `reasoningRole`: how this node patches, supports, refines, or expands the original User Reasoning Forest.
+- `patchRationale`: why this node belongs in the augmented reasoning graph rather than only in the follow-up report.
 
 Example:
 
@@ -47,6 +51,10 @@ Example:
     "confidence": "Direct evidence",
     "actor": "agent",
     "source": "followup_investigation",
+    "explanation": "This calculation checks whether the clicked manipulation-card users have measurable trade roles rather than only visual co-occurrence.",
+    "evidenceSummary": "Uses sorted ACT trades to compute buy count, sell count, USD volume, and net direction for the clicked cohort.",
+    "reasoningRole": "Produces a follow-up Finding that can support or weaken the original colluding-group Hypothesis.",
+    "patchRationale": "The original trace used visual card evidence; this node adds the missing statistical evidence required to patch that reasoning gap.",
     "planRef": {
       "strategyId": "RS1",
       "activityId": "AA1",
