@@ -48,9 +48,14 @@ Kind-specific fields:
 - `Hypothesis`: include `hypothesisStatus`, either `existing` or `proposed`.
 - `ReasoningGap`: include `targetNodeId`, `gapType`, and `desiredSupport`.
 - `ExpansionRationale`: include `sourceNodeId`.
+- `InvestigationStrategy`: include `explanation`. When useful, include `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, and `falsificationCriteria`.
 - `AnalyticActivity`: include `activityType`.
 - `RecommendedInteraction`: include `interactionType`.
 - `ExpectedFinding`: include `expectedOnly: true`.
+
+`InvestigationStrategy.label` should stay compact for tree display. `InvestigationStrategy.explanation` should provide enough context for a human or follow-up agent to understand and execute the strategy without chasing shorthand IDs through other files. Expand opaque references in the explanation, such as "the 9-user Behavior Details card selected around interaction 16 (A16)" instead of only `A16`.
+
+An `InvestigationStrategy` should operationalize a Hypothesis into an evidence-seeking direction. Valid patterns include role classification, targeted role discovery, cohort comparison, mechanism tracing, anomaly search, and falsification. Do not use an `InvestigationStrategy` that only restates the Hypothesis in plan language.
 
 Allowed `activityType` values:
 
@@ -132,6 +137,12 @@ SourceNode
       "id": "RS1",
       "kind": "InvestigationStrategy",
       "label": "Quantify clicked cohort behavior",
+      "explanation": "The user treated the clicked cohort as evidence for coordinated ACT behavior. Quantify the cohort's buy/sell volume, timing, and net direction so the existing Hypothesis is supported or weakened by concrete trade evidence rather than only by visual card inspection.",
+      "targetContext": "Clicked manipulation-card cohort from the trace",
+      "analyticContrast": "coordinated same-window behavior versus incidental co-occurrence",
+      "searchConcepts": ["buy/sell imbalance", "trade timing", "volume concentration"],
+      "decisionCriteria": "Support increases if the cohort has concentrated same-window activity with material net direction and volume relative to the surrounding market.",
+      "falsificationCriteria": "Support weakens if activity is low-volume, temporally scattered, or directionally inconsistent with the suspected manipulation window.",
       "recommendationType": "Evidence Completion",
       "status": "planned"
     },
@@ -195,3 +206,5 @@ By default, the script writes:
 - `TRACE/recommendation-plan-forest.md`
 
 The generated forest uses `flowchart TD` because it is a top-down plan, unlike the bottom-up evidence support view used by `user-reasoning-forest.md`.
+
+When `InvestigationStrategy` nodes include `explanation`, `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, or `falsificationCriteria`, the generated Markdown includes a `Strategy Context` table so the compact tree labels remain readable while the plan remains executable.

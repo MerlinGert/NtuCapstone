@@ -128,7 +128,7 @@ Definitions:
 - **Hypothesis**: a high-level explanatory claim to test, such as whether a wallet group coordinated to manipulate price.
 - **Interaction**: one executable operation performed by a human, agent, script, or system command.
 - **Analytic Activity**: a short sequence of related Interactions serving one Analytic Question.
-- **Investigation Strategy**: a high-level plan for testing a Hypothesis through multiple Analytic Activities.
+- **Investigation Strategy**: a high-level evidence-seeking lens for testing a Hypothesis through multiple Analytic Activities. It should operationalize the Hypothesis into concrete targets, analytic contrasts, search concepts, or falsification checks instead of merely restating the Hypothesis.
 - **Finding**: a local or mid-level result from observation, GUI-displayed evidence, model output, or computation.
 - **Insight**: a synthesized high-level understanding that connects multiple Findings and changes the analyst's understanding of the case.
 
@@ -156,6 +156,13 @@ If a candidate Analytic Activity mixes visual inspection and script-side calcula
 - Statistical Analysis: compute group overlap between detector outputs without inspecting the visualization.
 
 High-level Investigation Strategies do not need an action type. Organize them by Hypothesis, why the strategy matters, target outcome, and the Analytic Activities needed.
+
+Each Investigation Strategy should have both:
+
+- A compact `label` suitable for tree display.
+- A context-rich `explanation` suitable for humans and follow-up agents.
+
+The `explanation` should expand opaque IDs and shorthand references with human-readable provenance. Prefer phrases such as "the 9-user Behavior Details card selected around interaction 16 (A16)" instead of using `A16` alone.
 
 ### Mapping Rule
 
@@ -433,6 +440,8 @@ Use scope labels inside the plan, but do not let levels become the organizing st
 
 Recommended Investigation Strategy patterns:
 
+- **Classify roles inside a target cohort**: when a Hypothesis claims role differentiation. Use the strategy to classify each wallet into candidate roles, then test whether the cohort contains distinct functional roles rather than homogeneous behavior.
+- **Discover specific candidate roles**: when the evidence suggests possible accumulators, sellers, distributors, round-trip-like actors, transfer-linked facilitators, storage sinks, or other functional roles. Use the strategy to search for each role and record exceptions.
 - **Build a role-based case timeline**: when the trace suggests different wallet roles such as passive whale, bridge actor, functional buyer, storage sink, accumulator, or round-trip-like actor.
 - **Validate manipulation windows and price impact**: when the trace links behavior details or manipulation cards to K-line movement.
 - **Expand a suspected component without overgeneralizing**: when the trace suggests a larger community or entity, but raw transfer or behavior validation is still needed.
@@ -442,18 +451,32 @@ Recommended Investigation Strategy patterns:
 - **Test post-window exits and profit-taking**: when the user focused on accumulation or price support but did not investigate later selling, transfers, or realized earnings.
 - **Verify external motive only after on-chain evidence is stable**: when the trace suggests a motive but does not prove it.
 
+Strategy pattern examples:
+
+- Classification style: "Classify each wallet in the 9-user Behavior Details card selected around interaction 16 (A16) and the 3-user card selected around interaction 21 (A21) into candidate roles, then test whether the cohorts contain distinct functional roles rather than homogeneous same-direction traders."
+- Discovery style: "Find whether the A16 and A21 cohorts contain accumulators, sellers, round-trip-like actors, or transfer-linked facilitators, and determine whether these roles form a plausible coordination mechanism."
+
+Both styles are valid when grounded in the trace. The common requirement is that the strategy turns the Hypothesis into a concrete evidence-seeking direction with named targets, a useful analytic contrast, and decomposable follow-up work.
+
 For each Investigation Strategy, include:
 
 - Strategy ID, such as `S1`.
+- Compact title for tree labels.
+- Context-rich explanation for humans and follow-up agents.
 - Recommendation class.
 - Target Hypothesis or Analytic Question.
+- Concrete target, such as a cohort, wallet set, view, card, time window, annotation, screenshot, or local data slice.
 - Why this matters.
+- Analytic contrast, such as distinct roles versus homogeneous same-direction behavior, coordinated timing versus independent activity, or transfer-linked entity behavior versus incidental proximity.
+- Search concepts when useful, such as accumulators, sellers, round-trip actors, transfer-linked facilitators, downstream sinks, sibling windows, or counterexamples.
 - Target outcome.
 - One or more Analytic Activity IDs, such as `AA1`.
 - A table of Interactions with columns `Interaction ID`, `Interaction Type`, `Evidence Route`, and `Expected Output`.
 - Optional priority ordering for the most important Interactions or Analytic Activities.
 
 Preserve recommendation confidence and caveats. If an Investigation Strategy or Interaction is based on a weak Hypothesis, state what would confirm or weaken it.
+
+Avoid generic strategies that only repeat the Hypothesis. A good Investigation Strategy should explain what to look at, why that target matters, what distinction is being tested, and how a follow-up agent can break the strategy into Analytic Activities. It should also name evidence that would weaken or falsify the Hypothesis when that is clear.
 
 For crypto-investigator reports, do not limit recommendations to product or workflow improvements. Prefer executable investigation leads: wallets to open, components to recompute, windows to quantify, transfer chains to follow, and hypotheses to falsify.
 
@@ -616,7 +639,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 
 ### Recommendation and follow-up artifacts
 
-- `recommendation-plan-graph.json`: prescriptive plan graph. It must distinguish Evidence Completion from Hypothesis Expansion.
+- `recommendation-plan-graph.json`: prescriptive plan graph. It must distinguish Evidence Completion from Hypothesis Expansion. Every Investigation Strategy must include a compact `label` and a context-rich `explanation`; include optional `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, and `falsificationCriteria` when they help execution.
 - `recommendation-plan-forest.md`: readable plan forest. It must show Reasoning Gaps or Expansion Rationales above Investigation Strategies, Analytic Activities, Recommended Interactions, and Expected Findings.
 - `continued-investigation-report.md`: execution report for every recommendation branch, including completed checks, blocked checks, evidence, Findings, Insights, and unresolved gaps.
 - `reasoning-graph-patch-*.json`: follow-up evidence patch. New evidence nodes must include `actor`, `source`, and `planRef`.
@@ -637,6 +660,9 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - Mark external-event claims, such as exchange listing motives, as unverified unless verified with external sources.
 - Organize recommendations top-down, starting from the high-level Hypothesis or Analytic Question and ending with executable Interactions.
 - For action recommendations, cover the three recommendation classes unless the user asks for a narrower scope: Continue the user's path, Similar new explorations, and Hindsight opportunities.
+- Every Investigation Strategy must include a compact label and a context-rich explanation.
+- Investigation Strategy explanations must expand opaque IDs and shorthand references, for example "the 9-user Behavior Details card selected around interaction 16 (A16)".
+- Investigation Strategies must operationalize a Hypothesis into evidence-seeking work through concrete targets, analytic contrasts, search concepts, decision criteria, or falsification criteria. Do not merely restate the Hypothesis.
 - Every recommended Interaction must be labeled as `Data Action`, `Model Action`, `Visualization Action`, or `Synthesis Action`.
 - Treat checking statistics already displayed in ManiScope as a `Visualization Action`.
 - Treat statistics that require scripts, command-line queries, notebooks, or custom calculations as `Data Action`.
@@ -692,6 +718,8 @@ Before delivering, verify:
 - Every Analytic Question and Hypothesis has evidence and rationale.
 - Every mid-level Finding and high-level Insight has evidence and rationale.
 - Every Investigation Strategy has a "why this matters" rationale.
+- Every Investigation Strategy has a context-rich explanation that expands shorthand IDs and is understandable without reading unrelated files.
+- Every Investigation Strategy operationalizes the Hypothesis rather than repeating it.
 - Action recommendations cover Continue the user's path, Similar new explorations, and Hindsight opportunities, or clearly explain why one class is out of scope.
 - Every Investigation Strategy has a target outcome.
 - Every Investigation Strategy contains at least one Analytic Activity.

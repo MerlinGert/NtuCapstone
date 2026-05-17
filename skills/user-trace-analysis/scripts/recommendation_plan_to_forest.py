@@ -284,6 +284,12 @@ def build_forest(
                     "sourceNodeId": node.get("sourceNodeId"),
                     "targetNodeId": node.get("targetNodeId"),
                     "canonicalSourceId": node.get("canonicalId"),
+                    "explanation": node.get("explanation"),
+                    "targetContext": node.get("targetContext"),
+                    "analyticContrast": node.get("analyticContrast"),
+                    "searchConcepts": node.get("searchConcepts"),
+                    "decisionCriteria": node.get("decisionCriteria"),
+                    "falsificationCriteria": node.get("falsificationCriteria"),
                 }
             )
             if parent_instance_id is not None and relation_to_parent is not None:
@@ -339,6 +345,8 @@ def mermaid_label(node: dict[str, Any]) -> str:
 
 
 def markdown_cell(value: Any) -> str:
+    if isinstance(value, list):
+        return "<br>".join(markdown_cell(item) for item in value)
     return str(value).replace("\n", "<br>").replace("|", "\\|")
 
 
@@ -375,6 +383,49 @@ def render_markdown(forest: dict[str, Any]) -> str:
                 )
                 + " |"
             )
+        strategy_nodes = [
+            node
+            for node in tree["nodes"]
+            if node.get("kind") == "InvestigationStrategy"
+            and any(
+                node.get(field)
+                for field in [
+                    "explanation",
+                    "targetContext",
+                    "analyticContrast",
+                    "searchConcepts",
+                    "decisionCriteria",
+                    "falsificationCriteria",
+                ]
+            )
+        ]
+        if strategy_nodes:
+            lines.extend(
+                [
+                    "",
+                    "### Strategy Context",
+                    "",
+                    "| Strategy | Explanation | Target Context | Analytic Contrast | Search Concepts | Decision Criteria | Falsification Criteria |",
+                    "|---|---|---|---|---|---|---|",
+                ]
+            )
+            for node in strategy_nodes:
+                lines.append(
+                    "| "
+                    + " | ".join(
+                        markdown_cell(value)
+                        for value in [
+                            node["canonicalId"],
+                            node.get("explanation") or "",
+                            node.get("targetContext") or "",
+                            node.get("analyticContrast") or "",
+                            node.get("searchConcepts") or "",
+                            node.get("decisionCriteria") or "",
+                            node.get("falsificationCriteria") or "",
+                        ]
+                    )
+                    + " |"
+                )
         lines.extend(["", "```mermaid", "flowchart TD"])
         for node in tree["nodes"]:
             lines.append(f'  {mermaid_id(node["instanceId"])}["{mermaid_label(node)}"]')
