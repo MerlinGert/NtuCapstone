@@ -1,0 +1,2395 @@
+{
+  "version": 1,
+  "trace": "maniscope-session-ACT-20260501-025125",
+  "roots": [
+    "H1",
+    "H2",
+    "H3",
+    "H_AGENT_1"
+  ],
+  "nodes": [
+    {
+      "id": "I0",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Update ACT snapshot with default thresholds",
+      "interactionType": "Model Action",
+      "salience": "primary",
+      "provenance": [
+        "action:0",
+        "screenshot:../images/action-0001-target-kline_chart-01.png",
+        "screenshot:../images/action-0001-target-token_distribution-02.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Model Action updates the ACT snapshot with the default detector and holder thresholds so the initial Token Distribution and K-line views can be inspected.",
+      "evidenceSummary": "The immediate evidence is the post-update K-line and Token Distribution screenshots.",
+      "reasoningRole": "Initializes the visual evidence path for H1 and later card-cohort analysis."
+    },
+    {
+      "id": "I1",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Hide Token Distribution links",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:1"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I2",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Show Token Distribution links",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:2",
+        "screenshot:../images/action-0003-source-token_distribution-01.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I3",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Select top holder 6Z6 in Token Distribution",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:3",
+        "screenshot:../images/action-0004-source-token_distribution-01.png",
+        "screenshot:../images/action-0004-target-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action selects the top holder 6Z6 in Token Distribution and opens its Behavior Details view.",
+      "evidenceSummary": "The evidence is the source Token Distribution screenshot and the target Behavior Details screenshot.",
+      "reasoningRole": "Starts the passive-whale contrast case for H2."
+    },
+    {
+      "id": "I4",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Select CqW in Token Distribution",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:4",
+        "screenshot:../images/action-0005-source-token_distribution-01.png",
+        "screenshot:../images/action-0005-target-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action selects CqW in Token Distribution to inspect whether its behavior is accumulation or manipulation.",
+      "evidenceSummary": "The evidence is the selected Token Distribution source view and CqW Behavior Details target view.",
+      "reasoningRole": "Starts the progressive-accumulator contrast case for H2."
+    },
+    {
+      "id": "I5",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Zoom CqW Behavior Details window",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:5"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I6",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Toggle CqW Behavior Details to sequential time",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:6",
+        "screenshot:../images/action-0007-source-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I7",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Select DNL in Token Distribution",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:7",
+        "screenshot:../images/action-0008-source-token_distribution-01.png",
+        "screenshot:../images/action-0008-target-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action selects DNL in Token Distribution to inspect a more active account.",
+      "evidenceSummary": "The evidence is the DNL source and Behavior Details target screenshots.",
+      "reasoningRole": "Adds an active-account case to the role-separation analysis."
+    },
+    {
+      "id": "I8",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Show related users for DNL",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:8",
+        "screenshot:../images/action-0009-source-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I9",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Select DmJ from Behavior Details",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:9"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action selects DmJ from Behavior Details for closer inspection.",
+      "evidenceSummary": "The logged action records the DmJ selection in the Behavior Details workflow.",
+      "reasoningRole": "Connects the selected-wallet role analysis to later clicked-card cohorts that also include DmJ."
+    },
+    {
+      "id": "I10",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Show related users for DmJ",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:10",
+        "screenshot:../images/action-0011-source-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I11",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Hover DmJ Behavior Details label",
+      "interactionType": "Visualization Action",
+      "salience": "low",
+      "provenance": [
+        "action:11"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I12",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Scroll same-direction manipulation cards",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:12"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I13",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Click 9-user same-direction card around A13",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:13",
+        "screenshot:../images/action-0014-source-kline_chart-01.png",
+        "screenshot:../images/action-0014-target-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action clicks the 9-user same-direction card around A13 in the K-line view.",
+      "evidenceSummary": "The evidence is the K-line card screenshot and the resulting 9-user Behavior Details view.",
+      "reasoningRole": "Opens a primary cohort supporting the same-direction coordination part of H3."
+    },
+    {
+      "id": "I14",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Scroll manipulation cards after A13",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:14"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I15",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Switch A13 cohort Behavior Details to absolute time",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:15",
+        "screenshot:../images/action-0016-source-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action switches the A13 cohort Behavior Details view to absolute time.",
+      "evidenceSummary": "The evidence is the Behavior Details screenshot after the time-mode change.",
+      "reasoningRole": "Helps compare cohort events against calendar time and price windows."
+    },
+    {
+      "id": "I16",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Click 9-user manipulation card around A16",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:16",
+        "screenshot:../images/action-0017-source-kline_chart-01.png",
+        "screenshot:../images/action-0017-target-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action clicks the 9-user manipulation card around A16 in the K-line view.",
+      "evidenceSummary": "The evidence is the K-line card screenshot and the resulting Behavior Details view.",
+      "reasoningRole": "Opens the A16 cohort that supports the same-direction and round-trip interpretation."
+    },
+    {
+      "id": "I17",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Scroll manipulation cards after A16",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:17"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I18",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Switch A16 cohort Behavior Details to sequential time",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:18",
+        "screenshot:../images/action-0019-source-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action switches the A16 cohort Behavior Details view to sequential time.",
+      "evidenceSummary": "The evidence is the Behavior Details screenshot after the sequential-time toggle.",
+      "reasoningRole": "Supports closer inspection of event order inside the A16 cohort."
+    },
+    {
+      "id": "I19",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Zoom A16 sequential Behavior Details to later events",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:19"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action zooms the A16 sequential Behavior Details view to later events.",
+      "evidenceSummary": "The evidence is the logged zoom/navigation action in the A16 sequence.",
+      "reasoningRole": "Narrows the A16 visual comparison to later event ordering."
+    },
+    {
+      "id": "I20",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Zoom A16 sequential Behavior Details to earlier events",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:20"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action zooms the A16 sequential Behavior Details view to earlier events.",
+      "evidenceSummary": "The evidence is the logged zoom/navigation action in the A16 sequence.",
+      "reasoningRole": "Completes the A16 event-order comparison by checking earlier events."
+    },
+    {
+      "id": "I21",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Click 3-user round-trip card around A21",
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "provenance": [
+        "action:21",
+        "screenshot:../images/action-0022-source-kline_chart-01.png",
+        "screenshot:../images/action-0022-target-behavior_details-01.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This Visualization Action clicks the 3-user round-trip card around A21 in the K-line view.",
+      "evidenceSummary": "The evidence is the K-line card screenshot and the resulting 3-user Behavior Details view.",
+      "reasoningRole": "Opens the compact A21 cohort that motivates the adjacent hypothesis."
+    },
+    {
+      "id": "I22",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Scroll manipulation cards near A21",
+      "interactionType": "Visualization Action",
+      "salience": "supporting",
+      "provenance": [
+        "action:22"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "I23",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Export ACT trace session",
+      "interactionType": "Synthesis Action",
+      "salience": "low",
+      "provenance": [
+        "action:23"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "IA0",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate token_distribution: Approximately 51 users hold 30% of the token supply - highly centralized. Most are marked with red circles,...",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:0",
+        "screenshot:../images/annotation-0000-token_distribution.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate token_distribution: Approximately 51 users hold 30% of the token supply - highly centralized. Most are marked with red circles,...",
+      "evidenceSummary": "Evidence references: annotation:0, screenshot:../images/annotation-0000-token_distribution.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA1",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate token_distribution: Several large, dark-colored nodes are grouped by three orange dashed circles, representing entities detecte...",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:1",
+        "screenshot:../images/annotation-0001-token_distribution.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate token_distribution: Several large, dark-colored nodes are grouped by three orange dashed circles, representing entities detecte...",
+      "evidenceSummary": "Evidence references: annotation:1, screenshot:../images/annotation-0001-token_distribution.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA2",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate token_distribution: Two of the three entities, along with several other holders, are connected within a single component (commu...",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:2",
+        "screenshot:../images/annotation-0002-token_distribution.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate token_distribution: Two of the three entities, along with several other holders, are connected within a single component (commu...",
+      "evidenceSummary": "Evidence references: annotation:2, screenshot:../images/annotation-0002-token_distribution.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA3",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate system: A small number of whales control the vast majority of the circulating supply, while retail holders occupy o...",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:3"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate system: A small number of whales control the vast majority of the circulating supply, while retail holders occupy o...",
+      "evidenceSummary": "Evidence references: annotation:3.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA4",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate token_distribution: Top holder 6z6 holds 10M tokens but shows no manipulative behavior.",
+      "interactionType": "Synthesis Action",
+      "salience": "supporting",
+      "provenance": [
+        "annotation:4",
+        "screenshot:../images/annotation-0004-token_distribution.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "IA5",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: A whale, but not a manipulator - tokens were acquired through transfers.",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:5",
+        "screenshot:../images/annotation-0005-behavior_details.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate behavior_details: A whale, but not a manipulator - tokens were acquired through transfers.",
+      "evidenceSummary": "Evidence references: annotation:5, screenshot:../images/annotation-0005-behavior_details.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA6",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate token_distribution: Same-direction manipulation detected, but no entity affiliation.",
+      "interactionType": "Synthesis Action",
+      "salience": "supporting",
+      "provenance": [
+        "annotation:6",
+        "screenshot:../images/annotation-0006-token_distribution.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "IA7",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: The holder progressively accumulates tokens; four purchases within a short window triggered a same-directio...",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:7",
+        "screenshot:../images/annotation-0007-behavior_details.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate behavior_details: The holder progressively accumulates tokens; four purchases within a short window triggered a same-directio...",
+      "evidenceSummary": "Evidence references: annotation:7, screenshot:../images/annotation-0007-behavior_details.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA8",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate token_distribution: Located within the flagged component. Frequently buys and transfers out tokens - appears to be a functional...",
+      "interactionType": "Synthesis Action",
+      "salience": "supporting",
+      "provenance": [
+        "annotation:8",
+        "screenshot:../images/annotation-0008-token_distribution.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "IA9",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: Direct transfers to another seemingly normal account are observed - likely used to avoid detection.",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:9",
+        "screenshot:../images/annotation-0009-behavior_details.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate behavior_details: Direct transfers to another seemingly normal account are observed - likely used to avoid detection.",
+      "evidenceSummary": "Evidence references: annotation:9, screenshot:../images/annotation-0009-behavior_details.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA10",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: Another address bought a similar amount during the same period; investigating whether this affected the pri...",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:10",
+        "screenshot:../images/annotation-0010-behavior_details.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate behavior_details: Another address bought a similar amount during the same period; investigating whether this affected the pri...",
+      "evidenceSummary": "Evidence references: annotation:10, screenshot:../images/annotation-0010-behavior_details.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA12",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate candlestick_chart: This clearly affected the price.",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:12",
+        "screenshot:../images/annotation-0012-candlestick_chart.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate candlestick_chart: This clearly affected the price.",
+      "evidenceSummary": "Evidence references: annotation:12, screenshot:../images/annotation-0012-candlestick_chart.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA13",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: Oct 26, within 32 minutes: 26.17M tokens traded in the same direction. After DMj's sell, 9 addresses buy fr...",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:13",
+        "screenshot:../images/annotation-0013-behavior_details.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate behavior_details: Oct 26, within 32 minutes: 26.17M tokens traded in the same direction. After DMj's sell, 9 addresses buy fr...",
+      "evidenceSummary": "Evidence references: annotation:13, screenshot:../images/annotation-0013-behavior_details.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA14",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: Same-direction trading alternates between buys and sells (round-trip pattern).",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:14",
+        "screenshot:../images/annotation-0014-behavior_details.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate behavior_details: Same-direction trading alternates between buys and sells (round-trip pattern).",
+      "evidenceSummary": "Evidence references: annotation:14, screenshot:../images/annotation-0014-behavior_details.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA15",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: Behavior snapshot annotation 15",
+      "interactionType": "Synthesis Action",
+      "salience": "supporting",
+      "provenance": [
+        "annotation:15",
+        "screenshot:../images/annotation-0015-behavior_details.png"
+      ],
+      "confidence": "Direct evidence"
+    },
+    {
+      "id": "IA17",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate behavior_details: Three addresses fall within the same connected component.",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:17",
+        "screenshot:../images/annotation-0017-behavior_details.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate behavior_details: Three addresses fall within the same connected component.",
+      "evidenceSummary": "Evidence references: annotation:17, screenshot:../images/annotation-0017-behavior_details.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA18",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate system: These addresses are also part of the same component - forming a large colluding group.",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:18"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate system: These addresses are also part of the same component - forming a large colluding group.",
+      "evidenceSummary": "Evidence references: annotation:18.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "IA19",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Annotate token_distribution: Most of these addresses belong to the identified component.",
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "provenance": [
+        "annotation:19",
+        "screenshot:../images/annotation-0019-token_distribution.png"
+      ],
+      "confidence": "Direct evidence",
+      "explanation": "This primary Synthesis Action records the user's interpretation: Annotate token_distribution: Most of these addresses belong to the identified component.",
+      "evidenceSummary": "Evidence references: annotation:19, screenshot:../images/annotation-0019-token_distribution.png.",
+      "reasoningRole": "Turns a visual observation into explicit user-authored reasoning evidence."
+    },
+    {
+      "id": "H1",
+      "kind": "Hypothesis",
+      "space": "Intention",
+      "scope": "High",
+      "label": "ACT top-holder supply is centralized and many high-balance holders are flagged or linked",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:3",
+        "inference:token-distribution-synthesis"
+      ],
+      "explanation": "The user treated the ACT holder map as highly centralized and suspicious because the final Token Distribution view showed a small top-holder set covering a large supply share, with many central holders visually flagged or linked.",
+      "evidenceSummary": "The support comes from the user concentration annotation, the token-distribution screenshots, and the analyst synthesis of the final holder graph.",
+      "reasoningRole": "Top-level Hypothesis for the Token Distribution branch of the User Reasoning Forest."
+    },
+    {
+      "id": "H2",
+      "kind": "Hypothesis",
+      "space": "Intention",
+      "scope": "High",
+      "label": "Whales and flagged accounts have different roles, so passive storage should be separated from active coordination",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:5",
+        "annotation:7",
+        "annotation:10",
+        "inference:role-separation"
+      ],
+      "explanation": "The user did not treat every whale as the same kind of suspect. They compared selected high-balance wallets to separate passive storage, normal accumulation, transfer routing, and active manipulation behavior.",
+      "evidenceSummary": "The support comes from Behavior Details selections and annotations for 6Z6, CqW, DNL, DmJ, and related wallets.",
+      "reasoningRole": "Top-level Hypothesis that organizes the wallet-role analysis branch."
+    },
+    {
+      "id": "H3",
+      "kind": "Hypothesis",
+      "space": "Intention",
+      "scope": "High",
+      "label": "A large colluding ACT component coordinated same-direction and round-trip behavior around Oct 25-27",
+      "confidence": "Strong inference after follow-up validation",
+      "provenance": [
+        "annotation:18",
+        "screenshot:../images/annotation-0019-token_distribution.png",
+        "inference:cohort-synthesis"
+      ],
+      "explanation": "The user formed a broader collusion hypothesis by combining clicked K-line manipulation cards, Behavior Details sequences, and Token Distribution component membership around the October 25 to October 27 period.",
+      "evidenceSummary": "The support comes from A13, A16, and A21 card screenshots, Behavior Details annotations, and the later Token Distribution component annotation.",
+      "reasoningRole": "Top-level Hypothesis for the coordinated trading and component-membership branch."
+    },
+    {
+      "id": "AQ1",
+      "kind": "AnalyticQuestion",
+      "space": "Intention",
+      "scope": "Mid",
+      "label": "How centralized is the ACT holder graph and how many central holders are suspicious or linked?",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:0",
+        "annotation:1",
+        "annotation:2"
+      ],
+      "explanation": "This question asks whether the ACT holder graph is concentrated enough, and suspiciously connected enough, to justify deeper investigation.",
+      "evidenceSummary": "The user inspected the Token Distribution view, annotated the 51-user concentration, and noted entity/group and component structure.",
+      "reasoningRole": "Mid-level Intention that motivates the Token Distribution visual analysis."
+    },
+    {
+      "id": "AQ2",
+      "kind": "AnalyticQuestion",
+      "space": "Intention",
+      "scope": "Mid",
+      "label": "Which high-balance wallets behave like passive storage, normal accumulators, or active functional accounts?",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:5",
+        "annotation:7",
+        "annotation:9",
+        "annotation:10"
+      ],
+      "explanation": "This question asks which selected wallets are passive holders, normal accumulators, or active accounts involved in routing or manipulation.",
+      "evidenceSummary": "The user opened Behavior Details for selected wallets and annotated differences in acquisition mode, purchase pattern, and transfer behavior.",
+      "reasoningRole": "Mid-level Intention that motivates the selected-wallet role analysis."
+    },
+    {
+      "id": "AQ3",
+      "kind": "AnalyticQuestion",
+      "space": "Intention",
+      "scope": "Mid",
+      "label": "Do the clicked manipulation-card cohorts show coordinated behavior and price-window relevance?",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:12",
+        "annotation:13",
+        "annotation:14",
+        "annotation:17"
+      ],
+      "explanation": "This question asks whether the manipulation-card cohorts show coordinated behavior and whether those cohorts align with relevant K-line price windows.",
+      "evidenceSummary": "The user clicked A13, A16, and A21 K-line cards, changed Behavior Details time modes, zoomed event sequences, and annotated same-direction and round-trip patterns.",
+      "reasoningRole": "Mid-level Intention that motivates the clicked-card cohort analysis."
+    },
+    {
+      "id": "T1",
+      "kind": "Task",
+      "space": "Intention",
+      "scope": "Low",
+      "label": "Inspect Token Distribution concentration, entity boundaries, and links",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:0",
+        "annotation:0"
+      ],
+      "explanation": "The user first inspected the Token Distribution view to understand concentration, suspicious markings, entity boundaries, and visible links.",
+      "evidenceSummary": "Action 0 and early Token Distribution annotations provide the logged evidence.",
+      "reasoningRole": "Low-level Task that starts the holder-graph reasoning path."
+    },
+    {
+      "id": "T2",
+      "kind": "Task",
+      "space": "Intention",
+      "scope": "Low",
+      "label": "Inspect selected wallets in Behavior Details to assign likely roles",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:3",
+        "action:4",
+        "action:7",
+        "action:9"
+      ],
+      "explanation": "The user selected specific wallets and inspected their Behavior Details to assign likely behavioral roles.",
+      "evidenceSummary": "Actions 3, 4, 7, and 9 open wallet details for the role-comparison branch.",
+      "reasoningRole": "Low-level Task that turns the role-separation question into concrete wallet inspections."
+    },
+    {
+      "id": "T3",
+      "kind": "Task",
+      "space": "Intention",
+      "scope": "Low",
+      "label": "Open manipulation-card cohorts and compare their event sequences",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:13",
+        "action:16",
+        "action:21"
+      ],
+      "explanation": "The user opened manipulation-card cohorts and compared the resulting Behavior Details sequences.",
+      "evidenceSummary": "Actions 13, 16, and 21 are the key card clicks for the A13, A16, and A21 cohorts.",
+      "reasoningRole": "Low-level Task that grounds the collusion hypothesis in card-level visual evidence."
+    },
+    {
+      "id": "IS1",
+      "kind": "InvestigationStrategy",
+      "space": "Action",
+      "scope": "High",
+      "label": "Use Token Distribution topology to triage central suspicious holder structure",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:0",
+        "annotation:1",
+        "annotation:2"
+      ],
+      "explanation": "The strategy is to use Token Distribution topology as a triage surface: concentration, suspicious styling, entity groups, and links identify where deeper wallet or card investigation should focus.",
+      "evidenceSummary": "The strategy is inferred from the user concentration and component annotations on Token Distribution screenshots.",
+      "reasoningRole": "High-level Action-space strategy supporting H1."
+    },
+    {
+      "id": "IS2",
+      "kind": "InvestigationStrategy",
+      "space": "Action",
+      "scope": "High",
+      "label": "Classify wallet roles by contrasting balance storage, trade direction, transfers, and related-user context",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:5",
+        "annotation:7",
+        "annotation:10"
+      ],
+      "explanation": "The strategy is to classify selected wallets by contrasting balance storage, trading direction, transfers, and related-user context instead of assuming every large holder is manipulative.",
+      "evidenceSummary": "The strategy is inferred from wallet-level Behavior Details annotations for 6Z6, CqW, DNL, DmJ, and related accounts.",
+      "reasoningRole": "High-level Action-space strategy supporting H2."
+    },
+    {
+      "id": "IS3",
+      "kind": "InvestigationStrategy",
+      "space": "Action",
+      "scope": "High",
+      "label": "Compare card cohorts across K-line timing, Behavior Details sequences, and component membership",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:12",
+        "annotation:13",
+        "annotation:14",
+        "annotation:17"
+      ],
+      "explanation": "The strategy is to compare manipulation-card cohorts across K-line timing, Behavior Details sequences, and Token Distribution component membership.",
+      "evidenceSummary": "The strategy is inferred from the A13, A16, and A21 card clicks and the final component-membership annotations.",
+      "reasoningRole": "High-level Action-space strategy supporting H3."
+    },
+    {
+      "id": "AA1",
+      "kind": "AnalyticActivity",
+      "space": "Action",
+      "scope": "Mid",
+      "label": "Visual review of top-holder network and link/entity overlays",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:0",
+        "annotation:0"
+      ],
+      "activityType": "Visual Analysis",
+      "explanation": "This Visual Analysis activity reviews the top-holder network and link/entity overlays in Token Distribution.",
+      "evidenceSummary": "The activity uses the Token Distribution screenshots and concentration/entity annotations.",
+      "reasoningRole": "Mid-level Action-space unit that produces the holder-concentration and component Findings."
+    },
+    {
+      "id": "AA2",
+      "kind": "AnalyticActivity",
+      "space": "Action",
+      "scope": "Mid",
+      "label": "Visual role review of selected wallets and related users",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:3",
+        "action:4",
+        "action:7",
+        "action:9"
+      ],
+      "activityType": "Visual Analysis",
+      "explanation": "This Visual Analysis activity compares selected wallet Behavior Details views to separate storage, accumulation, and active routing roles.",
+      "evidenceSummary": "The activity uses Behavior Details screenshots and annotations for the selected wallets.",
+      "reasoningRole": "Mid-level Action-space unit that produces the wallet-role Findings."
+    },
+    {
+      "id": "AA3",
+      "kind": "AnalyticActivity",
+      "space": "Action",
+      "scope": "Mid",
+      "label": "Visual comparison of manipulation-card cohorts and price windows",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:13",
+        "action:16",
+        "action:21"
+      ],
+      "activityType": "Visual Analysis",
+      "explanation": "This Visual Analysis activity compares manipulation-card cohorts and the K-line windows they came from.",
+      "evidenceSummary": "The activity uses K-line card clicks, Behavior Details views, time-mode changes, zoom operations, and user annotations.",
+      "reasoningRole": "Mid-level Action-space unit that produces the card-cohort and price-window Findings."
+    },
+    {
+      "id": "F1",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "At the final snapshot, 51 active top/related users cover the configured 30 percent top-holder target, and many central nodes are red-stroked as suspicious.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:0",
+        "annotation:0",
+        "screenshot:../images/annotation-0000-token_distribution.png"
+      ],
+      "explanation": "The final Token Distribution snapshot shows that a configured top-holder group is large enough to be visible but still highly concentrated, with many central nodes styled as suspicious.",
+      "evidenceSummary": "Action 0 and annotation 0 show 51 users covering the configured 30 percent target and many red-stroked suspicious nodes.",
+      "reasoningRole": "Mid-level Finding supporting the centralized-holder Hypothesis H1."
+    },
+    {
+      "id": "F2",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "Three orange dashed entity groups sit inside or near a larger linked component, including normal-looking nodes inside suspicious neighborhoods.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "annotation:1",
+        "annotation:2",
+        "screenshot:../images/annotation-0002-token_distribution.png"
+      ],
+      "explanation": "The user observed multiple detected entity groups and a larger linked component, which suggests suspicious grouping is not isolated to a single wallet.",
+      "evidenceSummary": "Annotations 1 and 2 point to orange entity circles and component links in the Token Distribution screenshot.",
+      "reasoningRole": "Mid-level Finding supporting the topology part of H1."
+    },
+    {
+      "id": "F3",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Low",
+      "label": "6Z6...237 is a top holder with about 10M tokens but no observed manipulative behavior in the trace; its Behavior Details evidence is transfer/storage dominated.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:3",
+        "annotation:4",
+        "annotation:5",
+        "screenshot:../images/annotation-0005-behavior_details.png"
+      ],
+      "explanation": "The 6Z6 wallet appears to be a large holder but not visibly manipulative in the trace, so it functions as a storage-like contrast case.",
+      "evidenceSummary": "The Behavior Details annotation says tokens were acquired through transfers and does not show the same manipulation pattern.",
+      "reasoningRole": "Mid-level Finding that supports role separation in H2."
+    },
+    {
+      "id": "F4",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Low",
+      "label": "CqW...uhV is visually treated as a normal progressive accumulator despite being near manipulation evidence.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:4",
+        "annotation:7",
+        "screenshot:../images/annotation-0007-behavior_details.png"
+      ],
+      "explanation": "The CqW wallet is treated as a progressive accumulator, which separates ordinary or less suspicious accumulation from overt manipulation behavior.",
+      "evidenceSummary": "The Behavior Details annotation describes four purchases in a short window and frames the account as a normal accumulator.",
+      "reasoningRole": "Mid-level Finding that refines the wallet-role taxonomy under H2."
+    },
+    {
+      "id": "F5",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "DNL, DmJ, and nearby related wallets were investigated as functional accounts that buy, transfer, and potentially route activity to less suspicious-looking addresses.",
+      "confidence": "Strong inference",
+      "provenance": [
+        "action:7",
+        "action:9",
+        "annotation:8",
+        "annotation:9",
+        "annotation:10",
+        "screenshot:../images/annotation-0009-behavior_details.png"
+      ],
+      "explanation": "The user investigated DNL, DmJ, and related wallets as active functional accounts because their Behavior Details views showed buys, transfers, and routing-like behavior.",
+      "evidenceSummary": "Annotations 8, 9, and 10 describe direct transfers and similar-amount purchases among the selected wallets.",
+      "reasoningRole": "Mid-level Finding supporting the active-account part of H2."
+    },
+    {
+      "id": "F6",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "The user marked the Oct 23-27 K-line region as price-relevant to the suspicious activity, but the trace alone does not prove causality.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "annotation:12",
+        "screenshot:../images/annotation-0012-candlestick_chart.png"
+      ],
+      "explanation": "The user marked an Oct 23 to Oct 27 K-line region as price-relevant, but the trace itself only shows visual alignment and user interpretation, not causality.",
+      "evidenceSummary": "Annotation 12 on the candlestick chart states that suspicious activity affected the price.",
+      "reasoningRole": "Mid-level Finding supporting H3 while preserving a causal-evidence caveat."
+    },
+    {
+      "id": "F7",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "The A13 9-user Behavior Details card exposed dense same-window activity around Oct 26, including DmJ and multiple buyers in red manipulation boxes.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:13",
+        "annotation:13",
+        "screenshot:../images/action-0014-target-behavior_details-01.png",
+        "screenshot:../images/annotation-0013-behavior_details.png"
+      ],
+      "explanation": "The A13 9-user card exposed a dense same-window cohort, including DmJ and multiple buyers after a sell event.",
+      "evidenceSummary": "Action 13 opens the card and annotation 13 describes 26.17M tokens traded within 32 minutes.",
+      "reasoningRole": "Mid-level Finding supporting the same-direction coordination part of H3."
+    },
+    {
+      "id": "F8",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "The 9-user Behavior Details card selected around interaction 16 (A16) showed alternating buy/sell clusters consistent with a same-direction plus round-trip pattern.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:16",
+        "annotation:14",
+        "screenshot:../images/action-0017-target-behavior_details-01.png",
+        "screenshot:../images/annotation-0014-behavior_details.png"
+      ],
+      "explanation": "The 9-user Behavior Details card selected around interaction 16 (A16) showed alternating buy and sell clusters, which the user interpreted as same-direction plus round-trip behavior.",
+      "evidenceSummary": "Action 16 opens the A16 card and annotation 14 identifies alternating buy/sell behavior.",
+      "reasoningRole": "Mid-level Finding supporting the round-trip-pattern part of H3."
+    },
+    {
+      "id": "F9",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "The A21 3-user card showed a compact DmJ, 7Sm, and GCDE subpattern that the user linked to the same connected component.",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "action:21",
+        "annotation:17",
+        "screenshot:../images/action-0022-target-behavior_details-01.png",
+        "screenshot:../images/annotation-0017-behavior_details.png"
+      ],
+      "explanation": "The A21 3-user card showed a compact subpattern involving DmJ, 7Sm, and GCDE that the user connected to the broader component.",
+      "evidenceSummary": "Action 21 opens the A21 card and annotation 17 states that the three addresses fall within the same connected component.",
+      "reasoningRole": "Mid-level Finding that motivates the adjacent A21 hypothesis branch."
+    },
+    {
+      "id": "INS1",
+      "kind": "Insight",
+      "space": "Finding",
+      "scope": "High",
+      "label": "The ACT investigation starts from a concentrated top-holder map where suspicious styling and entity/link structure make a component-level manipulation hypothesis plausible.",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:3",
+        "screenshot:../images/annotation-0002-token_distribution.png"
+      ],
+      "explanation": "The first insight is that concentration, suspicious styling, entity grouping, and links together make a component-level manipulation hypothesis plausible.",
+      "evidenceSummary": "This aggregates early Token Distribution annotations and screenshots.",
+      "reasoningRole": "High-level Finding-space synthesis supporting H1."
+    },
+    {
+      "id": "INS2",
+      "kind": "Insight",
+      "space": "Finding",
+      "scope": "High",
+      "label": "The user refined the case from simple whale suspicion into role separation: passive storage, normal accumulation, functional routing, and active manipulation can coexist in one holder map.",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:5",
+        "annotation:7",
+        "annotation:10"
+      ],
+      "explanation": "The second insight is that the trace supports role separation rather than a flat whale-equals-manipulator interpretation.",
+      "evidenceSummary": "This aggregates the 6Z6, CqW, DNL, DmJ, and related-wallet Behavior Details annotations.",
+      "reasoningRole": "High-level Finding-space synthesis supporting H2."
+    },
+    {
+      "id": "INS3",
+      "kind": "Insight",
+      "space": "Finding",
+      "scope": "High",
+      "label": "The user synthesized selected wallets, clicked manipulation cards, and Token Distribution membership into a claim that these addresses form a large colluding group.",
+      "confidence": "Strong inference",
+      "provenance": [
+        "annotation:18",
+        "annotation:19",
+        "screenshot:../images/annotation-0019-token_distribution.png"
+      ],
+      "explanation": "The third insight is that selected wallets, clicked card cohorts, and component membership converge on a large colluding-group interpretation.",
+      "evidenceSummary": "This aggregates A13, A16, A21 card evidence and the final Token Distribution component-membership annotations.",
+      "reasoningRole": "High-level Finding-space synthesis supporting H3."
+    },
+    {
+      "id": "AI1",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Compute exact A13, A16, and A21 clicked-card trade, overlap, and transfer statistics",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "data:front/public/data/sorted_trades.csv",
+        "data:front/public/data/sorted_transfers.csv",
+        "data:continued-investigation-assets/follow-up-data-summary.json"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS1",
+        "activityId": "AA_RS1",
+        "recommendedInteractionId": "RI_RS1",
+        "expectedFindingId": "EF_RS1",
+        "gapId": "RG1"
+      },
+      "interactionType": "Data Action",
+      "salience": "primary",
+      "explanation": "This follow-up calculation checks whether the A13, A16, and A21 clicked-card cohorts have measurable trade roles and repeated-wallet structure.",
+      "evidenceSummary": "Uses sorted ACT trades, sorted transfers, and the follow-up data summary to compute trade counts, overlap, and transfer evidence.",
+      "reasoningRole": "Produces follow-up Findings that patch missing statistical support under H3.",
+      "patchRationale": "The original user trace relied on visual card inspection; this node adds the statistical interaction needed to fill that gap."
+    },
+    {
+      "id": "AI2",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Compute OHLC and clicked-cohort market-share contrasts for A13, A16, and A21",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "data:front/public/data/ACT_OHLC.json",
+        "data:front/public/data/sorted_trades.csv",
+        "data:continued-investigation-assets/follow-up-data-summary.json"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS2",
+        "activityId": "AA_RS2",
+        "recommendedInteractionId": "RI_RS2",
+        "expectedFindingId": "EF_RS2",
+        "gapId": "RG2"
+      },
+      "interactionType": "Data Action",
+      "salience": "primary",
+      "explanation": "This follow-up calculation checks whether clicked-card windows align with measurable price movement and cohort market share.",
+      "evidenceSummary": "Uses ACT OHLC data, sorted trades, and the follow-up data summary.",
+      "reasoningRole": "Produces a price-window Finding that refines the user price-impact claim.",
+      "patchRationale": "The original trace asserted price impact visually; this node adds the numeric contrast needed to patch the reasoning."
+    },
+    {
+      "id": "AI3",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Compare selected wallet role profiles from local ACT behavior and balance data",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "data:front/public/data/user_behavior_sequences.json",
+        "data:front/public/data/hourly_balance_snapshots.json",
+        "data:continued-investigation-assets/follow-up-data-summary.json"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS3",
+        "activityId": "AA_RS3",
+        "recommendedInteractionId": "RI_RS3",
+        "expectedFindingId": "EF_RS3",
+        "gapId": "RG3"
+      },
+      "interactionType": "Data Action",
+      "salience": "primary",
+      "explanation": "This follow-up calculation compares selected wallet profiles to validate the user role-separation interpretation.",
+      "evidenceSummary": "Uses behavior sequences, balance snapshots, and the follow-up data summary.",
+      "reasoningRole": "Produces a role-profile Finding that supports or weakens H2.",
+      "patchRationale": "The original trace distinguished wallet roles visually; this node adds raw-data support for that distinction."
+    },
+    {
+      "id": "AI4",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Render Token Distribution, K-line, and Behavior Details follow-up evidence through the local ManiScope frontend",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "render:continued-investigation-assets/token-distribution-final-snapshot.png",
+        "render:continued-investigation-assets/kline-oct25-oct28-window.png",
+        "render:continued-investigation-assets/behavior-a13-card-window.png",
+        "render:continued-investigation-assets/behavior-a16-card-window.png",
+        "render:continued-investigation-assets/behavior-a21-card-window.png"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS4",
+        "activityId": "AA_RS4",
+        "recommendedInteractionId": "RI_RS4",
+        "expectedFindingId": "EF_RS4",
+        "hypothesisId": "PH1"
+      },
+      "interactionType": "Visualization Action",
+      "salience": "primary",
+      "explanation": "This follow-up visualization renders Token Distribution, K-line, and Behavior Details views as durable evidence images.",
+      "evidenceSummary": "Uses the local ManiScope frontend render API and saves PNG assets under continued-investigation-assets.",
+      "reasoningRole": "Provides visual evidence for the follow-up Findings and the adjacent A21 hypothesis.",
+      "patchRationale": "The augmented forest needs durable rendered images rather than transient GUI state or copied trace screenshots."
+    },
+    {
+      "id": "AI5",
+      "kind": "Interaction",
+      "space": "Action",
+      "scope": "Low",
+      "label": "Resolve A21 Hypothesis Expansion using exact trades, overlaps, transfer checks, and rendered Behavior Details evidence",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "data:continued-investigation-assets/follow-up-data-summary.json",
+        "render:continued-investigation-assets/behavior-a21-card-window.png"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS4",
+        "activityId": "AA_RS4",
+        "recommendedInteractionId": "RI_RS4",
+        "expectedFindingId": "EF_RS4",
+        "hypothesisId": "PH1"
+      },
+      "interactionType": "Synthesis Action",
+      "salience": "primary",
+      "explanation": "This follow-up synthesis resolves whether the A21 proposed hypothesis should be promoted as a separate adjacent reasoning tree.",
+      "evidenceSummary": "Uses the follow-up data summary and the rendered A21 Behavior Details evidence.",
+      "reasoningRole": "Produces the Finding and Hypothesis nodes that form the executed adjacent-hypothesis forest.",
+      "patchRationale": "The Recommendation Plan included a Hypothesis Expansion branch, so the patch must explicitly resolve and, if supported, root the adjacent hypothesis."
+    },
+    {
+      "id": "F_AGENT_1",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "A13, A16, and A21 have measurable clicked-card trade profiles with role-specialized buy/sell behavior rather than a single homogeneous trader pattern",
+      "confidence": "Strong inference",
+      "provenance": [
+        "data:continued-investigation-assets/follow-up-data-summary.json",
+        "render:continued-investigation-assets/behavior-a13-card-window.png",
+        "render:continued-investigation-assets/behavior-a16-card-window.png",
+        "render:continued-investigation-assets/behavior-a21-card-window.png"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS1",
+        "activityId": "AA_RS1",
+        "recommendedInteractionId": "RI_RS1",
+        "expectedFindingId": "EF_RS1",
+        "gapId": "RG1"
+      },
+      "explanation": "The follow-up found that the clicked-card cohorts have measurable role-specialized trade profiles, not merely visual co-occurrence.",
+      "evidenceSummary": "The evidence combines exact card-window trade statistics and rendered Behavior Details views for A13, A16, and A21.",
+      "reasoningRole": "Patches H3 with statistical support for role-differentiated card cohorts.",
+      "patchRationale": "This Finding fills the clicked-cohort validation gap identified by RS1."
+    },
+    {
+      "id": "F_AGENT_2",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "The clicked cards are connected by repeated wallets and one direct A16-related transfer edge, but direct internal transfers are sparse",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "data:continued-investigation-assets/follow-up-data-summary.json"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS1",
+        "activityId": "AA_RS1",
+        "recommendedInteractionId": "RI_RS1",
+        "expectedFindingId": "EF_RS1",
+        "gapId": "RG1"
+      },
+      "explanation": "The follow-up found repeated wallets and one A16-related transfer edge across clicked cards, while direct internal transfer evidence remains sparse.",
+      "evidenceSummary": "The evidence comes from exact wallet overlap and transfer checks in the follow-up data summary.",
+      "reasoningRole": "Adds qualified connectivity evidence to H3.",
+      "patchRationale": "This Finding records both support and limitation, preventing the augmented tree from overstating direct-transfer coordination."
+    },
+    {
+      "id": "F_AGENT_3",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "The selected card windows align with volatile OHLC movement, but only A13 has a strongly positive open-to-close window; A16 and A21 are volatile and negative open-to-close",
+      "confidence": "Direct evidence",
+      "provenance": [
+        "data:front/public/data/ACT_OHLC.json",
+        "render:continued-investigation-assets/kline-oct25-oct28-window.png"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS2",
+        "activityId": "AA_RS2",
+        "recommendedInteractionId": "RI_RS2",
+        "expectedFindingId": "EF_RS2",
+        "gapId": "RG2"
+      },
+      "explanation": "The follow-up found that selected card windows align with volatile OHLC movement, but not all windows show positive open-to-close moves.",
+      "evidenceSummary": "The evidence comes from ACT OHLC calculations and the rendered Oct 25 to Oct 28 K-line view.",
+      "reasoningRole": "Refines F6 and H3 from price causality toward price relevance.",
+      "patchRationale": "This Finding patches the weak price-impact claim with bounded numeric evidence."
+    },
+    {
+      "id": "F_AGENT_4",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "Selected wallets have distinct raw profiles: 6Z6 is storage-like, CqW is accumulator-like, DNL and DmJ are active high-trade accounts, and GCDE participates in the compact A21 pattern",
+      "confidence": "Strong inference",
+      "provenance": [
+        "data:continued-investigation-assets/follow-up-data-summary.json"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS3",
+        "activityId": "AA_RS3",
+        "recommendedInteractionId": "RI_RS3",
+        "expectedFindingId": "EF_RS3",
+        "gapId": "RG3"
+      },
+      "explanation": "The follow-up found distinct selected-wallet profiles, including storage-like, accumulator-like, active high-trade, and compact A21 participants.",
+      "evidenceSummary": "The evidence comes from exact role-profile calculations in the follow-up data summary.",
+      "reasoningRole": "Adds raw-data support to H2.",
+      "patchRationale": "This Finding fills the role-profile validation gap identified by RS3."
+    },
+    {
+      "id": "F_AGENT_5",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "Mid",
+      "label": "A21 is supported as a behavior-linked nested round-trip-like subpattern through DmJ and GCDE exact-window trades plus A16 overlap through 7Sm and DmJ; direct A21 internal transfer evidence is absent",
+      "confidence": "Strong inference",
+      "provenance": [
+        "data:continued-investigation-assets/follow-up-data-summary.json",
+        "render:continued-investigation-assets/behavior-a21-card-window.png"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS4",
+        "activityId": "AA_RS4",
+        "recommendedInteractionId": "RI_RS4",
+        "expectedFindingId": "EF_RS4",
+        "hypothesisId": "PH1"
+      },
+      "explanation": "The follow-up supports A21 as a behavior-linked nested round-trip-like subpattern while noting that direct A21 internal transfer evidence is absent.",
+      "evidenceSummary": "The evidence combines exact A21 trades, A16 overlap through 7Sm and DmJ, and the rendered A21 Behavior Details view.",
+      "reasoningRole": "Supports both H3 and the new adjacent Hypothesis H_AGENT_1.",
+      "patchRationale": "This Finding resolves the Hypothesis Expansion branch by adding evidence that is specific enough to root a separate A21 tree."
+    },
+    {
+      "id": "INS_AGENT_1",
+      "kind": "Insight",
+      "space": "Finding",
+      "scope": "High",
+      "label": "Follow-up validation strengthens the colluding-component interpretation while refining price impact to price relevance rather than proven single-window causality",
+      "confidence": "Strong inference",
+      "provenance": [
+        "data:continued-investigation-assets/follow-up-data-summary.json",
+        "render:continued-investigation-assets/kline-oct25-oct28-window.png"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS1",
+        "activityId": "AA_RS1",
+        "recommendedInteractionId": "RI_RS1",
+        "expectedFindingId": "EF_RS1",
+        "gapId": "RG1"
+      },
+      "explanation": "The follow-up synthesis strengthens the colluding-component interpretation while narrowing the price claim to price relevance rather than proven causality.",
+      "evidenceSummary": "The evidence aggregates exact cohort statistics, OHLC contrasts, wallet-role checks, and rendered views.",
+      "reasoningRole": "High-level follow-up Insight that patches H3 and supports the adjacent A21 hypothesis.",
+      "patchRationale": "This node summarizes what changed after executing the Recommendation Plan Forest."
+    },
+    {
+      "id": "H_AGENT_1",
+      "kind": "Hypothesis",
+      "space": "Intention",
+      "scope": "High",
+      "label": "A21 is a nested behavior-linked round-trip mechanism inside the broader ACT colluding group",
+      "confidence": "Strong inference",
+      "provenance": [
+        "data:continued-investigation-assets/follow-up-data-summary.json",
+        "render:continued-investigation-assets/behavior-a21-card-window.png",
+        "inference:hypothesis-expansion-promoted"
+      ],
+      "actor": "agent",
+      "source": "followup_investigation",
+      "planRef": {
+        "strategyId": "RS4",
+        "activityId": "AA_RS4",
+        "recommendedInteractionId": "RI_RS4",
+        "expectedFindingId": "EF_RS4",
+        "hypothesisId": "PH1"
+      },
+      "explanation": "The follow-up promotes A21 into a separate adjacent hypothesis: a nested behavior-linked round-trip mechanism inside the broader ACT colluding group.",
+      "evidenceSummary": "The evidence comes from the A21 rendered Behavior Details view and exact follow-up data summary.",
+      "reasoningRole": "New top-level Hypothesis root for the executed adjacent-hypothesis forest.",
+      "patchRationale": "The Hypothesis Expansion branch produced enough support to add a new root rather than only a child Finding under H3."
+    }
+  ],
+  "edges": [
+    {
+      "source": "H1",
+      "target": "AQ1",
+      "relation": "contains",
+      "rationale": "H1 is decomposed into the bounded analytic question AQ1."
+    },
+    {
+      "source": "AQ1",
+      "target": "T1",
+      "relation": "contains",
+      "rationale": "AQ1 contains the concrete trace task T1."
+    },
+    {
+      "source": "H1",
+      "target": "IS1",
+      "relation": "motivates",
+      "rationale": "H1 motivates the high-level investigation strategy IS1."
+    },
+    {
+      "source": "AQ1",
+      "target": "AA1",
+      "relation": "motivates",
+      "rationale": "AQ1 motivates the analytic activity AA1."
+    },
+    {
+      "source": "T1",
+      "target": "AA1",
+      "relation": "motivates",
+      "rationale": "T1 motivates the activity AA1."
+    },
+    {
+      "source": "IS1",
+      "target": "AA1",
+      "relation": "contains",
+      "rationale": "IS1 is executed through AA1."
+    },
+    {
+      "source": "H2",
+      "target": "AQ2",
+      "relation": "contains",
+      "rationale": "H2 is decomposed into the bounded analytic question AQ2."
+    },
+    {
+      "source": "AQ2",
+      "target": "T2",
+      "relation": "contains",
+      "rationale": "AQ2 contains the concrete trace task T2."
+    },
+    {
+      "source": "H2",
+      "target": "IS2",
+      "relation": "motivates",
+      "rationale": "H2 motivates the high-level investigation strategy IS2."
+    },
+    {
+      "source": "AQ2",
+      "target": "AA2",
+      "relation": "motivates",
+      "rationale": "AQ2 motivates the analytic activity AA2."
+    },
+    {
+      "source": "T2",
+      "target": "AA2",
+      "relation": "motivates",
+      "rationale": "T2 motivates the activity AA2."
+    },
+    {
+      "source": "IS2",
+      "target": "AA2",
+      "relation": "contains",
+      "rationale": "IS2 is executed through AA2."
+    },
+    {
+      "source": "H3",
+      "target": "AQ3",
+      "relation": "contains",
+      "rationale": "H3 is decomposed into the bounded analytic question AQ3."
+    },
+    {
+      "source": "AQ3",
+      "target": "T3",
+      "relation": "contains",
+      "rationale": "AQ3 contains the concrete trace task T3."
+    },
+    {
+      "source": "H3",
+      "target": "IS3",
+      "relation": "motivates",
+      "rationale": "H3 motivates the high-level investigation strategy IS3."
+    },
+    {
+      "source": "AQ3",
+      "target": "AA3",
+      "relation": "motivates",
+      "rationale": "AQ3 motivates the analytic activity AA3."
+    },
+    {
+      "source": "T3",
+      "target": "AA3",
+      "relation": "motivates",
+      "rationale": "T3 motivates the activity AA3."
+    },
+    {
+      "source": "IS3",
+      "target": "AA3",
+      "relation": "contains",
+      "rationale": "IS3 is executed through AA3."
+    },
+    {
+      "source": "T1",
+      "target": "I0",
+      "relation": "motivates",
+      "rationale": "The top-holder triage task explains the link visibility and snapshot interactions."
+    },
+    {
+      "source": "AA1",
+      "target": "I0",
+      "relation": "contains",
+      "rationale": "The network visual review includes this logged interaction."
+    },
+    {
+      "source": "T1",
+      "target": "I1",
+      "relation": "motivates",
+      "rationale": "The top-holder triage task explains the link visibility and snapshot interactions."
+    },
+    {
+      "source": "AA1",
+      "target": "I1",
+      "relation": "contains",
+      "rationale": "The network visual review includes this logged interaction."
+    },
+    {
+      "source": "T1",
+      "target": "I2",
+      "relation": "motivates",
+      "rationale": "The top-holder triage task explains the link visibility and snapshot interactions."
+    },
+    {
+      "source": "AA1",
+      "target": "I2",
+      "relation": "contains",
+      "rationale": "The network visual review includes this logged interaction."
+    },
+    {
+      "source": "AA1",
+      "target": "IA0",
+      "relation": "contains",
+      "rationale": "The network visual review includes this annotation or synthesized insight."
+    },
+    {
+      "source": "AA1",
+      "target": "IA1",
+      "relation": "contains",
+      "rationale": "The network visual review includes this annotation or synthesized insight."
+    },
+    {
+      "source": "AA1",
+      "target": "IA2",
+      "relation": "contains",
+      "rationale": "The network visual review includes this annotation or synthesized insight."
+    },
+    {
+      "source": "AA1",
+      "target": "IA3",
+      "relation": "contains",
+      "rationale": "The network visual review includes this annotation or synthesized insight."
+    },
+    {
+      "source": "AA1",
+      "target": "IA19",
+      "relation": "contains",
+      "rationale": "The network visual review includes this annotation or synthesized insight."
+    },
+    {
+      "source": "I0",
+      "target": "F1",
+      "relation": "produces",
+      "rationale": "The interaction or annotation produced a network-structure finding."
+    },
+    {
+      "source": "I1",
+      "target": "F2",
+      "relation": "produces",
+      "rationale": "The interaction or annotation produced a network-structure finding."
+    },
+    {
+      "source": "I2",
+      "target": "F2",
+      "relation": "produces",
+      "rationale": "The interaction or annotation produced a network-structure finding."
+    },
+    {
+      "source": "IA0",
+      "target": "F1",
+      "relation": "produces",
+      "rationale": "The interaction or annotation produced a network-structure finding."
+    },
+    {
+      "source": "IA1",
+      "target": "F2",
+      "relation": "produces",
+      "rationale": "The interaction or annotation produced a network-structure finding."
+    },
+    {
+      "source": "IA2",
+      "target": "F2",
+      "relation": "produces",
+      "rationale": "The interaction or annotation produced a network-structure finding."
+    },
+    {
+      "source": "F1",
+      "target": "INS1",
+      "relation": "supports",
+      "rationale": "Concentration and suspicious styling support the component-level network insight."
+    },
+    {
+      "source": "F2",
+      "target": "INS1",
+      "relation": "supports",
+      "rationale": "Entity and link structure support the component-level network insight."
+    },
+    {
+      "source": "INS1",
+      "target": "H1",
+      "relation": "supports",
+      "rationale": "The synthesized network insight supports the centralized suspicious-holder hypothesis."
+    },
+    {
+      "source": "F1",
+      "target": "H1",
+      "relation": "supports",
+      "rationale": "The observed top-holder concentration directly supports H1."
+    },
+    {
+      "source": "F2",
+      "target": "H1",
+      "relation": "supports",
+      "rationale": "The linked entity structure directly supports H1."
+    },
+    {
+      "source": "T2",
+      "target": "I3",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I3",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I4",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I4",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I5",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I5",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I6",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I6",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I7",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I7",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I8",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I8",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I9",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I9",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I10",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I10",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "T2",
+      "target": "I11",
+      "relation": "motivates",
+      "rationale": "The role-classification task explains this wallet inspection interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "I11",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this logged interaction."
+    },
+    {
+      "source": "AA2",
+      "target": "IA4",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this annotation."
+    },
+    {
+      "source": "AA2",
+      "target": "IA5",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this annotation."
+    },
+    {
+      "source": "AA2",
+      "target": "IA6",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this annotation."
+    },
+    {
+      "source": "AA2",
+      "target": "IA7",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this annotation."
+    },
+    {
+      "source": "AA2",
+      "target": "IA8",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this annotation."
+    },
+    {
+      "source": "AA2",
+      "target": "IA9",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this annotation."
+    },
+    {
+      "source": "AA2",
+      "target": "IA10",
+      "relation": "contains",
+      "rationale": "The wallet role review includes this annotation."
+    },
+    {
+      "source": "I3",
+      "target": "F3",
+      "relation": "produces",
+      "rationale": "Selecting and annotating 6Z6 produced the passive-storage finding."
+    },
+    {
+      "source": "IA4",
+      "target": "F3",
+      "relation": "produces",
+      "rationale": "Selecting and annotating 6Z6 produced the passive-storage finding."
+    },
+    {
+      "source": "IA5",
+      "target": "F3",
+      "relation": "produces",
+      "rationale": "Selecting and annotating 6Z6 produced the passive-storage finding."
+    },
+    {
+      "source": "I4",
+      "target": "F4",
+      "relation": "produces",
+      "rationale": "Inspecting CqW produced the normal accumulator finding."
+    },
+    {
+      "source": "I5",
+      "target": "F4",
+      "relation": "produces",
+      "rationale": "Inspecting CqW produced the normal accumulator finding."
+    },
+    {
+      "source": "I6",
+      "target": "F4",
+      "relation": "produces",
+      "rationale": "Inspecting CqW produced the normal accumulator finding."
+    },
+    {
+      "source": "IA7",
+      "target": "F4",
+      "relation": "produces",
+      "rationale": "Inspecting CqW produced the normal accumulator finding."
+    },
+    {
+      "source": "I7",
+      "target": "F5",
+      "relation": "produces",
+      "rationale": "Inspecting DNL, DmJ, related users, and annotations produced the functional-account finding."
+    },
+    {
+      "source": "I8",
+      "target": "F5",
+      "relation": "produces",
+      "rationale": "Inspecting DNL, DmJ, related users, and annotations produced the functional-account finding."
+    },
+    {
+      "source": "I9",
+      "target": "F5",
+      "relation": "produces",
+      "rationale": "Inspecting DNL, DmJ, related users, and annotations produced the functional-account finding."
+    },
+    {
+      "source": "I10",
+      "target": "F5",
+      "relation": "produces",
+      "rationale": "Inspecting DNL, DmJ, related users, and annotations produced the functional-account finding."
+    },
+    {
+      "source": "IA8",
+      "target": "F5",
+      "relation": "produces",
+      "rationale": "Inspecting DNL, DmJ, related users, and annotations produced the functional-account finding."
+    },
+    {
+      "source": "IA9",
+      "target": "F5",
+      "relation": "produces",
+      "rationale": "Inspecting DNL, DmJ, related users, and annotations produced the functional-account finding."
+    },
+    {
+      "source": "IA10",
+      "target": "F5",
+      "relation": "produces",
+      "rationale": "Inspecting DNL, DmJ, related users, and annotations produced the functional-account finding."
+    },
+    {
+      "source": "F3",
+      "target": "INS2",
+      "relation": "supports",
+      "rationale": "F3 supports the role-separation insight."
+    },
+    {
+      "source": "F4",
+      "target": "INS2",
+      "relation": "supports",
+      "rationale": "F4 supports the role-separation insight."
+    },
+    {
+      "source": "F5",
+      "target": "INS2",
+      "relation": "supports",
+      "rationale": "F5 supports the role-separation insight."
+    },
+    {
+      "source": "INS2",
+      "target": "H2",
+      "relation": "supports",
+      "rationale": "The role-separation insight supports H2."
+    },
+    {
+      "source": "F3",
+      "target": "H2",
+      "relation": "supports",
+      "rationale": "A passive high-balance holder supports separating whales from manipulators."
+    },
+    {
+      "source": "F5",
+      "target": "H2",
+      "relation": "supports",
+      "rationale": "Functional account evidence supports separating account roles."
+    },
+    {
+      "source": "T3",
+      "target": "I12",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I12",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I13",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I13",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I14",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I14",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I15",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I15",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I16",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I16",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I17",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I17",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I18",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I18",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I19",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I19",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I20",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I20",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I21",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I21",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "T3",
+      "target": "I22",
+      "relation": "motivates",
+      "rationale": "The cohort-comparison task explains this K-line or Behavior Details interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "I22",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this logged interaction."
+    },
+    {
+      "source": "AA3",
+      "target": "IA12",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this annotation or insight."
+    },
+    {
+      "source": "AA3",
+      "target": "IA13",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this annotation or insight."
+    },
+    {
+      "source": "AA3",
+      "target": "IA14",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this annotation or insight."
+    },
+    {
+      "source": "AA3",
+      "target": "IA15",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this annotation or insight."
+    },
+    {
+      "source": "AA3",
+      "target": "IA17",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this annotation or insight."
+    },
+    {
+      "source": "AA3",
+      "target": "IA18",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this annotation or insight."
+    },
+    {
+      "source": "AA3",
+      "target": "IA19",
+      "relation": "contains",
+      "rationale": "The card-cohort comparison includes this annotation or insight."
+    },
+    {
+      "source": "IA12",
+      "target": "F6",
+      "relation": "produces",
+      "rationale": "The K-line inspection and annotation produced the price-window relevance finding."
+    },
+    {
+      "source": "I12",
+      "target": "F6",
+      "relation": "produces",
+      "rationale": "The K-line inspection and annotation produced the price-window relevance finding."
+    },
+    {
+      "source": "I13",
+      "target": "F6",
+      "relation": "produces",
+      "rationale": "The K-line inspection and annotation produced the price-window relevance finding."
+    },
+    {
+      "source": "I16",
+      "target": "F6",
+      "relation": "produces",
+      "rationale": "The K-line inspection and annotation produced the price-window relevance finding."
+    },
+    {
+      "source": "I21",
+      "target": "F6",
+      "relation": "produces",
+      "rationale": "The K-line inspection and annotation produced the price-window relevance finding."
+    },
+    {
+      "source": "I13",
+      "target": "F7",
+      "relation": "produces",
+      "rationale": "The A13 card interaction and annotation produced the dense same-window cohort finding."
+    },
+    {
+      "source": "I15",
+      "target": "F7",
+      "relation": "produces",
+      "rationale": "The A13 card interaction and annotation produced the dense same-window cohort finding."
+    },
+    {
+      "source": "IA13",
+      "target": "F7",
+      "relation": "produces",
+      "rationale": "The A13 card interaction and annotation produced the dense same-window cohort finding."
+    },
+    {
+      "source": "I16",
+      "target": "F8",
+      "relation": "produces",
+      "rationale": "The A16 card and sequential-time inspection produced the alternating pattern finding."
+    },
+    {
+      "source": "I18",
+      "target": "F8",
+      "relation": "produces",
+      "rationale": "The A16 card and sequential-time inspection produced the alternating pattern finding."
+    },
+    {
+      "source": "I19",
+      "target": "F8",
+      "relation": "produces",
+      "rationale": "The A16 card and sequential-time inspection produced the alternating pattern finding."
+    },
+    {
+      "source": "I20",
+      "target": "F8",
+      "relation": "produces",
+      "rationale": "The A16 card and sequential-time inspection produced the alternating pattern finding."
+    },
+    {
+      "source": "IA14",
+      "target": "F8",
+      "relation": "produces",
+      "rationale": "The A16 card and sequential-time inspection produced the alternating pattern finding."
+    },
+    {
+      "source": "IA15",
+      "target": "F8",
+      "relation": "produces",
+      "rationale": "The A16 card and sequential-time inspection produced the alternating pattern finding."
+    },
+    {
+      "source": "I21",
+      "target": "F9",
+      "relation": "produces",
+      "rationale": "The A21 card and annotation produced the compact 3-user subpattern finding."
+    },
+    {
+      "source": "IA17",
+      "target": "F9",
+      "relation": "produces",
+      "rationale": "The A21 card and annotation produced the compact 3-user subpattern finding."
+    },
+    {
+      "source": "F6",
+      "target": "INS3",
+      "relation": "supports",
+      "rationale": "F6 supports the colluding-group insight."
+    },
+    {
+      "source": "F7",
+      "target": "INS3",
+      "relation": "supports",
+      "rationale": "F7 supports the colluding-group insight."
+    },
+    {
+      "source": "F8",
+      "target": "INS3",
+      "relation": "supports",
+      "rationale": "F8 supports the colluding-group insight."
+    },
+    {
+      "source": "F9",
+      "target": "INS3",
+      "relation": "supports",
+      "rationale": "F9 supports the colluding-group insight."
+    },
+    {
+      "source": "IA18",
+      "target": "INS3",
+      "relation": "produces",
+      "rationale": "The user-authored high-level insight directly synthesized the selected evidence into INS3."
+    },
+    {
+      "source": "IA19",
+      "target": "INS3",
+      "relation": "produces",
+      "rationale": "The final Token Distribution annotation produced supporting synthesis for the colluding-group insight."
+    },
+    {
+      "source": "INS3",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "The colluding-group insight supports H3."
+    },
+    {
+      "source": "F7",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "The A13 same-window cohort supports H3."
+    },
+    {
+      "source": "F8",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "The A16 alternating cohort supports H3."
+    },
+    {
+      "source": "F9",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "The A21 compact subpattern supports H3."
+    },
+    {
+      "source": "AI1",
+      "target": "F_AGENT_1",
+      "relation": "produces",
+      "rationale": "The exact trade and overlap calculation produced the clicked-card role finding."
+    },
+    {
+      "source": "AI1",
+      "target": "F_AGENT_2",
+      "relation": "produces",
+      "rationale": "The transfer and overlap calculation produced the repeated-wallet and direct-transfer finding."
+    },
+    {
+      "source": "AI2",
+      "target": "F_AGENT_3",
+      "relation": "produces",
+      "rationale": "The OHLC and market-share calculation produced the price-window contrast finding."
+    },
+    {
+      "source": "AI3",
+      "target": "F_AGENT_4",
+      "relation": "produces",
+      "rationale": "The selected-wallet profile calculation produced the role-profile finding."
+    },
+    {
+      "source": "AI4",
+      "target": "F_AGENT_1",
+      "relation": "produces",
+      "rationale": "The rendered Behavior Details views produce the clicked-card role finding."
+    },
+    {
+      "source": "AI4",
+      "target": "F_AGENT_3",
+      "relation": "produces",
+      "rationale": "The rendered K-line view produces the price-window contrast finding."
+    },
+    {
+      "source": "AI5",
+      "target": "F_AGENT_5",
+      "relation": "produces",
+      "rationale": "The A21 expansion resolution produced the adjacent-hypothesis finding."
+    },
+    {
+      "source": "F_AGENT_1",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "Exact card-cohort role evidence strengthens the broader colluding-group hypothesis."
+    },
+    {
+      "source": "F_AGENT_2",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "Repeated-wallet and transfer evidence strengthens the broader colluding-group hypothesis."
+    },
+    {
+      "source": "F_AGENT_3",
+      "target": "F6",
+      "relation": "supports",
+      "rationale": "The OHLC calculation supports and qualifies the price-window relevance finding without proving causality."
+    },
+    {
+      "source": "F_AGENT_3",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "Volatile price-window alignment supports but does not prove the colluding-group hypothesis."
+    },
+    {
+      "source": "F_AGENT_4",
+      "target": "H2",
+      "relation": "supports",
+      "rationale": "Raw selected-wallet role profiles support the role-separation hypothesis."
+    },
+    {
+      "source": "F_AGENT_5",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "The nested A21 pattern supports the broader colluding-group hypothesis."
+    },
+    {
+      "source": "F_AGENT_5",
+      "target": "H_AGENT_1",
+      "relation": "supports",
+      "rationale": "The A21 exact-window and overlap evidence supports the promoted adjacent hypothesis."
+    },
+    {
+      "source": "INS_AGENT_1",
+      "target": "H3",
+      "relation": "supports",
+      "rationale": "The synthesized follow-up insight strengthens H3."
+    },
+    {
+      "source": "INS_AGENT_1",
+      "target": "H_AGENT_1",
+      "relation": "supports",
+      "rationale": "The synthesized follow-up insight supports the separate A21 adjacent root."
+    },
+    {
+      "source": "F_AGENT_1",
+      "target": "INS_AGENT_1",
+      "relation": "supports",
+      "rationale": "Exact clicked-card role evidence supports the follow-up synthesis insight."
+    },
+    {
+      "source": "F_AGENT_3",
+      "target": "INS_AGENT_1",
+      "relation": "supports",
+      "rationale": "OHLC contrast evidence supports the follow-up synthesis insight."
+    },
+    {
+      "source": "F_AGENT_5",
+      "target": "INS_AGENT_1",
+      "relation": "supports",
+      "rationale": "The A21 expansion resolution supports the follow-up synthesis insight."
+    }
+  ],
+  "patchesApplied": [
+    {
+      "runId": "investigation-run-001",
+      "description": "Executed Recommendation Plan Forest for ACT trace, added local data/render evidence, and promoted A21 adjacent hypothesis.",
+      "operationCount": 33
+    }
+  ]
+}

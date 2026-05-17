@@ -1,0 +1,170 @@
+{
+  "metadata": {
+    "users": 9,
+    "assetName": "behavior-a13-card-window.png",
+    "generatedAt": "2026-05-17T13:06:22.758Z"
+  },
+  "capture": {
+    "viewName": "behavior_details",
+    "image": {
+      "width": 1600,
+      "height": 760,
+      "viewName": "behavior_details"
+    },
+    "dependencies": {
+      "viewName": "behavior_details",
+      "requiredArguments": [
+        "selectedUser",
+        "selectedUsersList",
+        "behaviorData",
+        "entityInfo",
+        "snapshotTime",
+        "manipulationResults",
+        "syncTargetTimeWindow",
+        "showRelatedUsers",
+        "useSequentialTime",
+        "showManipulationBoxes",
+        "width",
+        "height"
+      ],
+      "optionalArguments": [
+        "visibleTimeWindow",
+        "maxEventsPerUser"
+      ],
+      "dataDependencies": [
+        {
+          "prop": "selectedUser",
+          "source": "CryptoVis.selectedUser",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "selectedUsersList",
+          "source": "CryptoVis.selectedCardUsers",
+          "summary": {
+            "type": "array",
+            "length": 9
+          }
+        },
+        {
+          "prop": "behaviorData",
+          "source": "CryptoVis.behaviorDetailData",
+          "summary": {
+            "type": "object",
+            "keyCount": 9,
+            "sampleKeys": [
+              "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+              "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+              "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+              "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+              "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+              "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+              "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+              "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+              "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+            ]
+          }
+        },
+        {
+          "prop": "entityInfo",
+          "source": "CryptoVis.selectedEntityInfo",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "snapshotTime",
+          "source": "CryptoVis.snapshot_configuration.time",
+          "summary": {
+            "type": "string",
+            "value": "2024-11-09 23:00:00 UTC"
+          }
+        },
+        {
+          "prop": "manipulationResults",
+          "source": "CryptoVis.manipulation_detection_results",
+          "summary": {
+            "type": "array",
+            "length": 106
+          }
+        },
+        {
+          "prop": "syncTargetTimeWindow",
+          "source": "CryptoVis.klineTimeWindow",
+          "summary": {
+            "type": "null"
+          }
+        },
+        {
+          "prop": "showRelatedUsers",
+          "source": "BehaviorDetails.showRelatedUsers",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "useSequentialTime",
+          "source": "BehaviorDetails.useSequentialTime",
+          "summary": {
+            "type": "boolean",
+            "value": false
+          }
+        },
+        {
+          "prop": "showManipulationBoxes",
+          "source": "BehaviorDetails.showManipulationBoxes",
+          "summary": {
+            "type": "boolean",
+            "value": true
+          }
+        },
+        {
+          "prop": "width",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 1600
+          }
+        },
+        {
+          "prop": "height",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 760
+          }
+        },
+        {
+          "prop": "visibleTimeWindow",
+          "source": "render argument",
+          "summary": {
+            "type": "array",
+            "length": 2
+          }
+        },
+        {
+          "prop": "maxEventsPerUser",
+          "source": "render argument",
+          "summary": {
+            "type": "number",
+            "value": 3000
+          }
+        }
+      ]
+    },
+    "renderMetadata": {
+      "behaviorDetails": {
+        "sampling": {
+          "maxEventsPerUser": 3000,
+          "users": []
+        },
+        "visibleTimeWindowApplied": [
+          "2024-10-25T08:38:45.000Z",
+          "2024-10-26T08:38:24.000Z"
+        ]
+      }
+    }
+  }
+}

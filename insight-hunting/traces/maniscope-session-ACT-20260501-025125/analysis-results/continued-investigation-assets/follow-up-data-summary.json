@@ -1,0 +1,3031 @@
+{
+  "trace": "maniscope-session-ACT-20260501-025125",
+  "coin": "ACT",
+  "exportedAt": "2026-04-30T18:51:25.070Z",
+  "actionCount": 24,
+  "annotationCount": 18,
+  "imageCount": 36,
+  "cohorts": {
+    "A13": [
+      "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+      "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+      "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+      "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+      "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+      "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+      "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+      "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+    ],
+    "A16": [
+      "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+      "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+      "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+      "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+      "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+      "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh"
+    ],
+    "A21": [
+      "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+    ]
+  },
+  "selectedUsers": {
+    "3": "6Z6RJJGrmVyndcPyTFhmLYHkHttiYtTccKpXFV9r2237",
+    "4": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+    "7": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+    "9": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+  },
+  "windows": {
+    "A13_card_screenshot_window": [
+      "2024-10-25T08:38:45Z",
+      "2024-10-26T08:38:24Z"
+    ],
+    "A16_card_screenshot_window": [
+      "2024-10-26T07:10:41Z",
+      "2024-10-27T07:42:24Z"
+    ],
+    "A21_card_screenshot_window": [
+      "2024-10-25T17:24:32Z",
+      "2024-10-26T02:52:01Z"
+    ],
+    "oct25_oct27_context": [
+      "2024-10-25T00:00:00Z",
+      "2024-10-27T23:59:59Z"
+    ],
+    "oct23_oct28_context": [
+      "2024-10-23T00:00:00Z",
+      "2024-10-28T23:59:59Z"
+    ]
+  },
+  "overlaps": {
+    "A13_A16": [
+      "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+      "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+    ],
+    "A13_A21": [
+      "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+    ],
+    "A16_A21": [
+      "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+      "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+    ]
+  },
+  "cohortStats": {
+    "A13": {
+      "users": [
+        "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+        "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+        "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+        "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+      ],
+      "over_all_trace_period": {
+        "trade_count": 348,
+        "buy_count": 305,
+        "sell_count": 43,
+        "buy_usd": 1687234.2566358135,
+        "sell_usd": 329016.7395730204,
+        "total_usd": 2016250.996208834,
+        "buy_tokens": 60323004.781776,
+        "sell_tokens": 17181792.642564,
+        "net_tokens": 43141212.139212005,
+        "market_total_usd": 630652781.9262024,
+        "market_share_pct": 0.31970857086376436,
+        "first_trade": "2024-10-24T03:53:43Z",
+        "last_trade": "2024-11-10T07:23:50Z",
+        "users_with_trades": [
+          "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+          "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+          "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+          "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+          "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+          "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+          "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3"
+        ],
+        "by_user": [
+          {
+            "wallet": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+            "short": "5RA...VEz",
+            "trade_count": 44,
+            "buy_count": 44,
+            "sell_count": 0,
+            "buy_usd": 151807.75706952,
+            "sell_usd": 0,
+            "total_usd": 151807.75706952,
+            "net_tokens": 4938079.289509,
+            "first_trade": "2024-10-26T03:55:10Z",
+            "last_trade": "2024-10-27T05:47:15Z",
+            "event_count": 50,
+            "transfer_in_events": 50,
+            "transfer_out_events": 0,
+            "snapshot_balance": 6659950.5754780015
+          },
+          {
+            "wallet": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+            "short": "CqW...uhV",
+            "trade_count": 29,
+            "buy_count": 27,
+            "sell_count": 2,
+            "buy_usd": 268896.91094517737,
+            "sell_usd": 10699.60688738187,
+            "total_usd": 279596.51783255924,
+            "net_tokens": 10229456.985234,
+            "first_trade": "2024-10-25T18:38:26Z",
+            "last_trade": "2024-11-04T10:00:54Z",
+            "event_count": 25,
+            "transfer_in_events": 23,
+            "transfer_out_events": 2,
+            "snapshot_balance": 10229456.985233998
+          },
+          {
+            "wallet": "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+            "short": "5WF...ZEw",
+            "trade_count": 53,
+            "buy_count": 45,
+            "sell_count": 8,
+            "buy_usd": 107609.6214843218,
+            "sell_usd": 8484.72905524033,
+            "total_usd": 116094.35053956213,
+            "net_tokens": 4361360.642088,
+            "first_trade": "2024-10-26T10:00:33Z",
+            "last_trade": "2024-11-10T07:23:50Z",
+            "event_count": 28,
+            "transfer_in_events": 24,
+            "transfer_out_events": 4,
+            "snapshot_balance": 4186014.620765999
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 125,
+            "buy_count": 103,
+            "sell_count": 22,
+            "buy_usd": 541883.1846765429,
+            "sell_usd": 172182.51687185324,
+            "total_usd": 714065.7015483961,
+            "net_tokens": 7049446.918116998,
+            "first_trade": "2024-10-24T03:53:43Z",
+            "last_trade": "2024-11-03T15:55:42Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+            "short": "35N...uPQ",
+            "trade_count": 6,
+            "buy_count": 6,
+            "sell_count": 0,
+            "buy_usd": 97891.0,
+            "sell_usd": 0,
+            "total_usd": 97891.0,
+            "net_tokens": 4225166.137751,
+            "first_trade": "2024-10-26T02:04:53Z",
+            "last_trade": "2024-10-26T02:08:14Z",
+            "event_count": 6,
+            "transfer_in_events": 6,
+            "transfer_out_events": 0,
+            "snapshot_balance": 4225166.137751
+          },
+          {
+            "wallet": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+            "short": "22J...eBm",
+            "trade_count": 16,
+            "buy_count": 8,
+            "sell_count": 8,
+            "buy_usd": 255298.09615013114,
+            "sell_usd": 136009.09275854495,
+            "total_usd": 391307.1889086761,
+            "net_tokens": 2800377.3379270006,
+            "first_trade": "2024-10-26T04:00:15Z",
+            "last_trade": "2024-10-30T14:41:48Z",
+            "event_count": 9,
+            "transfer_in_events": 4,
+            "transfer_out_events": 5,
+            "snapshot_balance": 2800377.3379269997
+          },
+          {
+            "wallet": "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+            "short": "EnM...BZ3",
+            "trade_count": 41,
+            "buy_count": 38,
+            "sell_count": 3,
+            "buy_usd": 137271.0063101203,
+            "sell_usd": 1640.794,
+            "total_usd": 138911.8003101203,
+            "net_tokens": 3564490.2619600003,
+            "first_trade": "2024-10-24T17:50:18Z",
+            "last_trade": "2024-11-09T12:23:34Z",
+            "event_count": 27,
+            "transfer_in_events": 21,
+            "transfer_out_events": 6,
+            "snapshot_balance": 3563884.683254
+          },
+          {
+            "wallet": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+            "short": "BgB...Don",
+            "trade_count": 6,
+            "buy_count": 6,
+            "sell_count": 0,
+            "buy_usd": 98289.0,
+            "sell_usd": 0,
+            "total_usd": 98289.0,
+            "net_tokens": 4376496.762087,
+            "first_trade": "2024-10-26T01:57:31Z",
+            "last_trade": "2024-10-26T02:02:05Z",
+            "event_count": 6,
+            "transfer_in_events": 6,
+            "transfer_out_events": 0,
+            "snapshot_balance": 4376496.7620870005
+          },
+          {
+            "wallet": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+            "short": "5YP...xYv",
+            "trade_count": 28,
+            "buy_count": 28,
+            "sell_count": 0,
+            "buy_usd": 28287.68,
+            "sell_usd": 0,
+            "total_usd": 28287.68,
+            "net_tokens": 1596337.804539,
+            "first_trade": "2024-10-25T23:16:43Z",
+            "last_trade": "2024-10-26T03:48:00Z",
+            "event_count": 32,
+            "transfer_in_events": 31,
+            "transfer_out_events": 1,
+            "snapshot_balance": 4603194.090241999
+          }
+        ]
+      },
+      "oct25_oct27_context": {
+        "trade_count": 215,
+        "buy_count": 185,
+        "sell_count": 30,
+        "buy_usd": 1200006.4509390416,
+        "sell_usd": 317385.65668678534,
+        "total_usd": 1517392.107625827,
+        "buy_tokens": 46805899.569811,
+        "sell_tokens": 16850539.667408,
+        "net_tokens": 29955359.902403,
+        "market_total_usd": 110034767.80261956,
+        "market_share_pct": 1.3790115051160245,
+        "first_trade": "2024-10-25T00:27:17Z",
+        "last_trade": "2024-10-27T17:38:30Z",
+        "users_with_trades": [
+          "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+          "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+          "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+          "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+          "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+          "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+          "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3"
+        ],
+        "by_user": [
+          {
+            "wallet": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+            "short": "5RA...VEz",
+            "trade_count": 44,
+            "buy_count": 44,
+            "sell_count": 0,
+            "buy_usd": 151807.75706952,
+            "sell_usd": 0,
+            "total_usd": 151807.75706952,
+            "net_tokens": 4938079.289509,
+            "first_trade": "2024-10-26T03:55:10Z",
+            "last_trade": "2024-10-27T05:47:15Z",
+            "event_count": 50,
+            "transfer_in_events": 50,
+            "transfer_out_events": 0,
+            "snapshot_balance": 6659950.5754780015
+          },
+          {
+            "wallet": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+            "short": "CqW...uhV",
+            "trade_count": 28,
+            "buy_count": 26,
+            "sell_count": 2,
+            "buy_usd": 258898.32821223728,
+            "sell_usd": 10699.60688738187,
+            "total_usd": 269597.93509961915,
+            "net_tokens": 9763807.009512,
+            "first_trade": "2024-10-25T18:38:26Z",
+            "last_trade": "2024-10-27T14:02:36Z",
+            "event_count": 25,
+            "transfer_in_events": 23,
+            "transfer_out_events": 2,
+            "snapshot_balance": 10229456.985233998
+          },
+          {
+            "wallet": "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+            "short": "5WF...ZEw",
+            "trade_count": 14,
+            "buy_count": 14,
+            "sell_count": 0,
+            "buy_usd": 19738.60700049,
+            "sell_usd": 0,
+            "total_usd": 19738.60700049,
+            "net_tokens": 660197.3967929999,
+            "first_trade": "2024-10-26T10:00:33Z",
+            "last_trade": "2024-10-27T05:11:09Z",
+            "event_count": 28,
+            "transfer_in_events": 24,
+            "transfer_out_events": 4,
+            "snapshot_balance": 4186014.620765999
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 58,
+            "buy_count": 36,
+            "sell_count": 22,
+            "buy_usd": 247404.70467654293,
+            "sell_usd": 172182.51687185324,
+            "total_usd": 419587.22154839616,
+            "net_tokens": 61703.46415399946,
+            "first_trade": "2024-10-25T00:27:17Z",
+            "last_trade": "2024-10-27T17:38:30Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+            "short": "35N...uPQ",
+            "trade_count": 6,
+            "buy_count": 6,
+            "sell_count": 0,
+            "buy_usd": 97891.0,
+            "sell_usd": 0,
+            "total_usd": 97891.0,
+            "net_tokens": 4225166.137751,
+            "first_trade": "2024-10-26T02:04:53Z",
+            "last_trade": "2024-10-26T02:08:14Z",
+            "event_count": 6,
+            "transfer_in_events": 6,
+            "transfer_out_events": 0,
+            "snapshot_balance": 4225166.137751
+          },
+          {
+            "wallet": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+            "short": "22J...eBm",
+            "trade_count": 14,
+            "buy_count": 8,
+            "sell_count": 6,
+            "buy_usd": 255298.09615013114,
+            "sell_usd": 134503.53292755023,
+            "total_usd": 389801.62907768134,
+            "net_tokens": 2839377.3379270006,
+            "first_trade": "2024-10-26T04:00:15Z",
+            "last_trade": "2024-10-27T12:06:26Z",
+            "event_count": 9,
+            "transfer_in_events": 4,
+            "transfer_out_events": 5,
+            "snapshot_balance": 2800377.3379269997
+          },
+          {
+            "wallet": "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+            "short": "EnM...BZ3",
+            "trade_count": 17,
+            "buy_count": 17,
+            "sell_count": 0,
+            "buy_usd": 42391.27783012032,
+            "sell_usd": 0,
+            "total_usd": 42391.27783012032,
+            "net_tokens": 1494194.700131,
+            "first_trade": "2024-10-25T09:07:58Z",
+            "last_trade": "2024-10-26T17:33:55Z",
+            "event_count": 27,
+            "transfer_in_events": 21,
+            "transfer_out_events": 6,
+            "snapshot_balance": 3563884.683254
+          },
+          {
+            "wallet": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+            "short": "BgB...Don",
+            "trade_count": 6,
+            "buy_count": 6,
+            "sell_count": 0,
+            "buy_usd": 98289.0,
+            "sell_usd": 0,
+            "total_usd": 98289.0,
+            "net_tokens": 4376496.762087,
+            "first_trade": "2024-10-26T01:57:31Z",
+            "last_trade": "2024-10-26T02:02:05Z",
+            "event_count": 6,
+            "transfer_in_events": 6,
+            "transfer_out_events": 0,
+            "snapshot_balance": 4376496.7620870005
+          },
+          {
+            "wallet": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+            "short": "5YP...xYv",
+            "trade_count": 28,
+            "buy_count": 28,
+            "sell_count": 0,
+            "buy_usd": 28287.68,
+            "sell_usd": 0,
+            "total_usd": 28287.68,
+            "net_tokens": 1596337.804539,
+            "first_trade": "2024-10-25T23:16:43Z",
+            "last_trade": "2024-10-26T03:48:00Z",
+            "event_count": 32,
+            "transfer_in_events": 31,
+            "transfer_out_events": 1,
+            "snapshot_balance": 4603194.090241999
+          }
+        ]
+      },
+      "A13_card_screenshot_window": {
+        "trade_count": 115,
+        "buy_count": 99,
+        "sell_count": 16,
+        "buy_usd": 722541.4056497714,
+        "sell_usd": 123752.8224584238,
+        "total_usd": 846294.2281081952,
+        "buy_tokens": 28720612.369495,
+        "sell_tokens": 8550539.667408,
+        "net_tokens": 20170072.702087,
+        "market_total_usd": 55563777.375393875,
+        "market_share_pct": 1.5231042022045322,
+        "first_trade": "2024-10-25T09:07:58Z",
+        "last_trade": "2024-10-26T08:01:32Z",
+        "users_with_trades": [
+          "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+          "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+          "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+          "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+          "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+          "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3"
+        ],
+        "by_user": [
+          {
+            "wallet": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+            "short": "5RA...VEz",
+            "trade_count": 26,
+            "buy_count": 26,
+            "sell_count": 0,
+            "buy_usd": 97270.35706952,
+            "sell_usd": 0,
+            "total_usd": 97270.35706952,
+            "net_tokens": 3205446.860157,
+            "first_trade": "2024-10-26T03:55:10Z",
+            "last_trade": "2024-10-26T08:01:32Z",
+            "event_count": 50,
+            "transfer_in_events": 50,
+            "transfer_out_events": 0,
+            "snapshot_balance": 6659950.5754780015
+          },
+          {
+            "wallet": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+            "short": "CqW...uhV",
+            "trade_count": 2,
+            "buy_count": 2,
+            "sell_count": 0,
+            "buy_usd": 17074.0,
+            "sell_usd": 0,
+            "total_usd": 17074.0,
+            "net_tokens": 938906.6473610001,
+            "first_trade": "2024-10-25T18:38:26Z",
+            "last_trade": "2024-10-25T18:38:26Z",
+            "event_count": 25,
+            "transfer_in_events": 23,
+            "transfer_out_events": 2,
+            "snapshot_balance": 10229456.985233998
+          },
+          {
+            "wallet": "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+            "short": "5WF...ZEw",
+            "trade_count": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "buy_usd": 0,
+            "sell_usd": 0,
+            "total_usd": 0,
+            "net_tokens": 0,
+            "first_trade": null,
+            "last_trade": null,
+            "event_count": 28,
+            "transfer_in_events": 24,
+            "transfer_out_events": 4,
+            "snapshot_balance": 4186014.620765999
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 34,
+            "buy_count": 18,
+            "sell_count": 16,
+            "buy_usd": 155101.2,
+            "sell_usd": 123752.8224584238,
+            "total_usd": 278854.0224584238,
+            "net_tokens": -1782575.582607001,
+            "first_trade": "2024-10-25T16:20:20Z",
+            "last_trade": "2024-10-26T02:26:16Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+            "short": "35N...uPQ",
+            "trade_count": 6,
+            "buy_count": 6,
+            "sell_count": 0,
+            "buy_usd": 97891.0,
+            "sell_usd": 0,
+            "total_usd": 97891.0,
+            "net_tokens": 4225166.137751,
+            "first_trade": "2024-10-26T02:04:53Z",
+            "last_trade": "2024-10-26T02:08:14Z",
+            "event_count": 6,
+            "transfer_in_events": 6,
+            "transfer_out_events": 0,
+            "snapshot_balance": 4225166.137751
+          },
+          {
+            "wallet": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+            "short": "22J...eBm",
+            "trade_count": 6,
+            "buy_count": 6,
+            "sell_count": 0,
+            "buy_usd": 208870.45615013113,
+            "sell_usd": 0,
+            "total_usd": 208870.45615013113,
+            "net_tokens": 6921060.177068,
+            "first_trade": "2024-10-26T04:00:15Z",
+            "last_trade": "2024-10-26T04:01:12Z",
+            "event_count": 9,
+            "transfer_in_events": 4,
+            "transfer_out_events": 5,
+            "snapshot_balance": 2800377.3379269997
+          },
+          {
+            "wallet": "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+            "short": "EnM...BZ3",
+            "trade_count": 7,
+            "buy_count": 7,
+            "sell_count": 0,
+            "buy_usd": 19757.712430120322,
+            "sell_usd": 0,
+            "total_usd": 19757.712430120322,
+            "net_tokens": 689233.895731,
+            "first_trade": "2024-10-25T09:07:58Z",
+            "last_trade": "2024-10-25T10:04:54Z",
+            "event_count": 27,
+            "transfer_in_events": 21,
+            "transfer_out_events": 6,
+            "snapshot_balance": 3563884.683254
+          },
+          {
+            "wallet": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+            "short": "BgB...Don",
+            "trade_count": 6,
+            "buy_count": 6,
+            "sell_count": 0,
+            "buy_usd": 98289.0,
+            "sell_usd": 0,
+            "total_usd": 98289.0,
+            "net_tokens": 4376496.762087,
+            "first_trade": "2024-10-26T01:57:31Z",
+            "last_trade": "2024-10-26T02:02:05Z",
+            "event_count": 6,
+            "transfer_in_events": 6,
+            "transfer_out_events": 0,
+            "snapshot_balance": 4376496.7620870005
+          },
+          {
+            "wallet": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+            "short": "5YP...xYv",
+            "trade_count": 28,
+            "buy_count": 28,
+            "sell_count": 0,
+            "buy_usd": 28287.68,
+            "sell_usd": 0,
+            "total_usd": 28287.68,
+            "net_tokens": 1596337.804539,
+            "first_trade": "2024-10-25T23:16:43Z",
+            "last_trade": "2024-10-26T03:48:00Z",
+            "event_count": 32,
+            "transfer_in_events": 31,
+            "transfer_out_events": 1,
+            "snapshot_balance": 4603194.090241999
+          }
+        ]
+      }
+    },
+    "A16": {
+      "users": [
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh"
+      ],
+      "over_all_trace_period": {
+        "trade_count": 725,
+        "buy_count": 564,
+        "sell_count": 161,
+        "buy_usd": 2109396.3806070117,
+        "sell_usd": 1164316.3632887602,
+        "total_usd": 3273712.743895772,
+        "buy_tokens": 84895765.820517,
+        "sell_tokens": 49097789.00665,
+        "net_tokens": 35797976.813867,
+        "market_total_usd": 630652781.9262024,
+        "market_share_pct": 0.5190990728522393,
+        "first_trade": "2024-10-19T14:31:29Z",
+        "last_trade": "2024-11-10T21:00:06Z",
+        "users_with_trades": [
+          "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+          "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+          "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+          "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+          "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+          "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+          "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+        ],
+        "by_user": [
+          {
+            "wallet": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+            "short": "7Sm...7qb",
+            "trade_count": 41,
+            "buy_count": 27,
+            "sell_count": 14,
+            "buy_usd": 102525.94164,
+            "sell_usd": 76451.63897119243,
+            "total_usd": 178977.58061119242,
+            "net_tokens": 2655130.8437450007,
+            "first_trade": "2024-10-19T17:49:58Z",
+            "last_trade": "2024-11-08T20:09:17Z",
+            "event_count": 61,
+            "transfer_in_events": 45,
+            "transfer_out_events": 16,
+            "snapshot_balance": 544431.8636710002
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 125,
+            "buy_count": 103,
+            "sell_count": 22,
+            "buy_usd": 541883.1846765429,
+            "sell_usd": 172182.51687185324,
+            "total_usd": 714065.7015483961,
+            "net_tokens": 7049446.918116998,
+            "first_trade": "2024-10-24T03:53:43Z",
+            "last_trade": "2024-11-03T15:55:42Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+            "short": "2br...izN",
+            "trade_count": 66,
+            "buy_count": 63,
+            "sell_count": 3,
+            "buy_usd": 89131.46233605026,
+            "sell_usd": 3622.53213863606,
+            "total_usd": 92753.99447468632,
+            "net_tokens": 4149979.8745730002,
+            "first_trade": "2024-10-24T04:03:12Z",
+            "last_trade": "2024-11-08T02:57:31Z",
+            "event_count": 50,
+            "transfer_in_events": 47,
+            "transfer_out_events": 3,
+            "snapshot_balance": 4134924.200718
+          },
+          {
+            "wallet": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+            "short": "XiX...SvN",
+            "trade_count": 118,
+            "buy_count": 74,
+            "sell_count": 44,
+            "buy_usd": 279712.3108676948,
+            "sell_usd": 284820.29720074654,
+            "total_usd": 564532.6080684414,
+            "net_tokens": 3618166.997828001,
+            "first_trade": "2024-10-21T10:27:17Z",
+            "last_trade": "2024-11-04T21:38:55Z",
+            "event_count": 76,
+            "transfer_in_events": 39,
+            "transfer_out_events": 37,
+            "snapshot_balance": 3581680.3726219996
+          },
+          {
+            "wallet": "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+            "short": "85T...Qff",
+            "trade_count": 37,
+            "buy_count": 24,
+            "sell_count": 13,
+            "buy_usd": 219651.28280450506,
+            "sell_usd": 162092.63035354114,
+            "total_usd": 381743.9131580462,
+            "net_tokens": 3038341.5346209994,
+            "first_trade": "2024-10-21T16:23:11Z",
+            "last_trade": "2024-11-02T20:36:58Z",
+            "event_count": 35,
+            "transfer_in_events": 22,
+            "transfer_out_events": 13,
+            "snapshot_balance": 3038341.534621
+          },
+          {
+            "wallet": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+            "short": "DNL...aji",
+            "trade_count": 168,
+            "buy_count": 165,
+            "sell_count": 3,
+            "buy_usd": 454481.531,
+            "sell_usd": 4634.15611810705,
+            "total_usd": 459115.68711810705,
+            "net_tokens": 17156573.082653,
+            "first_trade": "2024-10-25T04:23:53Z",
+            "last_trade": "2024-11-03T10:03:59Z",
+            "event_count": 165,
+            "transfer_in_events": 159,
+            "transfer_out_events": 6,
+            "snapshot_balance": 9328000.826101996
+          },
+          {
+            "wallet": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+            "short": "5YP...xYv",
+            "trade_count": 28,
+            "buy_count": 28,
+            "sell_count": 0,
+            "buy_usd": 28287.68,
+            "sell_usd": 0,
+            "total_usd": 28287.68,
+            "net_tokens": 1596337.804539,
+            "first_trade": "2024-10-25T23:16:43Z",
+            "last_trade": "2024-10-26T03:48:00Z",
+            "event_count": 32,
+            "transfer_in_events": 31,
+            "transfer_out_events": 1,
+            "snapshot_balance": 4603194.090241999
+          },
+          {
+            "wallet": "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+            "short": "ErA...3ZU",
+            "trade_count": 119,
+            "buy_count": 68,
+            "sell_count": 51,
+            "buy_usd": 326640.95,
+            "sell_usd": 325968.47023390693,
+            "total_usd": 652609.420233907,
+            "net_tokens": 0.0,
+            "first_trade": "2024-10-19T14:31:29Z",
+            "last_trade": "2024-11-10T21:00:06Z",
+            "event_count": 108,
+            "transfer_in_events": 67,
+            "transfer_out_events": 41,
+            "snapshot_balance": 3293389.8675839994
+          },
+          {
+            "wallet": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+            "short": "Eu4...Vzh",
+            "trade_count": 23,
+            "buy_count": 12,
+            "sell_count": 11,
+            "buy_usd": 67082.03728221865,
+            "sell_usd": 134544.12140077678,
+            "total_usd": 201626.15868299545,
+            "net_tokens": -3466000.2422089996,
+            "first_trade": "2024-10-24T23:51:36Z",
+            "last_trade": "2024-10-31T16:05:26Z",
+            "event_count": 226,
+            "transfer_in_events": 213,
+            "transfer_out_events": 13,
+            "snapshot_balance": 5394228.088194999
+          }
+        ]
+      },
+      "oct25_oct27_context": {
+        "trade_count": 255,
+        "buy_count": 192,
+        "sell_count": 63,
+        "buy_usd": 699195.5869368995,
+        "sell_usd": 510352.6870029268,
+        "total_usd": 1209548.2739398263,
+        "buy_tokens": 29217427.289847,
+        "sell_tokens": 24772149.796883,
+        "net_tokens": 4445277.492964003,
+        "market_total_usd": 110034767.80261956,
+        "market_share_pct": 1.099241901531991,
+        "first_trade": "2024-10-25T00:06:15Z",
+        "last_trade": "2024-10-27T17:38:30Z",
+        "users_with_trades": [
+          "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+          "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+          "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+          "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+          "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+          "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+          "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+        ],
+        "by_user": [
+          {
+            "wallet": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+            "short": "7Sm...7qb",
+            "trade_count": 7,
+            "buy_count": 5,
+            "sell_count": 2,
+            "buy_usd": 28066.9795,
+            "sell_usd": 24359.53218160104,
+            "total_usd": 52426.51168160104,
+            "net_tokens": 0.0,
+            "first_trade": "2024-10-25T15:51:53Z",
+            "last_trade": "2024-10-25T16:31:29Z",
+            "event_count": 61,
+            "transfer_in_events": 45,
+            "transfer_out_events": 16,
+            "snapshot_balance": 544431.8636710002
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 58,
+            "buy_count": 36,
+            "sell_count": 22,
+            "buy_usd": 247404.70467654293,
+            "sell_usd": 172182.51687185324,
+            "total_usd": 419587.22154839616,
+            "net_tokens": 61703.46415399946,
+            "first_trade": "2024-10-25T00:27:17Z",
+            "last_trade": "2024-10-27T17:38:30Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+            "short": "2br...izN",
+            "trade_count": 38,
+            "buy_count": 38,
+            "sell_count": 0,
+            "buy_usd": 32780.04898948672,
+            "sell_usd": 0,
+            "total_usd": 32780.04898948672,
+            "net_tokens": 1743069.363745,
+            "first_trade": "2024-10-25T02:30:10Z",
+            "last_trade": "2024-10-26T00:06:25Z",
+            "event_count": 50,
+            "transfer_in_events": 47,
+            "transfer_out_events": 3,
+            "snapshot_balance": 4134924.200718
+          },
+          {
+            "wallet": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+            "short": "XiX...SvN",
+            "trade_count": 17,
+            "buy_count": 10,
+            "sell_count": 7,
+            "buy_usd": 42759.06378851906,
+            "sell_usd": 27151.503966255,
+            "total_usd": 69910.56775477406,
+            "net_tokens": 809814.312072,
+            "first_trade": "2024-10-25T00:06:15Z",
+            "last_trade": "2024-10-26T17:16:07Z",
+            "event_count": 76,
+            "transfer_in_events": 39,
+            "transfer_out_events": 37,
+            "snapshot_balance": 3581680.3726219996
+          },
+          {
+            "wallet": "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+            "short": "85T...Qff",
+            "trade_count": 18,
+            "buy_count": 10,
+            "sell_count": 8,
+            "buy_usd": 79750.6917001321,
+            "sell_usd": 80128.5446472846,
+            "total_usd": 159879.23634741668,
+            "net_tokens": -326660.4350689999,
+            "first_trade": "2024-10-25T14:43:57Z",
+            "last_trade": "2024-10-26T17:20:53Z",
+            "event_count": 35,
+            "transfer_in_events": 22,
+            "transfer_out_events": 13,
+            "snapshot_balance": 3038341.534621
+          },
+          {
+            "wallet": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+            "short": "DNL...aji",
+            "trade_count": 44,
+            "buy_count": 44,
+            "sell_count": 0,
+            "buy_usd": 127973.621,
+            "sell_usd": 0,
+            "total_usd": 127973.621,
+            "net_tokens": 5549561.730592,
+            "first_trade": "2024-10-25T04:23:53Z",
+            "last_trade": "2024-10-25T21:20:21Z",
+            "event_count": 165,
+            "transfer_in_events": 159,
+            "transfer_out_events": 6,
+            "snapshot_balance": 9328000.826101996
+          },
+          {
+            "wallet": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+            "short": "5YP...xYv",
+            "trade_count": 28,
+            "buy_count": 28,
+            "sell_count": 0,
+            "buy_usd": 28287.68,
+            "sell_usd": 0,
+            "total_usd": 28287.68,
+            "net_tokens": 1596337.804539,
+            "first_trade": "2024-10-25T23:16:43Z",
+            "last_trade": "2024-10-26T03:48:00Z",
+            "event_count": 32,
+            "transfer_in_events": 31,
+            "transfer_out_events": 1,
+            "snapshot_balance": 4603194.090241999
+          },
+          {
+            "wallet": "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+            "short": "ErA...3ZU",
+            "trade_count": 34,
+            "buy_count": 19,
+            "sell_count": 15,
+            "buy_usd": 98274.4,
+            "sell_usd": 79541.41051141996,
+            "total_usd": 177815.81051141996,
+            "net_tokens": 91755.11632000003,
+            "first_trade": "2024-10-25T11:31:41Z",
+            "last_trade": "2024-10-27T10:15:04Z",
+            "event_count": 108,
+            "transfer_in_events": 67,
+            "transfer_out_events": 41,
+            "snapshot_balance": 3293389.8675839994
+          },
+          {
+            "wallet": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+            "short": "Eu4...Vzh",
+            "trade_count": 11,
+            "buy_count": 2,
+            "sell_count": 9,
+            "buy_usd": 13898.397282218642,
+            "sell_usd": 126989.17882451294,
+            "total_usd": 140887.57610673158,
+            "net_tokens": -5080303.863388999,
+            "first_trade": "2024-10-25T16:32:23Z",
+            "last_trade": "2024-10-26T19:24:13Z",
+            "event_count": 226,
+            "transfer_in_events": 213,
+            "transfer_out_events": 13,
+            "snapshot_balance": 5394228.088194999
+          }
+        ]
+      },
+      "A16_card_screenshot_window": {
+        "trade_count": 35,
+        "buy_count": 19,
+        "sell_count": 16,
+        "buy_usd": 116791.9119501321,
+        "sell_usd": 140163.62100302728,
+        "total_usd": 256955.5329531594,
+        "buy_tokens": 4069854.98225,
+        "sell_tokens": 6097521.450846,
+        "net_tokens": -2027666.4685959998,
+        "market_total_usd": 30419446.14084283,
+        "market_share_pct": 0.8447081244130763,
+        "first_trade": "2024-10-26T08:39:20Z",
+        "last_trade": "2024-10-27T04:02:11Z",
+        "users_with_trades": [
+          "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+          "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+          "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+          "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+        ],
+        "by_user": [
+          {
+            "wallet": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+            "short": "7Sm...7qb",
+            "trade_count": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "buy_usd": 0,
+            "sell_usd": 0,
+            "total_usd": 0,
+            "net_tokens": 0,
+            "first_trade": null,
+            "last_trade": null,
+            "event_count": 61,
+            "transfer_in_events": 45,
+            "transfer_out_events": 16,
+            "snapshot_balance": 544431.8636710002
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "buy_usd": 0,
+            "sell_usd": 0,
+            "total_usd": 0,
+            "net_tokens": 0,
+            "first_trade": null,
+            "last_trade": null,
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+            "short": "2br...izN",
+            "trade_count": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "buy_usd": 0,
+            "sell_usd": 0,
+            "total_usd": 0,
+            "net_tokens": 0,
+            "first_trade": null,
+            "last_trade": null,
+            "event_count": 50,
+            "transfer_in_events": 47,
+            "transfer_out_events": 3,
+            "snapshot_balance": 4134924.200718
+          },
+          {
+            "wallet": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+            "short": "XiX...SvN",
+            "trade_count": 4,
+            "buy_count": 4,
+            "sell_count": 0,
+            "buy_usd": 16759.82025,
+            "sell_usd": 0,
+            "total_usd": 16759.82025,
+            "net_tokens": 756806.9764490001,
+            "first_trade": "2024-10-26T17:14:50Z",
+            "last_trade": "2024-10-26T17:16:07Z",
+            "event_count": 76,
+            "transfer_in_events": 39,
+            "transfer_out_events": 37,
+            "snapshot_balance": 3581680.3726219996
+          },
+          {
+            "wallet": "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+            "short": "85T...Qff",
+            "trade_count": 10,
+            "buy_count": 10,
+            "sell_count": 0,
+            "buy_usd": 79750.6917001321,
+            "sell_usd": 0,
+            "total_usd": 79750.6917001321,
+            "net_tokens": 2782080.844723,
+            "first_trade": "2024-10-26T13:24:01Z",
+            "last_trade": "2024-10-26T17:20:53Z",
+            "event_count": 35,
+            "transfer_in_events": 22,
+            "transfer_out_events": 13,
+            "snapshot_balance": 3038341.534621
+          },
+          {
+            "wallet": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+            "short": "DNL...aji",
+            "trade_count": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "buy_usd": 0,
+            "sell_usd": 0,
+            "total_usd": 0,
+            "net_tokens": 0,
+            "first_trade": null,
+            "last_trade": null,
+            "event_count": 165,
+            "transfer_in_events": 159,
+            "transfer_out_events": 6,
+            "snapshot_balance": 9328000.826101996
+          },
+          {
+            "wallet": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+            "short": "5YP...xYv",
+            "trade_count": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "buy_usd": 0,
+            "sell_usd": 0,
+            "total_usd": 0,
+            "net_tokens": 0,
+            "first_trade": null,
+            "last_trade": null,
+            "event_count": 32,
+            "transfer_in_events": 31,
+            "transfer_out_events": 1,
+            "snapshot_balance": 4603194.090241999
+          },
+          {
+            "wallet": "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+            "short": "ErA...3ZU",
+            "trade_count": 17,
+            "buy_count": 5,
+            "sell_count": 12,
+            "buy_usd": 20281.4,
+            "sell_usd": 59429.61122745598,
+            "total_usd": 79711.01122745598,
+            "net_tokens": -1669032.838922,
+            "first_trade": "2024-10-26T08:39:20Z",
+            "last_trade": "2024-10-27T04:02:11Z",
+            "event_count": 108,
+            "transfer_in_events": 67,
+            "transfer_out_events": 41,
+            "snapshot_balance": 3293389.8675839994
+          },
+          {
+            "wallet": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+            "short": "Eu4...Vzh",
+            "trade_count": 4,
+            "buy_count": 0,
+            "sell_count": 4,
+            "buy_usd": 0,
+            "sell_usd": 80734.0097755713,
+            "total_usd": 80734.0097755713,
+            "net_tokens": -3897521.450846,
+            "first_trade": "2024-10-26T19:15:33Z",
+            "last_trade": "2024-10-26T19:24:13Z",
+            "event_count": 226,
+            "transfer_in_events": 213,
+            "transfer_out_events": 13,
+            "snapshot_balance": 5394228.088194999
+          }
+        ]
+      }
+    },
+    "A21": {
+      "users": [
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+      ],
+      "over_all_trace_period": {
+        "trade_count": 287,
+        "buy_count": 190,
+        "sell_count": 97,
+        "buy_usd": 880983.9438718305,
+        "sell_usd": 467817.1250123709,
+        "total_usd": 1348801.0688842013,
+        "buy_tokens": 35923108.737251,
+        "sell_tokens": 24031126.555739,
+        "net_tokens": 11891982.181511998,
+        "market_total_usd": 630652781.9262024,
+        "market_share_pct": 0.21387379990056637,
+        "first_trade": "2024-10-19T17:49:58Z",
+        "last_trade": "2024-11-10T23:55:59Z",
+        "users_with_trades": [
+          "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+        ],
+        "by_user": [
+          {
+            "wallet": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+            "short": "7Sm...7qb",
+            "trade_count": 41,
+            "buy_count": 27,
+            "sell_count": 14,
+            "buy_usd": 102525.94164,
+            "sell_usd": 76451.63897119243,
+            "total_usd": 178977.58061119242,
+            "net_tokens": 2655130.8437450007,
+            "first_trade": "2024-10-19T17:49:58Z",
+            "last_trade": "2024-11-08T20:09:17Z",
+            "event_count": 61,
+            "transfer_in_events": 45,
+            "transfer_out_events": 16,
+            "snapshot_balance": 544431.8636710002
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 125,
+            "buy_count": 103,
+            "sell_count": 22,
+            "buy_usd": 541883.1846765429,
+            "sell_usd": 172182.51687185324,
+            "total_usd": 714065.7015483961,
+            "net_tokens": 7049446.918116998,
+            "first_trade": "2024-10-24T03:53:43Z",
+            "last_trade": "2024-11-03T15:55:42Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+            "short": "GCD...ZXz",
+            "trade_count": 121,
+            "buy_count": 60,
+            "sell_count": 61,
+            "buy_usd": 236574.81755528747,
+            "sell_usd": 219182.96916932522,
+            "total_usd": 455757.7867246127,
+            "net_tokens": 2187404.4196500015,
+            "first_trade": "2024-10-20T02:28:27Z",
+            "last_trade": "2024-11-10T23:55:59Z",
+            "event_count": 85,
+            "transfer_in_events": 45,
+            "transfer_out_events": 40,
+            "snapshot_balance": 2327154.9288009997
+          }
+        ]
+      },
+      "oct25_oct27_context": {
+        "trade_count": 91,
+        "buy_count": 55,
+        "sell_count": 36,
+        "buy_usd": 341145.8041765429,
+        "sell_usd": 246571.86621366482,
+        "total_usd": 587717.6703902078,
+        "buy_tokens": 14381743.281206,
+        "sell_tokens": 13631978.277827,
+        "net_tokens": 749765.0033790004,
+        "market_total_usd": 110034767.80261956,
+        "market_share_pct": 0.5341199714661607,
+        "first_trade": "2024-10-25T00:27:17Z",
+        "last_trade": "2024-10-27T17:38:30Z",
+        "users_with_trades": [
+          "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+        ],
+        "by_user": [
+          {
+            "wallet": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+            "short": "7Sm...7qb",
+            "trade_count": 7,
+            "buy_count": 5,
+            "sell_count": 2,
+            "buy_usd": 28066.9795,
+            "sell_usd": 24359.53218160104,
+            "total_usd": 52426.51168160104,
+            "net_tokens": 0.0,
+            "first_trade": "2024-10-25T15:51:53Z",
+            "last_trade": "2024-10-25T16:31:29Z",
+            "event_count": 61,
+            "transfer_in_events": 45,
+            "transfer_out_events": 16,
+            "snapshot_balance": 544431.8636710002
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 58,
+            "buy_count": 36,
+            "sell_count": 22,
+            "buy_usd": 247404.70467654293,
+            "sell_usd": 172182.51687185324,
+            "total_usd": 419587.22154839616,
+            "net_tokens": 61703.46415399946,
+            "first_trade": "2024-10-25T00:27:17Z",
+            "last_trade": "2024-10-27T17:38:30Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+            "short": "GCD...ZXz",
+            "trade_count": 26,
+            "buy_count": 14,
+            "sell_count": 12,
+            "buy_usd": 65674.12,
+            "sell_usd": 50029.81716021056,
+            "total_usd": 115703.93716021057,
+            "net_tokens": 688061.5392250002,
+            "first_trade": "2024-10-25T04:18:26Z",
+            "last_trade": "2024-10-27T02:35:34Z",
+            "event_count": 85,
+            "transfer_in_events": 45,
+            "transfer_out_events": 40,
+            "snapshot_balance": 2327154.9288009997
+          }
+        ]
+      },
+      "A21_card_screenshot_window": {
+        "trade_count": 36,
+        "buy_count": 16,
+        "sell_count": 20,
+        "buy_usd": 133631.5,
+        "sell_usd": 137571.49750040655,
+        "total_usd": 271202.9975004065,
+        "buy_tokens": 6053210.872536,
+        "sell_tokens": 9439538.978552,
+        "net_tokens": -3386328.1060160007,
+        "market_total_usd": 21868881.651222937,
+        "market_share_pct": 1.2401319913185433,
+        "first_trade": "2024-10-25T17:36:00Z",
+        "last_trade": "2024-10-26T02:26:16Z",
+        "users_with_trades": [
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+        ],
+        "by_user": [
+          {
+            "wallet": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+            "short": "7Sm...7qb",
+            "trade_count": 0,
+            "buy_count": 0,
+            "sell_count": 0,
+            "buy_usd": 0,
+            "sell_usd": 0,
+            "total_usd": 0,
+            "net_tokens": 0,
+            "first_trade": null,
+            "last_trade": null,
+            "event_count": 61,
+            "transfer_in_events": 45,
+            "transfer_out_events": 16,
+            "snapshot_balance": 544431.8636710002
+          },
+          {
+            "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+            "short": "DmJ...uLH",
+            "trade_count": 28,
+            "buy_count": 12,
+            "sell_count": 16,
+            "buy_usd": 120536.20000000001,
+            "sell_usd": 123752.8224584238,
+            "total_usd": 244289.0224584238,
+            "net_tokens": -3386328.1060160007,
+            "first_trade": "2024-10-25T17:36:00Z",
+            "last_trade": "2024-10-26T02:26:16Z",
+            "event_count": 124,
+            "transfer_in_events": 102,
+            "transfer_out_events": 22,
+            "snapshot_balance": 7049446.918116999
+          },
+          {
+            "wallet": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+            "short": "GCD...ZXz",
+            "trade_count": 8,
+            "buy_count": 4,
+            "sell_count": 4,
+            "buy_usd": 13095.3,
+            "sell_usd": 13818.675041982739,
+            "total_usd": 26913.97504198274,
+            "net_tokens": 1.1641532182693481e-10,
+            "first_trade": "2024-10-25T23:21:01Z",
+            "last_trade": "2024-10-26T01:39:21Z",
+            "event_count": 85,
+            "transfer_in_events": 45,
+            "transfer_out_events": 40,
+            "snapshot_balance": 2327154.9288009997
+          }
+        ]
+      }
+    }
+  },
+  "singleUserStats": {
+    "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm": {
+      "trade_count": 16,
+      "buy_count": 8,
+      "sell_count": 8,
+      "buy_usd": 255298.09615013114,
+      "sell_usd": 136009.09275854495,
+      "total_usd": 391307.1889086761,
+      "buy_tokens": 8639377.337927,
+      "sell_tokens": 5839000.0,
+      "net_tokens": 2800377.3379270006,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.0620479604820749,
+      "first_trade": "2024-10-26T04:00:15Z",
+      "last_trade": "2024-10-30T14:41:48Z",
+      "users_with_trades": [
+        "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm"
+      ],
+      "by_user": [
+        {
+          "wallet": "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+          "short": "22J...eBm",
+          "trade_count": 16,
+          "buy_count": 8,
+          "sell_count": 8,
+          "buy_usd": 255298.09615013114,
+          "sell_usd": 136009.09275854495,
+          "total_usd": 391307.1889086761,
+          "net_tokens": 2800377.3379270006,
+          "first_trade": "2024-10-26T04:00:15Z",
+          "last_trade": "2024-10-30T14:41:48Z",
+          "event_count": 9,
+          "transfer_in_events": 4,
+          "transfer_out_events": 5,
+          "snapshot_balance": 2800377.3379269997
+        }
+      ]
+    },
+    "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN": {
+      "trade_count": 66,
+      "buy_count": 63,
+      "sell_count": 3,
+      "buy_usd": 89131.46233605026,
+      "sell_usd": 3622.53213863606,
+      "total_usd": 92753.99447468632,
+      "buy_tokens": 4265481.674614,
+      "sell_tokens": 115501.800041,
+      "net_tokens": 4149979.8745730002,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.014707616795312921,
+      "first_trade": "2024-10-24T04:03:12Z",
+      "last_trade": "2024-11-08T02:57:31Z",
+      "users_with_trades": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN"
+      ],
+      "by_user": [
+        {
+          "wallet": "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+          "short": "2br...izN",
+          "trade_count": 66,
+          "buy_count": 63,
+          "sell_count": 3,
+          "buy_usd": 89131.46233605026,
+          "sell_usd": 3622.53213863606,
+          "total_usd": 92753.99447468632,
+          "net_tokens": 4149979.8745730002,
+          "first_trade": "2024-10-24T04:03:12Z",
+          "last_trade": "2024-11-08T02:57:31Z",
+          "event_count": 50,
+          "transfer_in_events": 47,
+          "transfer_out_events": 3,
+          "snapshot_balance": 4134924.200718
+        }
+      ]
+    },
+    "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ": {
+      "trade_count": 6,
+      "buy_count": 6,
+      "sell_count": 0,
+      "buy_usd": 97891.0,
+      "sell_usd": 0,
+      "total_usd": 97891.0,
+      "buy_tokens": 4225166.137751,
+      "sell_tokens": 0,
+      "net_tokens": 4225166.137751,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.01552217048833299,
+      "first_trade": "2024-10-26T02:04:53Z",
+      "last_trade": "2024-10-26T02:08:14Z",
+      "users_with_trades": [
+        "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ"
+      ],
+      "by_user": [
+        {
+          "wallet": "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+          "short": "35N...uPQ",
+          "trade_count": 6,
+          "buy_count": 6,
+          "sell_count": 0,
+          "buy_usd": 97891.0,
+          "sell_usd": 0,
+          "total_usd": 97891.0,
+          "net_tokens": 4225166.137751,
+          "first_trade": "2024-10-26T02:04:53Z",
+          "last_trade": "2024-10-26T02:08:14Z",
+          "event_count": 6,
+          "transfer_in_events": 6,
+          "transfer_out_events": 0,
+          "snapshot_balance": 4225166.137751
+        }
+      ]
+    },
+    "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz": {
+      "trade_count": 44,
+      "buy_count": 44,
+      "sell_count": 0,
+      "buy_usd": 151807.75706952,
+      "sell_usd": 0,
+      "total_usd": 151807.75706952,
+      "buy_tokens": 4938079.289509,
+      "sell_tokens": 0,
+      "net_tokens": 4938079.289509,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.024071527379274166,
+      "first_trade": "2024-10-26T03:55:10Z",
+      "last_trade": "2024-10-27T05:47:15Z",
+      "users_with_trades": [
+        "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz"
+      ],
+      "by_user": [
+        {
+          "wallet": "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+          "short": "5RA...VEz",
+          "trade_count": 44,
+          "buy_count": 44,
+          "sell_count": 0,
+          "buy_usd": 151807.75706952,
+          "sell_usd": 0,
+          "total_usd": 151807.75706952,
+          "net_tokens": 4938079.289509,
+          "first_trade": "2024-10-26T03:55:10Z",
+          "last_trade": "2024-10-27T05:47:15Z",
+          "event_count": 50,
+          "transfer_in_events": 50,
+          "transfer_out_events": 0,
+          "snapshot_balance": 6659950.5754780015
+        }
+      ]
+    },
+    "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw": {
+      "trade_count": 53,
+      "buy_count": 45,
+      "sell_count": 8,
+      "buy_usd": 107609.6214843218,
+      "sell_usd": 8484.72905524033,
+      "total_usd": 116094.35053956213,
+      "buy_tokens": 4582974.642088,
+      "sell_tokens": 221614.0,
+      "net_tokens": 4361360.642088,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.018408600400520746,
+      "first_trade": "2024-10-26T10:00:33Z",
+      "last_trade": "2024-11-10T07:23:50Z",
+      "users_with_trades": [
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw"
+      ],
+      "by_user": [
+        {
+          "wallet": "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+          "short": "5WF...ZEw",
+          "trade_count": 53,
+          "buy_count": 45,
+          "sell_count": 8,
+          "buy_usd": 107609.6214843218,
+          "sell_usd": 8484.72905524033,
+          "total_usd": 116094.35053956213,
+          "net_tokens": 4361360.642088,
+          "first_trade": "2024-10-26T10:00:33Z",
+          "last_trade": "2024-11-10T07:23:50Z",
+          "event_count": 28,
+          "transfer_in_events": 24,
+          "transfer_out_events": 4,
+          "snapshot_balance": 4186014.620765999
+        }
+      ]
+    },
+    "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv": {
+      "trade_count": 28,
+      "buy_count": 28,
+      "sell_count": 0,
+      "buy_usd": 28287.68,
+      "sell_usd": 0,
+      "total_usd": 28287.68,
+      "buy_tokens": 1596337.804539,
+      "sell_tokens": 0,
+      "net_tokens": 1596337.804539,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.004485460273972146,
+      "first_trade": "2024-10-25T23:16:43Z",
+      "last_trade": "2024-10-26T03:48:00Z",
+      "users_with_trades": [
+        "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+      ],
+      "by_user": [
+        {
+          "wallet": "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+          "short": "5YP...xYv",
+          "trade_count": 28,
+          "buy_count": 28,
+          "sell_count": 0,
+          "buy_usd": 28287.68,
+          "sell_usd": 0,
+          "total_usd": 28287.68,
+          "net_tokens": 1596337.804539,
+          "first_trade": "2024-10-25T23:16:43Z",
+          "last_trade": "2024-10-26T03:48:00Z",
+          "event_count": 32,
+          "transfer_in_events": 31,
+          "transfer_out_events": 1,
+          "snapshot_balance": 4603194.090241999
+        }
+      ]
+    },
+    "6Z6RJJGrmVyndcPyTFhmLYHkHttiYtTccKpXFV9r2237": {
+      "trade_count": 0,
+      "buy_count": 0,
+      "sell_count": 0,
+      "buy_usd": 0,
+      "sell_usd": 0,
+      "total_usd": 0,
+      "buy_tokens": 0,
+      "sell_tokens": 0,
+      "net_tokens": 0,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.0,
+      "first_trade": null,
+      "last_trade": null,
+      "users_with_trades": [],
+      "by_user": [
+        {
+          "wallet": "6Z6RJJGrmVyndcPyTFhmLYHkHttiYtTccKpXFV9r2237",
+          "short": "6Z6...237",
+          "trade_count": 0,
+          "buy_count": 0,
+          "sell_count": 0,
+          "buy_usd": 0,
+          "sell_usd": 0,
+          "total_usd": 0,
+          "net_tokens": 0,
+          "first_trade": null,
+          "last_trade": null,
+          "event_count": 3,
+          "transfer_in_events": 2,
+          "transfer_out_events": 1,
+          "snapshot_balance": 10636142.000784
+        }
+      ]
+    },
+    "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb": {
+      "trade_count": 41,
+      "buy_count": 27,
+      "sell_count": 14,
+      "buy_usd": 102525.94164,
+      "sell_usd": 76451.63897119243,
+      "total_usd": 178977.58061119242,
+      "buy_tokens": 5768281.286043,
+      "sell_tokens": 3113150.4422979997,
+      "net_tokens": 2655130.8437450007,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.028379733783864602,
+      "first_trade": "2024-10-19T17:49:58Z",
+      "last_trade": "2024-11-08T20:09:17Z",
+      "users_with_trades": [
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb"
+      ],
+      "by_user": [
+        {
+          "wallet": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+          "short": "7Sm...7qb",
+          "trade_count": 41,
+          "buy_count": 27,
+          "sell_count": 14,
+          "buy_usd": 102525.94164,
+          "sell_usd": 76451.63897119243,
+          "total_usd": 178977.58061119242,
+          "net_tokens": 2655130.8437450007,
+          "first_trade": "2024-10-19T17:49:58Z",
+          "last_trade": "2024-11-08T20:09:17Z",
+          "event_count": 61,
+          "transfer_in_events": 45,
+          "transfer_out_events": 16,
+          "snapshot_balance": 544431.8636710002
+        }
+      ]
+    },
+    "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff": {
+      "trade_count": 37,
+      "buy_count": 24,
+      "sell_count": 13,
+      "buy_usd": 219651.28280450506,
+      "sell_usd": 162092.63035354114,
+      "total_usd": 381743.9131580462,
+      "buy_tokens": 9178405.611581,
+      "sell_tokens": 6140064.07696,
+      "net_tokens": 3038341.5346209994,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.060531551449291315,
+      "first_trade": "2024-10-21T16:23:11Z",
+      "last_trade": "2024-11-02T20:36:58Z",
+      "users_with_trades": [
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff"
+      ],
+      "by_user": [
+        {
+          "wallet": "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+          "short": "85T...Qff",
+          "trade_count": 37,
+          "buy_count": 24,
+          "sell_count": 13,
+          "buy_usd": 219651.28280450506,
+          "sell_usd": 162092.63035354114,
+          "total_usd": 381743.9131580462,
+          "net_tokens": 3038341.5346209994,
+          "first_trade": "2024-10-21T16:23:11Z",
+          "last_trade": "2024-11-02T20:36:58Z",
+          "event_count": 35,
+          "transfer_in_events": 22,
+          "transfer_out_events": 13,
+          "snapshot_balance": 3038341.534621
+        }
+      ]
+    },
+    "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon": {
+      "trade_count": 6,
+      "buy_count": 6,
+      "sell_count": 0,
+      "buy_usd": 98289.0,
+      "sell_usd": 0,
+      "total_usd": 98289.0,
+      "buy_tokens": 4376496.762087,
+      "sell_tokens": 0,
+      "net_tokens": 4376496.762087,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.015585279700153857,
+      "first_trade": "2024-10-26T01:57:31Z",
+      "last_trade": "2024-10-26T02:02:05Z",
+      "users_with_trades": [
+        "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon"
+      ],
+      "by_user": [
+        {
+          "wallet": "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+          "short": "BgB...Don",
+          "trade_count": 6,
+          "buy_count": 6,
+          "sell_count": 0,
+          "buy_usd": 98289.0,
+          "sell_usd": 0,
+          "total_usd": 98289.0,
+          "net_tokens": 4376496.762087,
+          "first_trade": "2024-10-26T01:57:31Z",
+          "last_trade": "2024-10-26T02:02:05Z",
+          "event_count": 6,
+          "transfer_in_events": 6,
+          "transfer_out_events": 0,
+          "snapshot_balance": 4376496.7620870005
+        }
+      ]
+    },
+    "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV": {
+      "trade_count": 29,
+      "buy_count": 27,
+      "sell_count": 2,
+      "buy_usd": 268896.91094517737,
+      "sell_usd": 10699.60688738187,
+      "total_usd": 279596.51783255924,
+      "buy_tokens": 10729456.985234,
+      "sell_tokens": 500000.0,
+      "net_tokens": 10229456.985234,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.04433446198058268,
+      "first_trade": "2024-10-25T18:38:26Z",
+      "last_trade": "2024-11-04T10:00:54Z",
+      "users_with_trades": [
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV"
+      ],
+      "by_user": [
+        {
+          "wallet": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+          "short": "CqW...uhV",
+          "trade_count": 29,
+          "buy_count": 27,
+          "sell_count": 2,
+          "buy_usd": 268896.91094517737,
+          "sell_usd": 10699.60688738187,
+          "total_usd": 279596.51783255924,
+          "net_tokens": 10229456.985234,
+          "first_trade": "2024-10-25T18:38:26Z",
+          "last_trade": "2024-11-04T10:00:54Z",
+          "event_count": 25,
+          "transfer_in_events": 23,
+          "transfer_out_events": 2,
+          "snapshot_balance": 10229456.985233998
+        }
+      ]
+    },
+    "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji": {
+      "trade_count": 168,
+      "buy_count": 165,
+      "sell_count": 3,
+      "buy_usd": 454481.531,
+      "sell_usd": 4634.15611810705,
+      "total_usd": 459115.68711810705,
+      "buy_tokens": 17306573.082653,
+      "sell_tokens": 150000.0,
+      "net_tokens": 17156573.082653,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.07280007323773793,
+      "first_trade": "2024-10-25T04:23:53Z",
+      "last_trade": "2024-11-03T10:03:59Z",
+      "users_with_trades": [
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji"
+      ],
+      "by_user": [
+        {
+          "wallet": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+          "short": "DNL...aji",
+          "trade_count": 168,
+          "buy_count": 165,
+          "sell_count": 3,
+          "buy_usd": 454481.531,
+          "sell_usd": 4634.15611810705,
+          "total_usd": 459115.68711810705,
+          "net_tokens": 17156573.082653,
+          "first_trade": "2024-10-25T04:23:53Z",
+          "last_trade": "2024-11-03T10:03:59Z",
+          "event_count": 165,
+          "transfer_in_events": 159,
+          "transfer_out_events": 6,
+          "snapshot_balance": 9328000.826101996
+        }
+      ]
+    },
+    "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH": {
+      "trade_count": 125,
+      "buy_count": 103,
+      "sell_count": 22,
+      "buy_usd": 541883.1846765429,
+      "sell_usd": 172182.51687185324,
+      "total_usd": 714065.7015483961,
+      "buy_tokens": 17599986.585525,
+      "sell_tokens": 10550539.667408,
+      "net_tokens": 7049446.918116998,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.11322644123877892,
+      "first_trade": "2024-10-24T03:53:43Z",
+      "last_trade": "2024-11-03T15:55:42Z",
+      "users_with_trades": [
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+      ],
+      "by_user": [
+        {
+          "wallet": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "short": "DmJ...uLH",
+          "trade_count": 125,
+          "buy_count": 103,
+          "sell_count": 22,
+          "buy_usd": 541883.1846765429,
+          "sell_usd": 172182.51687185324,
+          "total_usd": 714065.7015483961,
+          "net_tokens": 7049446.918116998,
+          "first_trade": "2024-10-24T03:53:43Z",
+          "last_trade": "2024-11-03T15:55:42Z",
+          "event_count": 124,
+          "transfer_in_events": 102,
+          "transfer_out_events": 22,
+          "snapshot_balance": 7049446.918116999
+        }
+      ]
+    },
+    "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3": {
+      "trade_count": 41,
+      "buy_count": 38,
+      "sell_count": 3,
+      "buy_usd": 137271.0063101203,
+      "sell_usd": 1640.794,
+      "total_usd": 138911.8003101203,
+      "buy_tokens": 3635129.237116,
+      "sell_tokens": 70638.975156,
+      "net_tokens": 3564490.2619600003,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.02202666892007391,
+      "first_trade": "2024-10-24T17:50:18Z",
+      "last_trade": "2024-11-09T12:23:34Z",
+      "users_with_trades": [
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3"
+      ],
+      "by_user": [
+        {
+          "wallet": "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+          "short": "EnM...BZ3",
+          "trade_count": 41,
+          "buy_count": 38,
+          "sell_count": 3,
+          "buy_usd": 137271.0063101203,
+          "sell_usd": 1640.794,
+          "total_usd": 138911.8003101203,
+          "net_tokens": 3564490.2619600003,
+          "first_trade": "2024-10-24T17:50:18Z",
+          "last_trade": "2024-11-09T12:23:34Z",
+          "event_count": 27,
+          "transfer_in_events": 21,
+          "transfer_out_events": 6,
+          "snapshot_balance": 3563884.683254
+        }
+      ]
+    },
+    "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU": {
+      "trade_count": 119,
+      "buy_count": 68,
+      "sell_count": 51,
+      "buy_usd": 326640.95,
+      "sell_usd": 325968.47023390693,
+      "total_usd": 652609.420233907,
+      "buy_tokens": 12929399.131947,
+      "sell_tokens": 12929399.131947,
+      "net_tokens": 0.0,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.10348157321064094,
+      "first_trade": "2024-10-19T14:31:29Z",
+      "last_trade": "2024-11-10T21:00:06Z",
+      "users_with_trades": [
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU"
+      ],
+      "by_user": [
+        {
+          "wallet": "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+          "short": "ErA...3ZU",
+          "trade_count": 119,
+          "buy_count": 68,
+          "sell_count": 51,
+          "buy_usd": 326640.95,
+          "sell_usd": 325968.47023390693,
+          "total_usd": 652609.420233907,
+          "net_tokens": 0.0,
+          "first_trade": "2024-10-19T14:31:29Z",
+          "last_trade": "2024-11-10T21:00:06Z",
+          "event_count": 108,
+          "transfer_in_events": 67,
+          "transfer_out_events": 41,
+          "snapshot_balance": 3293389.8675839994
+        }
+      ]
+    },
+    "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh": {
+      "trade_count": 23,
+      "buy_count": 12,
+      "sell_count": 11,
+      "buy_usd": 67082.03728221865,
+      "sell_usd": 134544.12140077678,
+      "total_usd": 201626.15868299545,
+      "buy_tokens": 2764852.208637,
+      "sell_tokens": 6230852.450846,
+      "net_tokens": -3466000.2422089996,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.031971025017469804,
+      "first_trade": "2024-10-24T23:51:36Z",
+      "last_trade": "2024-10-31T16:05:26Z",
+      "users_with_trades": [
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh"
+      ],
+      "by_user": [
+        {
+          "wallet": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+          "short": "Eu4...Vzh",
+          "trade_count": 23,
+          "buy_count": 12,
+          "sell_count": 11,
+          "buy_usd": 67082.03728221865,
+          "sell_usd": 134544.12140077678,
+          "total_usd": 201626.15868299545,
+          "net_tokens": -3466000.2422089996,
+          "first_trade": "2024-10-24T23:51:36Z",
+          "last_trade": "2024-10-31T16:05:26Z",
+          "event_count": 226,
+          "transfer_in_events": 213,
+          "transfer_out_events": 13,
+          "snapshot_balance": 5394228.088194999
+        }
+      ]
+    },
+    "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz": {
+      "trade_count": 121,
+      "buy_count": 60,
+      "sell_count": 61,
+      "buy_usd": 236574.81755528747,
+      "sell_usd": 219182.96916932522,
+      "total_usd": 455757.7867246127,
+      "buy_tokens": 12554840.865683,
+      "sell_tokens": 10367436.446033,
+      "net_tokens": 2187404.4196500015,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.07226762487792283,
+      "first_trade": "2024-10-20T02:28:27Z",
+      "last_trade": "2024-11-10T23:55:59Z",
+      "users_with_trades": [
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+      ],
+      "by_user": [
+        {
+          "wallet": "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+          "short": "GCD...ZXz",
+          "trade_count": 121,
+          "buy_count": 60,
+          "sell_count": 61,
+          "buy_usd": 236574.81755528747,
+          "sell_usd": 219182.96916932522,
+          "total_usd": 455757.7867246127,
+          "net_tokens": 2187404.4196500015,
+          "first_trade": "2024-10-20T02:28:27Z",
+          "last_trade": "2024-11-10T23:55:59Z",
+          "event_count": 85,
+          "transfer_in_events": 45,
+          "transfer_out_events": 40,
+          "snapshot_balance": 2327154.9288009997
+        }
+      ]
+    },
+    "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN": {
+      "trade_count": 118,
+      "buy_count": 74,
+      "sell_count": 44,
+      "buy_usd": 279712.3108676948,
+      "sell_usd": 284820.29720074654,
+      "total_usd": 564532.6080684414,
+      "buy_tokens": 13486448.434978,
+      "sell_tokens": 9868281.43715,
+      "net_tokens": 3618166.997828001,
+      "market_total_usd": 630652781.9262024,
+      "market_share_pct": 0.0895155978451708,
+      "first_trade": "2024-10-21T10:27:17Z",
+      "last_trade": "2024-11-04T21:38:55Z",
+      "users_with_trades": [
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ],
+      "by_user": [
+        {
+          "wallet": "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN",
+          "short": "XiX...SvN",
+          "trade_count": 118,
+          "buy_count": 74,
+          "sell_count": 44,
+          "buy_usd": 279712.3108676948,
+          "sell_usd": 284820.29720074654,
+          "total_usd": 564532.6080684414,
+          "net_tokens": 3618166.997828001,
+          "first_trade": "2024-10-21T10:27:17Z",
+          "last_trade": "2024-11-04T21:38:55Z",
+          "event_count": 76,
+          "transfer_in_events": 39,
+          "transfer_out_events": 37,
+          "snapshot_balance": 3581680.3726219996
+        }
+      ]
+    }
+  },
+  "transferStats": {
+    "A13": {
+      "internal_count": 0,
+      "inbound_count": 267,
+      "outbound_count": 40,
+      "internal_amount": 0,
+      "inbound_amount": 73497446.509194,
+      "outbound_amount": 25803458.398338,
+      "internal_edges": [],
+      "top_external_counterparties": [
+        {
+          "wallet": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+          "count": 91,
+          "amount": 35970313.39424
+        },
+        {
+          "wallet": "7NoYCzhP3UzjSHTgVoveRCvgLPUhXfyYqFJAnyM6g9e9",
+          "count": 40,
+          "amount": 4240064.170115
+        },
+        {
+          "wallet": "7tPwvKZ5FMpTgpiudNQSriuThoq66kpcPF1AWaz6QVzK",
+          "count": 32,
+          "amount": 4229124.917916999
+        },
+        {
+          "wallet": "GuYRk5aaNJGyLV7cnBSGsdThSA11cRR1W29TRRFmv22J",
+          "count": 23,
+          "amount": 1044617.3319810001
+        },
+        {
+          "wallet": "75fTybiMbR1o9Cmt4UjN6Qn64nQLpAN4fw7w4DdZZZUT",
+          "count": 10,
+          "amount": 613511.1671499999
+        },
+        {
+          "wallet": "GdZjvzmqN4UxPC2CqZKchr2z9XPwJAhHcRDKJbKUitAp",
+          "count": 10,
+          "amount": 899144.792348
+        },
+        {
+          "wallet": "BQ72nSv9f3PRyRKCBnHLVrerrv37CYTHm5h3s9VSGQDV",
+          "count": 9,
+          "amount": 3563721.637104
+        },
+        {
+          "wallet": "6U91aKa8pmMxkJwBCfPTmUEfZi6dHe7DcFq2ALvB2tbB",
+          "count": 8,
+          "amount": 4197130.231892
+        },
+        {
+          "wallet": "2MFoS3MPtvyQ4Wh4M9pdfPjz6UhVoNbFbGJAskCPCj3h",
+          "count": 8,
+          "amount": 6854840.723204
+        },
+        {
+          "wallet": "GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ",
+          "count": 7,
+          "amount": 1913967.4523470001
+        }
+      ]
+    },
+    "A16": {
+      "internal_count": 1,
+      "inbound_count": 724,
+      "outbound_count": 151,
+      "internal_amount": 5558866.23,
+      "inbound_amount": 108971365.96331,
+      "outbound_amount": 68003728.201438,
+      "internal_edges": [
+        {
+          "from": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+          "to": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+          "count": 1,
+          "amount": 5558866.23,
+          "first": "2024-10-23T15:31:44Z",
+          "last": "2024-10-23T15:31:44Z"
+        }
+      ],
+      "top_external_counterparties": [
+        {
+          "wallet": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+          "count": 244,
+          "amount": 67137625.23437399
+        },
+        {
+          "wallet": "j1opmdubY84LUeidrPCsSGskTCYmeJVzds1UWm6nngb",
+          "count": 125,
+          "amount": 5456487.573638998
+        },
+        {
+          "wallet": "7NoYCzhP3UzjSHTgVoveRCvgLPUhXfyYqFJAnyM6g9e9",
+          "count": 95,
+          "amount": 8100267.027023
+        },
+        {
+          "wallet": "7tPwvKZ5FMpTgpiudNQSriuThoq66kpcPF1AWaz6QVzK",
+          "count": 94,
+          "amount": 11188305.792613
+        },
+        {
+          "wallet": "j1oeQoPeuEDmjvyMwBmCWexzCQup77kbKKxV59CnYbd",
+          "count": 83,
+          "amount": 2189033.875080999
+        },
+        {
+          "wallet": "GuYRk5aaNJGyLV7cnBSGsdThSA11cRR1W29TRRFmv22J",
+          "count": 38,
+          "amount": 1741396.952195
+        },
+        {
+          "wallet": "3S2o362YPJRWzBZ695k8rnYYr5L2CVQMcGnQKo5DapH5",
+          "count": 20,
+          "amount": 1584028.045686
+        },
+        {
+          "wallet": "4TQu88kbVPPBi8bzJ98Gq56VLpcMgyKLXQUPLzo7mbmk",
+          "count": 18,
+          "amount": 650015.442802
+        },
+        {
+          "wallet": "GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ",
+          "count": 17,
+          "amount": 5425027.0568780005
+        },
+        {
+          "wallet": "CapuXNQoDviLvU1PxFiizLgPNQCxrsag1uMeyk6zLVps",
+          "count": 15,
+          "amount": 5013792.6223180005
+        }
+      ]
+    },
+    "A21": {
+      "internal_count": 0,
+      "inbound_count": 192,
+      "outbound_count": 78,
+      "internal_amount": 0,
+      "inbound_amount": 57723933.207384996,
+      "outbound_amount": 47802899.496796,
+      "internal_edges": [],
+      "top_external_counterparties": [
+        {
+          "wallet": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+          "count": 82,
+          "amount": 28443205.459373996
+        },
+        {
+          "wallet": "7NoYCzhP3UzjSHTgVoveRCvgLPUhXfyYqFJAnyM6g9e9",
+          "count": 30,
+          "amount": 3674102.312798
+        },
+        {
+          "wallet": "7tPwvKZ5FMpTgpiudNQSriuThoq66kpcPF1AWaz6QVzK",
+          "count": 21,
+          "amount": 3553566.2934209993
+        },
+        {
+          "wallet": "GuYRk5aaNJGyLV7cnBSGsdThSA11cRR1W29TRRFmv22J",
+          "count": 20,
+          "amount": 934660.065404
+        },
+        {
+          "wallet": "j1opmdubY84LUeidrPCsSGskTCYmeJVzds1UWm6nngb",
+          "count": 10,
+          "amount": 593563.9067570001
+        },
+        {
+          "wallet": "GP8StUXNYSZjPikyRsvkTbvRV1GBxMErb59cpeCJnDf1",
+          "count": 10,
+          "amount": 4382016.237491
+        },
+        {
+          "wallet": "DSN3j1ykL3obAVNv7ZX49VsFCPe4LqzxHnmtLiPwY6xg",
+          "count": 9,
+          "amount": 2201909.727672
+        },
+        {
+          "wallet": "7iWnBRRhBCiNXXPhqiGzvvBkKrvFSWqqmxRyu9VyYBxE",
+          "count": 9,
+          "amount": 2676072.8824320002
+        },
+        {
+          "wallet": "3CgvbiM3op4vjrrjH2zcrQUwsqh5veNVRjFCB9N6sRoD",
+          "count": 8,
+          "amount": 2529056.991851
+        },
+        {
+          "wallet": "3S2o362YPJRWzBZ695k8rnYYr5L2CVQMcGnQKo5DapH5",
+          "count": 7,
+          "amount": 750483.082396
+        }
+      ]
+    },
+    "all_clicked_cohorts": {
+      "internal_count": 1,
+      "inbound_count": 905,
+      "outbound_count": 209,
+      "internal_amount": 5558866.23,
+      "inbound_amount": 195478392.451083,
+      "outbound_amount": 105506110.657129,
+      "internal_edges": [
+        {
+          "from": "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+          "to": "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+          "count": 1,
+          "amount": 5558866.23,
+          "first": "2024-10-23T15:31:44Z",
+          "last": "2024-10-23T15:31:44Z"
+        }
+      ],
+      "top_external_counterparties": [
+        {
+          "wallet": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+          "count": 292,
+          "amount": 86651909.495614
+        },
+        {
+          "wallet": "j1opmdubY84LUeidrPCsSGskTCYmeJVzds1UWm6nngb",
+          "count": 125,
+          "amount": 5456487.573638998
+        },
+        {
+          "wallet": "7tPwvKZ5FMpTgpiudNQSriuThoq66kpcPF1AWaz6QVzK",
+          "count": 99,
+          "amount": 11755363.30378
+        },
+        {
+          "wallet": "7NoYCzhP3UzjSHTgVoveRCvgLPUhXfyYqFJAnyM6g9e9",
+          "count": 98,
+          "amount": 8483378.366049
+        },
+        {
+          "wallet": "j1oeQoPeuEDmjvyMwBmCWexzCQup77kbKKxV59CnYbd",
+          "count": 83,
+          "amount": 2189033.875080999
+        },
+        {
+          "wallet": "GuYRk5aaNJGyLV7cnBSGsdThSA11cRR1W29TRRFmv22J",
+          "count": 40,
+          "amount": 1844095.517904
+        },
+        {
+          "wallet": "GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ",
+          "count": 24,
+          "amount": 7338994.509225001
+        },
+        {
+          "wallet": "4TQu88kbVPPBi8bzJ98Gq56VLpcMgyKLXQUPLzo7mbmk",
+          "count": 21,
+          "amount": 1073019.0345180002
+        },
+        {
+          "wallet": "3S2o362YPJRWzBZ695k8rnYYr5L2CVQMcGnQKo5DapH5",
+          "count": 20,
+          "amount": 1584028.045686
+        },
+        {
+          "wallet": "2MFoS3MPtvyQ4Wh4M9pdfPjz6UhVoNbFbGJAskCPCj3h",
+          "count": 20,
+          "amount": 11388286.67244
+        }
+      ]
+    },
+    "all_clicked_oct25_oct27": {
+      "internal_count": 0,
+      "inbound_count": 487,
+      "outbound_count": 74,
+      "internal_amount": 0,
+      "inbound_amount": 82508151.596199,
+      "outbound_amount": 42435967.361968,
+      "internal_edges": [],
+      "top_external_counterparties": [
+        {
+          "wallet": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+          "count": 133,
+          "amount": 45574615.993208
+        },
+        {
+          "wallet": "j1opmdubY84LUeidrPCsSGskTCYmeJVzds1UWm6nngb",
+          "count": 115,
+          "amount": 4862923.666882001
+        },
+        {
+          "wallet": "j1oeQoPeuEDmjvyMwBmCWexzCQup77kbKKxV59CnYbd",
+          "count": 77,
+          "amount": 1890659.4091030003
+        },
+        {
+          "wallet": "7NoYCzhP3UzjSHTgVoveRCvgLPUhXfyYqFJAnyM6g9e9",
+          "count": 41,
+          "amount": 4800695.448034
+        },
+        {
+          "wallet": "7tPwvKZ5FMpTgpiudNQSriuThoq66kpcPF1AWaz6QVzK",
+          "count": 35,
+          "amount": 4993588.998088
+        },
+        {
+          "wallet": "GuYRk5aaNJGyLV7cnBSGsdThSA11cRR1W29TRRFmv22J",
+          "count": 18,
+          "amount": 808050.753006
+        },
+        {
+          "wallet": "GGztQqQ6pCPaJQnNpXBgELr5cs3WwDakRbh1iEMzjgSJ",
+          "count": 10,
+          "amount": 2766405.147549
+        },
+        {
+          "wallet": "75fTybiMbR1o9Cmt4UjN6Qn64nQLpAN4fw7w4DdZZZUT",
+          "count": 10,
+          "amount": 613511.1671499999
+        },
+        {
+          "wallet": "GdZjvzmqN4UxPC2CqZKchr2z9XPwJAhHcRDKJbKUitAp",
+          "count": 10,
+          "amount": 899144.792348
+        },
+        {
+          "wallet": "j1oAbxxiDUWvoHxEDhWE7THLjEkDQW2cSHYn2vttxTF",
+          "count": 9,
+          "amount": 170383.27327
+        }
+      ]
+    }
+  },
+  "dailyClickedTop": [
+    {
+      "buy_usd": 921989.1598048462,
+      "sell_usd": 94552.68481755405,
+      "total_usd": 1016541.8446224001,
+      "trades": 145,
+      "day": "2024-10-26",
+      "user_count": 15,
+      "users": [
+        "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+        "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+        "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 512818.36902034475,
+      "sell_usd": 337858.714420734,
+      "total_usd": 850677.0834410784,
+      "trades": 200,
+      "day": "2024-10-25",
+      "user_count": 12,
+      "users": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 254376.24437420763,
+      "sell_usd": 273174.2447397815,
+      "total_usd": 527550.489113989,
+      "trades": 65,
+      "day": "2024-10-27",
+      "user_count": 7,
+      "users": [
+        "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+        "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+      ]
+    },
+    {
+      "buy_usd": 311840.36088500585,
+      "sell_usd": 147092.79819556267,
+      "total_usd": 458933.15908056864,
+      "trades": 97,
+      "day": "2024-10-31",
+      "user_count": 8,
+      "users": [
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 278761.7621205414,
+      "sell_usd": 103187.08225766249,
+      "total_usd": 381948.8443782039,
+      "trades": 91,
+      "day": "2024-10-24",
+      "user_count": 6,
+      "users": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 258486.85382102898,
+      "sell_usd": 71928.43687629145,
+      "total_usd": 330415.29069732054,
+      "trades": 88,
+      "day": "2024-11-01",
+      "user_count": 7,
+      "users": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 95839.01316417246,
+      "sell_usd": 94300.89969432997,
+      "total_usd": 190139.91285850247,
+      "trades": 26,
+      "day": "2024-10-22",
+      "user_count": 3,
+      "users": [
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+      ]
+    },
+    {
+      "buy_usd": 62640.55807319989,
+      "sell_usd": 95934.38480794632,
+      "total_usd": 158574.9428811462,
+      "trades": 26,
+      "day": "2024-10-23",
+      "user_count": 3,
+      "users": [
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+      ]
+    },
+    {
+      "buy_usd": 90005.4769,
+      "sell_usd": 60937.60605126716,
+      "total_usd": 150943.0829512672,
+      "trades": 26,
+      "day": "2024-10-29",
+      "user_count": 4,
+      "users": [
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 143853.81330309864,
+      "sell_usd": 1057.745,
+      "total_usd": 144911.55830309863,
+      "trades": 63,
+      "day": "2024-11-03",
+      "user_count": 6,
+      "users": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    }
+  ],
+  "hourlyClickedTop": [
+    {
+      "buy_usd": 281749.3561501311,
+      "sell_usd": 0,
+      "total_usd": 281749.3561501311,
+      "trades": 22,
+      "hour": "2024-10-26T04:00:00Z",
+      "user_count": 3,
+      "users": [
+        "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+        "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU"
+      ]
+    },
+    {
+      "buy_usd": 244103.29999999993,
+      "sell_usd": 0,
+      "total_usd": 244103.29999999993,
+      "trades": 24,
+      "hour": "2024-10-26T02:00:00Z",
+      "user_count": 4,
+      "users": [
+        "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+        "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv",
+        "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+      ]
+    },
+    {
+      "buy_usd": 46427.64,
+      "sell_usd": 157414.7974601017,
+      "total_usd": 203842.4374601017,
+      "trades": 11,
+      "hour": "2024-10-27T12:00:00Z",
+      "user_count": 2,
+      "users": [
+        "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+      ]
+    },
+    {
+      "buy_usd": 121975.71582000001,
+      "sell_usd": 48446.96815913939,
+      "total_usd": 170422.68397913934,
+      "trades": 30,
+      "hour": "2024-10-31T15:00:00Z",
+      "user_count": 5,
+      "users": [
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 53542.24223851906,
+      "sell_usd": 70614.70123054269,
+      "total_usd": 124156.94346906175,
+      "trades": 19,
+      "hour": "2024-10-25T16:00:00Z",
+      "user_count": 5,
+      "users": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 24016.929640698847,
+      "sell_usd": 94758.9160923705,
+      "total_usd": 118775.84573306936,
+      "trades": 26,
+      "hour": "2024-10-25T17:00:00Z",
+      "user_count": 3,
+      "users": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh"
+      ]
+    },
+    {
+      "buy_usd": 108757.00091076935,
+      "sell_usd": 0,
+      "total_usd": 108757.00091076935,
+      "trades": 21,
+      "hour": "2024-10-26T17:00:00Z",
+      "user_count": 5,
+      "users": [
+        "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 26313.64475,
+      "sell_usd": 80128.5446472846,
+      "total_usd": 106442.18939728459,
+      "trades": 13,
+      "hour": "2024-10-25T14:00:00Z",
+      "user_count": 3,
+      "users": [
+        "85TMiRBoDjZiFjHUwrrBkqZDh4o3SHMPtgbDXM7N7Qff",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 74914.50205000001,
+      "sell_usd": 28993.9063660533,
+      "total_usd": 103908.40841605332,
+      "trades": 18,
+      "hour": "2024-10-25T18:00:00Z",
+      "user_count": 4,
+      "users": [
+        "2brzD1rU8m71zf23bfgtw3vn9pqZG2CDxYU3nQ5pPizN",
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+      ]
+    },
+    {
+      "buy_usd": 8783.202749999999,
+      "sell_usd": 87338.60263969778,
+      "total_usd": 96121.80538969778,
+      "trades": 22,
+      "hour": "2024-10-24T23:00:00Z",
+      "user_count": 3,
+      "users": [
+        "7SmhQ9r2TLLgS5cmWoFSVGZZw7sEySmZXzwBVscrc7qb",
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    },
+    {
+      "buy_usd": 92247.5,
+      "sell_usd": 0,
+      "total_usd": 92247.5,
+      "trades": 26,
+      "hour": "2024-11-01T01:00:00Z",
+      "user_count": 2,
+      "users": [
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+      ]
+    },
+    {
+      "buy_usd": 73092.38,
+      "sell_usd": 18515.51541955197,
+      "total_usd": 91607.89541955198,
+      "trades": 17,
+      "hour": "2024-10-25T04:00:00Z",
+      "user_count": 2,
+      "users": [
+        "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "GCDEuA5Q6KugDcN5wxnorwkeSrMYiPJse24pDfFbLZXz"
+      ]
+    },
+    {
+      "buy_usd": 70304.95614419614,
+      "sell_usd": 20392.1848032292,
+      "total_usd": 90697.14094742535,
+      "trades": 10,
+      "hour": "2024-10-27T04:00:00Z",
+      "user_count": 3,
+      "users": [
+        "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+        "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "ErAJGcJTEUqa11ag1MxLWZjqoqzgTtZKJk9cQiN9T3ZU"
+      ]
+    },
+    {
+      "buy_usd": 0,
+      "sell_usd": 80734.0097755713,
+      "total_usd": 80734.0097755713,
+      "trades": 4,
+      "hour": "2024-10-26T19:00:00Z",
+      "user_count": 1,
+      "users": [
+        "Eu4DNnkPbV9kMj81FwaZMHPqAHsBAVrwbtjGfKdRhVzh"
+      ]
+    },
+    {
+      "buy_usd": 53167.0,
+      "sell_usd": 27151.503966255,
+      "total_usd": 80318.50396625501,
+      "trades": 16,
+      "hour": "2024-10-25T00:00:00Z",
+      "user_count": 2,
+      "users": [
+        "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "XiXRAfbXGgNsZw2hwPdqBsU461kXFfYgTMV8sgjRSvN"
+      ]
+    }
+  ],
+  "ohlcStats": {
+    "A13_card_screenshot_window": {
+      "start": "2024-10-25T09:00:00Z",
+      "end": "2024-10-26T08:00:00Z",
+      "open": 0.016267777957214277,
+      "close": 0.023240839605246418,
+      "high": 0.043825572846946374,
+      "low": 0.014645030564802585,
+      "volume": 73365,
+      "pct_change": 42.864253903464395,
+      "high_from_open_pct": 169.40110052037582,
+      "low_from_open_pct": -9.975224623053403,
+      "row_count": 24
+    },
+    "A16_card_screenshot_window": {
+      "start": "2024-10-26T08:00:00Z",
+      "end": "2024-10-27T07:00:00Z",
+      "open": 0.02800140071227709,
+      "close": 0.024391245312448,
+      "high": 0.043632622224352394,
+      "low": 0.015090679500563402,
+      "volume": 36849,
+      "pct_change": -12.892767175915715,
+      "high_from_open_pct": 55.82299854457589,
+      "low_from_open_pct": -46.10741206975778,
+      "row_count": 24
+    },
+    "A21_card_screenshot_window": {
+      "start": "2024-10-25T18:00:00Z",
+      "end": "2024-10-26T02:00:00Z",
+      "open": 0.03952066899608682,
+      "close": 0.021755630716550862,
+      "high": 0.0397996679954696,
+      "low": 0.020489898720463702,
+      "volume": 25791,
+      "pct_change": -44.95125900144803,
+      "high_from_open_pct": 0.7059571775224904,
+      "low_from_open_pct": -48.15396793386132,
+      "row_count": 9
+    },
+    "oct25_oct27_context": {
+      "start": "2024-10-25T00:00:00Z",
+      "end": "2024-10-27T23:00:00Z",
+      "open": 0.02854050666798489,
+      "close": 0.035021,
+      "high": 0.043825572846946374,
+      "low": 0.0112871579572965,
+      "volume": 172840,
+      "pct_change": 22.706300933629024,
+      "high_from_open_pct": 53.555693165417416,
+      "low_from_open_pct": -60.45214582697726,
+      "row_count": 72
+    },
+    "oct23_oct28_context": {
+      "start": "2024-10-23T00:00:00Z",
+      "end": "2024-10-28T23:00:00Z",
+      "open": 0.03768815279626612,
+      "close": 0.029753932097091224,
+      "high": 0.0747865822655949,
+      "low": 0.0112871579572965,
+      "volume": 354808,
+      "pct_change": -21.052293918636845,
+      "high_from_open_pct": 98.43525542330171,
+      "low_from_open_pct": -70.05117757213415,
+      "row_count": 144
+    }
+  },
+  "snapshotBalanceTime": "2024-11-09 23:00:00 UTC",
+  "imageReferences": [
+    [
+      "action:0",
+      "targetSnapshot",
+      "images/action-0001-target-kline_chart-01.png"
+    ],
+    [
+      "action:0",
+      "targetSnapshot",
+      "images/action-0001-target-token_distribution-02.png"
+    ],
+    [
+      "action:2",
+      "sourceSnapshot",
+      "images/action-0003-source-token_distribution-01.png"
+    ],
+    [
+      "action:3",
+      "sourceSnapshot",
+      "images/action-0004-source-token_distribution-01.png"
+    ],
+    [
+      "action:3",
+      "targetSnapshot",
+      "images/action-0004-target-behavior_details-01.png"
+    ],
+    [
+      "action:4",
+      "sourceSnapshot",
+      "images/action-0005-source-token_distribution-01.png"
+    ],
+    [
+      "action:4",
+      "targetSnapshot",
+      "images/action-0005-target-behavior_details-01.png"
+    ],
+    [
+      "action:6",
+      "sourceSnapshot",
+      "images/action-0007-source-behavior_details-01.png"
+    ],
+    [
+      "action:7",
+      "sourceSnapshot",
+      "images/action-0008-source-token_distribution-01.png"
+    ],
+    [
+      "action:7",
+      "targetSnapshot",
+      "images/action-0008-target-behavior_details-01.png"
+    ],
+    [
+      "action:8",
+      "sourceSnapshot",
+      "images/action-0009-source-behavior_details-01.png"
+    ],
+    [
+      "action:10",
+      "sourceSnapshot",
+      "images/action-0011-source-behavior_details-01.png"
+    ],
+    [
+      "action:13",
+      "sourceSnapshot",
+      "images/action-0014-source-kline_chart-01.png"
+    ],
+    [
+      "action:13",
+      "targetSnapshot",
+      "images/action-0014-target-behavior_details-01.png"
+    ],
+    [
+      "action:15",
+      "sourceSnapshot",
+      "images/action-0016-source-behavior_details-01.png"
+    ],
+    [
+      "action:16",
+      "sourceSnapshot",
+      "images/action-0017-source-kline_chart-01.png"
+    ],
+    [
+      "action:16",
+      "targetSnapshot",
+      "images/action-0017-target-behavior_details-01.png"
+    ],
+    [
+      "action:18",
+      "sourceSnapshot",
+      "images/action-0019-source-behavior_details-01.png"
+    ],
+    [
+      "action:21",
+      "sourceSnapshot",
+      "images/action-0022-source-kline_chart-01.png"
+    ],
+    [
+      "action:21",
+      "targetSnapshot",
+      "images/action-0022-target-behavior_details-01.png"
+    ],
+    [
+      "annotation:0",
+      "sketch",
+      "images/annotation-0000-token_distribution.png"
+    ],
+    [
+      "annotation:1",
+      "sketch",
+      "images/annotation-0001-token_distribution.png"
+    ],
+    [
+      "annotation:2",
+      "sketch",
+      "images/annotation-0002-token_distribution.png"
+    ],
+    [
+      "annotation:4",
+      "sketch",
+      "images/annotation-0004-token_distribution.png"
+    ],
+    [
+      "annotation:5",
+      "sketch",
+      "images/annotation-0005-behavior_details.png"
+    ],
+    [
+      "annotation:6",
+      "sketch",
+      "images/annotation-0006-token_distribution.png"
+    ],
+    [
+      "annotation:7",
+      "sketch",
+      "images/annotation-0007-behavior_details.png"
+    ],
+    [
+      "annotation:8",
+      "sketch",
+      "images/annotation-0008-token_distribution.png"
+    ],
+    [
+      "annotation:9",
+      "sketch",
+      "images/annotation-0009-behavior_details.png"
+    ],
+    [
+      "annotation:10",
+      "sketch",
+      "images/annotation-0010-behavior_details.png"
+    ],
+    [
+      "annotation:11",
+      "sketch",
+      "images/annotation-0012-candlestick_chart.png"
+    ],
+    [
+      "annotation:12",
+      "sketch",
+      "images/annotation-0013-behavior_details.png"
+    ],
+    [
+      "annotation:13",
+      "sketch",
+      "images/annotation-0014-behavior_details.png"
+    ],
+    [
+      "annotation:14",
+      "sketch",
+      "images/annotation-0015-behavior_details.png"
+    ],
+    [
+      "annotation:15",
+      "sketch",
+      "images/annotation-0017-behavior_details.png"
+    ],
+    [
+      "annotation:17",
+      "sketch",
+      "images/annotation-0019-token_distribution.png"
+    ]
+  ],
+  "dataFiles": [
+    "front/public/data/sorted_trades.csv",
+    "front/public/data/sorted_transfers.csv",
+    "front/public/data/user_behavior_sequences.json",
+    "front/public/data/ACT_OHLC.json",
+    "front/public/data/hourly_balance_snapshots.json"
+  ]
+}
