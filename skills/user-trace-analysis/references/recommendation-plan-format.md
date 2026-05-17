@@ -197,13 +197,13 @@ After the plan is executed:
 
 ```bash
 python skills/user-trace-analysis/scripts/recommendation_plan_to_forest.py \
-  TRACE/recommendation-plan-graph.json
+  TRACE/analysis-results/recommendation-plan-graph.json
 ```
 
 By default, the script writes:
 
-- `TRACE/recommendation-plan-forest.json`
-- `TRACE/recommendation-plan-forest.md`
+- `TRACE/analysis-results/recommendation-plan-forest.json`
+- `TRACE/analysis-results/recommendation-plan-forest.md`
 
 The generated forest uses `flowchart TD` because it is a top-down plan, unlike the bottom-up evidence support view used by `user-reasoning-forest.md`.
 

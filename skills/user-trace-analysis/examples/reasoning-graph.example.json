@@ -11,7 +11,7 @@
       "label": "Click first 9-user manipulation card",
       "interactionType": "Visualization Action",
       "salience": "primary",
-      "provenance": ["action:14", "screenshot:images/action-0014-source-kline_chart-01.png"],
+      "provenance": ["action:14", "screenshot:../images/action-0014-source-kline_chart-01.png"],
       "confidence": "Direct evidence"
     },
     {

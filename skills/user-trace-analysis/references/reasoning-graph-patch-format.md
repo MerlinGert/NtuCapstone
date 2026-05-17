@@ -106,14 +106,14 @@ Use `add_root` when a Hypothesis Expansion follow-up creates an evidence-backed 
 
 ```bash
 python skills/user-trace-analysis/scripts/apply_reasoning_graph_patch.py \
-  TRACE/reasoning-graph.json \
-  TRACE/reasoning-graph-patch-001.json
+  TRACE/analysis-results/reasoning-graph.json \
+  TRACE/analysis-results/reasoning-graph-patch-001.json
 ```
 
 By default, the script writes:
 
-- `TRACE/augmented-reasoning-graph.json`
-- `TRACE/augmented-reasoning-forest.json`
-- `TRACE/augmented-reasoning-forest.md`
+- `TRACE/analysis-results/augmented-reasoning-graph.json`
+- `TRACE/analysis-results/augmented-reasoning-forest.json`
+- `TRACE/analysis-results/augmented-reasoning-forest.md`
 
 The script validates the augmented graph with `reasoning_graph_to_forest.py` before writing forest outputs.

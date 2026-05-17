@@ -4,7 +4,7 @@ Use `reasoning-graph.json` as the canonical shared-node representation for a Man
 
 ## Files
 
-For a full trace analysis, place these files in the trace folder:
+For a full trace analysis, place these files in `TRACE/analysis-results/`:
 
 - `reasoning-graph.json`: canonical graph with shared nodes.
 - `user-reasoning-forest.json`: generated tree instances with duplicated shared nodes.
@@ -21,7 +21,7 @@ Each node must have:
   "space": "Action",
   "scope": "Low",
   "label": "Click first 9-user manipulation card",
-  "provenance": ["action:14", "screenshot:images/action-0014-source-kline_chart-01.png"],
+  "provenance": ["action:14", "screenshot:../images/action-0014-source-kline_chart-01.png"],
   "confidence": "Direct evidence"
 }
 ```
@@ -81,7 +81,7 @@ Every node must include a non-empty `label`, `confidence`, and `provenance` list
 - `render:<relative-path>`
 - `inference:<short-note>`
 
-`render:<relative-path>` must point to a saved trace-local PNG produced by the ManiScope render API. Do not use transient browser data URLs as durable provenance.
+`screenshot:<relative-path>` and `render:<relative-path>` should be durable relative paths from `TRACE/analysis-results/`. Original trace screenshots usually use `screenshot:../images/...`. Rendered follow-up images should be saved under an assets folder inside `analysis-results`, usually `render:continued-investigation-assets/...`. Do not use transient browser data URLs as durable provenance.
 
 ## Edge Schema
 
@@ -152,7 +152,8 @@ The forest must preserve raw Interaction leaves by default. If a compact Step vi
 Before using a graph in a report:
 
 ```bash
-python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py TRACE/reasoning-graph.json
+python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py \
+  TRACE/analysis-results/reasoning-graph.json
 ```
 
 The script should fail if:

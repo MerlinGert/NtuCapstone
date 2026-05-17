@@ -13,7 +13,7 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
 - `AGENTS.md` for repository conventions.
 - `docs/ui-analysis/major-view-render-api.md` for current render API details.
 - The target trace directory under `insight-hunting/traces/`.
-- Existing trace artifacts such as `analysis-report.md`, `trace-step-map.md`, `reasoning-graph.json`, `user-reasoning-forest.md`, `recommendation-plan-graph.json`, and previous follow-up reports.
+- Existing trace artifacts under `TRACE/analysis-results/`, such as `analysis-report.md`, `trace-step-map.md`, `reasoning-graph.json`, `user-reasoning-forest.md`, `recommendation-plan-graph.json`, and previous follow-up reports.
 - Local data or backend endpoints needed for exact transfers, trades, balances, and behavior sequences.
 
 ## Execution Workflow
@@ -36,7 +36,7 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
    - Use raw trace data, local JSON/CSV data, or backend endpoints for exact counts, amounts, timestamps, and transfer relations.
    - Use `/api/user_behavior/sequences` to build `behaviorData` for Behavior Details renders.
    - Treat rendered images as visual evidence for timing, density, grouping, and qualitative role comparison.
-   - If a rendered image supports a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save it as a trace-local PNG asset and cite it with `render:<relative-path>` provenance. Do not leave supporting visual evidence only as a transient browser data URL.
+   - If a rendered image supports a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save it as a PNG asset under `TRACE/analysis-results/` and cite it with `render:<relative-path>` provenance. Do not leave supporting visual evidence only as a transient browser data URL.
    - Do not infer exact event counts from Behavior Details dots when the row may be sampled. Use sequence payloads and render metadata for exact counts.
 
 4. **Render focused views**
@@ -93,7 +93,7 @@ async function saveCapturePng(capture, outputPath) {
 
 await saveCapturePng(
   klineCapture,
-  '/absolute/path/to/continued-investigation-assets/kline-window.png',
+  '/absolute/path/to/maniscope-session-ACT-20260501-025125/analysis-results/continued-investigation-assets/kline-window.png',
 )
 ```
 
@@ -129,7 +129,7 @@ const behaviorCapture = await api.captureView('behavior_details', behaviorArgs, 
 
 ## Report And Asset Rules
 
-When the user asks for a durable follow-up report, place it in the target trace directory unless the user gives a different path. Prefer:
+When the user asks for a durable follow-up report, place it in `TRACE/analysis-results/` unless the user gives a different path. Prefer:
 
 - `continued-investigation-report.md`
 - `continued-investigation-assets/`
@@ -147,7 +147,7 @@ Asset rules:
 
 - Save only images that support a report claim.
 - Save every rendered visualization used as evidence for a claim, Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch.
-- Put kept assets in `continued-investigation-assets/` or another trace-local assets folder named by the user.
+- Put kept assets in `TRACE/analysis-results/continued-investigation-assets/` or another assets folder inside `analysis-results` named by the user.
 - Use evidence-oriented filenames, for example `kline-core-window.png`, `behavior-selected-wallets.png`, or `token-distribution-sibling-wallets.png`.
 - Delete unused intermediate captures before finishing.
 - Verify every image link in the report resolves.
@@ -160,11 +160,11 @@ Before reporting completion:
 
 ```bash
 python skills/user-trace-analysis/scripts/apply_reasoning_graph_patch.py \
-  TRACE/reasoning-graph.json \
-  TRACE/reasoning-graph-patch-001.json
+  TRACE/analysis-results/reasoning-graph.json \
+  TRACE/analysis-results/reasoning-graph-patch-001.json
 
-find TRACE/continued-investigation-assets -maxdepth 1 -type f
-rg "continued-investigation-assets/" TRACE/continued-investigation-report.md
+find TRACE/analysis-results/continued-investigation-assets -maxdepth 1 -type f
+rg "continued-investigation-assets/" TRACE/analysis-results/continued-investigation-report.md
 git diff --check
 ```
 

@@ -7,17 +7,17 @@ description: Use when analyzing a ManiScope exported or live user-interaction tr
 
 Use this skill when analyzing a ManiScope exported user-interaction trace, especially a folder containing `session.json` plus screenshot images. The goal is to reconstruct what the user was trying to do, what findings or insights they explicitly captured or implicitly discovered, execute the follow-up Investigation Strategies implied by those findings, and map both user and agent evidence back to trace steps.
 
-For a full trace analysis, produce these artifacts unless the user explicitly asks for an analysis-only or lighter output:
+For a full trace analysis, produce all analysis artifacts inside `TRACE/analysis-results/` unless the user explicitly asks for an analysis-only, lighter, or different output location. Keep raw trace inputs in the trace folder itself, such as `TRACE/session.json` and `TRACE/images/`.
 
-- `TRACE/analysis-report.md`: narrative analysis with evidence, rationale, caveats, intentions, findings, insights, and recommendations.
-- `TRACE/trace-step-map.md`: traceability map linking logged Interactions and annotations to intentions, findings, insights, and recommendations.
-- `TRACE/reasoning-graph.json`: canonical shared-node graph for the trace. This is the source of truth for reasoning support.
-- `TRACE/user-reasoning-forest.md`: readable derived forest rooted at user Hypotheses.
-- `TRACE/user-reasoning-forest.json`: machine-readable derived forest when using the transformer script.
-- `TRACE/recommendation-plan-graph.json` and `TRACE/recommendation-plan-forest.md`: prescriptive plan artifacts for Evidence Completion and Hypothesis Expansion.
-- `TRACE/continued-investigation-report.md`: evidence-backed follow-up execution report.
-- `TRACE/reasoning-graph-patch-001.json`: follow-up evidence patch.
-- `TRACE/augmented-reasoning-graph.json`, `TRACE/augmented-reasoning-forest.json`, and `TRACE/augmented-reasoning-forest.md`: regenerated reasoning artifacts after applying the follow-up patch.
+- `TRACE/analysis-results/analysis-report.md`: narrative analysis with evidence, rationale, caveats, intentions, findings, insights, and recommendations.
+- `TRACE/analysis-results/trace-step-map.md`: traceability map linking logged Interactions and annotations to intentions, findings, insights, and recommendations.
+- `TRACE/analysis-results/reasoning-graph.json`: canonical shared-node graph for the trace. This is the source of truth for reasoning support.
+- `TRACE/analysis-results/user-reasoning-forest.md`: readable derived forest rooted at user Hypotheses.
+- `TRACE/analysis-results/user-reasoning-forest.json`: machine-readable derived forest when using the transformer script.
+- `TRACE/analysis-results/recommendation-plan-graph.json` and `TRACE/analysis-results/recommendation-plan-forest.md`: prescriptive plan artifacts for Evidence Completion and Hypothesis Expansion.
+- `TRACE/analysis-results/continued-investigation-report.md`: evidence-backed follow-up execution report.
+- `TRACE/analysis-results/reasoning-graph-patch-001.json`: follow-up evidence patch.
+- `TRACE/analysis-results/augmented-reasoning-graph.json`, `TRACE/analysis-results/augmented-reasoning-forest.json`, and `TRACE/analysis-results/augmented-reasoning-forest.md`: regenerated reasoning artifacts after applying the follow-up patch.
 
 For the canonical graph schema, relation taxonomy, salience field, and forest transformation rules, read `references/reasoning-graph-format.md`. Use `scripts/reasoning_graph_to_forest.py` to mechanically derive `user-reasoning-forest.json` and `user-reasoning-forest.md` from `reasoning-graph.json`.
 
@@ -29,6 +29,14 @@ For a full trace analysis, also read:
 
 Use `scripts/recommendation_plan_to_forest.py` to mechanically derive `recommendation-plan-forest.json` and `recommendation-plan-forest.md` from `recommendation-plan-graph.json`.
 Use `scripts/apply_reasoning_graph_patch.py` to apply a follow-up evidence patch to `reasoning-graph.json`, producing `augmented-reasoning-graph.json` and regenerated `augmented-reasoning-forest.md`.
+
+Path convention:
+
+- Use `TRACE` for the trace directory that contains `session.json`.
+- Use `RESULTS=TRACE/analysis-results` for all analysis outputs.
+- Create `TRACE/analysis-results/` before writing artifacts.
+- Links inside Markdown files under `analysis-results` should be relative to those files. Raw trace screenshots should usually be linked as `../images/...`.
+- Provenance paths in JSON artifacts should also be durable relative paths. Use `screenshot:../images/...` for original trace screenshots and `render:continued-investigation-assets/...` for rendered follow-up images saved under `TRACE/analysis-results/continued-investigation-assets/`.
 
 ## 1. Clarify The Task When Needed
 
@@ -244,7 +252,7 @@ Keep the epistemic boundary clear:
 Required lifecycle for a full trace analysis:
 
 ```text
-reasoning-graph.json
+analysis-results/reasoning-graph.json
   -> user-reasoning-forest.md
   -> recommendation-plan-graph.json
   -> recommendation-plan-forest.md
@@ -517,7 +525,8 @@ Recommendation mapping:
 After building `trace-step-map.md`, produce `reasoning-graph.json` using the schema in `references/reasoning-graph-format.md`. Then run:
 
 ```bash
-python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py TRACE/reasoning-graph.json
+python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py \
+  TRACE/analysis-results/reasoning-graph.json
 ```
 
 The generated `user-reasoning-forest.md` should show one bottom-up reasoning support tree per Hypothesis. Duplicate shared canonical nodes mechanically so each tree node instance has at most one parent.
@@ -537,7 +546,7 @@ Then run:
 
 ```bash
 python skills/user-trace-analysis/scripts/recommendation_plan_to_forest.py \
-  TRACE/recommendation-plan-graph.json
+  TRACE/analysis-results/recommendation-plan-graph.json
 ```
 
 ### Step 8: Execute follow-up investigation and patch the graph
@@ -560,38 +569,38 @@ Patch flow:
 
 ```bash
 python skills/user-trace-analysis/scripts/apply_reasoning_graph_patch.py \
-  TRACE/reasoning-graph.json \
-  TRACE/reasoning-graph-patch-001.json
+  TRACE/analysis-results/reasoning-graph.json \
+  TRACE/analysis-results/reasoning-graph-patch-001.json
 ```
 
 The patch script writes `augmented-reasoning-graph.json`, `augmented-reasoning-forest.json`, and `augmented-reasoning-forest.md` by default. Use the patch format in `references/reasoning-graph-patch-format.md`.
 
 ## 6. Requirements For The Deliverables
 
-The primary report should be a Markdown file unless the user requests otherwise. Prefer placing it next to the trace folder, for example:
+The primary report should be a Markdown file unless the user requests otherwise. Place it in the trace's `analysis-results` subfolder:
 
 ```text
-TRACE/analysis-report.md
+TRACE/analysis-results/analysis-report.md
 ```
 
 For an analysis-only run, also create:
 
 ```text
-TRACE/trace-step-map.md
-TRACE/reasoning-graph.json
-TRACE/user-reasoning-forest.md
+TRACE/analysis-results/trace-step-map.md
+TRACE/analysis-results/reasoning-graph.json
+TRACE/analysis-results/user-reasoning-forest.md
 ```
 
 For a full trace analysis, also create and execute the recommendation and follow-up artifacts:
 
 ```text
-TRACE/recommendation-plan-graph.json
-TRACE/recommendation-plan-forest.md
-TRACE/continued-investigation-report.md
-TRACE/reasoning-graph-patch-001.json
-TRACE/augmented-reasoning-graph.json
-TRACE/augmented-reasoning-forest.json
-TRACE/augmented-reasoning-forest.md
+TRACE/analysis-results/recommendation-plan-graph.json
+TRACE/analysis-results/recommendation-plan-forest.md
+TRACE/analysis-results/continued-investigation-report.md
+TRACE/analysis-results/reasoning-graph-patch-001.json
+TRACE/analysis-results/augmented-reasoning-graph.json
+TRACE/analysis-results/augmented-reasoning-forest.json
+TRACE/analysis-results/augmented-reasoning-forest.md
 ```
 
 If the user asks for analysis-only, recommendation-only, or planning-only output, omit the follow-up execution artifacts and explicitly label the run scope in `analysis-report.md`. Otherwise, their absence is a failure of a full trace analysis.
@@ -651,8 +660,8 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 
 - Include analysis and rationale, not only conclusions.
 - Separate observed facts from inferred claims.
-- Keep screenshots linked by relative path.
-- When render APIs generate visualization evidence used for a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save the rendered PNG in a trace-local assets folder and cite it with `render:<relative-path>` provenance. Do not rely on transient data URLs as evidence.
+- Keep screenshots linked by relative path from the artifact file. From `TRACE/analysis-results/*.md`, original trace screenshots should usually use `../images/...`.
+- When render APIs generate visualization evidence used for a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save the rendered PNG under `TRACE/analysis-results/continued-investigation-assets/` or another assets folder inside `analysis-results`, and cite it with `render:<relative-path>` provenance. Do not rely on transient data URLs as evidence.
 - Preserve exact wallet addresses in evidence tables unless the user asks for anonymization.
 - Use shortened addresses in prose for readability.
 - Use concrete dates and times for market or session events.
@@ -713,8 +722,8 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 
 Before delivering, verify:
 
-- The report path is correct and `analysis-report.md` exists.
-- For a full analysis, `trace-step-map.md` exists next to the report.
+- The report path is correct and `TRACE/analysis-results/analysis-report.md` exists.
+- For a full analysis, `TRACE/analysis-results/trace-step-map.md` exists next to the report.
 - Every Analytic Question and Hypothesis has evidence and rationale.
 - Every mid-level Finding and high-level Insight has evidence and rationale.
 - Every Investigation Strategy has a "why this matters" rationale.

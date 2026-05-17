@@ -5,17 +5,18 @@ description: Create a standalone HTML viewer for ManiScope user trace analysis a
 
 # Trace Analysis HTML Viewer
 
-Use this skill to create a local, standalone HTML page for browsing artifacts from the `user-trace-analysis` workflow. The common output is `TRACE/trees.html`, but adapt the filename when the user asks for a different viewer.
+Use this skill to create a local, standalone HTML page for browsing artifacts from the `user-trace-analysis` workflow. The common output is `TRACE/analysis-results/trees.html`, but adapt the filename when the user asks for a different viewer.
 
 ## Inputs
 
-Prefer these artifacts when present:
+Prefer these artifacts under `TRACE/analysis-results/` when present:
 
 - `user-reasoning-forest.json`: descriptive forest rooted at Hypotheses.
 - `recommendation-plan-forest.json`: prescriptive forest rooted at reasoning gaps or expansion sources.
 - `reasoning-graph.json` and `recommendation-plan-graph.json`: canonical shared-node sources for cross-checking.
 - `analysis-report.md`, `trace-step-map.md`, `user-reasoning-forest.md`, `recommendation-plan-forest.md`: readable context and labels.
-- `images/`: screenshots referenced through `screenshot:<relative-path>` provenance.
+- `../images/`: raw trace screenshots referenced through `screenshot:../images/...` provenance.
+- `continued-investigation-assets/` or another assets folder under `analysis-results`: rendered follow-up images referenced through `render:<relative-path>` provenance.
 
 If an artifact is missing, make a useful partial viewer rather than blocking. State which inputs were omitted.
 
@@ -58,7 +59,7 @@ Notes:
 
 ## Implementation Steps
 
-1. Inspect available artifacts with `rg --files TRACE` and identify JSON, Markdown, and image assets.
+1. Inspect available artifacts with `rg --files TRACE/analysis-results TRACE/images` and identify JSON, Markdown, and image assets.
 2. Validate JSON with `jq empty` before embedding it.
 3. Read enough Markdown to understand the titles, forest purpose, and terminology. Do not blindly trust JSON labels if the report contradicts them.
 4. Create the HTML with plain HTML, CSS, and browser JavaScript. Avoid adding a build step.
@@ -87,13 +88,13 @@ Notes:
 
 Before finishing:
 
-- Run `git diff --check -- TRACE/trees.html`.
+- Run `git diff --check -- TRACE/analysis-results/trees.html`.
 - Parse the embedded script with Node:
 
 ```bash
 node <<'NODE'
 const fs = require('fs');
-const html = fs.readFileSync('TRACE/trees.html', 'utf8');
+const html = fs.readFileSync('TRACE/analysis-results/trees.html', 'utf8');
 const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
 if (!script) throw new Error('missing script');
 new Function(script);
