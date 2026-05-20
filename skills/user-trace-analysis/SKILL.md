@@ -421,6 +421,15 @@ Before writing strategies, classify the opportunity space into three recommendat
 
 When local data validation is allowed, use it to seed Similar new explorations and Hindsight opportunities. Keep the provenance clear: trace-observed leads are what the user actually saw; local data leads are analyst-discovered follow-up opportunities.
 
+For each Reasoning Gap or proposed adjacent Hypothesis, deliberately choose the evidence mode before writing Interactions:
+
+- Use **Visualization Actions** and **Visual Analysis** when the claim depends on what a ManiScope view, screenshot, rendered view, or GUI-displayed statistic shows.
+- Use **Data Actions** and **Statistical Analysis** when the claim requires quantities not already displayed in the GUI, such as volume share, overlap, medians, role summaries, or transfer counts.
+- Use **Model Actions** when the claim depends on detector outputs, model-generated suspicious labels, entity groups, manipulation boxes, link construction, component membership, or threshold-sensitive groupings.
+- Use **Synthesis Actions** when the work is to record, compare, qualify, or connect evidence already produced by visual, data, or model work.
+
+Do not default to script-side statistics. A strong recommendation plan should combine visual, statistical, model, and synthesis evidence according to the claim being tested. When a Finding, Insight, or Hypothesis relies on model-derived output, include a detector/model robustness check or explicitly explain why such a check is unavailable or unnecessary.
+
 Use this structure:
 
 - **Investigation Strategy**: the high-level plan for testing a Hypothesis, such as building a case timeline, validating price impact, expanding a suspected component, or avoiding false positives.
@@ -462,6 +471,7 @@ Recommended Investigation Strategy patterns:
 - **Build a role-based case timeline**: when the trace suggests different wallet roles such as passive whale, bridge actor, functional buyer, storage sink, accumulator, or round-trip-like actor.
 - **Validate manipulation windows and price impact**: when the trace links behavior details or manipulation cards to K-line movement.
 - **Expand a suspected component without overgeneralizing**: when the trace suggests a larger community or entity, but raw transfer or behavior validation is still needed.
+- **Test model/detector robustness**: when a Hypothesis depends on detector parameters, suspicious labels, entity groups, manipulation boxes, link generation, component membership, or threshold-sensitive model outputs. Include Model Actions that vary relevant parameters, rerun detection or grouping, and compare whether the same wallets, cohorts, and links remain stable.
 - **Search for sibling windows or cohorts**: when the user investigated one manipulation card, time window, or card-user group and local data or nearby screenshots may reveal similar unclicked candidates.
 - **Search for role analogues**: when the user assigned roles to wallets and local data can find other wallets with similar trade, transfer, balance, or earning profiles.
 - **Follow overlooked downstream sinks or upstream funders**: when the trace shows a functional wallet, transfer arrows, or outgoing inventory movement that the user did not follow.
@@ -472,6 +482,7 @@ Strategy pattern examples:
 
 - Classification style: "Classify each wallet in the 9-user Behavior Details card selected around interaction 16 (A16) and the 3-user card selected around interaction 21 (A21) into candidate roles, then test whether the cohorts contain distinct functional roles rather than homogeneous same-direction traders."
 - Discovery style: "Find whether the A16 and A21 cohorts contain accumulators, sellers, round-trip-like actors, or transfer-linked facilitators, and determine whether these roles form a plausible coordination mechanism."
+- Model-robustness style: "Vary the entity-link and manipulation-card detector thresholds around the settings used in the trace, rerun detection, then compare whether the A16 and A21 cohorts remain grouped visually and by computed wallet-overlap statistics."
 
 Both styles are valid when grounded in the trace. The common requirement is that the strategy turns the Hypothesis into a concrete evidence-seeking direction with named targets, a useful analytic contrast, and decomposable follow-up work.
 
@@ -728,6 +739,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - Keep Expected Findings out of the evidence-backed reasoning graph until follow-up work actually produces evidence.
 - Use Reasoning Graph Patches to merge follow-up investigation evidence. This keeps the original user trace reasoning auditable.
 - Separate Visual Analysis from Statistical Analysis. This helps users decide whether the next step is a visual investigation in ManiScope or a script-side analysis outside the GUI.
+- Treat model robustness as a first-class recommendation mode. If a claim relies on detector-generated labels, groups, boxes, links, or components, consider Model Actions that vary parameters and rerun outputs before accepting the claim as stable.
 
 ## 8. Quality Checklist
 
@@ -747,6 +759,7 @@ Before delivering, verify:
 - Every Investigation Strategy contains at least one Analytic Activity.
 - Every recommended Analytic Activity is labeled `Visual Analysis` or `Statistical Analysis`.
 - Every recommended Interaction is labeled `Data Action`, `Model Action`, `Visualization Action`, or `Synthesis Action`.
+- For model-derived claims, the recommendations include a Model Action robustness check or explicitly explain why it is unavailable or unnecessary.
 - GUI-displayed statistics are classified under a `Visualization Action`, not a `Data Action`.
 - Scripted or custom data calculations are classified as `Data Action`.
 - Key screenshots are linked and paths resolve.
