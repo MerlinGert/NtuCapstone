@@ -139,6 +139,12 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 点击 Behavior Details 中的用户标签可以切换选中用户。缩放行为图会记录 zoom 动作，并且在对应动作类别启用时可能捕获视图快照。
 
+## Codex Chat
+
+浮动的 Codex Chat 侧边栏可以让你要求智能体检查当前会话 trace、解释交互路径、推荐调查步骤，或继续进行分析。每条消息发送前，ManiScope 会把实时 trace、当前状态和最新的主要视图截图同步到会话工作区，使智能体能够引用当前可见的上下文。
+
+助手回复可以包含 Markdown 文本、生成的 artifact 和图片预览。当智能体在回复中提到本地图片路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的图片根目录下，ManiScope 会显示这张图片。有效图片会被复制到会话的 `artifacts/` 文件夹，并通过会话 artifact 接口提供给浏览器，而不会直接暴露任意文件系统路径。聊天中生成的图片通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析图片则应保存到对应 trace 的 `analysis-results/` 文件夹。
+
 ## User Actions、Annotations 和 Action Tree
 
 中列下方的面板现在是调查工作流的一部分。它包含三个标签页：User Actions、Annotations 和 Action Tree。默认激活的标签页是 Action Tree。

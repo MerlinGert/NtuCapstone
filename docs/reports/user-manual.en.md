@@ -139,6 +139,12 @@ Controls in this panel include:
 
 Clicking a user label inside Behavior Details can switch the selected user. Zooming the behavior chart records a zoom action and may capture a view snapshot if that action category is enabled.
 
+## Codex Chat
+
+The floating Codex Chat sidebar lets you ask the agent to inspect the current session trace, explain interaction paths, recommend investigation steps, or continue analysis. Before each message is sent, ManiScope syncs the live trace, current state, and latest major-view screenshots into the session workspace so the agent can reference what is currently visible.
+
+Assistant responses can include Markdown text, generated artifacts, and image previews. When the agent mentions a local image path in its response, ManiScope displays the image if the file is under the active session folder, the project folder, or another explicitly allowed image root. Valid images are copied into the session `artifacts/` folder and served through the session artifact endpoint rather than exposing arbitrary filesystem paths. Generated images should normally be saved under the session `artifacts/` folder for chat evidence, or under a trace `analysis-results/` folder for durable trace-analysis artifacts.
+
 ## User Actions, Annotations, And Action Tree
 
 The bottom panel in the middle column is now part of the investigation workflow. It has three tabs: User Actions, Annotations, and Action Tree. The default active tab is Action Tree.

@@ -3,6 +3,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { materializeLocalImageReferences } from './local-image-artifacts.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
@@ -686,6 +687,27 @@ function listArtifacts(sessionId) {
     })
 }
 
+function materializeAgentMessageEvent(sessionId, event) {
+  if (!event || event.type !== 'agent_message' || !event.text) {
+    return { event, artifacts: [] }
+  }
+  try {
+    const result = materializeLocalImageReferences(event.text, {
+      sessionId,
+      sessionDir: sessionDir(sessionId),
+      repoRoot: REPO_ROOT,
+      env: process.env,
+    })
+    return {
+      event: { ...event, text: result.text },
+      artifacts: result.artifacts,
+    }
+  } catch (error) {
+    console.warn('Codex bridge: failed to materialize local image references', error)
+    return { event, artifacts: [] }
+  }
+}
+
 async function handleChat(req, res, sessionId) {
   const body = await readBody(req)
   const message = String(body.message || '').trim()
@@ -773,7 +795,13 @@ async function handleChat(req, res, sessionId) {
     for await (const event of events) {
       if (controller.signal.aborted) break
       const normalized = normalizeEvent(event)
-      if (normalized) sendSse(res, normalized)
+      if (normalized) {
+        const materialized = materializeAgentMessageEvent(sessionId, normalized)
+        sendSse(res, materialized.event)
+        for (const artifact of materialized.artifacts) {
+          sendSse(res, { type: 'artifact', artifact })
+        }
+      }
     }
 
     const threadId = thread.id || existing?.threadId || ''

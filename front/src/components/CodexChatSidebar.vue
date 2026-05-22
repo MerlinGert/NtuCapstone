@@ -948,6 +948,17 @@ export default {
   padding: 8px;
 }
 
+.message-markdown :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: 360px;
+  margin: 8px 0;
+  border: 1px solid #dbe3ef;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
 .message-loading {
   display: flex;
   align-items: center;
