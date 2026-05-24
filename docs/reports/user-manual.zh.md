@@ -11,8 +11,8 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 仪表板会铺满浏览器窗口。当前 UI 在顶部标题栏下方分成三列。
 
 ```
-+--------------------------------------------------------------------------------+
-| ManiScope                                  Coin: ACT PNUT | Export | Import     |
++---------------------------------------------------------------------------------------------+
+| ManiScope | Session | Human Workspace | Open Agent Workspace | Coin: ACT PNUT | Export Import |
 +------------------+------------------------------+------------------------------+
 | Control Panel    | Token Distribution           | ACT or PNUT K-Line           |
 |                  |                              | round-trip cards             |
@@ -24,9 +24,21 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 +------------------+------------------------------+------------------------------+
 ```
 
-标题栏包含产品名、ACT 和 PNUT 单选按钮、Export 按钮，以及当前禁用的 Import 按钮。导入相关的代码路径已经存在，但当前 UI 没有启用入口。
+标题栏包含产品名、会话标记、工作区标记、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。在 Human Workspace 中，标题栏还会显示 **Open Agent Workspace**，用于把同一个会话以 `/agent` 页面在新标签页中打开，方便并排分析。
 
 左列是 Control Panel。中列上方是 Token Distribution 视图，下方是带标签页的调查面板。右列上方是 K 线和操纵卡片视图，下方是 Behavior Details。
+
+## Human 和 Agent 工作区
+
+每个 ManiScope 浏览器页面都属于一个工作区角色。
+
+- `/{sessionId}/human` 是 Human Workspace。它是用户交互、标注、导入 trace、重排 trace 项目和用户笔记的权威来源。
+- `/{sessionId}/agent` 是 Agent Workspace。它是 Codex 或另一位分析者使用的独立可视分析页面，可以探索同一个会话，但不会改变人的页面状态。
+- `/{sessionId}` 仍然有效，并会打开 Human Workspace。访问 `/` 会创建一个新的 5 字符会话并跳转到 Human Workspace。
+
+两个工作区都会读取会话中共享的 canonical trace。当你在人的页面交互、标注、导入、重排或同步会话时，Human Workspace 会写入 canonical trace。Agent Workspace 会在后台刷新这份 canonical trace，因此它可以看到人已经做过什么，但智能体侧的选择、检测器设置、缩放窗口、选中用户和渲染证据会单独保存。在 Agent Workspace 中，Action Tree 是只读的。
+
+为了保持向后兼容，`current-state.json` 仍表示人的当前状态。同时，human 和 agent 会分别维护 `workspaces/human/current-state.json` 和 `workspaces/agent/current-state.json`。这意味着智能体可以运行不同的检测参数、查看不同快照、选择不同用户或渲染证据图片，而不会覆盖人的可见分析状态。
 
 ## Control Panel
 
@@ -141,7 +153,13 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 ## Codex Chat
 
-浮动的 Codex Chat 侧边栏可以让你要求智能体检查当前会话 trace、解释交互路径、推荐调查步骤，或继续进行分析。每条消息发送前，ManiScope 会把实时 trace、当前状态和最新的主要视图截图同步到会话工作区，使智能体能够引用当前可见的上下文。
+浮动的 Codex Chat 侧边栏可以让你要求智能体检查当前会话 trace、解释交互路径、推荐调查步骤，或继续进行分析。每条消息发送前，ManiScope 会同步共享的实时 trace 和当前工作区状态。来自 Human Workspace 的消息会附带人的工作区截图；来自 Agent Workspace 的消息会附带智能体工作区截图。
+
+聊天历史和生成的 artifacts 在会话层级共享。智能体提示词会区分三类上下文：共享的 canonical trace、人的当前状态，以及智能体私有的探索状态。智能体的可视探索应使用 Agent Workspace，并且不应追加到人的动作 trace，除非你明确要求生成持久 artifacts 或 reasoning patches。
+
+Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
+
+在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。回合完成后，这些区域会折叠，但最新一条活动会以紧凑状态卡的形式保留可见。
 
 助手回复可以包含 Markdown 文本、生成的 artifact 和图片预览。当智能体在回复中提到本地图片路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的图片根目录下，ManiScope 会显示这张图片。有效图片会被复制到会话的 `artifacts/` 文件夹，并通过会话 artifact 接口提供给浏览器，而不会直接暴露任意文件系统路径。聊天中生成的图片通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析图片则应保存到对应 trace 的 `analysis-results/` 文件夹。
 

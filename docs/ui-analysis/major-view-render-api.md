@@ -4,7 +4,9 @@ The frontend exposes the three major visualization views as browser-side APIs th
 
 The primary render contract is argument-based: each view has a function that requires the full argument object needed to render that view. `getRenderArgs(viewName)` is a convenience extractor from the current UI state. `renderView(viewName, args)` is the actual renderer and does not depend on the current on-screen panel layout.
 
-These APIs are browser render helpers, not a headless analytical engine. They mount Vue/D3 components into a temporary DOM host and export the rendered pixels. Use the returned dependencies and metadata for auditability, and use raw data for exact counts when the visual can be sampled.
+These APIs are browser render helpers, not a headless analytical engine. They mount Vue/D3 components into a temporary offscreen DOM host and export the rendered pixels. Use the returned dependencies and metadata for auditability, and use raw data for exact counts when the visual can be sampled.
+
+The temporary render host is fixed far offscreen with pointer events disabled, `aria-hidden="true"`, and CSS containment. Captures should not visually cover or intercept the active Human Workspace or Agent Workspace page. Render calls are queued per browser page, so multiple `renderView` or `captureView` calls complete in order instead of mounting competing temporary views at the same time.
 
 ## Views
 
@@ -44,7 +46,7 @@ klineArgs.visibleTimeWindow = [
 klineArgs.cardAlignment = 'visible_window'
 await api.renderView('kline_chart', klineArgs, { quality: 'thumbnail' })
 
-// Convenience wrapper: extract args from the current UI and render.
+// Convenience wrapper: extract args from the current workspace UI and render.
 // For Behavior Details this throws by default if no user/card is selected.
 await api.captureView('behavior_details', { width: 1500, height: 450 })
 
@@ -94,12 +96,15 @@ Each capture result has this shape:
 
 `renderView` clones its argument object before rendering. This prevents D3 and Vue rendering from mutating the caller's input data. For the same arguments, app code, browser engine, fonts, and static assets, the returned `image.dataUrl` is intended to be deterministic. The renderer still uses the browser DOM and rasterization pipeline internally, so it is not a side-effect-free pure function in the formal programming-language sense.
 
+`captureView` is the convenience wrapper for the current mounted workspace. In the Human Workspace it captures human state; in the Agent Workspace it captures agent state. To avoid coupling to either visible workspace, call `renderView(viewName, args)` with a complete argument object.
+
 ## Current Caveats
 
 - Token Distribution and `html-to-image` can still emit SVG validation warnings such as `Expected length, "NaN"` or negative `<rect>` heights while producing usable PNGs. Treat image success and console cleanliness as separate checks.
 - K-line card alignment works for choosing the relevant card strip region, but labels can be cramped in thumbnail captures. Use larger dimensions or `quality: 'full'` when card text matters.
 - Behavior Details event dots can be visually downsampled for high-event users. Use `renderMetadata.behaviorDetails.sampling` plus the fetched sequence data for exact event counts.
 - `visibleTimeWindow` for Behavior Details only applies in absolute-time mode. If `useSequentialTime` is true, the sequential x-axis is used instead.
+- The render queue is per browser tab. Separate human and agent browser pages each have their own queue.
 
 ## Required Arguments
 

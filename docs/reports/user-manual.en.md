@@ -11,8 +11,8 @@ ManiScope is best understood as an investigator's workspace rather than a real-t
 The dashboard fills the browser window. The current UI is arranged as three vertical columns under a header.
 
 ```
-+--------------------------------------------------------------------------------+
-| ManiScope                                  Coin: ACT PNUT | Export | Import     |
++---------------------------------------------------------------------------------------------+
+| ManiScope | Session | Human Workspace | Open Agent Workspace | Coin: ACT PNUT | Export Import |
 +------------------+------------------------------+------------------------------+
 | Control Panel    | Token Distribution           | ACT or PNUT K-Line           |
 |                  |                              | round-trip cards             |
@@ -24,9 +24,21 @@ The dashboard fills the browser window. The current UI is arranged as three vert
 +------------------+------------------------------+------------------------------+
 ```
 
-The header contains the product name, the ACT and PNUT radio buttons, an Export button, and a disabled Import button. Import support exists in the code path but is not enabled in the current UI.
+The header contains the product name, the session chip, a workspace badge, the Codex Chat button, the ACT and PNUT radio buttons, and session import/export controls. In the Human Workspace, the header also includes **Open Agent Workspace**, which opens the same session in a separate `/agent` page for side-by-side analysis.
 
 The left column is the Control Panel. The middle column contains the Token Distribution view on top and a tabbed investigation panel on the bottom. The right column contains the K-line and manipulation-card view on top and Behavior Details on the bottom.
+
+## Human And Agent Workspaces
+
+Each ManiScope browser page belongs to one workspace role.
+
+- `/{sessionId}/human` is the Human Workspace. It is the source of truth for user interactions, annotations, imported trace data, reordered trace items, and user-authored notes.
+- `/{sessionId}/agent` is the Agent Workspace. It is an independent visual-analysis page for Codex or another analyst to explore the same session without changing the human page state.
+- `/{sessionId}` remains valid and opens the Human Workspace. Visiting `/` creates a fresh 5-character session and redirects to the Human Workspace.
+
+Both workspaces read the shared canonical trace stored in the session. The human page writes the canonical trace when you interact, annotate, import, reorder, or sync the session. The agent page refreshes that canonical trace in the background so it can see what the human has done, but agent-side selections, detector settings, zoom windows, selected users, and rendered evidence are saved separately. The Action Tree is read-only in the Agent Workspace.
+
+The backward-compatible `current-state.json` is the human current state. The human and agent workspaces also keep separate `workspaces/human/current-state.json` and `workspaces/agent/current-state.json` files. This means the agent can run different detector settings, inspect a different snapshot, select different users, or render evidence images without overwriting the human's visible analysis.
 
 ## Control Panel
 
@@ -141,7 +153,13 @@ Clicking a user label inside Behavior Details can switch the selected user. Zoom
 
 ## Codex Chat
 
-The floating Codex Chat sidebar lets you ask the agent to inspect the current session trace, explain interaction paths, recommend investigation steps, or continue analysis. Before each message is sent, ManiScope syncs the live trace, current state, and latest major-view screenshots into the session workspace so the agent can reference what is currently visible.
+The floating Codex Chat sidebar lets you ask the agent to inspect the current session trace, explain interaction paths, recommend investigation steps, or continue analysis. Before each message is sent, ManiScope syncs the shared live trace and the current workspace state. Messages from the Human Workspace attach human workspace screenshots. Messages from the Agent Workspace attach agent workspace screenshots.
+
+Chat history and generated artifacts are shared at the session level. The agent prompt distinguishes three kinds of context: the shared canonical trace, the human current state, and the agent's private exploratory state. Agent visual exploration should use the Agent Workspace and should not append to the human action trace unless you explicitly ask for durable artifacts or reasoning patches.
+
+The Codex Chat panel is floating. Drag its header to move it, or drag the lower corners to resize it. The panel keeps its local position and size in the browser.
+
+During an agent turn, Thinking and Agent Activity appear above the assistant response. When the turn completes, these sections collapse, while the latest activity remains visible as a compact status card.
 
 Assistant responses can include Markdown text, generated artifacts, and image previews. When the agent mentions a local image path in its response, ManiScope displays the image if the file is under the active session folder, the project folder, or another explicitly allowed image root. Valid images are copied into the session `artifacts/` folder and served through the session artifact endpoint rather than exposing arbitrary filesystem paths. Generated images should normally be saved under the session `artifacts/` folder for chat evidence, or under a trace `analysis-results/` folder for durable trace-analysis artifacts.
 
