@@ -1,26 +1,28 @@
 <template>
   <div class="user-action-tree-container" ref="container">
-    <div class="header-panel">
-      <div class="panel-title">Action Tree</div>
-      <div class="count-badge">{{ nodesCount }}</div>
-      
-      <!-- ezio: Multi-select insight buttons -->
-      <div v-if="!readOnly" class="insight-controls" style="margin-left: 16px; display: flex; gap: 8px;">
-        <button v-if="!isMultiSelectMode" class="insight-btn" @click="startMultiSelect" title="Create Insight" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-        </button>
-        <template v-else>
-          <button class="insight-btn cancel-btn" @click="cancelMultiSelect">Cancel</button>
-          <button class="insight-btn confirm-btn" @click="openInsightPopup" :disabled="selectedInsightAnnotations.length === 0">
-            Confirm ({{ selectedInsightAnnotations.length }})
+    <div class="header-panel" style="flex-direction: column; align-items: stretch; gap: 8px; height: auto; padding-top: 8px; padding-bottom: 8px;">
+      <!-- Row 1: Badges & Controls -->
+      <div style="display: flex; align-items: center;">
+        <div class="count-badge">{{ nodesCount }}</div>
+        
+        <!-- ezio: Multi-select insight buttons -->
+        <div v-if="!readOnly" class="insight-controls" style="margin-left: 16px; display: flex; gap: 8px;">
+          <button v-if="!isMultiSelectMode" class="insight-btn" @click="startMultiSelect" title="Create Insight" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
           </button>
-        </template>
+          <template v-else>
+            <button class="insight-btn cancel-btn" @click="cancelMultiSelect">Cancel</button>
+            <button class="insight-btn confirm-btn" @click="openInsightPopup" :disabled="selectedInsightAnnotations.length === 0">
+              Confirm ({{ selectedInsightAnnotations.length }})
+            </button>
+          </template>
+        </div>
+
+        <button v-if="!readOnly" class="insight-btn confirm-btn" @click="openAddNodeDialog" title="Add Custom Node" style="margin-left:8px;padding:4px 8px;font-size:12px;">+ Add Node</button>
       </div>
 
-      <button v-if="!readOnly" class="insight-btn" @click="openAddNodeDialog" title="Add Custom Node" style="margin-left:8px;padding:2px 8px;font-size:11px;">+ Node</button>
-
-      <div style="flex: 1"></div>
-      <div class="tree-legend">
+      <!-- Row 2: Legend -->
+      <div class="tree-legend" style="flex-wrap: wrap;">
         <div class="legend-item"><div class="legend-box" style="background:#fee2e2; border-color:#fca5a5"></div>System</div>
         <div class="legend-item"><div class="legend-box" style="background:#dbeafe; border-color:#93c5fd"></div>Interact</div>
         <div class="legend-item"><div class="legend-box" style="background:#dcfce7; border-color:#86efac"></div>Zoom/Scroll</div>
@@ -639,16 +641,15 @@ export default {
       const root = d3.hierarchy(treeData)
       
       // Compute tree layout. We use a tidy tree layout.
-      // dx is the vertical distance between branches, dy is the horizontal
-      const dx = 75 // Exactly enough for 3 lanes (+/- 25) plus a standard 25px gap to match the inter-lane spacing
-      const baseDy = 35 // Reduced horizontal distance to make tree more compact
+      // dx is the horizontal distance between branches, dy is the vertical
+      const dx = 45 // Reduced horizontal spacing for a vertical layout
+      const baseDy = 35 // Vertical distance between nodes
       const tree = d3.tree().nodeSize([dx, baseDy])
       tree(root)
 
       // Post-process the tree to compact consecutive nodes of the same type on the same branch
-      // and adjust their vertical (x) positions based on their sourceView
+      // and adjust their horizontal (x) positions based on their sourceView
       
-      // Reduced the vertical offsets to compress the 3 views into a tighter group
       const viewLanes = {
         'token_distribution': -25,
         'kline_chart': 0,
@@ -659,7 +660,7 @@ export default {
       };
 
       root.eachBefore(d => {
-        // Adjust horizontal (y) spacing for compacting
+        // Adjust vertical (y) spacing for compacting
         if (d.parent) {
           const isContinuousSameType = 
             d.parent.children.length === 1 && 
@@ -676,12 +677,9 @@ export default {
           d.customY = 0;
         }
         
-        // Adjust vertical (x) spacing based on source view
+        // Adjust horizontal (x) spacing based on source view
         if (d.data.type !== 'root' && d.data.data && d.data.data.sourceView) {
            const sv = d.data.data.sourceView;
-           // Offset the node vertically based on the view it belongs to
-           d.customX = (d.parent && d.parent.data.type === 'root' ? d.x : (d.parent ? d.parent.customX : d.x)) + (viewLanes[sv] !== undefined ? viewLanes[sv] : 0);
-           // Actually, since we want them to form absolute lanes relative to their system root parent:
            
            // Find the closest system root ancestor
            let systemAncestor = d;
@@ -700,25 +698,21 @@ export default {
         }
       })
 
-      // Replace the default D3 computed coordinates
-      root.each(d => {
-        d.y = d.customY;
-        d.x = d.customX;
-      })
-
-      // Center the tree in the SVG initially based on vertical (x) bounds
+      // Center the tree in the SVG initially based on horizontal (x) bounds
       let x0 = Infinity
       let x1 = -x0
+      let y0 = Infinity
       let maxY = 0
       root.each(d => {
-        if (d.x > x1) x1 = d.x
-        if (d.x < x0) x0 = d.x
-        if (d.y > maxY) maxY = d.y
+        if (d.customX > x1) x1 = d.customX
+        if (d.customX < x0) x0 = d.customX
+        if (d.customY > maxY) maxY = d.customY
+        if (d.customY < y0) y0 = d.customY
       })
 
-      // Add a slight padding so root isn't right against the left edge
+      // Add a slight padding so root isn't right against the top edge
       const g = svg.append('g')
-        .attr('transform', `translate(20,${height/2 - (x0 + x1)/2})`)
+        .attr('transform', `translate(${width/2 - (x0 + x1)/2}, 20)`)
 
       // Add zoom capabilities
       const zoom = d3.zoom()
@@ -758,7 +752,7 @@ export default {
       });
 
       let currentActiveSegment = null;
-      // Track which view lanes have already been labeled for each system branch (using system branch y-coord as key)
+      // Track which view lanes have already been labeled for each system branch (using system branch x-coord as key)
       const labeledLanes = {};
 
       sortedNodes.forEach(d => {
@@ -766,12 +760,12 @@ export default {
         if (d.data.type !== 'root') {
           const sv = d.data.data.sourceView || 'system'
           
-          // Find the closest system root ancestor to use its x (vertical pos) as a unique identifier for the current system branch
+          // Find the closest system root ancestor to use its customX (horizontal pos) as a unique identifier for the current system branch
           let systemAncestor = d;
           while(systemAncestor.parent && systemAncestor.parent.data.type !== 'root') {
             systemAncestor = systemAncestor.parent;
           }
-          const branchId = systemAncestor.x;
+          const branchId = systemAncestor.customX;
           
           // Initialize tracking for this system branch if it doesn't exist
           if (!labeledLanes[branchId]) {
@@ -798,20 +792,20 @@ export default {
           // by not doing anything special to exclude it. It has sourceView 'kline_chart'.
           
           // Check if we can append to the currently active segment
-          // It must be the exact same lane (same yCenter) AND the user hasn't switched to another view in between
-          if (currentActiveSegment && currentActiveSegment.view === sv && Math.abs(currentActiveSegment.yCenter - d.x) < 5) {
+          // It must be the exact same lane (same xCenter) AND the user hasn't switched to another view in between
+          if (currentActiveSegment && currentActiveSegment.view === sv && Math.abs(currentActiveSegment.xCenter - d.customX) < 5) {
              currentActiveSegment.nodes.push(d)
-             currentActiveSegment.minX = Math.min(currentActiveSegment.minX, d.y)
-             currentActiveSegment.maxX = Math.max(currentActiveSegment.maxX, d.y)
+             currentActiveSegment.minY = Math.min(currentActiveSegment.minY, d.customY)
+             currentActiveSegment.maxY = Math.max(currentActiveSegment.maxY, d.customY)
              // We don't overwrite isFirstInBranch for appended nodes, it only applies to the segment start
           } else {
              // Either there is no active segment, OR the user switched to a different view/branch
              // So we MUST start a brand new capsule
              currentActiveSegment = {
                view: sv,
-               yCenter: d.x,
-               minX: d.y,
-               maxX: d.y,
+               xCenter: d.customX,
+               minY: d.customY,
+               maxY: d.customY,
                nodes: [d],
                isFirstInBranch: isFirstInBranch, // tag the segment if it's the very first of its kind
                branchId: branchId // track the branch to connect later
@@ -831,24 +825,24 @@ export default {
         const key = `${seg.branchId}_${seg.view}`;
         if (!laneBounds[key]) {
           laneBounds[key] = {
-            yCenter: seg.yCenter,
-            minX: seg.minX,
-            maxX: seg.maxX
+            xCenter: seg.xCenter,
+            minY: seg.minY,
+            maxY: seg.maxY
           };
         } else {
-          laneBounds[key].minX = Math.min(laneBounds[key].minX, seg.minX);
-          laneBounds[key].maxX = Math.max(laneBounds[key].maxX, seg.maxX);
+          laneBounds[key].minY = Math.min(laneBounds[key].minY, seg.minY);
+          laneBounds[key].maxY = Math.max(laneBounds[key].maxY, seg.maxY);
         }
       });
 
       // Draw dashed connecting lines underneath the capsules
       Object.values(laneBounds).forEach(bound => {
-        if (bound.minX < bound.maxX) {
+        if (bound.minY < bound.maxY) {
           bgGroup.append('line')
-            .attr('x1', bound.minX)
-            .attr('y1', bound.yCenter)
-            .attr('x2', bound.maxX)
-            .attr('y2', bound.yCenter)
+            .attr('x1', bound.xCenter)
+            .attr('y1', bound.minY)
+            .attr('x2', bound.xCenter)
+            .attr('y2', bound.maxY)
             .attr('stroke', '#e2e8f0') // Very subtle light gray (slate-200)
             .attr('stroke-width', 2)
             .attr('stroke-dasharray', '4,4') // Dashed pattern
@@ -862,16 +856,16 @@ export default {
         // Pad the bounding box a bit so it wraps the 16x16 node rects nicely
         const paddingX = 14
         const paddingY = 14
-        // The segment bounding box width is simply the span of the node centers
-        // plus padding on both left and right sides.
-        const width = (seg.maxX - seg.minX) + paddingX * 2
+        // The segment bounding box height is simply the span of the node centers
+        // plus padding on both top and bottom sides.
+        const heightBox = (seg.maxY - seg.minY) + paddingY * 2
         
         bgGroup.append('rect')
-          .attr('x', seg.minX - paddingX)
-          .attr('y', seg.yCenter - paddingY)
-          .attr('width', width)
-          .attr('height', paddingY * 2)
-          .attr('rx', paddingY) // Fully rounded capsule shape
+          .attr('x', seg.xCenter - paddingX)
+          .attr('y', seg.minY - paddingY)
+          .attr('width', paddingX * 2)
+          .attr('height', heightBox)
+          .attr('rx', paddingX) // Fully rounded capsule shape
           .attr('fill', bandColors[seg.view] || '#f8fafc')
           .attr('stroke', 'none')
           
@@ -884,10 +878,9 @@ export default {
           
           if (labelText) {
             bgGroup.append('text')
-              .attr('x', seg.minX - paddingX - 6) // Slightly to the left of the capsule
-              .attr('y', seg.yCenter) // Center vertically with the lane
-              .attr('dy', '0.32em') // Vertical alignment adjustment
-              .attr('text-anchor', 'end') // Right-align text so it flows leftward away from the capsule
+              .attr('x', seg.xCenter) // Center horizontally with the lane
+              .attr('y', seg.minY - paddingY - 6) // Slightly above the capsule
+              .attr('text-anchor', 'middle') // Center-align text
               .attr('font-size', '10px')
               .attr('font-weight', '600')
               .attr('fill', '#94a3b8') // slate-400 color for a subtle look
@@ -895,18 +888,7 @@ export default {
           }
         }
       })
-
-      // Links
-      g.append('g')
-        .attr('fill', 'none')
-        .attr('stroke', '#cbd5e1')
-        .attr('stroke-width', 1.5)
-        .selectAll('path')
-        .data(root.links())
-        .join('path')
-        .attr('d', d3.linkHorizontal()
-            .x(d => d.y)
-            .y(d => d.x))
+      
       const getActionClass = (type) => {
         if (!type) return 'default'
         if (type.includes('zoom') || type.includes('scroll') || type.includes('scale')) return 'zoom'
@@ -936,9 +918,9 @@ export default {
         .selectAll('path')
         .data(root.links())
         .join('path')
-        .attr('d', d3.linkHorizontal()
-            .x(d => d.y)
-            .y(d => d.x))
+        .attr('d', d3.linkVertical()
+            .x(d => d.customX)
+            .y(d => d.customY))
         .attr('stroke-dasharray', d => d.target.data.type === 'view_branch' ? '4,4' : 'none') // Dashed lines for view branches
 
       // Nodes
@@ -946,7 +928,7 @@ export default {
         .selectAll('g')
         .data(root.descendants())
         .join('g')
-        .attr('transform', d => `translate(${d.y},${d.x})`)
+        .attr('transform', d => `translate(${d.customX},${d.customY})`)
 
       const getStrokeColor = d => {
         if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
@@ -971,10 +953,10 @@ export default {
       // Node Rectangles based on type
       node.append('rect')
         .attr('class', 'node-rect')
-        .attr('x', -8)
-        .attr('y', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? -33 : -8)
-        .attr('width', 16)
-        .attr('height', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? 66 : 16)
+        .attr('x', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? -33 : -8)
+        .attr('y', -8)
+        .attr('width', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? 66 : 16)
+        .attr('height', 16)
         .attr('rx', 4) // Rounded corners
         .attr('fill', d => {
           if (d.data.type === 'root') return '#4a5568'

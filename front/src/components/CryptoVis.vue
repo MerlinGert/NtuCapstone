@@ -64,38 +64,8 @@
         style="width:100%;height:100%;overflow:hidden"
         :content-style="{ display: 'flex', flexDirection: 'row', overflow: 'hidden', width: '100%', height: '100%', boxSizing: 'border-box' }"
       >
-	<!-- Left sidebar: ControlPanel -->
-	    <div style="flex: 3; min-width:0; overflow:hidden; display:flex; flex-direction:column;">
-	      <div style="flex:1; height:100%; overflow:hidden; flex-shrink:0;">
-	        <n-card
-            size="small"
-            style="width:100%;height:100%;"
-            class="panel-card"
-            header-style="text-align:left;height:50px;font-size:1.4em;"
-            :content-style="{ padding: 0, height: 'calc(100% - 50px)', overflow: 'hidden' }"
-        >
-            <ControlPanel 
-                :key="`control-panel-${currentCoin}`"
-                :loading="detecting"
-                :loadingLinks="detectingLinks"
-                :loadingManipulation="detectingManipulation"
-                :lastResultCount="lastDetectionCount"
-                :snapshotConfig="snapshot_configuration"
-                :snapshotTimes="snapshotTimes"
-                :entityConfig="entity_detection_configuration"
-                :linkConfig="link_detection_configuration"
-                :manipulationConfig="manipulation_detection_configuration"
-                @run-detection="handleRunDetection"
-                @update-snapshot="handleUpdateSnapshot"
-                @request-manipulation-detection="handleRequestManipulationDetection"
-                @update-links="handleUpdateLinks"
-                @log-action="logUserAction"
-	            />
-	        </n-card>
-	      </div>
-	    </div>
 
-<div style="flex: 6; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+<div style="flex: 5; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
         <!-- ezio: snapshot shortcut marker -->
         <n-card
             size="small"
@@ -117,65 +87,29 @@
             />
         </n-card>
         
-        <!-- ezio: tab-switched panel for User Actions / Annotations -->
-        <div class="bottom-tab-panel" style="width:100%;height:40%;flex-shrink:0; display:flex; flex-direction:column; border:1px solid #efeff5; border-radius:3px; background:#fff;">
-          <div class="tab-header" style="flex-shrink:0; display:flex; border-bottom:1px solid #eef2f7; background:#f8fafc;">
-            <button
-              class="tab-btn"
-              :class="{ active: activeBottomTab === 'actions' }"
-              @click="activeBottomTab = 'actions'"
-              style="flex:1; padding:6px 0; border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:#718096; border-bottom:2px solid transparent; transition: all 0.2s;"
-              :style="activeBottomTab === 'actions' ? 'color:#3182ce; border-bottom-color:#3182ce; background:#fff;' : ''"
-            >User Actions</button>
-            <button
-              class="tab-btn"
-              :class="{ active: activeBottomTab === 'annotations' }"
-              @click="activeBottomTab = 'annotations'"
-              style="flex:1; padding:6px 0; border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:#718096; border-bottom:2px solid transparent; transition: all 0.2s;"
-              :style="activeBottomTab === 'annotations' ? 'color:#d97706; border-bottom-color:#d97706; background:#fff;' : ''"
-            >Annotations</button>
-            <button
-              class="tab-btn"
-              :class="{ active: activeBottomTab === 'tree' }"
-              @click="activeBottomTab = 'tree'"
-              style="flex:1; padding:6px 0; border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:#718096; border-bottom:2px solid transparent; transition: all 0.2s;"
-              :style="activeBottomTab === 'tree' ? 'color:#059669; border-bottom-color:#059669; background:#fff;' : ''"
-            >Action Tree</button>
-          </div>
-          <div style="flex:1; height:0; min-height:0; overflow:hidden;">
-            <UserActionTimeline
-                v-show="activeBottomTab === 'actions'"
-                :actions="userActionSequence"
-                :snapshot-categories="snapshotCategories"
-                :snapshot-quality="snapshotQuality"
-                @toggle-category="onSnapshotCategoryToggle"
-                @change-quality="onSnapshotQualityChange"
-                style="height:100%;"
+        <div style="width:100%;height:40%;flex-shrink:0; overflow:hidden;">
+            <ControlPanel 
+                :key="`control-panel-${currentCoin}`"
+                :loading="detecting"
+                :loadingLinks="detectingLinks"
+                :loadingManipulation="detectingManipulation"
+                :lastResultCount="lastDetectionCount"
+                :snapshotConfig="snapshot_configuration"
+                :snapshotTimes="snapshotTimes"
+                :entityConfig="entity_detection_configuration"
+                :linkConfig="link_detection_configuration"
+                :manipulationConfig="manipulation_detection_configuration"
+                @run-detection="handleRunDetection"
+                @update-snapshot="handleUpdateSnapshot"
+                @request-manipulation-detection="handleRequestManipulationDetection"
+                @update-links="handleUpdateLinks"
+                @log-action="logUserAction"
             />
-            <AnnotationTimeline
-                v-show="activeBottomTab === 'annotations'"
-                :annotations="annotationRecords"
-                style="height:100%;"
-            />
-            <UserActionTree
-                v-show="activeBottomTab === 'tree'"
-                :actions="userActionSequence"
-                :annotations="annotationRecords"
-                :read-only="isAgentWorkspace"
-                @add-insight-annotation="handleAddInsightAnnotation"
-                @delete-annotation="handleDeleteAnnotation"
-                @delete-action="handleDeleteAction"
-                @update-annotation="handleUpdateAnnotation"
-                @add-custom-annotation="handleAddCustomAnnotation"
-                @reorder-action="handleReorderAction"
-                style="height:100%;"
-            />
-          </div>
         </div>
     </div>
 
 
-    <div style="flex: 9; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
+    <div style="flex: 7; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
         <!-- ezio: snapshot shortcut marker -->
         <n-card
           size="small"
@@ -238,6 +172,24 @@
                 @snapshot-input="handleSnapshotAnnotation('behavior_details', $event)"
             />
         </n-card>
+    </div>
+    
+    <div style="flex: 3; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
+        <NotesPanel 
+            :actions="userActionSequence"
+            :annotations="annotationRecords"
+            :read-only="isAgentWorkspace"
+            :snapshot-categories="snapshotCategories"
+            :snapshot-quality="snapshotQuality"
+            @add-insight-annotation="handleAddInsightAnnotation"
+            @delete-annotation="handleDeleteAnnotation"
+            @delete-action="handleDeleteAction"
+            @update-annotation="handleUpdateAnnotation"
+            @add-custom-annotation="handleAddCustomAnnotation"
+            @reorder-action="handleReorderAction"
+            @toggle-category="onSnapshotCategoryToggle"
+            @change-quality="onSnapshotQualityChange"
+        />
     </div>
       <!-- </n-layout> -->
   </n-layout>
@@ -336,6 +288,7 @@ import UserActionTimeline from './UserActionTimeline.vue'
 import UserActionTree from './UserActionTree.vue'
 // ezio: import AnnotationTimeline for snapshot annotation display
 import AnnotationTimeline from './AnnotationTimeline.vue'
+import NotesPanel from './NotesPanel.vue'
 // ezio: view screenshot utility
 import { captureViewByName, isCapturable } from '../utils/viewSnapshot'
 import {
@@ -383,6 +336,7 @@ export default {
     AnnotationTimeline,
     UserActionTree,
     CodexChatSidebar,
+    NotesPanel,
   },
   data() {
     return {
@@ -1544,7 +1498,7 @@ export default {
       this.selectedEntityInfo = null
 
       // Expand via entity results
-      if (this.entity_detection_results) {
+      if (this.entity_detection_results && Array.isArray(this.entity_detection_results)) {
         const targetEntity = this.entity_detection_results.find((entity) =>
           entity.users?.includes(this.selectedUser),
         )
