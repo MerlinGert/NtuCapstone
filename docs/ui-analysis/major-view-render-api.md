@@ -6,13 +6,75 @@ The primary render contract is argument-based: each view has a function that req
 
 These APIs are browser render helpers, not a headless analytical engine. They mount Vue/D3 components into a temporary offscreen DOM host and export the rendered pixels. Use the returned dependencies and metadata for auditability, and use raw data for exact counts when the visual can be sampled.
 
-The temporary render host is fixed far offscreen with pointer events disabled, `aria-hidden="true"`, and CSS containment. Captures should not visually cover or intercept the active Human Workspace or Agent Workspace page. Render calls are queued per browser page, so multiple `renderView` or `captureView` calls complete in order instead of mounting competing temporary views at the same time.
+The temporary render host is fixed behind the page with pointer events disabled, `aria-hidden="true"`, negative z-index, and CSS containment. It stays inside the browser's renderable area so `html-to-image` can capture SVG/HTML views reliably, but it should not visually cover or intercept the active Human Workspace or Agent Workspace page. Render calls are queued per browser page, so multiple `renderView` or `captureView` calls complete in order instead of mounting competing temporary views at the same time.
+
+Codex agents should normally use the session-local Python wrapper instead of calling `window.maniScopeMajorViewApi` directly. Each session contains `.maniscope-chat/sessions/{sessionId}/maniscope_visualization.py`. That wrapper calls the Codex bridge, which owns an isolated Agent Workspace browser page at `http://127.0.0.1:3099/{sessionId}/agent`, renders through the browser API, and saves PNG artifacts under `.maniscope-chat/sessions/{sessionId}/artifacts/`.
 
 ## Views
 
 - `token_distribution`: token holder distribution network.
 - `candlestick_chart`: ACT or PNUT K-line view with manipulation cards. The alias `kline_chart` is accepted.
 - `behavior_details`: selected user or selected manipulation-card user behavior timeline.
+
+## Python Agent API
+
+The copied `maniscope_visualization.py` file exposes view-specific functions:
+
+```python
+from maniscope_visualization import (
+    get_token_distribution_args,
+    render_token_distribution,
+    get_kline_args,
+    render_kline_chart,
+    fetch_behavior_sequences,
+    get_behavior_details_args,
+    render_behavior_details,
+)
+```
+
+Use `get_*_args(...)` to extract the Agent Workspace's current view inputs, then pass explicit arguments into `render_*` functions for deterministic evidence:
+
+```python
+kline_args = get_kline_args(
+    width=1600,
+    height=900,
+    visible_time_window=["2024-10-26T00:00:00Z", "2024-10-27T00:00:00Z"],
+    card_alignment="visible_window",
+)
+
+kline_image = render_kline_chart(
+    **kline_args,
+    artifact_name="oct26-kline.png",
+)
+
+users = ["wallet_1", "wallet_2"]
+behavior_data = fetch_behavior_sequences(users, coin="ACT")
+
+behavior_image = render_behavior_details(
+    selected_user=users[0],
+    selected_users_list=users,
+    behavior_data=behavior_data,
+    entity_info=None,
+    snapshot_time="2024-11-09T23:00:00Z",
+    manipulation_results=kline_args["manipulation_results"],
+    sync_target_time_window=None,
+    visible_time_window=["2024-10-26T00:00:00Z", "2024-10-27T00:00:00Z"],
+    artifact_name="oct26-behavior-details.png",
+)
+```
+
+Render results use Python-style top-level keys such as `artifact_path`, `artifact_url`, `artifact_name`, `dependencies`, and `render_metadata`. The actual frontend render arguments inside the wrapper are converted from Python snake case to the frontend camel case contract.
+
+The wrapper talks to these local bridge endpoints:
+
+- `GET /api/agent-browser/{sessionId}/health`
+- `POST /api/agent-browser/{sessionId}/token-distribution/current-args`
+- `POST /api/agent-browser/{sessionId}/token-distribution/render`
+- `POST /api/agent-browser/{sessionId}/kline/current-args`
+- `POST /api/agent-browser/{sessionId}/kline/render`
+- `POST /api/agent-browser/{sessionId}/behavior-details/current-args`
+- `POST /api/agent-browser/{sessionId}/behavior-details/render`
+- `POST /api/agent-browser/{sessionId}/behavior-details/fetch-sequences`
 
 ## API
 

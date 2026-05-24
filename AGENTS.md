@@ -32,6 +32,14 @@ The backend direct-run default in `front/server/main.py` is `127.0.0.1:8099`, ov
 
 The Codex bridge default in `front/codex-bridge/server.mjs` is `8787`, overridable with `CODEX_BRIDGE_PORT`. The backend chat service defaults to `http://127.0.0.1:8787`, overridable with `CODEX_BRIDGE_URL`.
 
+## Agent Visualization Helper
+
+Every ManiScope chat session contains a managed helper file at `.maniscope-chat/sessions/{sessionId}/maniscope_visualization.py`. Use it when an agent needs to render visual evidence from Python. It exposes view-specific functions for Token Distribution, K-Line, and Behavior Details, including `get_token_distribution_args`, `render_token_distribution`, `get_kline_args`, `render_kline_chart`, `fetch_behavior_sequences`, `get_behavior_details_args`, and `render_behavior_details`.
+
+The helper calls the Codex bridge on `http://127.0.0.1:8787`. The bridge opens an isolated Agent Workspace browser page at `http://127.0.0.1:3099/{sessionId}/agent`, invokes the frontend render API there, and saves generated PNGs to the session `artifacts/` folder. Prefer these helper functions over manual browser attachment or ad hoc JavaScript evaluation.
+
+Agent rendering uses Playwright Chromium from the `front/` package. If the bridge reports a missing browser runtime, run `bunx playwright install chromium` from `front/`.
+
 ## Interaction Requirements
 
 - Always ask for clarification if the task specification is ambiguous or a reasonable assumption would be risky.

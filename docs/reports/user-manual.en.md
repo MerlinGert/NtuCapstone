@@ -163,6 +163,8 @@ During an agent turn, Thinking and Agent Activity appear above the assistant res
 
 Assistant responses can include Markdown text, generated artifacts, and image previews. When the agent mentions a local image path in its response, ManiScope displays the image if the file is under the active session folder, the project folder, or another explicitly allowed image root. Valid images are copied into the session `artifacts/` folder and served through the session artifact endpoint rather than exposing arbitrary filesystem paths. Generated images should normally be saved under the session `artifacts/` folder for chat evidence, or under a trace `analysis-results/` folder for durable trace-analysis artifacts.
 
+For visual follow-up work, each session also includes a managed Python helper named `maniscope_visualization.py`. The agent can import this file from the session folder to render Token Distribution, K-line, and Behavior Details images through an isolated Agent Workspace browser page. These renders save PNG evidence into the shared session `artifacts/` folder without changing the Human Workspace state.
+
 ## User Actions, Annotations, And Action Tree
 
 The bottom panel in the middle column is now part of the investigation workflow. It has three tabs: User Actions, Annotations, and Action Tree. The default active tab is Action Tree.
