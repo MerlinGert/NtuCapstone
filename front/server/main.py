@@ -37,6 +37,9 @@ app.include_router(user_behavior_service.router)
 app.include_router(chat_session_service.router)
 app.include_router(codex_chat_service.router)
 
+DEFAULT_BACKEND_HOST = os.getenv("MANISCOPE_BACKEND_HOST", "127.0.0.1")
+DEFAULT_BACKEND_PORT = int(os.getenv("MANISCOPE_BACKEND_PORT", "8099"))
+
 
 @app.get("/")
 def read_root():
@@ -46,4 +49,4 @@ def read_root():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=DEFAULT_BACKEND_HOST, port=DEFAULT_BACKEND_PORT)

@@ -15,13 +15,13 @@ This is a FastAPI backend for processing data and serving API requests.
 
 ## Running the Server
 
-Run the server from the project root (`code/front`):
+Run the server from `front/server`:
 
 ```bash
-uvicorn server.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --reload --host 127.0.0.1 --port 8099
 ```
 
-The API will be available at `http://localhost:8000`.
+The API will be available at `http://127.0.0.1:8099`.
 Frontend requests to `/api/*` will be proxied to this server.
 
 ## Structure
