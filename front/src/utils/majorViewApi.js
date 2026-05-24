@@ -358,13 +358,14 @@ function createRenderHost(viewName, width, height) {
   host.setAttribute('aria-hidden', 'true')
   Object.assign(host.style, {
     position: 'fixed',
-    left: '-100000px',
+    left: '0',
     top: '0',
     width: `${width}px`,
     height: `${height}px`,
     background: '#ffffff',
     overflow: 'hidden',
     pointerEvents: 'none',
+    zIndex: '-1',
     contain: 'layout style paint size',
   })
   document.body.appendChild(host)

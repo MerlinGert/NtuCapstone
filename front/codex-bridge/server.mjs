@@ -3,6 +3,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { AgentBrowserManager } from './agent-browser.mjs'
 import { materializeLocalImageReferences } from './local-image-artifacts.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
@@ -15,8 +16,11 @@ const CHAT_ROOT = path.join(REPO_ROOT, '.maniscope-chat')
 const SESSIONS_DIR = path.join(CHAT_ROOT, 'sessions')
 const DEFAULT_CODEX_BRIDGE_PORT = 8787
 const PORT = Number(process.env.CODEX_BRIDGE_PORT || DEFAULT_CODEX_BRIDGE_PORT)
+const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8099'
+const BACKEND_URL = process.env.MANISCOPE_BACKEND_URL || DEFAULT_BACKEND_URL
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
+const agentBrowser = new AgentBrowserManager()
 
 function sessionDir(sessionId) {
   if (!SESSION_ID_RE.test(sessionId)) {
@@ -25,6 +29,16 @@ function sessionDir(sessionId) {
     throw error
   }
   return path.join(SESSIONS_DIR, sessionId)
+}
+
+function existingSessionDir(sessionId) {
+  const dir = sessionDir(sessionId)
+  if (!fs.existsSync(dir)) {
+    const error = new Error('session not found')
+    error.statusCode = 404
+    throw error
+  }
+  return dir
 }
 
 function validateThreadKey(threadKey) {
@@ -344,10 +358,25 @@ Major ManiScope views and when to use them:
 Rendering policy:
 - The frontend exposes major-view render helpers through window.maniScopeMajorViewApi after CryptoVis mounts.
 - The available views are token_distribution, candlestick_chart or kline_chart, and behavior_details.
-- For a new visual investigation, render focused views rather than relying only on attached trace images.
-- For K-line windows, prefer an explicit visibleTimeWindow and cardAlignment: 'visible_window' when focusing on a suspicious time range.
-- For Behavior Details, provide selectedUser or selectedUsersList plus fetched behaviorData; use strict rendering when an empty view would be misleading.
-- Use larger dimensions or full-quality captures when labels, card text, or timelines matter.
+- In this session, a Python helper is available at ${relativeSessionRoot}/maniscope_visualization.py. Run Python scripts from ${relativeSessionRoot} so "from maniscope_visualization import ..." works.
+- Prefer the Python helper for visual investigation. Do not manually attach to the browser, call Playwright yourself, or evaluate frontend JavaScript unless the helper fails and you explain why.
+- The helper calls the Codex bridge, which opens an isolated Agent Workspace browser page at /${sessionId}/agent and saves rendered PNGs into ${relativeSessionRoot}/artifacts without mutating the Human Workspace.
+- Use view-specific helper functions instead of generic view-name strings:
+  - Token Distribution: get_token_distribution_args(...), render_token_distribution(...)
+  - K-Line: get_kline_args(...), render_kline_chart(...)
+  - Behavior Details: fetch_behavior_sequences(...), get_behavior_details_args(...), render_behavior_details(...)
+- Use this visual rendering workflow:
+  1. Choose the view and evidence target.
+  2. Call the matching get_*_args(...) function to extract current Agent Workspace data and render state.
+  3. Modify only explicit arguments needed for the question, such as time window, card alignment, selected users, dimensions, or display options.
+  4. Call the matching render_* function with a descriptive artifact_name.
+  5. Use the returned artifact_path, artifact_url, dependencies, and render_metadata in your analysis.
+  6. Mention the rendered image when it supports a Finding, Insight, Hypothesis, InvestigationStrategy, or recommendation.
+- For a new visual investigation, render focused views rather than relying only on attached trace images. Existing trace screenshots are enough only when the question is specifically about what the user previously saw and the screenshot directly shows the needed evidence.
+- For Token Distribution, use render_token_distribution for holder clusters, links, entity boundaries, suspicious user locations, selected entities, and detector grouping structure.
+- For K-Line, use render_kline_chart for price phases, manipulation card timing, time-window alignment, and cohort comparison. Prefer visible_time_window and card_alignment="visible_window" when focusing on a suspicious time range.
+- For Behavior Details, use fetch_behavior_sequences before rendering when behavior_data is not already available. Use render_behavior_details for wallet or cohort timelines, role comparison, buy/sell/transfer order, balance trajectories, residual holdings, exits, and manipulation boxes. Use strict rendering when an empty view would be misleading.
+- Use larger dimensions or full-quality renders when labels, card text, timelines, or dense event patterns matter.
 - Save rendered evidence images when they support a Finding, Insight, Hypothesis, recommendation, or Reasoning Graph Patch. For trace analysis artifacts, save them under analysis-results/continued-investigation-assets or another assets folder inside analysis-results.
 
 Response and execution modes:
@@ -381,6 +410,8 @@ Mode D: recommendation planning.
 Mode E: autonomous investigation.
 - If the user asks you to investigate, explore, validate, or continue analysis, first state a short InvestigationStrategy plan, even if the user did not explicitly ask for a plan.
 - Then execute the needed Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions unless the user asks for planning-only.
+- When a claim depends on visual evidence, write and run a small Python script in ${relativeSessionRoot} that imports maniscope_visualization.py and renders the needed focused view. Do this unless the existing trace screenshot is exactly the evidence needed.
+- Do not only cite old trace screenshots for a new visual investigation. Use newly rendered evidence when investigating a new visual question, then pair it with statistical or model checks when exact values or robustness matter.
 - For broad or deep investigations, ask the Codex runtime to spawn a subagent with functions.spawn_agent when that tool is available. Give the subagent a bounded evidence-gathering task and continue useful non-overlapping work locally. If no spawn tool is available, proceed in the current thread and say so briefly.
 - Convert recommendation-plan Interactions into concrete visual checks, data queries, model robustness checks, or synthesis steps.
 - Report completed checks, blocked checks, evidence, Findings, Insights, and unresolved gaps.
@@ -396,6 +427,7 @@ Be visibly collaborative while working:
 - Send concise progress updates as user-facing working notes when you start reading context, inspect trace evidence, run a command, render a view, save an artifact, calculate statistics, rerun or vary model outputs, spawn a subagent, or change investigation direction.
 - Keep progress updates factual and short. Do not wait until the final answer if the task takes more than a moment.
 - Final conclusions must be grounded in trace evidence, rendered visual evidence, model output, data, or stated assumptions.
+- When using rendered images, state the helper function used, the key render arguments, where the image was saved, what visual evidence it supports, and whether exact statistics still need script-side validation.
 
 Use focused reads and queries. Avoid broad filesystem scans or dumping entire large files unless the user explicitly asks for exhaustive output.
 
@@ -914,14 +946,117 @@ async function handleStop(req, res, sessionId, threadKey) {
   sendJson(res, 200, { sessionId, threadKey, stopped: true })
 }
 
+function objectPayload(value, fallback = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback
+  return value
+}
+
+async function handleAgentBrowserHealth(_req, res, sessionId) {
+  existingSessionDir(sessionId)
+  const payload = await agentBrowser.health(sessionId)
+  sendJson(res, 200, payload)
+}
+
+async function handleAgentBrowserCurrentArgs(req, res, sessionId, viewKey) {
+  existingSessionDir(sessionId)
+  const body = await readBody(req)
+  const options = objectPayload(body.options)
+  const args = await agentBrowser.getCurrentArgs(sessionId, viewKey, options)
+  sendJson(res, 200, {
+    sessionId,
+    viewKey,
+    args,
+  })
+}
+
+async function handleAgentBrowserRender(req, res, sessionId, viewKey) {
+  const dir = existingSessionDir(sessionId)
+  const body = await readBody(req)
+  const args = objectPayload(body.args, null)
+  if (!args) {
+    sendJson(res, 400, { error: 'args must be an object' })
+    return
+  }
+  const result = await agentBrowser.renderViewToArtifact({
+    sessionId,
+    sessionDir: dir,
+    viewKey,
+    args,
+    options: objectPayload(body.options),
+    artifactName: typeof body.artifactName === 'string' ? body.artifactName : null,
+  })
+  sendJson(res, 200, result)
+}
+
+async function handleBehaviorSequences(req, res, sessionId) {
+  existingSessionDir(sessionId)
+  const body = await readBody(req)
+  const users = body.users
+  if (!Array.isArray(users) || !users.every((user) => typeof user === 'string')) {
+    sendJson(res, 400, { error: 'users must be an array of strings' })
+    return
+  }
+  const coin = typeof body.coin === 'string' && body.coin ? body.coin : 'ACT'
+  const response = await fetch(`${BACKEND_URL.replace(/\/+$/, '')}/api/user_behavior/sequences`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ users, coin }),
+  })
+  const text = await response.text()
+  if (!response.ok) {
+    sendJson(res, response.status, {
+      error: text || `Backend returned HTTP ${response.status}`,
+    })
+    return
+  }
+  sendJson(res, 200, text ? JSON.parse(text) : {})
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`)
   const chatMatch = url.pathname.match(/^\/chat\/([0-9a-f]{5})\/message$/)
   const stopMatch = url.pathname.match(/^\/chat\/([0-9a-f]{5})\/threads\/([a-zA-Z0-9_-]{1,64})\/stop$/)
+  const agentHealthMatch = url.pathname.match(/^\/api\/agent-browser\/([0-9a-f]{5})\/health$/)
+  const agentViewMatch = url.pathname.match(
+    /^\/api\/agent-browser\/([0-9a-f]{5})\/(token-distribution|kline|behavior-details)\/(render|current-args|fetch-sequences)$/,
+  )
 
   if (req.method === 'GET' && url.pathname === '/health') {
     sendJson(res, 200, { ok: true })
     return
+  }
+
+  if (req.method === 'GET' && agentHealthMatch) {
+    handleAgentBrowserHealth(req, res, agentHealthMatch[1]).catch((error) => {
+      sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
+    })
+    return
+  }
+
+  if (req.method === 'POST' && agentViewMatch) {
+    const [, sessionId, viewKey, operation] = agentViewMatch
+    if (operation === 'fetch-sequences' && viewKey !== 'behavior-details') {
+      sendJson(res, 404, { error: 'not found' })
+      return
+    }
+    if (operation === 'current-args') {
+      handleAgentBrowserCurrentArgs(req, res, sessionId, viewKey).catch((error) => {
+        sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
+      })
+      return
+    }
+    if (operation === 'render') {
+      handleAgentBrowserRender(req, res, sessionId, viewKey).catch((error) => {
+        sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
+      })
+      return
+    }
+    if (operation === 'fetch-sequences') {
+      handleBehaviorSequences(req, res, sessionId).catch((error) => {
+        sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
+      })
+      return
+    }
   }
 
   if (req.method === 'POST' && chatMatch) {
@@ -943,4 +1078,18 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`Codex bridge listening on http://127.0.0.1:${PORT}`)
+})
+
+async function shutdown() {
+  await agentBrowser.close()
+  server.close(() => {
+    process.exit(0)
+  })
+}
+
+process.on('SIGINT', () => {
+  shutdown().catch(() => process.exit(1))
+})
+process.on('SIGTERM', () => {
+  shutdown().catch(() => process.exit(1))
 })

@@ -19,6 +19,7 @@
     "gradient-path": "^2.3.0",
     "html-to-image": "^1.11.13",
     "markdown-it": "^14.1.1",
+    "playwright": "^1.60.0",
     "snapsvg": "^0.5.1",
     "snapsvg-cjs": "^0.0.6",
     "vue": "^3.2.25"

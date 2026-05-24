@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from session_git_service import SessionGitError, commit_trace_state, list_trace_versions
+from session_tool_service import ensure_session_tools
 
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -129,6 +130,7 @@ def _ensure_session(session_id: str, coin: str | None = None) -> tuple[Path, dic
             image_count=0,
             updated_at=meta["createdAt"],
         )
+    ensure_session_tools(session_dir, session_id)
     return session_dir, meta, existed
 
 
@@ -501,6 +503,7 @@ def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
             image_count=0,
             updated_at=meta["createdAt"],
         )
+        ensure_session_tools(session_dir, session_id)
         return {"sessionId": session_id, "meta": meta, "git": git_result}
 
     raise HTTPException(status_code=503, detail="Unable to allocate a unique session ID")

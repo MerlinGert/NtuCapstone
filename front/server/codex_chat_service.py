@@ -10,6 +10,8 @@ import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from session_tool_service import ensure_session_tools
+
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
@@ -48,6 +50,7 @@ def _session_dir(session_id: str) -> Path:
     session_dir.mkdir(parents=True, exist_ok=True)
     (session_dir / "images").mkdir(exist_ok=True)
     (session_dir / "artifacts").mkdir(exist_ok=True)
+    ensure_session_tools(session_dir, session_id)
     return session_dir
 
 
