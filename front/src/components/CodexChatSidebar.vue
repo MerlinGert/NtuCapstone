@@ -1,16 +1,20 @@
 <template>
   <aside
+    ref="sidebar"
     class="codex-chat-sidebar"
-    :class="{ open }"
+    :class="{ open, moving: !!panelDragState, resizing: !!panelResizeState }"
+    :style="panelStyle"
     aria-label="Codex chat"
     @dragover.prevent="dragging = true"
     @dragleave.prevent="dragging = false"
     @drop.prevent="handleDrop"
   >
-    <div class="codex-chat-header">
+    <div class="codex-chat-header" @pointerdown="startPanelDrag">
       <div>
         <div class="codex-chat-title">Codex Chat</div>
-        <div class="codex-chat-subtitle">Session {{ sessionId || 'pending' }}</div>
+        <div class="codex-chat-subtitle">
+          Session {{ sessionId || 'pending' }} · {{ workspaceLabel }}
+        </div>
       </div>
       <button class="codex-chat-icon-btn" type="button" title="Close chat" @click="$emit('close')">
         ×
@@ -36,44 +40,69 @@
         <div class="message-role">{{ message.role === 'user' ? 'You' : 'Codex' }}</div>
         <div class="message-bubble">
           <div
+            v-if="message.role === 'assistant' && (message.loading || message.ephemeralReasoning || (message.activity && message.activity.length))"
+            class="message-status-stack"
+          >
+            <div v-if="message.loading" class="message-loading">
+              <span class="loading-pulse"></span>
+              {{ stopRequested ? 'Stopping Codex...' : 'Codex is working...' }}
+            </div>
+            <div v-if="message.ephemeralReasoning && message.thinkingOpen !== false" class="reasoning-bubble">
+              <div class="reasoning-label">Thinking</div>
+              <div class="reasoning-text">{{ message.ephemeralReasoning }}</div>
+            </div>
+            <div
+              v-if="message.activity && message.activity.length"
+              class="message-activity"
+              :class="{ 'message-activity-after-thinking': hasVisibleThinking(message) }"
+            >
+              <div class="activity-header">
+                <span>Agent activity</span>
+              </div>
+              <div v-if="message.activityOpen && displayedActivities(message).length" class="activity-list">
+                <div
+                  v-for="activity in displayedActivities(message)"
+                  :key="activity.id"
+                  class="activity-item"
+                  :class="activityClass(activity)"
+                >
+                  <span class="activity-dot"></span>
+                  <span class="activity-body">
+                    <span class="activity-title">{{ activity.title || activity.text }}</span>
+                    <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
+                    <span v-if="activity.output && message.activityOpen" class="activity-output">
+                      {{ activity.output }}
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <div v-else-if="collapsedActivities(message).length" class="activity-list activity-list-collapsed">
+                <div
+                  v-for="activity in collapsedActivities(message)"
+                  :key="activity.id"
+                  class="activity-item activity-item-latest"
+                  :class="activityClass(activity)"
+                >
+                  <span class="activity-dot"></span>
+                  <span class="activity-body">
+                    <span class="activity-title">{{ activity.title || activity.text }}</span>
+                    <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
+                  </span>
+                </div>
+              </div>
+              <div class="activity-footer">
+                <button type="button" class="activity-toggle" @click="message.activityOpen = !message.activityOpen">
+                  {{ activityToggleLabel(message) }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
             v-if="message.content && message.role === 'assistant'"
             class="message-markdown"
             v-html="renderMarkdown(message.content)"
           ></div>
           <div v-else-if="message.content" class="message-text">{{ message.content }}</div>
-          <div v-if="message.loading" class="message-loading">
-            <span class="loading-pulse"></span>
-            {{ stopRequested ? 'Stopping Codex...' : 'Codex is working...' }}
-          </div>
-          <div v-if="message.ephemeralReasoning" class="reasoning-bubble">
-            <div class="reasoning-label">Thinking</div>
-            <div class="reasoning-text">{{ message.ephemeralReasoning }}</div>
-          </div>
-          <div v-if="message.activity && message.activity.length" class="message-activity">
-            <div class="activity-header">
-              <span>Agent activity</span>
-              <button type="button" class="activity-toggle" @click="message.activityOpen = !message.activityOpen">
-                {{ activityToggleLabel(message) }}
-              </button>
-            </div>
-            <div class="activity-list">
-              <div
-                v-for="activity in displayedActivities(message)"
-                :key="activity.id"
-                class="activity-item"
-                :class="activityClass(activity)"
-              >
-                <span class="activity-dot"></span>
-                <span class="activity-body">
-                  <span class="activity-title">{{ activity.title || activity.text }}</span>
-                  <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
-                  <span v-if="activity.output && message.activityOpen" class="activity-output">
-                    {{ activity.output }}
-                  </span>
-                </span>
-              </div>
-            </div>
-          </div>
           <div v-if="message.artifacts && message.artifacts.length" class="message-artifacts">
             <a
               v-for="artifact in message.artifacts"
@@ -164,6 +193,16 @@
         @change="handleFileInput"
       />
     </div>
+    <div
+      class="panel-resize-handle resize-bottom-left"
+      title="Resize chat panel"
+      @pointerdown="startPanelResize($event, 'bottom-left')"
+    ></div>
+    <div
+      class="panel-resize-handle resize-bottom-right"
+      title="Resize chat panel"
+      @pointerdown="startPanelResize($event, 'bottom-right')"
+    ></div>
   </aside>
 </template>
 
@@ -175,6 +214,8 @@ const markdown = new MarkdownIt({
   breaks: true,
   linkify: true,
 })
+const PANEL_LAYOUT_STORAGE_KEY = 'maniscope.codexChat.panelLayout.v1'
+const PANEL_MARGIN = 8
 
 export default {
   name: 'CodexChatSidebar',
@@ -186,6 +227,11 @@ export default {
     sessionId: {
       type: String,
       default: '',
+    },
+    workspaceRole: {
+      type: String,
+      default: 'human',
+      validator: (value) => ['human', 'agent'].includes(value),
     },
     syncInFlight: {
       type: Boolean,
@@ -213,6 +259,13 @@ export default {
       nextAttachmentId: 1,
       nextActivityId: 1,
       historyLoadedForSession: '',
+      panelPositioned: false,
+      panelX: 0,
+      panelY: 0,
+      panelWidth: 520,
+      panelHeight: 640,
+      panelDragState: null,
+      panelResizeState: null,
     }
   },
   computed: {
@@ -221,9 +274,29 @@ export default {
       if (this.lastSyncAt) return `Live trace synced ${new Date(this.lastSyncAt).toLocaleTimeString()}`
       return 'Live trace will sync before each message'
     },
+    workspaceLabel() {
+      return this.workspaceRole === 'agent' ? 'Agent Workspace' : 'Human Workspace'
+    },
+    panelStyle() {
+      if (!this.panelPositioned) return null
+      return {
+        left: `${this.panelX}px`,
+        top: `${this.panelY}px`,
+        right: 'auto',
+        bottom: 'auto',
+        width: `${this.panelWidth}px`,
+        height: `${this.panelHeight}px`,
+      }
+    },
+  },
+  mounted() {
+    this.restorePanelLayout()
+    window.addEventListener('resize', this.clampPanelToViewport)
   },
   beforeUnmount() {
     this.attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
+    this.detachPanelPointerListeners()
+    window.removeEventListener('resize', this.clampPanelToViewport)
   },
   watch: {
     sessionId: {
@@ -239,6 +312,139 @@ export default {
     },
   },
   methods: {
+    clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value))
+    },
+    panelMinWidth() {
+      return Math.min(360, Math.max(280, window.innerWidth - PANEL_MARGIN * 2))
+    },
+    panelMinHeight() {
+      return Math.min(360, Math.max(300, window.innerHeight - PANEL_MARGIN * 2))
+    },
+    restorePanelLayout() {
+      if (typeof window === 'undefined') return
+      try {
+        const saved = JSON.parse(window.localStorage.getItem(PANEL_LAYOUT_STORAGE_KEY) || 'null')
+        if (!saved || typeof saved !== 'object') return
+        const { x, y, width, height } = saved
+        if (![x, y, width, height].every((value) => Number.isFinite(Number(value)))) return
+        this.panelX = Number(x)
+        this.panelY = Number(y)
+        this.panelWidth = Number(width)
+        this.panelHeight = Number(height)
+        this.panelPositioned = true
+        this.clampPanelToViewport()
+      } catch (_error) {
+        // Ignore invalid local layout state.
+      }
+    },
+    savePanelLayout() {
+      if (typeof window === 'undefined' || !this.panelPositioned) return
+      window.localStorage.setItem(
+        PANEL_LAYOUT_STORAGE_KEY,
+        JSON.stringify({
+          x: this.panelX,
+          y: this.panelY,
+          width: this.panelWidth,
+          height: this.panelHeight,
+        }),
+      )
+    },
+    ensurePanelPositioned() {
+      if (this.panelPositioned) return
+      const rect = this.$refs.sidebar?.getBoundingClientRect?.()
+      if (!rect) return
+      this.panelX = Math.round(rect.left)
+      this.panelY = Math.round(rect.top)
+      this.panelWidth = Math.round(rect.width)
+      this.panelHeight = Math.round(rect.height)
+      this.panelPositioned = true
+      this.clampPanelToViewport()
+    },
+    clampPanelToViewport() {
+      if (!this.panelPositioned || typeof window === 'undefined') return
+      const maxWidth = Math.max(this.panelMinWidth(), window.innerWidth - PANEL_MARGIN * 2)
+      const maxHeight = Math.max(this.panelMinHeight(), window.innerHeight - PANEL_MARGIN * 2)
+      this.panelWidth = this.clamp(this.panelWidth, this.panelMinWidth(), maxWidth)
+      this.panelHeight = this.clamp(this.panelHeight, this.panelMinHeight(), maxHeight)
+      this.panelX = this.clamp(this.panelX, PANEL_MARGIN, window.innerWidth - this.panelWidth - PANEL_MARGIN)
+      this.panelY = this.clamp(this.panelY, PANEL_MARGIN, window.innerHeight - this.panelHeight - PANEL_MARGIN)
+    },
+    detachPanelPointerListeners() {
+      window.removeEventListener('pointermove', this.handlePanelPointerMove)
+      window.removeEventListener('pointerup', this.stopPanelPointerInteraction)
+      window.removeEventListener('pointercancel', this.stopPanelPointerInteraction)
+    },
+    startPanelDrag(event) {
+      if (!this.open || event.button !== 0) return
+      if (event.target?.closest?.('button, a, input, textarea, .panel-resize-handle')) return
+      this.ensurePanelPositioned()
+      event.preventDefault()
+      this.panelDragState = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startX: this.panelX,
+        startY: this.panelY,
+      }
+      window.addEventListener('pointermove', this.handlePanelPointerMove)
+      window.addEventListener('pointerup', this.stopPanelPointerInteraction)
+      window.addEventListener('pointercancel', this.stopPanelPointerInteraction)
+    },
+    startPanelResize(event, edge) {
+      if (!this.open || event.button !== 0) return
+      this.ensurePanelPositioned()
+      event.preventDefault()
+      event.stopPropagation()
+      this.panelResizeState = {
+        edge,
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startX: this.panelX,
+        startY: this.panelY,
+        startWidth: this.panelWidth,
+        startHeight: this.panelHeight,
+      }
+      window.addEventListener('pointermove', this.handlePanelPointerMove)
+      window.addEventListener('pointerup', this.stopPanelPointerInteraction)
+      window.addEventListener('pointercancel', this.stopPanelPointerInteraction)
+    },
+    handlePanelPointerMove(event) {
+      if (this.panelDragState && event.pointerId === this.panelDragState.pointerId) {
+        const dx = event.clientX - this.panelDragState.startClientX
+        const dy = event.clientY - this.panelDragState.startClientY
+        this.panelX = this.panelDragState.startX + dx
+        this.panelY = this.panelDragState.startY + dy
+        this.clampPanelToViewport()
+      } else if (this.panelResizeState && event.pointerId === this.panelResizeState.pointerId) {
+        const dx = event.clientX - this.panelResizeState.startClientX
+        const dy = event.clientY - this.panelResizeState.startClientY
+        const minWidth = this.panelMinWidth()
+        const minHeight = this.panelMinHeight()
+        const rightEdge = this.panelResizeState.startX + this.panelResizeState.startWidth
+        if (this.panelResizeState.edge === 'bottom-left') {
+          const maxWidth = Math.max(minWidth, rightEdge - PANEL_MARGIN)
+          this.panelWidth = this.clamp(this.panelResizeState.startWidth - dx, minWidth, maxWidth)
+          this.panelX = rightEdge - this.panelWidth
+        } else {
+          const maxWidth = Math.max(minWidth, window.innerWidth - this.panelResizeState.startX - PANEL_MARGIN)
+          this.panelWidth = this.clamp(this.panelResizeState.startWidth + dx, minWidth, maxWidth)
+          this.panelX = this.panelResizeState.startX
+        }
+        const maxHeight = Math.max(minHeight, window.innerHeight - this.panelResizeState.startY - PANEL_MARGIN)
+        this.panelHeight = this.clamp(this.panelResizeState.startHeight + dy, minHeight, maxHeight)
+        this.panelY = this.panelResizeState.startY
+        this.clampPanelToViewport()
+      }
+    },
+    stopPanelPointerInteraction() {
+      if (!this.panelDragState && !this.panelResizeState) return
+      this.panelDragState = null
+      this.panelResizeState = null
+      this.detachPanelPointerListeners()
+      this.savePanelLayout()
+    },
     renderMarkdown(content) {
       return DOMPurify.sanitize(markdown.render(content || ''))
     },
@@ -290,6 +496,7 @@ export default {
         threadId: message.threadId || '',
         createdAt: message.createdAt || '',
         loading: false,
+        thinkingOpen: false,
         ephemeralReasoning: '',
       }
     },
@@ -431,15 +638,24 @@ export default {
       if (!this.sessionId || !artifact?.title) return '#'
       return `/api/sessions/${this.sessionId}/artifacts/${encodeURIComponent(artifact.title)}`
     },
+    hasVisibleThinking(message) {
+      return Boolean(message.ephemeralReasoning && message.thinkingOpen !== false)
+    },
     displayedActivities(message) {
       const activities = (message.activity || []).filter((activity) => !activity.ephemeral)
       if (message.activityOpen) return activities
-      const visible = activities.filter((activity) => activity.level !== 'debug')
-      return visible.slice(Math.max(0, visible.length - 5))
+      return []
+    },
+    collapsedActivities(message) {
+      if (message.activityOpen) return []
+      const activities = (message.activity || []).filter((activity) => !activity.ephemeral)
+      const latest = activities[activities.length - 1]
+      return latest ? [latest] : []
     },
     activityToggleLabel(message) {
       if (message.activityOpen) return 'Hide details'
-      return `${this.displayedActivities(message).length}/${(message.activity || []).length}`
+      const total = (message.activity || []).filter((activity) => !activity.ephemeral).length
+      return `Show ${total}`
     },
     activityClass(activity) {
       return {
@@ -546,11 +762,15 @@ export default {
         })
       } else if (event.type === 'stopped') {
         assistantMessage.ephemeralReasoning = ''
+        assistantMessage.thinkingOpen = false
+        assistantMessage.activityOpen = false
         assistantMessage.loading = false
         this.addActivity(assistantMessage, event)
         if (!assistantMessage.content) assistantMessage.content = 'Stopped before completion.'
       } else if (event.type === 'done') {
         assistantMessage.ephemeralReasoning = ''
+        assistantMessage.thinkingOpen = false
+        assistantMessage.activityOpen = false
         assistantMessage.threadId = event.threadId || assistantMessage.threadId
         this.addActivity(assistantMessage, {
           level: 'detail',
@@ -604,6 +824,7 @@ export default {
           attachments: codexAttachments,
           includeCurrentTrace: true,
           includeCurrentViews: true,
+          workspaceRole: this.workspaceRole,
         }),
       })
 
@@ -713,7 +934,8 @@ export default {
           loading: true,
           activity: [],
           artifacts: [],
-          activityOpen: false,
+          activityOpen: true,
+          thinkingOpen: true,
           ephemeralReasoning: '',
           createdAt: new Date().toISOString(),
         }
@@ -752,6 +974,8 @@ export default {
         if (assistantMessage) {
           assistantMessage.loading = false
           assistantMessage.ephemeralReasoning = ''
+          assistantMessage.thinkingOpen = false
+          assistantMessage.activityOpen = false
         }
         await this.persistChatHistory().catch((error) => {
           console.error('CodexChatSidebar: failed to persist chat history', error)
@@ -772,13 +996,17 @@ export default {
   right: 16px;
   bottom: 16px;
   width: min(520px, 42vw);
-  min-width: 380px;
+  min-width: 360px;
+  min-height: 360px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
   display: flex;
   flex-direction: column;
   background: #fff;
   border: 1px solid #dbe3ec;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
   z-index: 3000;
+  overflow: hidden;
   transform: translateX(calc(100% + 32px));
   opacity: 0;
   pointer-events: none;
@@ -793,6 +1021,12 @@ export default {
   pointer-events: auto;
 }
 
+.codex-chat-sidebar.moving,
+.codex-chat-sidebar.resizing {
+  transition: none;
+  user-select: none;
+}
+
 .codex-chat-header {
   display: flex;
   align-items: center;
@@ -801,6 +1035,12 @@ export default {
   border-bottom: 1px solid #e2e8f0;
   background: #f8fafc;
   flex-shrink: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.codex-chat-sidebar.moving .codex-chat-header {
+  cursor: grabbing;
 }
 
 .codex-chat-title {
@@ -916,6 +1156,13 @@ export default {
   white-space: pre-wrap;
 }
 
+.message-status-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
 .message-markdown {
   overflow-wrap: anywhere;
 }
@@ -977,7 +1224,6 @@ export default {
 }
 
 .reasoning-bubble {
-  margin-top: 7px;
   padding: 7px 8px;
   border: 1px solid #bfdbfe;
   border-left: 3px solid #3182ce;
@@ -1001,7 +1247,12 @@ export default {
 }
 
 .message-activity {
-  margin-top: 7px;
+  padding-top: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.message-activity-after-thinking {
   border-top: 1px solid #edf2f7;
   padding-top: 6px;
 }
@@ -1009,11 +1260,17 @@ export default {
 .activity-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   color: #475569;
   font-size: 11px;
   font-weight: 700;
+}
+
+.activity-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 5px;
 }
 
 .activity-toggle {
@@ -1033,6 +1290,10 @@ export default {
   margin-top: 6px;
 }
 
+.activity-list-collapsed {
+  margin-top: 5px;
+}
+
 .activity-item {
   display: grid;
   grid-template-columns: 8px 1fr;
@@ -1045,6 +1306,12 @@ export default {
   color: #475569;
   font-size: 11px;
   line-height: 1.35;
+}
+
+.activity-item-latest {
+  padding: 4px 6px;
+  font-size: 10.5px;
+  background: #fff;
 }
 
 .activity-dot {
@@ -1232,6 +1499,42 @@ export default {
   border-top: 1px solid #e2e8f0;
   background: #fff;
   flex-shrink: 0;
+}
+
+.panel-resize-handle {
+  position: absolute;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  z-index: 3;
+  opacity: 0.55;
+  touch-action: none;
+}
+
+.panel-resize-handle::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #94a3b8;
+  border-bottom: 2px solid #94a3b8;
+}
+
+.panel-resize-handle:hover {
+  opacity: 1;
+}
+
+.resize-bottom-right {
+  right: 0;
+  cursor: nwse-resize;
+}
+
+.resize-bottom-left {
+  left: 0;
+  cursor: nesw-resize;
+  transform: scaleX(-1);
 }
 
 .codex-chat-input {
