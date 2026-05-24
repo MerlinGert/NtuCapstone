@@ -23,6 +23,7 @@ CHAT_ROOT = REPO_ROOT / ".maniscope-chat"
 SESSIONS_DIR = CHAT_ROOT / "sessions"
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
 EXPORT_VERSION = "1.0"
+WORKSPACE_ROLES = {"human", "agent"}
 
 
 def _now_iso() -> str:
@@ -37,6 +38,25 @@ def _validate_session_id(session_id: str) -> None:
 def _session_dir(session_id: str) -> Path:
     _validate_session_id(session_id)
     return SESSIONS_DIR / session_id
+
+
+def _validate_workspace_role(role: str) -> None:
+    if role not in WORKSPACE_ROLES:
+        raise HTTPException(status_code=400, detail="Workspace role must be 'human' or 'agent'")
+
+
+def _workspace_dir(session_dir: Path, role: str) -> Path:
+    _validate_workspace_role(role)
+    return session_dir / "workspaces" / role
+
+
+def _workspace_state_path(session_dir: Path, role: str) -> Path:
+    return _workspace_dir(session_dir, role) / "current-state.json"
+
+
+def _ensure_workspace_dirs(session_dir: Path) -> None:
+    for role in WORKSPACE_ROLES:
+        _workspace_dir(session_dir, role).mkdir(parents=True, exist_ok=True)
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -93,6 +113,7 @@ def _ensure_session(session_id: str, coin: str | None = None) -> tuple[Path, dic
     session_dir.mkdir(parents=True, exist_ok=True)
     (session_dir / "images").mkdir(exist_ok=True)
     (session_dir / "artifacts").mkdir(exist_ok=True)
+    _ensure_workspace_dirs(session_dir)
 
     meta_path = session_dir / "session-meta.json"
     meta = _read_json(meta_path)
@@ -192,7 +213,11 @@ def _process_annotation_images(session_dir: Path, annotations: list[Any]) -> int
     return image_count
 
 
-def _process_current_state_images(session_dir: Path, current_state: dict[str, Any]) -> int:
+def _process_current_state_images(
+    session_dir: Path,
+    current_state: dict[str, Any],
+    prefix: str = "current",
+) -> int:
     image_count = 0
     screenshots = current_state.get("majorViewScreenshots")
     if not isinstance(screenshots, dict):
@@ -202,7 +227,7 @@ def _process_current_state_images(session_dir: Path, current_state: dict[str, An
         if isinstance(value, str) and value.startswith("data:image/png"):
             image_path = _write_data_url_image(
                 session_dir,
-                f"images/current-{_safe_name_part(view_name)}.png",
+                f"images/{_safe_name_part(prefix)}-{_safe_name_part(view_name)}.png",
                 value,
             )
             if image_path:
@@ -344,6 +369,7 @@ def _write_trace_state(
     )
     _atomic_write_json(session_dir / "live-session.json", live_session)
     _atomic_write_json(session_dir / "current-state.json", current_state)
+    _atomic_write_json(_workspace_state_path(session_dir, "human"), current_state)
     _atomic_write_json(session_dir / "session-meta.json", meta)
     git_result = _commit_trace_history(
         session_dir=session_dir,
@@ -422,6 +448,33 @@ def _annotation_detail(annotation: dict[str, Any] | None, annotation_id: int | N
     return {key: value for key, value in detail.items() if value is not None}
 
 
+def _workspace_payload(session_id: str, role: str) -> dict[str, Any]:
+    _validate_workspace_role(role)
+    session_dir, meta, existed = _ensure_session(session_id)
+    live_session = _load_live_session(session_dir, session_id, coin=meta.get("coin"))
+    current_state = _read_json(session_dir / "current-state.json")
+    workspace_state = _read_json(_workspace_state_path(session_dir, role))
+    if workspace_state is None and role == "human":
+        workspace_state = current_state
+    return {
+        "sessionId": session_id,
+        "workspaceRole": role,
+        "meta": {**meta, "restoredFromExisting": existed},
+        "liveSession": _hydrate_live_session_for_frontend(session_dir, live_session),
+        "currentState": current_state,
+        "workspaceState": workspace_state,
+        "latestTraceTimestamp": (live_session or {}).get("lastUpdatedAt") or meta.get("lastUpdatedAt"),
+        "latestWorkspaceTimestamp": (workspace_state or {}).get("lastUpdatedAt"),
+    }
+
+
+def _workspace_state_from_body(body: dict[str, Any]) -> dict[str, Any]:
+    state = body.get("currentState") if isinstance(body, dict) and "currentState" in body else body
+    if not isinstance(state, dict):
+        raise HTTPException(status_code=400, detail="currentState must be an object")
+    return copy.deepcopy(state)
+
+
 @router.post("")
 def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
     coin = (body or {}).get("coin")
@@ -436,6 +489,7 @@ def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
             continue
         (session_dir / "images").mkdir()
         (session_dir / "artifacts").mkdir()
+        _ensure_workspace_dirs(session_dir)
         meta = _create_meta(session_id, coin=coin, restored=False)
         _atomic_write_json(session_dir / "session-meta.json", meta)
         git_result = _commit_trace_history(
@@ -462,6 +516,33 @@ def get_session(session_id: str) -> dict[str, Any]:
         "meta": {**meta, "restoredFromExisting": existed},
         "liveSession": _hydrate_live_session_for_frontend(session_dir, live_session) if live_session else None,
         "currentState": current_state,
+    }
+
+
+@router.get("/{session_id}/workspaces/{role}")
+def get_session_workspace(session_id: str, role: str) -> dict[str, Any]:
+    return _workspace_payload(session_id, role)
+
+
+@router.put("/{session_id}/workspaces/{role}/state")
+def put_session_workspace_state(session_id: str, role: str, body: dict[str, Any]) -> dict[str, Any]:
+    _validate_workspace_role(role)
+    session_dir, _, _ = _ensure_session(session_id)
+    state = _workspace_state_from_body(body)
+    now = _now_iso()
+    _process_current_state_images(session_dir, state, prefix=f"{role}-current")
+    state.update(
+        {
+            "sessionId": session_id,
+            "workspaceRole": role,
+            "lastUpdatedAt": now,
+        }
+    )
+    _atomic_write_json(_workspace_state_path(session_dir, role), state)
+    return {
+        "sessionId": session_id,
+        "workspaceRole": role,
+        "lastUpdatedAt": now,
     }
 
 

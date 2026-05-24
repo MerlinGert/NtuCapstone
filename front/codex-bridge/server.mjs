@@ -7,12 +7,14 @@ import { materializeLocalImageReferences } from './local-image-artifacts.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
+const WORKSPACE_ROLE_RE = /^(human|agent)$/
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FRONT_DIR = path.resolve(__dirname, '..')
 const REPO_ROOT = process.env.MANISCOPE_REPO_ROOT || path.resolve(FRONT_DIR, '..')
 const CHAT_ROOT = path.join(REPO_ROOT, '.maniscope-chat')
 const SESSIONS_DIR = path.join(CHAT_ROOT, 'sessions')
-const PORT = Number(process.env.CODEX_BRIDGE_PORT || 8787)
+const DEFAULT_CODEX_BRIDGE_PORT = 8787
+const PORT = Number(process.env.CODEX_BRIDGE_PORT || DEFAULT_CODEX_BRIDGE_PORT)
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
 
@@ -32,6 +34,15 @@ function validateThreadKey(threadKey) {
     throw error
   }
   return threadKey
+}
+
+function validateWorkspaceRole(workspaceRole) {
+  if (!WORKSPACE_ROLE_RE.test(workspaceRole)) {
+    const error = new Error('workspaceRole must be human or agent')
+    error.statusCode = 400
+    throw error
+  }
+  return workspaceRole
 }
 
 function activeTurnKey(sessionId, threadKey) {
@@ -168,8 +179,14 @@ function resolveSessionFile(sessionId, relativePath) {
   return filePath
 }
 
-function currentViewImagePaths(sessionId) {
-  const currentState = readJson(path.join(sessionDir(sessionId), 'current-state.json'), {})
+function workspaceCurrentStatePath(sessionId, workspaceRole) {
+  const dir = sessionDir(sessionId)
+  if (workspaceRole === 'human') return path.join(dir, 'current-state.json')
+  return path.join(dir, 'workspaces', workspaceRole, 'current-state.json')
+}
+
+function currentViewImagePaths(sessionId, workspaceRole = 'human') {
+  const currentState = readJson(workspaceCurrentStatePath(sessionId, workspaceRole), {})
   const screenshots = currentState.majorViewScreenshots
   if (!screenshots || typeof screenshots !== 'object') return []
 
@@ -220,19 +237,40 @@ function buildThreadOptions() {
   return options
 }
 
-function buildTraceAnalysisPrompt(sessionId, userMessage) {
+function buildTraceAnalysisPrompt(sessionId, userMessage, workspaceRole = 'human') {
   const relativeSessionRoot = `.maniscope-chat/sessions/${sessionId}`
+  const activeWorkspaceState =
+    workspaceRole === 'agent'
+      ? `${relativeSessionRoot}/workspaces/agent/current-state.json`
+      : `${relativeSessionRoot}/workspaces/human/current-state.json`
+  const workspaceContext =
+    workspaceRole === 'agent'
+      ? `The user is chatting from the Agent Workspace. The agent workspace is a private exploratory ManiScope page: use ${activeWorkspaceState} for current agent-side screenshots and view state, and do not mutate or append to the human trace when doing UI exploration. The canonical human current state remains ${relativeSessionRoot}/current-state.json and represents the user's active context.`
+      : `The user is chatting from the Human Workspace. Use ${relativeSessionRoot}/current-state.json as the user's active current view state, and treat ${activeWorkspaceState} as the mirrored human workspace state.`
   return `You are a Codex agent collaborating with a user inside ManiScope.
 
-You are embedded in the active ManiScope session, so treat the live trace and
-current views as shared working context. The user is asking from inside the
-application and expects a collaborator, not a report generator by default.
+You are embedded in the active ManiScope session. The canonical live trace is
+shared, but human and agent visual workspaces have separate current states.
+The user is asking from inside the application and expects a collaborator, not
+a report generator by default.
+
+Active chat workspace role: ${workspaceRole}
+${workspaceContext}
 
 Start every trace-dependent turn by refreshing context. Read these files first:
 - docs/reports/user-manual.en.md
 - docs/ui-analysis/major-view-render-api.md
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
+- ${activeWorkspaceState}
+
+Workspace state model:
+- ${relativeSessionRoot}/live-session.json is the canonical user trace. It contains human user actions, annotations, imported trace data, reordered trace, and user-authored notes.
+- ${relativeSessionRoot}/current-state.json is the backward-compatible canonical human current state.
+- ${relativeSessionRoot}/workspaces/human/current-state.json mirrors the human workspace current state.
+- ${relativeSessionRoot}/workspaces/agent/current-state.json is private exploratory agent state.
+- Both workspaces read the canonical trace, but only human-facing trace operations write it in this stage.
+- Agent visual exploration may change agent workspace state and generated artifacts, but must not alter the human workspace state or canonical user trace unless the user explicitly asks for a durable artifact or reasoning patch.
 
 Screenshots and generated evidence are under:
 - ${relativeSessionRoot}/images
@@ -241,14 +279,15 @@ Screenshots and generated evidence are under:
 The latest major-view screenshots are also attached to this turn as image inputs when available.
 
 Live trace refresh protocol:
-- Before answering a trace-dependent question, reread live-session.json and current-state.json. Do not rely only on memory from prior turns.
+- Before answering a trace-dependent question, reread live-session.json, current-state.json, and the active workspace current-state file. Do not rely only on memory from prior turns.
 - The session directory is a git repository when trace versioning is enabled. Use it to inspect what changed quickly:
   - git -C ${relativeSessionRoot} log --oneline -n 10
   - git -C ${relativeSessionRoot} status --short
-  - git -C ${relativeSessionRoot} diff HEAD~1..HEAD -- live-session.json current-state.json
+  - git -C ${relativeSessionRoot} diff HEAD~1..HEAD -- live-session.json current-state.json workspaces/human/current-state.json workspaces/agent/current-state.json
 - If HEAD~1 is unavailable because the session has only one commit, inspect the latest full trace files instead.
 - If you do not know which session commit was last analyzed, say you are refreshing from the latest full trace, then inspect the latest trace state directly.
 - Treat new user Interactions, annotations, settings changes, imports, and trace reorders from the session git history as updates to the User Reasoning Forest.
+- Treat human current state as the user's active visual context. Treat agent current state as the agent's exploratory visual context.
 - Treat evidence that you produce through follow-up analysis as agent follow-up evidence. When durable artifacts are requested, add it through a Reasoning Graph Patch instead of silently rewriting the user's original reasoning.
 
 Core methodology:
@@ -366,13 +405,13 @@ User message:
 ${userMessage}`
 }
 
-function buildInput(sessionId, threadKey, userMessage, isNewThread, attachmentPaths) {
+function buildInput(sessionId, threadKey, userMessage, isNewThread, attachmentPaths, workspaceRole = 'human') {
   const text =
     userMessage ||
     'Please inspect the attached image input in the context of the current ManiScope session.'
 
   if (isNewThread && threadKey === 'trace-analysis') {
-    const promptText = buildTraceAnalysisPrompt(sessionId, text)
+    const promptText = buildTraceAnalysisPrompt(sessionId, text, workspaceRole)
     if (attachmentPaths.length === 0) return promptText
     return [
       { type: 'text', text: promptText },
@@ -712,6 +751,7 @@ async function handleChat(req, res, sessionId) {
   const body = await readBody(req)
   const message = String(body.message || '').trim()
   const threadKey = validateThreadKey(String(body.threadKey || 'trace-analysis'))
+  const workspaceRole = validateWorkspaceRole(String(body.workspaceRole || 'human'))
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
   const includeCurrentViews = body.includeCurrentViews !== false
   if (!message && attachments.length === 0) {
@@ -738,10 +778,17 @@ async function handleChat(req, res, sessionId) {
     return
   }
   const inputImagePaths = uniquePaths([
-    ...(includeCurrentViews ? currentViewImagePaths(sessionId) : []),
+    ...(includeCurrentViews ? currentViewImagePaths(sessionId, workspaceRole) : []),
     ...attachmentPaths,
   ])
-  const input = buildInput(sessionId, threadKey, message, isNewThread, inputImagePaths)
+  const input = buildInput(
+    sessionId,
+    threadKey,
+    message,
+    isNewThread,
+    inputImagePaths,
+    workspaceRole,
+  )
   const turnKey = activeTurnKey(sessionId, threadKey)
   if (activeTurns.has(turnKey)) {
     sendJson(res, 409, { error: 'A Codex turn is already running for this thread.' })
@@ -783,7 +830,10 @@ async function handleChat(req, res, sessionId) {
     level: 'highlight',
     category: 'session',
     title: 'Preparing Codex context',
-    detail: 'Syncing trace files and attaching current view screenshots.',
+    detail:
+      workspaceRole === 'agent'
+        ? 'Syncing shared trace files and attaching agent workspace screenshots.'
+        : 'Syncing shared trace files and attaching human workspace screenshots.',
   })
   const progressHeartbeat = startProgressHeartbeat(
     res,

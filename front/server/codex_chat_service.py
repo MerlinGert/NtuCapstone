@@ -14,7 +14,9 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
 THREAD_KEY_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
-CODEX_BRIDGE_URL = os.getenv("CODEX_BRIDGE_URL", "http://127.0.0.1:8787")
+WORKSPACE_ROLES = {"human", "agent"}
+DEFAULT_CODEX_BRIDGE_URL = "http://127.0.0.1:8787"
+CODEX_BRIDGE_URL = os.getenv("CODEX_BRIDGE_URL", DEFAULT_CODEX_BRIDGE_URL)
 BASE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = BASE_DIR.parent.parent
 SESSIONS_DIR = REPO_ROOT / ".maniscope-chat" / "sessions"
@@ -28,6 +30,12 @@ def _validate_session_id(session_id: str) -> None:
 def _validate_thread_key(thread_key: str) -> None:
     if not THREAD_KEY_RE.fullmatch(thread_key):
         raise HTTPException(status_code=400, detail="Thread key must use letters, numbers, underscores, or hyphens")
+
+
+def _validate_workspace_role(role: str) -> str:
+    if role not in WORKSPACE_ROLES:
+        raise HTTPException(status_code=400, detail="workspaceRole must be 'human' or 'agent'")
+    return role
 
 
 def _now_iso() -> str:
@@ -133,6 +141,7 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
 
     thread_key = str(body.get("threadKey") or "trace-analysis")
     _validate_thread_key(thread_key)
+    workspace_role = _validate_workspace_role(str(body.get("workspaceRole") or "human"))
 
     payload = {
         "message": message,
@@ -140,6 +149,7 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
         "attachments": attachments,
         "includeCurrentTrace": body.get("includeCurrentTrace", True),
         "includeCurrentViews": body.get("includeCurrentViews", True),
+        "workspaceRole": workspace_role,
     }
     return StreamingResponse(
         _stream_codex_response(session_id, payload),

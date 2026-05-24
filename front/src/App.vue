@@ -2,6 +2,7 @@
 import CryptoVis from './components/CryptoVis.vue'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
+const WORKSPACE_ROLES = new Set(['human', 'agent'])
 
 export default {
   components: {
@@ -10,6 +11,7 @@ export default {
   data() {
     return {
       sessionId: null,
+      workspaceRole: 'human',
       sessionError: '',
     }
   },
@@ -31,26 +33,29 @@ export default {
           if (!SESSION_ID_RE.test(payload.sessionId)) {
             throw new Error('Backend returned an invalid session ID')
           }
-          window.location.replace(`/${payload.sessionId}`)
+          window.location.replace(`/${payload.sessionId}/human`)
         } catch (error) {
           this.sessionError = error && error.message ? error.message : String(error)
         }
         return
       }
 
-      const candidate = path.slice(1)
-      if (!SESSION_ID_RE.test(candidate)) {
+      const parts = path.slice(1).split('/')
+      const candidate = parts[0]
+      const role = parts[1] || 'human'
+      if (!SESSION_ID_RE.test(candidate) || !WORKSPACE_ROLES.has(role) || parts.length > 2) {
         window.location.replace('/')
         return
       }
       this.sessionId = candidate
+      this.workspaceRole = role
     },
   },
 }
 </script>
 
 <template>
-  <CryptoVis v-if="sessionId" :session-id="sessionId" />
+  <CryptoVis v-if="sessionId" :session-id="sessionId" :workspace-role="workspaceRole" />
   <div v-else class="session-bootstrap">
     <div v-if="sessionError" class="session-bootstrap-error">
       Failed to initialize session: {{ sessionError }}

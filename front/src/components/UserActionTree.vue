@@ -5,7 +5,7 @@
       <div class="count-badge">{{ nodesCount }}</div>
       
       <!-- ezio: Multi-select insight buttons -->
-      <div class="insight-controls" style="margin-left: 16px; display: flex; gap: 8px;">
+      <div v-if="!readOnly" class="insight-controls" style="margin-left: 16px; display: flex; gap: 8px;">
         <button v-if="!isMultiSelectMode" class="insight-btn" @click="startMultiSelect" title="Create Insight" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
         </button>
@@ -17,7 +17,7 @@
         </template>
       </div>
 
-      <button class="insight-btn" @click="openAddNodeDialog" title="Add Custom Node" style="margin-left:8px;padding:2px 8px;font-size:11px;">+ Node</button>
+      <button v-if="!readOnly" class="insight-btn" @click="openAddNodeDialog" title="Add Custom Node" style="margin-left:8px;padding:2px 8px;font-size:11px;">+ Node</button>
 
       <div style="flex: 1"></div>
       <div class="tree-legend">
@@ -124,8 +124,8 @@
   </div>
 
   <!-- Context Menu -->
-  <div v-if="contextMenu.visible" class="ctx-overlay" @click="hideContextMenu" @contextmenu.prevent="hideContextMenu"></div>
-  <div v-if="contextMenu.visible" class="ctx-menu" :style="{left: contextMenu.x+'px', top: contextMenu.y+'px'}">
+  <div v-if="contextMenu.visible && !readOnly" class="ctx-overlay" @click="hideContextMenu" @contextmenu.prevent="hideContextMenu"></div>
+  <div v-if="contextMenu.visible && !readOnly" class="ctx-menu" :style="{left: contextMenu.x+'px', top: contextMenu.y+'px'}">
     <div v-if="contextMenu.node && contextMenu.node.data.type === 'annotation'" class="ctx-item" @click="openEditDialog">✏️ Edit</div>
     <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="insertAfterContextNode">➕ Insert After</div>
     <div v-if="contextMenu.node && contextMenu.node.data.type !== 'root'" class="ctx-item" @click="moveContextNode('up')">⬆️ Move Up</div>
@@ -236,7 +236,11 @@ export default {
     annotations: {
       type: Array,
       default: () => []
-    }
+    },
+    readOnly: {
+      type: Boolean,
+      default: false
+    },
   },
   data() {
     return {
@@ -298,6 +302,7 @@ export default {
     },
     // ezio: high level insight methods
     startMultiSelect() {
+      if (this.readOnly) return
       this.isMultiSelectMode = true
       this.selectedInsightAnnotations = []
       this.drawTree()
@@ -308,6 +313,7 @@ export default {
       this.drawTree()
     },
     openInsightPopup() {
+      if (this.readOnly) return
       if (this.selectedInsightAnnotations.length > 0) {
         this.showInsightPopup = true
         this.insightText = ''
@@ -320,6 +326,7 @@ export default {
       this.selectedInsightToView = null
     },
     saveInsight() {
+      if (this.readOnly) return
       if (!this.insightText.trim()) return
       
       const payload = {
@@ -345,6 +352,7 @@ export default {
       this.contextMenu.visible = false
     },
     deleteContextNode() {
+      if (this.readOnly) return
       const node = this.contextMenu.node
       this.hideContextMenu()
       if (!node) return
@@ -363,6 +371,7 @@ export default {
       }
     },
     openEditDialog() {
+      if (this.readOnly) return
       const node = this.contextMenu.node
       this.hideContextMenu()
       if (!node) return
@@ -390,6 +399,7 @@ export default {
       reader.readAsDataURL(file)
     },
     saveEdit() {
+      if (this.readOnly) return
       this.$emit('update-annotation', {
         id: this.editDialog.annotationId,
         text: this.editDialog.text,
@@ -401,9 +411,11 @@ export default {
 
     // ezio: add custom annotation node
     openAddNodeDialog() {
+      if (this.readOnly) return
       this.addNodeDialog = { visible: true, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: null }
     },
     insertAfterContextNode() {
+      if (this.readOnly) return
       const node = this.contextMenu.node
       this.hideContextMenu()
       if (!node || !node.data.data) return
@@ -411,6 +423,7 @@ export default {
       this.addNodeDialog = { visible: true, text: '', sourceView: 'token_distribution', color: '#fde68a', imageUrl: null, afterTimestamp: ts }
     },
     moveContextNode(direction) {
+      if (this.readOnly) return
       const node = this.contextMenu.node
       this.hideContextMenu()
       if (!node || !node.data.data) return
@@ -428,6 +441,7 @@ export default {
       reader.readAsDataURL(file)
     },
     saveNewNode() {
+      if (this.readOnly) return
       if (!this.addNodeDialog.text.trim()) return
       this.$emit('add-custom-annotation', {
         text: this.addNodeDialog.text,
@@ -999,6 +1013,7 @@ export default {
         .on('contextmenu', (event, d) => {
           event.preventDefault()
           event.stopPropagation()
+          if (this.readOnly) return
           if (d.data.type === 'root') return
           this.contextMenu = { visible: true, x: event.clientX, y: event.clientY, node: d }
         })

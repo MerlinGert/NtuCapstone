@@ -18,6 +18,8 @@ const VIEW_ALIASES = {
   behavior_details: 'behavior_details',
 }
 
+let renderQueue = Promise.resolve()
+
 const REQUIRED_RENDER_ARGS = {
   token_distribution: [
     'snapshotData',
@@ -353,22 +355,31 @@ async function waitForSettledRender(ms) {
 function createRenderHost(viewName, width, height) {
   const host = document.createElement('div')
   host.dataset.majorViewRenderHost = viewName
+  host.setAttribute('aria-hidden', 'true')
   Object.assign(host.style, {
     position: 'fixed',
-    left: '0',
+    left: '-100000px',
     top: '0',
     width: `${width}px`,
     height: `${height}px`,
     background: '#ffffff',
     overflow: 'hidden',
     pointerEvents: 'none',
-    zIndex: '2147483647',
+    contain: 'layout style paint size',
   })
   document.body.appendChild(host)
   return host
 }
 
 async function mountAndRender(Component, props, args, options = {}) {
+  const run = renderQueue.catch(() => {}).then(() =>
+    mountAndRenderNow(Component, props, args, options),
+  )
+  renderQueue = run.catch(() => {})
+  return run
+}
+
+async function mountAndRenderNow(Component, props, args, options = {}) {
   const viewName = options.viewName
   const width = normalizeDimension(args.width, 'width', viewName)
   const height = normalizeDimension(args.height, 'height', viewName)

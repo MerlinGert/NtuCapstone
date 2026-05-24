@@ -12,6 +12,17 @@
           >
             Session {{ maniscopeSessionId }}
           </button>
+          <span class="workspace-badge" :class="`workspace-${workspaceRole}`">
+            {{ workspaceLabel }}
+          </span>
+          <button
+            v-if="isHumanWorkspace && maniscopeSessionId"
+            class="session-io-btn"
+            @click="openAgentWorkspace"
+            title="Open the agent workspace in a separate page"
+          >
+            Open Agent Workspace
+          </button>
           <button
             class="ai-chat-btn"
             @click="chatBoxOpen = !chatBoxOpen"
@@ -30,7 +41,7 @@
             </label>
           </div>
           <!-- ezio: export/import session buttons -->
-          <div style="display: flex; gap: 6px; margin-left: 16px; border-left: 1px solid #e2e8f0; padding-left: 16px;">
+          <div v-if="isHumanWorkspace" style="display: flex; gap: 6px; margin-left: 16px; border-left: 1px solid #e2e8f0; padding-left: 16px;">
             <button class="session-io-btn" @click="onClickExport" title="Export Actions & Annotations as JSON">
               Export
             </button>
@@ -150,6 +161,7 @@
                 v-show="activeBottomTab === 'tree'"
                 :actions="userActionSequence"
                 :annotations="annotationRecords"
+                :read-only="isAgentWorkspace"
                 @add-insight-annotation="handleAddInsightAnnotation"
                 @delete-annotation="handleDeleteAnnotation"
                 @delete-action="handleDeleteAction"
@@ -235,6 +247,7 @@
 <CodexChatSidebar
   :open="chatBoxOpen"
   :session-id="maniscopeSessionId"
+  :workspace-role="workspaceRole"
   :sync-in-flight="liveTraceSyncInFlight"
   :last-sync-at="lastLiveTraceSyncAt"
   :before-send="syncTraceForChat"
@@ -347,6 +360,11 @@ export default {
       type: String,
       default: null,
     },
+    workspaceRole: {
+      type: String,
+      default: 'human',
+      validator: (value) => ['human', 'agent'].includes(value),
+    },
   },
   components: {
     NSelect,
@@ -374,10 +392,15 @@ export default {
       maniscopeSessionId: this.sessionId,
       sessionRestoreStatus: 'pending',
       lastLiveTraceSyncAt: null,
+      lastWorkspaceSyncAt: null,
+      latestHumanCurrentState: null,
       liveTraceSyncInFlight: false,
       liveTraceSyncError: '',
       _liveTraceSyncTimer: null,
+      _agentTraceRefreshTimer: null,
+      _workspaceStateTimer: null,
       _sessionEventQueue: null,
+      _workspaceRestoreState: null,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -545,6 +568,17 @@ export default {
       majorViewApi: null,
     }
   },
+  computed: {
+    isHumanWorkspace() {
+      return this.workspaceRole !== 'agent'
+    },
+    isAgentWorkspace() {
+      return this.workspaceRole === 'agent'
+    },
+    workspaceLabel() {
+      return this.isAgentWorkspace ? 'Agent Workspace' : 'Human Workspace'
+    },
+  },
   watch: {
     selectedUser(newVal) {
       if (newVal) {
@@ -563,7 +597,9 @@ export default {
         return
       }
       try {
-        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}`)
+        const response = await fetch(
+          `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
+        )
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const payload = await response.json()
         if (payload.liveSession) {
@@ -572,19 +608,26 @@ export default {
         } else {
           this.sessionRestoreStatus = 'new'
         }
-        if (payload.currentState) {
-          this.applyCurrentState(payload.currentState)
+        this.latestHumanCurrentState = payload.currentState || null
+        const restoreState = payload.workspaceState || (this.isHumanWorkspace ? payload.currentState : null)
+        if (restoreState) {
+          this._workspaceRestoreState = restoreState
+          this.applyCurrentState(restoreState)
         }
-        this.lastLiveTraceSyncAt = payload.meta?.lastUpdatedAt || null
+        this.lastLiveTraceSyncAt = payload.latestTraceTimestamp || payload.meta?.lastUpdatedAt || null
+        this.lastWorkspaceSyncAt = payload.latestWorkspaceTimestamp || null
       } catch (error) {
         this.sessionRestoreStatus = 'error'
         this.liveTraceSyncError = error && error.message ? error.message : String(error)
         console.error('CryptoVis: failed to initialize ManiScope session', error)
       }
     },
-    applyLiveSession(liveSession) {
+    clonePlain(value) {
+      return JSON.parse(JSON.stringify(value))
+    },
+    applyTraceRecordsFromLiveSession(liveSession, { applyWorkspaceDefaults = true } = {}) {
       if (!liveSession || typeof liveSession !== 'object') return
-      if (liveSession.coin === 'ACT' || liveSession.coin === 'PNUT') {
+      if (applyWorkspaceDefaults && (liveSession.coin === 'ACT' || liveSession.coin === 'PNUT')) {
         this.currentCoin = liveSession.coin
       }
       this.userActionSequence = Array.isArray(liveSession.userActionSequence)
@@ -600,6 +643,10 @@ export default {
               Number.isFinite(annotation?.id) && annotation.id >= maxId ? annotation.id + 1 : maxId,
             0,
           )
+    },
+    applyLiveSession(liveSession) {
+      if (!liveSession || typeof liveSession !== 'object') return
+      this.applyTraceRecordsFromLiveSession(liveSession, { applyWorkspaceDefaults: true })
       if (Array.isArray(liveSession.config?.snapshotCategories)) {
         this.snapshotCategories = liveSession.config.snapshotCategories
       }
@@ -612,6 +659,36 @@ export default {
       if (currentState.coin === 'ACT' || currentState.coin === 'PNUT') {
         this.currentCoin = currentState.coin
       }
+      if (currentState.snapshotTime) {
+        this.snapshot_configuration.time = currentState.snapshotTime
+      }
+      if (currentState.snapshotConfig && typeof currentState.snapshotConfig === 'object') {
+        this.snapshot_configuration = {
+          ...this.snapshot_configuration,
+          ...this.clonePlain(currentState.snapshotConfig),
+        }
+      }
+      if (currentState.entityConfig && typeof currentState.entityConfig === 'object') {
+        this.entity_detection_configuration = this.clonePlain(currentState.entityConfig)
+      }
+      if (currentState.linkConfig && typeof currentState.linkConfig === 'object') {
+        this.link_detection_configuration = this.clonePlain(currentState.linkConfig)
+      }
+      if (currentState.manipulationConfig && typeof currentState.manipulationConfig === 'object') {
+        this.manipulation_detection_configuration = this.clonePlain(currentState.manipulationConfig)
+      }
+      if (Object.prototype.hasOwnProperty.call(currentState, 'selectedUser')) {
+        this.selectedUser = currentState.selectedUser || null
+      }
+      if (Array.isArray(currentState.selectedCardUsers)) {
+        this.selectedCardUsers = currentState.selectedCardUsers
+      }
+      if (Object.prototype.hasOwnProperty.call(currentState, 'klineTimeWindow')) {
+        this.klineTimeWindow = currentState.klineTimeWindow || null
+      }
+      if (Object.prototype.hasOwnProperty.call(currentState, 'behaviorTimeWindow')) {
+        this.behaviorTimeWindow = currentState.behaviorTimeWindow || null
+      }
       if (currentState.activeBottomTab) {
         this.activeBottomTab = currentState.activeBottomTab
       }
@@ -620,7 +697,12 @@ export default {
       return {
         sessionId: this.maniscopeSessionId,
         coin: this.currentCoin,
+        workspaceRole: this.workspaceRole,
         snapshotTime: this.snapshot_configuration.time,
+        snapshotConfig: this.clonePlain(this.snapshot_configuration),
+        entityConfig: this.clonePlain(this.entity_detection_configuration),
+        linkConfig: this.clonePlain(this.link_detection_configuration),
+        manipulationConfig: this.clonePlain(this.manipulation_detection_configuration),
         selectedUser: this.selectedUser,
         selectedCardUsers: this.selectedCardUsers,
         klineTimeWindow: this.klineTimeWindow,
@@ -641,6 +723,36 @@ export default {
         ...extra,
       }
     },
+    async putWorkspaceState({ includeCurrentViews = false } = {}) {
+      if (!this.maniscopeSessionId) return null
+      const majorViewScreenshots = includeCurrentViews
+        ? await this.captureCurrentMajorViewsForSession()
+        : null
+      const currentState = this.buildCurrentState(majorViewScreenshots)
+      const response = await fetch(
+        `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}/state`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentState }),
+        },
+      )
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const payload = await response.json()
+      this.lastWorkspaceSyncAt = payload.lastUpdatedAt || new Date().toISOString()
+      return payload
+    },
+    scheduleWorkspaceStateSync(delay = 750) {
+      if (!this.maniscopeSessionId) return
+      if (this._workspaceStateTimer) clearTimeout(this._workspaceStateTimer)
+      this._workspaceStateTimer = setTimeout(() => {
+        this._workspaceStateTimer = null
+        this.putWorkspaceState().catch((error) => {
+          this.liveTraceSyncError = error && error.message ? error.message : String(error)
+          console.error('CryptoVis: failed to sync workspace state', error)
+        })
+      }, delay)
+    },
     queueSessionEvent(runEvent) {
       if (!this.maniscopeSessionId) return Promise.resolve(null)
       const previous = this._sessionEventQueue || Promise.resolve()
@@ -659,6 +771,10 @@ export default {
       return this._sessionEventQueue
     },
     sendSessionEvent(endpoint, { method = 'POST', body = {} } = {}) {
+      if (this.isAgentWorkspace) {
+        this.scheduleWorkspaceStateSync()
+        return Promise.resolve(null)
+      }
       return this.queueSessionEvent(async () => {
         const response = await fetch(`/api/sessions/${this.maniscopeSessionId}/events/${endpoint}`, {
           method,
@@ -733,6 +849,9 @@ export default {
       this.liveTraceSyncInFlight = true
       this.liveTraceSyncError = ''
       try {
+        if (this.isAgentWorkspace) {
+          return await this.putWorkspaceState({ includeCurrentViews })
+        }
         const majorViewScreenshots = includeCurrentViews
           ? await this.captureCurrentMajorViewsForSession()
           : null
@@ -773,8 +892,43 @@ export default {
       }
       return result
     },
+    async refreshCanonicalTraceForAgent({ force = false } = {}) {
+      if (!this.isAgentWorkspace || !this.maniscopeSessionId) return null
+      try {
+        const response = await fetch(
+          `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
+        )
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const payload = await response.json()
+        this.latestHumanCurrentState = payload.currentState || null
+        const latestTraceTimestamp = payload.latestTraceTimestamp || payload.meta?.lastUpdatedAt || null
+        if (payload.liveSession && (force || latestTraceTimestamp !== this.lastLiveTraceSyncAt)) {
+          this.applyTraceRecordsFromLiveSession(payload.liveSession, {
+            applyWorkspaceDefaults: false,
+          })
+          this.lastLiveTraceSyncAt = latestTraceTimestamp
+        }
+        return payload
+      } catch (error) {
+        this.liveTraceSyncError = error && error.message ? error.message : String(error)
+        console.error('CryptoVis: failed to refresh agent trace context', error)
+        return null
+      }
+    },
+    startAgentTraceRefresh() {
+      if (!this.isAgentWorkspace || this._agentTraceRefreshTimer) return
+      this._agentTraceRefreshTimer = setInterval(() => {
+        this.refreshCanonicalTraceForAgent().catch((error) => {
+          console.error('CryptoVis: agent trace refresh failed', error)
+        })
+      }, 3000)
+    },
     scheduleLiveTraceSync(delay = 750) {
       if (!this.maniscopeSessionId) return
+      if (this.isAgentWorkspace) {
+        this.scheduleWorkspaceStateSync(delay)
+        return
+      }
       if (this._liveTraceSyncTimer) clearTimeout(this._liveTraceSyncTimer)
       this._liveTraceSyncTimer = setTimeout(() => {
         this._liveTraceSyncTimer = null
@@ -784,10 +938,14 @@ export default {
       }, delay)
     },
     copySessionLink() {
-      const url = `${window.location.origin}/${this.maniscopeSessionId}`
+      const url = `${window.location.origin}/${this.maniscopeSessionId}/${this.workspaceRole}`
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(url).catch(() => {})
       }
+    },
+    openAgentWorkspace() {
+      if (!this.maniscopeSessionId || typeof window === 'undefined') return
+      window.open(`${window.location.origin}/${this.maniscopeSessionId}/agent`, '_blank', 'noopener')
     },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
@@ -837,6 +995,10 @@ export default {
     },
     // ezio: handle annotation submission from snapshot modals
     handleSnapshotAnnotation(sourceView, payload) {
+      if (this.isAgentWorkspace) {
+        this.scheduleWorkspaceStateSync()
+        return
+      }
       const record = {
         id: this._annotationSeqId++,
         timestamp: new Date().toISOString(),
@@ -852,6 +1014,7 @@ export default {
 	    },
     // ezio: handle insight annotation added from UserActionTree
     handleAddInsightAnnotation(payload) {
+      if (this.isAgentWorkspace) return
       const record = {
         id: this._annotationSeqId++,
         timestamp: new Date().toISOString(),
@@ -867,6 +1030,7 @@ export default {
 
     // ezio: delete annotation by id (from tree editor)
     handleDeleteAnnotation(id) {
+      if (this.isAgentWorkspace) return
 	      const idx = this.annotationRecords.findIndex(a => a.id === id)
 	      if (idx !== -1) {
 	        this.annotationRecords.splice(idx, 1)
@@ -876,6 +1040,7 @@ export default {
 
     // ezio: delete action by timestamp (from tree editor)
     handleDeleteAction(timestamp) {
+      if (this.isAgentWorkspace) return
 	      const idx = this.userActionSequence.findIndex(a => a.timestamp === timestamp)
 	      if (idx !== -1) {
 	        this.userActionSequence.splice(idx, 1)
@@ -885,6 +1050,7 @@ export default {
 
     // ezio: update annotation text/color/image (from tree editor)
     handleUpdateAnnotation(payload) {
+      if (this.isAgentWorkspace) return
       const ann = this.annotationRecords.find(a => a.id === payload.id)
       if (!ann) return
 	      if (payload.text !== undefined) ann.text = payload.text
@@ -895,6 +1061,7 @@ export default {
 
     // ezio: add a custom annotation node (from tree editor)
     handleAddCustomAnnotation(payload) {
+      if (this.isAgentWorkspace) return
       let timestamp = new Date().toISOString()
       if (payload.afterTimestamp) {
         const allItems = [
@@ -924,6 +1091,7 @@ export default {
 
     // ezio: reorder actions/annotations by swapping timestamps
     handleReorderAction({ timestamp, direction }) {
+      if (this.isAgentWorkspace) return
       const allItems = [
         ...this.userActionSequence,
         ...this.annotationRecords
@@ -941,10 +1109,12 @@ export default {
 
     // ezio: open export dialog
     onClickExport() {
+      if (this.isAgentWorkspace) return
       this.showExportDialog = true
     },
     // ezio: build zip payload + trigger download
     confirmExport() {
+      if (this.isAgentWorkspace) return
       const archive = buildExportArchive({
         coin: this.currentCoin,
         userActionSequence: this.userActionSequence,
@@ -964,6 +1134,7 @@ export default {
     },
     // ezio: trigger hidden file input
     onClickImport() {
+      if (this.isAgentWorkspace) return
       if (this.$refs.importFileInput) {
         this.$refs.importFileInput.value = ''
         this.$refs.importFileInput.click()
@@ -971,6 +1142,7 @@ export default {
     },
     // ezio: parse the selected JSON file
     async onImportFileChosen(e) {
+      if (this.isAgentWorkspace) return
       const file = e.target.files && e.target.files[0]
       if (!file) return
       try {
@@ -998,6 +1170,7 @@ export default {
     },
     // ezio: replace current session with imported payload
     applyImport() {
+      if (this.isAgentWorkspace) return
       const parsed = this.pendingImportPayload
       if (!parsed) return
       this.userActionSequence = parsed.userActionSequence || []
@@ -1021,6 +1194,11 @@ export default {
 	    },
 
     logUserAction(actionType, actionInfo = {}, userId = null) {
+      if (this.isAgentWorkspace) {
+        if (actionType === 'cancel_hover') return
+        this.scheduleWorkspaceStateSync()
+        return
+      }
       // If it's a cancel hover action, clear the timer and return
       if (actionType === 'cancel_hover') {
         const hoverTypeToCancel = actionInfo.hoverType;
@@ -1333,7 +1511,8 @@ export default {
         topPairs: [],
       }
     },
-    async loadSnapshotTimesForCurrentCoin() {
+    async loadSnapshotTimesForCurrentCoin({ preserveSnapshotTime = false } = {}) {
+      const requestedSnapshotTime = this.snapshot_configuration.time
       const response = await fetch(
         `/api/snapshot/times?coin=${encodeURIComponent(this.currentCoin)}`,
       )
@@ -1343,14 +1522,18 @@ export default {
       this.snapshotTimes = times
 
       if (times.length > 0) {
-        // 每次切换币种重新加载时间时，强制选中最新（最后一个）时间
-        this.snapshot_configuration.time = times[times.length - 1]
+        if (preserveSnapshotTime && requestedSnapshotTime && times.includes(requestedSnapshotTime)) {
+          this.snapshot_configuration.time = requestedSnapshotTime
+        } else {
+          // 每次切换币种重新加载时间时，强制选中最新（最后一个）时间
+          this.snapshot_configuration.time = times[times.length - 1]
+        }
       } else {
         this.snapshot_configuration.time = ''
       }
     },
-    async initializeForCurrentCoin() {
-      await this.loadSnapshotTimesForCurrentCoin()
+    async initializeForCurrentCoin(options = {}) {
+      await this.loadSnapshotTimesForCurrentCoin(options)
       await this.handleUpdateSnapshot({ ...this.snapshot_configuration })
     },
     // ezio: returns the fetch promise chain so callers can stash it on _targetReadyPromise;
@@ -1460,6 +1643,7 @@ export default {
       this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
       this.logUserAction('change_coin', { coin: this.currentCoin })
       await work
+      if (this.isAgentWorkspace) this.scheduleWorkspaceStateSync(0)
     },
     handleUserSelect(userId) {
       this.selectedCardUsers = [] // clear card mode
@@ -2030,6 +2214,7 @@ export default {
       this.logUserAction('run_entity_detection', { config: this.entity_detection_configuration })
 
       await work
+      if (this.isAgentWorkspace) this.scheduleWorkspaceStateSync(0)
     },
     async handleRequestManipulationDetection(newManipulationConfig) {
       console.log(
@@ -2092,6 +2277,7 @@ export default {
       this.logUserAction('run_manipulation_detection', { config: this.manipulation_detection_configuration })
 
       await work
+      if (this.isAgentWorkspace) this.scheduleWorkspaceStateSync(0)
     },
     async handleUpdateSnapshot(newSnapshotConfig) {
       if (newSnapshotConfig) {
@@ -2209,6 +2395,7 @@ export default {
       this.logUserAction('update_snapshot', { config: this.snapshot_configuration })
 
       await work
+      if (this.isAgentWorkspace) this.scheduleWorkspaceStateSync(0)
     },
     handleDetectionComplete(count) {
       this.detecting = false
@@ -2273,6 +2460,7 @@ export default {
       this.logUserAction('update_link_detection', { config: this.link_detection_configuration })
 
       await work
+      if (this.isAgentWorkspace) this.scheduleWorkspaceStateSync(0)
     },
     async fetchInitialSnapshotData() {
       console.log('CryptoVis: Fetching initial snapshot data...')
@@ -2425,7 +2613,14 @@ export default {
 
 	    try {
 	      await this.initializeManiScopeSession()
-	      await this.initializeForCurrentCoin()
+	      const restoreState = this._workspaceRestoreState
+	      await this.initializeForCurrentCoin({ preserveSnapshotTime: !!restoreState?.snapshotTime })
+	      if (restoreState) {
+	        this.applyCurrentState(restoreState)
+	      }
+	      if (this.isAgentWorkspace) {
+	        this.startAgentTraceRefresh()
+	      }
 	      this.scheduleLiveTraceSync(0)
 	    } catch (error) {
 	      console.error('CryptoVis: Error during initial load:', error)
@@ -2434,10 +2629,14 @@ export default {
   // ezio: cleanup snapshot shortcut listeners
 	  beforeUnmount() {
 	    if (this._liveTraceSyncTimer) clearTimeout(this._liveTraceSyncTimer)
+	    if (this._agentTraceRefreshTimer) clearInterval(this._agentTraceRefreshTimer)
+	    if (this._workspaceStateTimer) clearTimeout(this._workspaceStateTimer)
 	    this.cleanupGlobalHandlers()
 	  },
 	  beforeDestroy() {
 	    if (this._liveTraceSyncTimer) clearTimeout(this._liveTraceSyncTimer)
+	    if (this._agentTraceRefreshTimer) clearInterval(this._agentTraceRefreshTimer)
+	    if (this._workspaceStateTimer) clearTimeout(this._workspaceStateTimer)
 	    this.cleanupGlobalHandlers()
 	  },
   updated() {},
@@ -2482,6 +2681,30 @@ a {
 .session-chip:hover {
   background: #edf2f7;
   border-color: #a0aec0;
+}
+
+.workspace-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  border: 1px solid transparent;
+}
+
+.workspace-human {
+  background: #edf7ff;
+  color: #1e5f9f;
+  border-color: #bee3f8;
+}
+
+.workspace-agent {
+  background: #f0fff4;
+  color: #276749;
+  border-color: #9ae6b4;
 }
 
 .ai-chat-btn {
