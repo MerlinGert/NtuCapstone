@@ -3,18 +3,21 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
+const TEXT_ARTIFACT_EXTENSIONS = new Set(['.md', '.json'])
+const SUPPORTED_ARTIFACT_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...TEXT_ARTIFACT_EXTENSIONS])
 const DEFAULT_MAX_IMAGE_BYTES = 25 * 1024 * 1024
+const DEFAULT_MAX_TEXT_ARTIFACT_BYTES = 25 * 1024 * 1024
 const MARKDOWN_REF_RE = /(!?)\[([^\]]*)\]\(([^)]*)\)/g
-const BARE_IMAGE_PATH_RE =
-  /(^|[\s([{"'=])((?:\/|\.{1,2}\/|[A-Za-z0-9_.-]+\/|[A-Za-z0-9_.-]+)[^\s<>"'`)]*?\.(?:png|jpe?g|webp))/gi
+const BARE_ARTIFACT_PATH_RE =
+  /(^|[\s([{"'=])((?:\/|\.{1,2}\/|[A-Za-z0-9_.-]+\/|[A-Za-z0-9_.-]+)[^\s<>"'`)]*?\.(?:png|jpe?g|webp|md|json))/gi
 const CODE_BLOCK_OR_INLINE_RE = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g
 
 function safeNamePart(value) {
-  return String(value || 'image')
+  return String(value || 'artifact')
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 80) || 'image'
+    .slice(0, 80) || 'artifact'
 }
 
 function pathInsideRoot(filePath, rootPath) {
@@ -65,6 +68,14 @@ function extensionForImageKind(kind) {
   return '.png'
 }
 
+function artifactKindForExtension(extension) {
+  const normalized = String(extension || '').toLowerCase()
+  if (IMAGE_EXTENSIONS.has(normalized)) return 'image'
+  if (normalized === '.md') return 'markdown'
+  if (normalized === '.json') return 'json'
+  return ''
+}
+
 function detectImageKind(filePath) {
   const fd = fs.openSync(filePath, 'r')
   try {
@@ -102,10 +113,11 @@ function detectImageKind(filePath) {
 function artifactObject(sessionDir, artifactName) {
   const filePath = path.join(sessionDir, 'artifacts', artifactName)
   const stat = fs.statSync(filePath)
+  const kind = artifactKindForExtension(path.extname(artifactName)) || 'file'
   return {
     id: artifactName.replace(/[^a-zA-Z0-9_-]+/g, '-'),
     title: artifactName,
-    kind: 'image',
+    kind,
     path: `artifacts/${artifactName}`,
     updatedAt: stat.mtime.toISOString(),
   }
@@ -147,9 +159,9 @@ function isBrowserUrl(value) {
   )
 }
 
-function isSupportedImagePath(value) {
+function isSupportedArtifactPath(value) {
   if (!value || isBrowserUrl(value)) return false
-  return IMAGE_EXTENSIONS.has(path.extname(value).toLowerCase())
+  return SUPPORTED_ARTIFACT_EXTENSIONS.has(path.extname(value).toLowerCase())
 }
 
 function removeUrlDecoration(value) {
@@ -168,7 +180,8 @@ function buildResolutionCandidates(reference, roots) {
 function normalizeRoots({ sessionDir, repoRoot, env = process.env, extraRoots = [] }) {
   const sessionArtifacts = path.join(sessionDir, 'artifacts')
   const sessionImages = path.join(sessionDir, 'images')
-  const envRoots = parseExtraRoots(env.MANISCOPE_CHAT_IMAGE_ROOTS)
+  const envArtifactRoots = parseExtraRoots(env.MANISCOPE_CHAT_ARTIFACT_ROOTS)
+  const envImageRoots = parseExtraRoots(env.MANISCOPE_CHAT_IMAGE_ROOTS)
   const configuredExtraRoots = Array.isArray(extraRoots) ? extraRoots : parseExtraRoots(extraRoots)
 
   const candidateRoots = uniqueValues([sessionDir, sessionArtifacts, sessionImages, repoRoot])
@@ -176,7 +189,8 @@ function normalizeRoots({ sessionDir, repoRoot, env = process.env, extraRoots = 
     sessionDir,
     repoRoot,
     ...configuredExtraRoots,
-    ...envRoots,
+    ...envArtifactRoots,
+    ...envImageRoots,
   ])
   const allowedRoots = uniqueValues(allowedRootInputs.map(existingRootRealPath))
   return { candidateRoots, allowedRoots }
@@ -188,7 +202,13 @@ function maxImageBytesFromEnv(env = process.env) {
   return DEFAULT_MAX_IMAGE_BYTES
 }
 
-function createArtifactName(realPath, stat, detectedKind) {
+function maxTextArtifactBytesFromEnv(env = process.env) {
+  const parsed = Number(env.MANISCOPE_CHAT_MAX_ARTIFACT_BYTES)
+  if (Number.isFinite(parsed) && parsed > 0) return parsed
+  return DEFAULT_MAX_TEXT_ARTIFACT_BYTES
+}
+
+function createArtifactName(realPath, stat, extension) {
   const basename = path.basename(realPath, path.extname(realPath))
   const hash = crypto
     .createHash('sha256')
@@ -199,7 +219,22 @@ function createArtifactName(realPath, stat, detectedKind) {
     .update(String(stat.mtimeMs))
     .digest('hex')
     .slice(0, 16)
-  return `${safeNamePart(basename)}-${hash}${extensionForImageKind(detectedKind)}`
+  return `${safeNamePart(basename)}-${hash}${extension}`
+}
+
+function directArtifactName(realPath, artifactsRealDir) {
+  if (!artifactsRealDir) return null
+  if (path.dirname(realPath) !== artifactsRealDir) return null
+  return path.basename(realPath)
+}
+
+function validJsonFile(filePath) {
+  try {
+    JSON.parse(fs.readFileSync(filePath, 'utf8'))
+    return true
+  } catch {
+    return false
+  }
 }
 
 function artifactUrl(sessionId, artifactName) {
@@ -225,13 +260,16 @@ function makeMaterializer(options) {
   const artifactsDir = path.join(sessionDir, 'artifacts')
   const roots = normalizeRoots(options)
   const maxImageBytes = options.maxImageBytes || maxImageBytesFromEnv(options.env)
+  const maxTextArtifactBytes =
+    options.maxTextArtifactBytes || maxTextArtifactBytesFromEnv(options.env)
   const materializedByRealPath = new Map()
   const artifactsByName = new Map()
 
   fs.mkdirSync(artifactsDir, { recursive: true })
+  const artifactsRealDir = existingRootRealPath(artifactsDir)
 
   const materializeReference = (reference) => {
-    if (!isSupportedImagePath(reference)) return null
+    if (!isSupportedArtifactPath(reference)) return null
 
     for (const candidate of buildResolutionCandidates(reference, roots)) {
       if (!fs.existsSync(candidate)) continue
@@ -239,21 +277,34 @@ function makeMaterializer(options) {
       if (!realPath) continue
       if (!roots.allowedRoots.some((root) => pathInsideRoot(realPath, root))) continue
 
-      const extensionKind = imageKindForExtension(path.extname(candidate))
-      if (!extensionKind) continue
-
       const stat = fs.statSync(realPath)
-      if (!stat.isFile() || stat.size > maxImageBytes) continue
+      if (!stat.isFile()) continue
 
-      const detectedKind = detectImageKind(realPath)
-      if (!detectedKind || detectedKind !== extensionKind) continue
+      const extension = path.extname(candidate).toLowerCase()
+      const artifactKind = artifactKindForExtension(extension)
+      if (!artifactKind) continue
+      let artifactExtension = extension
+
+      if (artifactKind === 'image') {
+        if (stat.size > maxImageBytes) continue
+        const extensionKind = imageKindForExtension(extension)
+        if (!extensionKind) continue
+        const detectedKind = detectImageKind(realPath)
+        if (!detectedKind || detectedKind !== extensionKind) continue
+        artifactExtension = extensionForImageKind(detectedKind)
+      } else {
+        if (stat.size > maxTextArtifactBytes) continue
+        if (artifactKind === 'json' && !validJsonFile(realPath)) continue
+      }
 
       const cached = materializedByRealPath.get(realPath)
       if (cached) return cached
 
-      const artifactName = createArtifactName(realPath, stat, detectedKind)
+      const artifactName =
+        directArtifactName(realPath, artifactsRealDir) ||
+        createArtifactName(realPath, stat, artifactExtension)
       const artifactPath = path.join(artifactsDir, artifactName)
-      if (!fs.existsSync(artifactPath)) {
+      if (realPath !== artifactPath && !fs.existsSync(artifactPath)) {
         fs.copyFileSync(realPath, artifactPath)
       }
 
@@ -281,27 +332,45 @@ function rewriteMarkdownReferences(segment, materializer) {
     if (!parsed) return fullMatch
     const materialized = materializer.materializeReference(parsed.destination)
     if (!materialized) return fullMatch
-    const marker = bang ? '!' : ''
+    const marker = bang && materialized.artifact.kind === 'image' ? '!' : ''
     return `${marker}[${label}](${materialized.url}${parsed.suffix})`
   })
 }
 
-function appendBareImageReferences(segment, materializer, appendedReferences) {
-  segment.replace(BARE_IMAGE_PATH_RE, (fullMatch, prefix, reference) => {
+function collectBareArtifactReferences(segment, materializer, appendedReferences) {
+  String(segment || '').replace(BARE_ARTIFACT_PATH_RE, (fullMatch, prefix, reference) => {
     const materialized = materializer.materializeReference(reference)
     if (materialized) appendedReferences.set(materialized.artifact.title, materialized)
     return fullMatch
   })
 }
 
-function referencedImagesBlock(materializedReferences) {
-  const references = Array.from(materializedReferences.values())
-  if (references.length === 0) return ''
-  const lines = references.map(({ artifact, url }) => `![${artifact.title}](${url})`)
-  return `\n\nReferenced images:\n\n${lines.join('\n\n')}`
+function appendBareArtifactReferences(segment, materializer, appendedReferences) {
+  let lastIndex = 0
+  String(segment || '').replace(MARKDOWN_REF_RE, (fullMatch, bang, label, rawDestination, offset) => {
+    collectBareArtifactReferences(segment.slice(lastIndex, offset), materializer, appendedReferences)
+    lastIndex = offset + fullMatch.length
+    return fullMatch
+  })
+  collectBareArtifactReferences(segment.slice(lastIndex), materializer, appendedReferences)
 }
 
-export function materializeLocalImageReferences(text, options) {
+function referencedArtifactsBlock(materializedReferences) {
+  const references = Array.from(materializedReferences.values())
+  if (references.length === 0) return ''
+  const images = references.filter(({ artifact }) => artifact.kind === 'image')
+  const files = references.filter(({ artifact }) => artifact.kind !== 'image')
+  const sections = []
+  if (images.length > 0) {
+    sections.push(`Referenced images:\n\n${images.map(({ artifact, url }) => `![${artifact.title}](${url})`).join('\n\n')}`)
+  }
+  if (files.length > 0) {
+    sections.push(`Referenced files:\n\n${files.map(({ artifact, url }) => `- [${artifact.title}](${url})`).join('\n')}`)
+  }
+  return `\n\n${sections.join('\n\n')}`
+}
+
+export function materializeLocalArtifactReferences(text, options) {
   const content = String(text || '')
   if (!content) return { text: content, artifacts: [] }
 
@@ -311,22 +380,25 @@ export function materializeLocalImageReferences(text, options) {
     .map((segment) => {
       if (segment.protected) return segment.text
       const markdownRewritten = rewriteMarkdownReferences(segment.text, materializer)
-      appendBareImageReferences(markdownRewritten, materializer, appendedReferences)
+      appendBareArtifactReferences(markdownRewritten, materializer, appendedReferences)
       return markdownRewritten
     })
     .join('')
 
-  const finalText = `${rewritten}${referencedImagesBlock(appendedReferences)}`
+  const finalText = `${rewritten}${referencedArtifactsBlock(appendedReferences)}`
   return {
     text: finalText,
     artifacts: Array.from(materializer.artifactsByName.values()),
   }
 }
 
+export const materializeLocalImageReferences = materializeLocalArtifactReferences
+
 export const testInternals = {
   artifactUrl,
+  artifactKindForExtension,
   detectImageKind,
   imageKindForExtension,
-  isSupportedImagePath,
+  isSupportedArtifactPath,
   splitMarkdownProtectedSegments,
 }

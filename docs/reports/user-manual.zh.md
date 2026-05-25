@@ -161,7 +161,7 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。回合完成后，这些区域会折叠，但最新一条活动会以紧凑状态卡的形式保留可见。
 
-助手回复可以包含 Markdown 文本、生成的 artifact 和图片预览。当智能体在回复中提到本地图片路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的图片根目录下，ManiScope 会显示这张图片。有效图片会被复制到会话的 `artifacts/` 文件夹，并通过会话 artifact 接口提供给浏览器，而不会直接暴露任意文件系统路径。聊天中生成的图片通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析图片则应保存到对应 trace 的 `analysis-results/` 文件夹。
+助手回复可以包含 Markdown 文本、生成的 artifact、JSON 文件、Markdown 报告和图片预览。当智能体在回复中提到本地图片、Markdown 或 JSON 路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的 artifact 根目录下，ManiScope 会通过会话 artifact 接口生成链接。有效图片会被复制到会话的 `artifacts/` 文件夹用于预览；Markdown 和 JSON 输出会显示为可下载的 artifact 链接。聊天中生成的文件通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析 artifact 则应保存到对应 trace 的 `analysis-results/` 文件夹。
 
 对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
 

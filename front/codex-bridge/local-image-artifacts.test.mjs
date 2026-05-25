@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { materializeLocalImageReferences } from './local-image-artifacts.mjs'
+import { materializeLocalArtifactReferences } from './local-image-artifacts.mjs'
 
 const SESSION_ID = 'abcde'
 
@@ -30,7 +30,7 @@ function writeFile(filePath, bytes = PNG_BYTES) {
 }
 
 function materialize(text, fixture, extra = {}) {
-  return materializeLocalImageReferences(text, {
+  return materializeLocalArtifactReferences(text, {
     sessionId: SESSION_ID,
     sessionDir: fixture.sessionDir,
     repoRoot: fixture.repoRoot,
@@ -59,7 +59,7 @@ test('resolves relative paths from session images and artifacts', () => {
   const result = materialize('![current](images/current.png)\n![existing](existing.webp)', fixture)
 
   assert.match(result.text, /!\[current\]\(\/api\/sessions\/abcde\/artifacts\/current-[a-f0-9]{16}\.png\)/)
-  assert.match(result.text, /!\[existing\]\(\/api\/sessions\/abcde\/artifacts\/existing-[a-f0-9]{16}\.webp\)/)
+  assert.match(result.text, /!\[existing\]\(\/api\/sessions\/abcde\/artifacts\/existing\.webp\)/)
   assert.equal(result.artifacts.length, 2)
 })
 
@@ -73,6 +73,39 @@ test('keeps bare paths in prose and appends referenced images', () => {
   assert.match(result.text, /Referenced images:/)
   assert.match(result.text, /!\[view-[a-f0-9]{16}\.png\]\(\/api\/sessions\/abcde\/artifacts\/view-[a-f0-9]{16}\.png\)/)
   assert.equal(result.artifacts.length, 1)
+})
+
+test('rewrites markdown and json links to session artifact URLs', () => {
+  const fixture = makeFixture()
+  writeFile(path.join(fixture.sessionDir, 'artifacts', 'report.md'), '# Report\n')
+  writeFile(path.join(fixture.sessionDir, 'artifacts', 'graph.json'), '{"nodes":[]}\n')
+
+  const result = materialize(
+    `Saved: [report.md](${path.join(fixture.sessionDir, 'artifacts', 'report.md')}) and [graph.json](graph.json)`,
+    fixture,
+  )
+
+  assert.match(result.text, /\[report\.md\]\(\/api\/sessions\/abcde\/artifacts\/report\.md\)/)
+  assert.match(result.text, /\[graph\.json\]\(\/api\/sessions\/abcde\/artifacts\/graph\.json\)/)
+  assert.doesNotMatch(result.text, /Referenced files:/)
+  assert.deepEqual(
+    result.artifacts.map((artifact) => artifact.kind).sort(),
+    ['json', 'markdown'],
+  )
+})
+
+test('keeps bare markdown and json paths in prose and appends referenced files', () => {
+  const fixture = makeFixture()
+  writeFile(path.join(fixture.sessionDir, 'artifacts', 'report.md'), '# Report\n')
+  writeFile(path.join(fixture.sessionDir, 'artifacts', 'graph.json'), '{"nodes":[]}\n')
+
+  const result = materialize('Saved outputs:\n- report.md\n- graph.json', fixture)
+
+  assert.match(result.text, /^Saved outputs:\n- report\.md\n- graph\.json/)
+  assert.match(result.text, /Referenced files:/)
+  assert.match(result.text, /- \[report\.md\]\(\/api\/sessions\/abcde\/artifacts\/report\.md\)/)
+  assert.match(result.text, /- \[graph\.json\]\(\/api\/sessions\/abcde\/artifacts\/graph\.json\)/)
+  assert.equal(result.artifacts.length, 2)
 })
 
 test('leaves external and existing artifact URLs unchanged', () => {
@@ -131,8 +164,9 @@ test('rejects unsupported extensions and mismatched magic bytes', () => {
   const fixture = makeFixture()
   writeFile(path.join(fixture.repoRoot, 'not-image.gif'))
   writeFile(path.join(fixture.repoRoot, 'mismatch.png'), JPG_BYTES)
+  writeFile(path.join(fixture.repoRoot, 'bad.json'), '{')
 
-  const text = '![gif](not-image.gif)\n![mismatch](mismatch.png)'
+  const text = '![gif](not-image.gif)\n![mismatch](mismatch.png)\n[bad](bad.json)'
   const result = materialize(text, fixture)
 
   assert.equal(result.text, text)

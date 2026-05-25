@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AgentBrowserManager } from './agent-browser.mjs'
-import { materializeLocalImageReferences } from './local-image-artifacts.mjs'
+import { materializeLocalArtifactReferences } from './local-image-artifacts.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
@@ -756,12 +756,18 @@ function describeFunctionCall(item) {
 function listArtifacts(sessionId) {
   const artifactsDir = path.join(sessionDir(sessionId), 'artifacts')
   if (!fs.existsSync(artifactsDir)) return []
+  const artifactKinds = new Map([
+    ['.md', 'markdown'],
+    ['.json', 'json'],
+    ['.png', 'image'],
+    ['.jpg', 'image'],
+    ['.jpeg', 'image'],
+    ['.webp', 'image'],
+  ])
   return fs
     .readdirSync(artifactsDir, { withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .filter((entry) =>
-      ['.md', '.png', '.jpg', '.jpeg', '.webp'].includes(path.extname(entry.name).toLowerCase()),
-    )
+    .filter((entry) => artifactKinds.has(path.extname(entry.name).toLowerCase()))
     .map((entry) => {
       const filePath = path.join(artifactsDir, entry.name)
       const stat = fs.statSync(filePath)
@@ -769,7 +775,7 @@ function listArtifacts(sessionId) {
       return {
         id: entry.name.replace(/[^a-zA-Z0-9_-]+/g, '-'),
         title: entry.name,
-        kind: extension === '.md' ? 'markdown' : 'image',
+        kind: artifactKinds.get(extension),
         path: `artifacts/${entry.name}`,
         updatedAt: stat.mtime.toISOString(),
       }
@@ -781,7 +787,7 @@ function materializeAgentMessageEvent(sessionId, event) {
     return { event, artifacts: [] }
   }
   try {
-    const result = materializeLocalImageReferences(event.text, {
+    const result = materializeLocalArtifactReferences(event.text, {
       sessionId,
       sessionDir: sessionDir(sessionId),
       repoRoot: REPO_ROOT,
@@ -792,7 +798,7 @@ function materializeAgentMessageEvent(sessionId, event) {
       artifacts: result.artifacts,
     }
   } catch (error) {
-    console.warn('Codex bridge: failed to materialize local image references', error)
+    console.warn('Codex bridge: failed to materialize local artifact references', error)
     return { event, artifacts: [] }
   }
 }

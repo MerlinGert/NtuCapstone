@@ -558,7 +558,7 @@ def get_session_artifact(session_id: str, artifact_name: str) -> FileResponse:
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid artifact path")
 
-    allowed_suffixes = {".md", ".png", ".jpg", ".jpeg", ".webp"}
+    allowed_suffixes = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
     if artifact_path.suffix.lower() not in allowed_suffixes:
         raise HTTPException(status_code=400, detail="Unsupported artifact type")
     if not artifact_path.exists() or not artifact_path.is_file():
