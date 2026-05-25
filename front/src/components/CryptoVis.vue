@@ -182,7 +182,7 @@
             :read-only="isAgentWorkspace"
             :snapshot-categories="snapshotCategories"
             :snapshot-quality="snapshotQuality"
-            @add-insight-annotation="handleAddInsightAnnotation"
+            @add-finding-annotation="handleAddFindingAnnotation"
             @delete-annotation="handleDeleteAnnotation"
             @delete-action="handleDeleteAction"
             @update-annotation="handleUpdateAnnotation"
@@ -509,7 +509,7 @@ export default {
         { key: 'zoom_scroll',   label: 'Zoom / Scroll',   enabled: false, actions: ['zoom_kline_chart', 'zoom_behavior_chart', 'scroll_manipulation_cards', 'sync_time_window'] },
         { key: 'click_select',  label: 'Click / Select',  enabled: true,  actions: ['click_manipulation_card', 'click_kline_align_cards', 'select_user_from_network', 'select_user_from_behavior_details'] },
         { key: 'change_toggle', label: 'Change / Toggle', enabled: true,  actions: ['change_coin', 'change_kline_granularity', 'scale_change', 'toggle_show_links', 'toggle_show_related_users', 'toggle_show_manipulation_boxes', 'toggle_sequential_time'] },
-        { key: 'system',        label: 'System',          enabled: true,  actions: ['run_entity_detection', 'run_manipulation_detection', 'update_snapshot', 'update_link_detection', 'high_level_insight'] },
+        { key: 'system',        label: 'System',          enabled: true,  actions: ['run_entity_detection', 'run_manipulation_detection', 'update_snapshot', 'update_link_detection', 'high_level_finding'] },
       ],
       snapshotQuality: 'full', // ezio: default to full-res; 'thumbnail' | 'full'
       _snapshotCaptureInFlight: false,
@@ -967,8 +967,8 @@ export default {
 	      this.activeBottomTab = 'annotations'
 	      this.upsertAnnotationEvent(record)
 	    },
-    // ezio: handle insight annotation added from UserActionTree
-    handleAddInsightAnnotation(payload) {
+    // ezio: handle finding annotation added from UserActionTree
+    handleAddFindingAnnotation(payload) {
       if (this.isAgentWorkspace) return
       const record = {
         id: this._annotationSeqId++,
@@ -977,7 +977,7 @@ export default {
         text: payload.text || '',
         selectedItems: payload.selectedItems || [],
         sketchDataUrl: null,
-        isInsight: true
+        isFinding: true
 	      }
 	      this.annotationRecords.push(record)
 	      this.upsertAnnotationEvent(record)

@@ -14,8 +14,8 @@ The Recommendation Plan Forest is the planning counterpart of the User Reasoning
 
 Use exactly one recommendation type per top-level recommendation branch:
 
-- `Evidence Completion`: fills a Reasoning Gap under an existing Finding, Insight, or Hypothesis.
-- `Hypothesis Expansion`: proposes a new related Hypothesis from an existing Finding, Insight, or Hypothesis.
+- `Evidence Completion`: fills a Reasoning Gap under an existing Finding or Hypothesis.
+- `Hypothesis Expansion`: proposes a new related Hypothesis from an existing Finding or Hypothesis.
 
 ## Node Kinds
 
@@ -203,7 +203,7 @@ For a full trace analysis, execute every Recommendation Plan Forest branch after
 After the plan is executed:
 
 - Keep `ExpectedFinding` nodes in the plan artifacts.
-- Create real `Finding` or `Insight` nodes only in a Reasoning Graph Patch.
+- Create real `Finding` nodes only in a Reasoning Graph Patch.
 - For every executed `Hypothesis Expansion` branch, explicitly resolve the proposed Hypothesis. Promote it into a new evidence-backed Hypothesis root when supported, or record a rejected, deferred, or unsupported outcome when not supported.
 - Link actual evidence back to `ExpectedFinding`, `RecommendedInteraction`, `AnalyticActivity`, and `InvestigationStrategy` through `planRef`.
 

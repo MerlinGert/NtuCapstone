@@ -62,7 +62,7 @@
           :actions="actions"
           :annotations="annotations"
           :read-only="readOnly"
-          @add-insight-annotation="$emit('add-insight-annotation', $event)"
+          @add-finding-annotation="$emit('add-finding-annotation', $event)"
           @delete-annotation="$emit('delete-annotation', $event)"
           @delete-action="$emit('delete-action', $event)"
           @update-annotation="$emit('update-annotation', $event)"

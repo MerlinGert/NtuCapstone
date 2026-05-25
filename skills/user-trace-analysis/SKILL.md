@@ -1,16 +1,16 @@
 ---
 name: user-trace-analysis
-description: Use when analyzing a ManiScope exported or live user-interaction trace to reconstruct Tasks, Analytic Questions, Hypotheses, Interactions, Analytic Activities, Investigation Strategies, Findings, Insights, trace-step maps, reasoning graphs, User Reasoning Forests, Recommendation Plan Forests, follow-up investigation patches, and augmented reasoning forests.
+description: Use when analyzing a ManiScope exported or live user-interaction trace to reconstruct Tasks, Analytic Questions, Hypotheses, Interactions, Analytic Activities, Investigation Strategies, Findings, trace-step maps, reasoning graphs, User Reasoning Forests, Recommendation Plan Forests, follow-up investigation patches, and augmented reasoning forests.
 ---
 
 # User Trace Analysis Skill
 
-Use this skill when analyzing a ManiScope exported user-interaction trace, especially a folder containing `session.json` plus screenshot images. The goal is to reconstruct what the user was trying to do, what findings or insights they explicitly captured or implicitly discovered, execute the follow-up Investigation Strategies implied by those findings, and map both user and agent evidence back to trace steps.
+Use this skill when analyzing a ManiScope exported user-interaction trace, especially a folder containing `session.json` plus screenshot images. The goal is to reconstruct what the user was trying to do, what findings they explicitly captured or implicitly discovered, execute the follow-up Investigation Strategies implied by those findings, and map both user and agent evidence back to trace steps.
 
 For a full trace analysis, produce all analysis artifacts inside `TRACE/analysis-results/` unless the user explicitly asks for an analysis-only, lighter, or different output location. Keep raw trace inputs in the trace folder itself, such as `TRACE/session.json` and `TRACE/images/`.
 
-- `TRACE/analysis-results/analysis-report.md`: narrative analysis with evidence, rationale, caveats, intentions, findings, insights, and recommendations.
-- `TRACE/analysis-results/trace-step-map.md`: traceability map linking logged Interactions and annotations to intentions, findings, insights, and recommendations.
+- `TRACE/analysis-results/analysis-report.md`: narrative analysis with evidence, rationale, caveats, intentions, findings, and recommendations.
+- `TRACE/analysis-results/trace-step-map.md`: traceability map linking logged Interactions and annotations to intentions, findings, and recommendations.
 - `TRACE/analysis-results/reasoning-graph.json`: canonical shared-node graph for the trace. This is the source of truth for reasoning support.
 - `TRACE/analysis-results/user-reasoning-forest.md`: readable derived forest rooted at user Hypotheses.
 - `TRACE/analysis-results/user-reasoning-forest.json`: machine-readable derived forest when using the transformer script.
@@ -51,7 +51,7 @@ Ask concise questions before deep analysis if the request leaves an important ch
 - Do you want exact wallet addresses preserved, shortened, anonymized, or grouped by role?
 - Should the step map use compact analytical steps, raw Interaction-level nodes, or both?
 - Should the step map include a Mermaid graph, a matrix only, or a graph plus matrix?
-- Should confidence labels be included for intentions, insights, and recommendations?
+- Should confidence labels be included for intentions, findings, and recommendations?
 - Should external web evidence be used to verify market events such as listings, announcements, or news? If yes, browse and cite sources.
 - Are there known ground-truth events, labels, or hypotheses that should be checked against the trace?
 - Should the output include recommendations for product/UI improvement, investigation next steps, or both?
@@ -73,7 +73,7 @@ Key `session.json` fields:
 
 - `coin`, `exportedAt`, `exportFormat`, `includesSnapshots`, `imageCount`.
 - `userActionSequence[]`: `timestamp`, `actionType`, `sourceView`, `targetView`, `userId`, `actionInfo`, `relatedViewWithViewState`, `sourceSnapshot`, `targetSnapshot`.
-- `annotationRecords[]`: `id`, `timestamp`, `sourceView`, `text`, `selectedItems`, `sketchImagePath`, `isInsight`.
+- `annotationRecords[]`: `id`, `timestamp`, `sourceView`, `text`, `selectedItems`, `sketchImagePath`, `isFinding`.
 - `config.snapshotCategories`: tells which logged `actionType` values have screenshots and which may be missing screenshots by design.
 
 ### Required documentation
@@ -98,12 +98,12 @@ Read these files when interpreting a trace:
 - `front/src/components/BehaviorDetails.vue`: behavior timeline encodings, buy/sell colors, transfers, balance/earning areas, manipulation boxes, sequential time, related users, label clicks.
 - `front/src/components/UserActionTimeline.vue`: logged Interaction display names and capture category behavior.
 - `front/src/components/AnnotationTimeline.vue`: annotation display semantics.
-- `front/src/components/UserActionTree.vue`: action-tree and high-level insight behavior.
+- `front/src/components/UserActionTree.vue`: action-tree and high-level finding behavior.
 - `front/src/utils/sessionIO.js`: export schema, image path mapping, stripped versus included snapshot behavior.
 
 ### Optional local data for validation
 
-Use local data when the request asks for insights about the domain, not just interaction intent:
+Use local data when the request asks for findings about the domain, not just interaction intent:
 
 - `front/public/data/ACT_OHLC.json` or `front/public/data2/PNUT_OHLC.json`: price and granularity data.
 - `front/public/data/sorted_trades.csv` or `data2/sorted_trades.csv`: wallet trade timing, buy/sell counts, USD totals, counterparties.
@@ -127,7 +127,7 @@ Classify trace interpretation into three spaces:
 |---|---|---|---|
 | Low | **Task** | **Interaction** | **Finding** |
 | Mid | **Analytic Question** | **Analytic Activity** | **Finding** |
-| High | **Hypothesis** | **Investigation Strategy** | **Insight** |
+| High | **Hypothesis** | **Investigation Strategy** | **Finding** |
 
 Definitions:
 
@@ -137,10 +137,9 @@ Definitions:
 - **Interaction**: one executable operation performed by a human, agent, script, or system command.
 - **Analytic Activity**: a short sequence of related Interactions serving one Analytic Question.
 - **Investigation Strategy**: a high-level evidence-seeking lens for testing a Hypothesis through multiple Analytic Activities. It should operationalize the Hypothesis into concrete targets, analytic contrasts, search concepts, or falsification checks instead of merely restating the Hypothesis.
-- **Finding**: a local or mid-level result from observation, GUI-displayed evidence, model output, or computation.
-- **Insight**: a synthesized high-level understanding that connects multiple Findings and changes the analyst's understanding of the case.
+- **Finding**: a result from observation, GUI-displayed evidence, model output, computation, or synthesis. A Finding can be low-, mid-, or high-level depending on scope.
 
-Do not use **Knowledge** for normal trace reports unless the claim has been validated beyond the trace and local exploratory analysis. Most ManiScope reports should stop at Findings and Insights.
+Do not use **Knowledge** for normal trace reports unless the claim has been validated beyond the trace and local exploratory analysis. Most ManiScope reports should stop at Findings.
 
 ### Action Space Types
 
@@ -179,7 +178,7 @@ Use rich detail fields on graph nodes that need to be read outside the compact t
 - `reasoningRole`: how the node supports, refines, motivates, or completes a reasoning path.
 - `patchRationale`: required on agent-created follow-up patch nodes to explain why the node was added to the augmented reasoning graph.
 
-Require `explanation` for every `Hypothesis`, `Insight`, `Finding`, `AnalyticQuestion`, `Task`, `InvestigationStrategy`, and `AnalyticActivity`. For `Interaction`, require `explanation` when it is `primary` or agent-created. In Recommendation Plan Forests, provide context-rich explanations for `ReasoningGap`, `InvestigationStrategy`, proposed or existing plan `Hypothesis`, `ExpansionRationale`, and `ExpectedFinding`.
+Require `explanation` for every `Hypothesis`, `Finding`, `AnalyticQuestion`, `Task`, `InvestigationStrategy`, and `AnalyticActivity`. For `Interaction`, require `explanation` when it is `primary` or agent-created. In Recommendation Plan Forests, provide context-rich explanations for `ReasoningGap`, `InvestigationStrategy`, proposed or existing plan `Hypothesis`, `ExpansionRationale`, and `ExpectedFinding`.
 
 ### Mapping Rule
 
@@ -195,9 +194,9 @@ Use same-scope mappings when possible:
 
 - Task -> Interaction -> Finding.
 - Analytic Question -> Analytic Activity -> Finding.
-- Hypothesis -> Investigation Strategy -> Insight.
+- Hypothesis -> Investigation Strategy -> Finding.
 
-Lower-scope rows should support higher-scope rows. Multiple low-level Findings can support a mid-level Finding, and multiple Findings can support or weaken a high-level Insight.
+Lower-scope rows should support higher-scope rows. Multiple low-level Findings can support a mid-level Finding, and multiple Findings can support or weaken a high-level Finding.
 
 ### Evidence Route
 
@@ -208,18 +207,18 @@ Examples:
 - `data -> finding`: compute mean token price.
 - `model -> visualization -> finding`: change detector config, inspect grouping, record visual stability.
 - `model output -> data -> finding`: compute overlap between old and new groups.
-- `findings -> insight`: synthesize timing, roles, and price impact into a coordination Insight.
+- `findings -> high-level finding`: synthesize timing, roles, and price impact into a coordination Finding.
 
 ### Reasoning Graph and Forest Terms
 
 Use these terms when building traceability outputs:
 
-- **Reasoning Support Graph**: the canonical directed graph with shared nodes. Nodes are Interactions, Tasks, Analytic Questions, Analytic Activities, Findings, Insights, Hypotheses, and Investigation Strategies. Edges encode reasoning relations.
+- **Reasoning Support Graph**: the canonical directed graph with shared nodes. Nodes are Interactions, Tasks, Analytic Questions, Analytic Activities, Findings, Hypotheses, and Investigation Strategies. Edges encode reasoning relations.
 - **User Reasoning Forest**: a derived readable tree view of the Reasoning Support Graph. Each tree is rooted at one user-authored or analyst-inferred Hypothesis.
 - **Canonical Node**: the original graph node, such as `F7`.
 - **Tree Node Instance**: a duplicated tree node that points back to a canonical node, such as `F7@H1.2`.
 - **Shared Node**: a canonical node with more than one parent in the support projection.
-- **Reasoning Gap**: a missing, weak, contradictory, or under-supported path below an existing Finding, Insight, or Hypothesis.
+- **Reasoning Gap**: a missing, weak, contradictory, or under-supported path below an existing Finding or Hypothesis.
 - **Evidence Completion Recommendation**: an Investigation Strategy that fills a Reasoning Gap in an existing User Reasoning Forest.
 - **Hypothesis Expansion Recommendation**: an Investigation Strategy that proposes a related new Hypothesis and grows a new tree or branch.
 - **Recommendation Plan Graph**: a prescriptive graph of Reasoning Gaps, Expansion Rationales, Investigation Strategies, Analytic Activities, Recommended Interactions, and Expected Findings.
@@ -234,16 +233,16 @@ Use this relation taxonomy in `reasoning-graph.json`:
 | Relation | Direction | Meaning |
 |---|---|---|
 | `motivates` | Intention -> Action Space unit | A Task, Analytic Question, or Hypothesis explains why an Interaction, Analytic Activity, or Investigation Strategy happened. |
-| `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding or Insight. |
-| `supports` | Finding Space output -> Finding Space output or Intention | A Finding or Insight strengthens another Finding, an Insight, a Task interpretation, an Analytic Question, or a Hypothesis. |
-| `refines` | Finding Space output -> Intention | A Finding or Insight changes or narrows the intention. |
-| `contradicts` | Finding Space output -> Intention | A Finding or Insight weakens or falsifies the intention. |
+| `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding. |
+| `supports` | Finding Space output -> Finding Space output or Intention | A Finding strengthens another Finding, a Task interpretation, an Analytic Question, or a Hypothesis. |
+| `refines` | Finding Space output -> Intention | A Finding changes or narrows the intention. |
+| `contradicts` | Finding Space output -> Intention | A Finding weakens or falsifies the intention. |
 | `contains` | Higher-level unit -> lower-level unit | A Hypothesis contains Analytic Questions, an Analytic Activity contains Interactions, or another hierarchical containment relation is useful. |
 | `derived_from` | Analyst-inferred node -> evidence node | A node was inferred from raw trace evidence, screenshots, annotations, local data, or rendered visual evidence. |
 
 Every Interaction node in `reasoning-graph.json` should include `salience`:
 
-- `primary`: directly supports a major Finding, Insight, or Hypothesis.
+- `primary`: directly supports a major Finding or Hypothesis.
 - `supporting`: provides context or strengthens a reasoning path.
 - `low`: logged but weakly relevant, such as incidental hover, scroll, or layout navigation.
 
@@ -275,9 +274,9 @@ analysis-results/reasoning-graph.json
 
 Do not stop after producing a Recommendation Plan Forest in a full trace analysis. Execute the plan unless the user explicitly asks for analysis-only, recommendation-only, or planning-only output.
 
-For **Evidence Completion Recommendations**, attach the plan to an existing Reasoning Gap. After execution, create real Interaction, Finding, or Insight nodes with `actor: "agent"` and `source: "followup_investigation"`, then patch them into the original graph with `supports`, `refines`, or `contradicts` edges to the original target node.
+For **Evidence Completion Recommendations**, attach the plan to an existing Reasoning Gap. After execution, create real Interaction or Finding nodes with `actor: "agent"` and `source: "followup_investigation"`, then patch them into the original graph with `supports`, `refines`, or `contradicts` edges to the original target node.
 
-For **Hypothesis Expansion Recommendations**, the plan proposes an adjacent Hypothesis. After execution, explicitly resolve that adjacent Hypothesis instead of folding the result silently into the original Hypothesis. If follow-up evidence supports it, create a new evidence-backed `Hypothesis` node, connect the supporting Findings or Insights to it, add it as a graph root, and regenerate the Augmented Reasoning Forest with a separate tree for that adjacent Hypothesis. If follow-up evidence rejects or does not substantiate it, record the rejection or deferral in `continued-investigation-report.md` and add a `Finding` or `Insight` that `contradicts` or `refines` the proposed direction when evidence is strong enough.
+For **Hypothesis Expansion Recommendations**, the plan proposes an adjacent Hypothesis. After execution, explicitly resolve that adjacent Hypothesis instead of folding the result silently into the original Hypothesis. If follow-up evidence supports it, create a new evidence-backed `Hypothesis` node, connect the supporting Findings to it, add it as a graph root, and regenerate the Augmented Reasoning Forest with a separate tree for that adjacent Hypothesis. If follow-up evidence rejects or does not substantiate it, record the rejection or deferral in `continued-investigation-report.md` and add a `Finding` that `contradicts` or `refines` the proposed direction when evidence is strong enough.
 
 Complete follow-up means attempt every recommended Investigation Strategy in the Recommendation Plan Forest. If a branch cannot be executed because required data, services, render APIs, or permissions are unavailable, mark that branch as blocked in `continued-investigation-report.md` with the exact blocker and any partial evidence. Do not silently omit blocked branches.
 
@@ -302,7 +301,7 @@ jq -r '.userActionSequence | to_entries[] | [(.key|tostring), .value.timestamp, 
 Annotation timeline:
 
 ```bash
-jq -r '.annotationRecords | to_entries[] | [(.key|tostring), (.value.id|tostring), .value.timestamp, .value.sourceView, (.value.isInsight|tostring), (.value.text|gsub("\n";" ")), ((.value.selectedItems // [])|length|tostring), (.value.sketchImagePath // .value.imagePath // "")] | @tsv' TRACE/session.json
+jq -r '.annotationRecords | to_entries[] | [(.key|tostring), (.value.id|tostring), .value.timestamp, .value.sourceView, (.value.isFinding|tostring), (.value.text|gsub("\n";" ")), ((.value.selectedItems // [])|length|tostring), (.value.sketchImagePath // .value.imagePath // "")] | @tsv' TRACE/session.json
 ```
 
 Image mapping:
@@ -349,7 +348,7 @@ Distinguish:
 
 - Logged Interactions: clicks, toggles, hovers, scrolls, granularity changes, annotations, script runs, or other executable operations.
 - Derived state: selected users or time windows visible in `relatedViewWithViewState`.
-- User-authored Findings or Insights: annotation text.
+- User-authored Findings: annotation text.
 - Analyst inferences: conclusions derived from several Interactions or from local data validation.
 
 ### Step 2: Interpret screenshots with view semantics
@@ -400,14 +399,14 @@ Use this hierarchy:
 
 - **Low-level Findings**: facts visible in one view, one annotation, one model output, or one computation, such as a connected cluster, a selected funded wallet, a card window with many users, or a computed mean price.
 - **Mid-level Findings**: bounded patterns across a few Interactions, Analytic Activities, or views, such as "this card cohort appears coordinated" or "this account bridges two windows."
-- **High-level Insights**: aggregated narratives across the session, such as accumulation, price support, wash-like activity, profit-taking, or campaign-level collusion.
+- **High-level Findings**: aggregated narratives across the session, such as accumulation, price support, wash-like activity, profit-taking, or campaign-level collusion.
 
-For every mid-level Finding and high-level Insight, include:
+For every mid-level Finding and high-level Finding, include:
 
 - Evidence from annotations and screenshots.
 - If available, validation from local data.
-- Rationale explaining how the Finding or Insight follows from the evidence.
-- What would falsify or weaken the Finding or Insight.
+- Rationale explaining how the Finding follows from the evidence.
+- What would falsify or weaken the Finding.
 
 ### Step 5: Build a top-down recommendation plan
 
@@ -428,13 +427,13 @@ For each Reasoning Gap or proposed adjacent Hypothesis, deliberately choose the 
 - Use **Model Actions** when the claim depends on detector outputs, model-generated suspicious labels, entity groups, manipulation boxes, link construction, component membership, or threshold-sensitive groupings.
 - Use **Synthesis Actions** when the work is to record, compare, qualify, or connect evidence already produced by visual, data, or model work.
 
-Do not default to script-side statistics. A strong recommendation plan should combine visual, statistical, model, and synthesis evidence according to the claim being tested. When a Finding, Insight, or Hypothesis relies on model-derived output, include a detector/model robustness check or explicitly explain why such a check is unavailable or unnecessary.
+Do not default to script-side statistics. A strong recommendation plan should combine visual, statistical, model, and synthesis evidence according to the claim being tested. When a Finding or Hypothesis relies on model-derived output, include a detector/model robustness check or explicitly explain why such a check is unavailable or unnecessary.
 
 Use this structure:
 
 - **Investigation Strategy**: the high-level plan for testing a Hypothesis, such as building a case timeline, validating price impact, expanding a suspected component, or avoiding false positives.
 - **Recommendation class**: Continue the user's path, Similar new exploration, or Hindsight opportunity.
-- **Why this matters**: concise rationale grounded in trace Findings and Insights.
+- **Why this matters**: concise rationale grounded in trace Findings.
 - **Target outcome**: the concrete artifact or evidence state the investigation should produce.
 - **Analytic Activities**: coherent mid-level analysis units under the Investigation Strategy, such as confirming core wallet roles, validating card windows, testing entity relationships, or classifying shared hubs.
 - **Interactions**: specific executable operations inside each Analytic Activity.
@@ -516,8 +515,8 @@ Use this structure:
 
 - **Step nodes**: observable evidence bundles such as logged Interactions, annotations, screenshots, and view states.
 - **Intention nodes**: Tasks, Analytic Questions, and Hypotheses.
-- **Finding-space nodes**: Findings and Insights.
-- **Recommendation nodes**: Investigation Strategies, Analytic Activities, or important Interactions that follow from Findings and Insights.
+- **Finding-space nodes**: Findings.
+- **Recommendation nodes**: Investigation Strategies, Analytic Activities, or important Interactions that follow from Findings.
 
 Step-node construction:
 
@@ -529,17 +528,17 @@ Step-node construction:
 
 Claim-node construction:
 
-- Give every Task, Analytic Question, Hypothesis, Finding, Insight, Investigation Strategy, Analytic Activity, and mapped Interaction a stable ID.
-- Label each claim with both space and scope, such as `Task`, `Analytic Question`, `Hypothesis`, `Finding`, or `Insight`.
-- For Analytic Questions, Hypotheses, mid-level Findings, and Insights, ensure the map shows multiple supporting steps or explains why one step is sufficient.
+- Give every Task, Analytic Question, Hypothesis, Finding, Investigation Strategy, Analytic Activity, and mapped Interaction a stable ID.
+- Label each claim with both space and scope, such as `Task`, `Analytic Question`, `Hypothesis`, or `Finding`.
+- For Analytic Questions, Hypotheses, and mid- or high-level Findings, ensure the map shows multiple supporting steps or explains why one step is sufficient.
 - Keep unverified motives, such as exchange-listing explanations, as separate weak-hypothesis nodes instead of merging them into stronger trace-supported findings.
 - Add confidence labels when useful: direct evidence, strong inference, weak hypothesis.
 
 Recommendation mapping:
 
-- Put most Investigation Strategies downstream of Insights, not directly downstream of logged Interactions.
+- Put most Investigation Strategies downstream of Findings, not directly downstream of logged Interactions.
 - Link pure UI or trace-review Interactions directly to steps when the recommendation is to reopen a screenshot, compare a view state, or inspect an annotation.
-- Make Investigation Strategies depend on Insights that aggregate multiple Findings.
+- Make Investigation Strategies depend on Findings that aggregate multiple Findings.
 - If the full report contains many Interactions, map only the Investigation Strategies and the most important Analytic Activities unless the user asks for an Interaction-level graph.
 
 After building `trace-step-map.md`, produce `reasoning-graph.json` using the schema in `references/reasoning-graph-format.md`. Then run:
@@ -558,7 +557,7 @@ Create `recommendation-plan-graph.json` and `recommendation-plan-forest.md` for 
 Use two recommendation types:
 
 - **Evidence Completion**: fills a Reasoning Gap inside an existing User Reasoning Forest.
-- **Hypothesis Expansion**: proposes a new related Hypothesis from an existing Finding, Insight, or Hypothesis.
+- **Hypothesis Expansion**: proposes a new related Hypothesis from an existing Finding or Hypothesis.
 
 Use the format in `references/recommendation-plan-format.md`. Recommendation Plan Forest nodes are plans, not evidence. Keep Expected Findings visually and semantically separate from actual Findings.
 
@@ -579,9 +578,9 @@ Execution requirements:
 
 - Attempt every Investigation Strategy in `recommendation-plan-forest.md`.
 - Convert each Recommended Interaction into an executable visual or statistical check.
-- Save rendered visualization evidence as trace-local PNG files whenever a visual check supports a Finding, Insight, Hypothesis, recommendation, or patch node.
+- Save rendered visualization evidence as trace-local PNG files whenever a visual check supports a Finding, Hypothesis, recommendation, or patch node.
 - For every executed Hypothesis Expansion branch, either promote the proposed adjacent Hypothesis into a new evidence-backed graph root with `add_root`, or explicitly mark it rejected, deferred, or unsupported in `continued-investigation-report.md`. Do not only attach its evidence to the original Hypothesis.
-- Write `continued-investigation-report.md` with executed checks, blocked checks, evidence, Findings, Insights, and bottom line.
+- Write `continued-investigation-report.md` with executed checks, blocked checks, evidence, Findings, and bottom line.
 - Create `reasoning-graph-patch-001.json` for all evidence-backed follow-up results. If all branches are blocked and no new evidence exists, write the report and explicitly state why no patch was produced.
 - Apply the patch and regenerate augmented artifacts whenever at least one evidence-backed follow-up node exists.
 
@@ -633,7 +632,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - System/view semantics needed to understand the trace.
 - Chronological reconstruction.
 - Intention Space analysis: Tasks, Analytic Questions, and Hypotheses.
-- Finding Space analysis: user-authored and analyst-inferred Findings and Insights.
+- Finding Space analysis: user-authored and analyst-inferred Findings.
 - Top-down recommendations using Investigation Strategies, Analytic Activities, and Interactions. Cover Continue the user's path, Similar new explorations, and Hindsight opportunities when the report includes action recommendations. Analytic Activities must be typed as `Visual Analysis` or `Statistical Analysis`; Interactions must be typed as `Data Action`, `Model Action`, `Visualization Action`, or `Synthesis Action`.
 - Evidence tables for important users, groups, time windows, and screenshots.
 - Bottom line.
@@ -643,7 +642,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - Purpose and relation to `analysis-report.md`.
 - Representation choice, usually a claim-traceability graph.
 - Step nodes table with step ID, evidence, what happened, and why it matters.
-- Claim nodes for Tasks, Analytic Questions, Hypotheses, Findings, Insights, and mapped recommendations, each with stable IDs and scope labels.
+- Claim nodes for Tasks, Analytic Questions, Hypotheses, Findings, and mapped recommendations, each with stable IDs and scope labels.
 - Traceability matrix mapping steps to intention-space IDs, finding-space IDs, recommendation IDs, and rationale.
 - Mermaid graph linking steps to intention-space nodes, finding-space nodes, and recommendation nodes.
 - How to read the graph, including the strongest reasoning paths and weak or unverified paths.
@@ -652,7 +651,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 ### `reasoning-graph.json` required content
 
 - `version`, `trace`, `nodes`, `edges`, and `roots`.
-- One canonical node for every Interaction, Task, Analytic Question, Analytic Activity, Finding, Insight, Hypothesis, and Investigation Strategy used in the trace-step map.
+- One canonical node for every Interaction, Task, Analytic Question, Analytic Activity, Finding, Hypothesis, and Investigation Strategy used in the trace-step map.
 - Relation types limited to `motivates`, `produces`, `supports`, `refines`, `contradicts`, `contains`, and `derived_from`.
 - Every Interaction node must include `interactionType` and `salience`.
 - Every Analytic Activity node must include `activityType`.
@@ -670,7 +669,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 
 - `recommendation-plan-graph.json`: prescriptive plan graph. It must distinguish Evidence Completion from Hypothesis Expansion. Every Reasoning Gap, Investigation Strategy, plan Hypothesis, Expansion Rationale, and Expected Finding must include a compact `label` and a context-rich `explanation`; include optional `evidenceSummary`, `reasoningRole`, `targetContext`, `analyticContrast`, `searchConcepts`, `decisionCriteria`, and `falsificationCriteria` when they help execution.
 - `recommendation-plan-forest.md`: readable plan forest. It must show Reasoning Gaps or Expansion Rationales above Investigation Strategies, Analytic Activities, Recommended Interactions, and Expected Findings.
-- `continued-investigation-report.md`: execution report for every recommendation branch, including completed checks, blocked checks, evidence, Findings, Insights, and unresolved gaps.
+- `continued-investigation-report.md`: execution report for every recommendation branch, including completed checks, blocked checks, evidence, Findings, and unresolved gaps.
 - `reasoning-graph-patch-*.json`: follow-up evidence patch. New evidence nodes must include `actor`, `source`, `planRef`, `explanation`, `evidenceSummary`, `reasoningRole`, and `patchRationale`.
 - `augmented-reasoning-graph.json`: canonical reasoning graph after patch application.
 - `augmented-reasoning-forest.json`: machine-readable regenerated forest from the augmented graph.
@@ -681,7 +680,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - Include analysis and rationale, not only conclusions.
 - Separate observed facts from inferred claims.
 - Keep screenshots linked by relative path from the artifact file. From `TRACE/analysis-results/*.md`, original trace screenshots should usually use `../images/...`.
-- When render APIs generate visualization evidence used for a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save the rendered PNG under `TRACE/analysis-results/continued-investigation-assets/` or another assets folder inside `analysis-results`, and cite it with `render:<relative-path>` provenance. Do not rely on transient data URLs as evidence.
+- When render APIs generate visualization evidence used for a Finding, Hypothesis, recommendation, or reasoning-graph patch, save the rendered PNG under `TRACE/analysis-results/continued-investigation-assets/` or another assets folder inside `analysis-results`, and cite it with `render:<relative-path>` provenance. Do not rely on transient data URLs as evidence.
 - Preserve exact wallet addresses in evidence tables unless the user asks for anonymization.
 - Use shortened addresses in prose for readability.
 - Use concrete dates and times for market or session events.
@@ -722,7 +721,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - `CandlestickChart.vue` is essential for understanding how manipulation cards are aggregated and why clicked card users represent cohorts.
 - Annotation text is the strongest evidence of what the user believed or wanted to record.
 - Interaction screenshots are useful, but annotation screenshots usually encode the user's actual evidence markings.
-- Always distinguish user insight from analyst inference. A user annotation can be quoted or summarized as user-authored; a conclusion from local data must be labeled as validation or inference.
+- Always distinguish user finding from analyst inference. A user annotation can be quoted or summarized as user-authored; a conclusion from local data must be labeled as validation or inference.
 - Repeated users across card groups are high-value bridge evidence. Compute overlaps early.
 - Direct transfers among selected or repeated users can materially strengthen coordination hypotheses. Check `sorted_transfers.csv`.
 - Trade summaries by selected cohort and time window make qualitative screenshot claims more defensible. Check `sorted_trades.csv` after identifying candidate users and windows.
@@ -732,9 +731,9 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - Include caveats for unverified motives. Trading patterns can support a manipulation hypothesis without proving why the users acted.
 - For future efficiency, produce reusable tables while analyzing: Interaction timeline, annotation timeline, image map, clicked card users, repeated users, transfer links, and per-window trade totals.
 - Produce the trace-step map after the narrative report. The report helps decide what the claims are; the map helps verify whether each claim is actually grounded in trace evidence.
-- Use step-level map nodes for Finding and Insight analysis and reserve raw Interaction-level graph nodes for usability analysis.
-- Keep Investigation Strategies downstream of Insights whenever possible. This makes it clear whether a recommendation follows from evidence or is just a generic next step.
-- Use graph weak points to improve the report. If a high-level insight only has one edge, either add missing evidence, lower the claim level, or mark it as a weak hypothesis.
+- Use step-level map nodes for Finding analysis and reserve raw Interaction-level graph nodes for usability analysis.
+- Keep Investigation Strategies downstream of Findings whenever possible. This makes it clear whether a recommendation follows from evidence or is just a generic next step.
+- Use graph weak points to improve the report. If a high-level finding only has one edge, either add missing evidence, lower the claim level, or mark it as a weak hypothesis.
 - Make recommendation sections read like an investigation plan, not a flat checklist: Hypothesis, Investigation Strategy, target outcome, Analytic Activities, then Interactions.
 - Keep Expected Findings out of the evidence-backed reasoning graph until follow-up work actually produces evidence.
 - Use Reasoning Graph Patches to merge follow-up investigation evidence. This keeps the original user trace reasoning auditable.
@@ -748,7 +747,7 @@ Before delivering, verify:
 - The report path is correct and `TRACE/analysis-results/analysis-report.md` exists.
 - For a full analysis, `TRACE/analysis-results/trace-step-map.md` exists next to the report.
 - Every Analytic Question and Hypothesis has evidence and rationale.
-- Every mid-level Finding and high-level Insight has evidence and rationale.
+- Every mid-level Finding and high-level Finding has evidence and rationale.
 - Every Investigation Strategy has a "why this matters" rationale.
 - Every Investigation Strategy has a context-rich explanation that expands shorthand IDs and is understandable without reading unrelated files.
 - Every non-trivial graph node has a context-rich `explanation`, and every primary or agent-created Interaction has one as well.

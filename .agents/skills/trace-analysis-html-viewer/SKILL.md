@@ -48,7 +48,7 @@ Use the `user-trace-analysis` terminology matrix for node legends:
 |---|---|---|---|
 | Low | Task | Interaction, RecommendedInteraction | Finding |
 | Mid | AnalyticQuestion | AnalyticActivity | Finding |
-| High | Hypothesis | InvestigationStrategy | Insight |
+| High | Hypothesis | InvestigationStrategy | Finding |
 
 Notes:
 

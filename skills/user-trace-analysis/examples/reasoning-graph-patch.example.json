@@ -17,6 +17,10 @@
         "confidence": "Direct evidence",
         "actor": "agent",
         "source": "followup_investigation",
+        "explanation": "The agent computes exact trade counts and USD volume for the clicked cohort.",
+        "evidenceSummary": "The computation uses local ACT trade records for the users in the selected manipulation card.",
+        "reasoningRole": "Produces a follow-up Finding that can fill the missing quantitative support under H1.",
+        "patchRationale": "The original user reasoning was visual; this patch adds the missing statistical evidence.",
         "planRef": {
           "strategyId": "RS1",
           "activityId": "AA1",
@@ -29,7 +33,7 @@
     {
       "op": "add_node",
       "node": {
-        "id": "F2",
+        "id": "F_AGENT_1",
         "kind": "Finding",
         "space": "Finding",
         "scope": "Mid",
@@ -38,6 +42,10 @@
         "confidence": "Strong inference",
         "actor": "agent",
         "source": "followup_investigation",
+        "explanation": "The clicked cohort's trade totals show synchronized net buying during the marked window.",
+        "evidenceSummary": "The Finding summarizes buy/sell counts, net direction, and USD volume computed from local trade records.",
+        "reasoningRole": "Supports H1 by adding quantitative evidence below the user's visual coordination claim.",
+        "patchRationale": "This evidence directly addresses the planned ExpectedFinding and belongs in the augmented reasoning graph.",
         "planRef": {
           "strategyId": "RS1",
           "activityId": "AA1",
@@ -51,7 +59,7 @@
       "op": "add_edge",
       "edge": {
         "source": "AI2",
-        "target": "F2",
+        "target": "F_AGENT_1",
         "relation": "produces",
         "rationale": "The follow-up calculation produced the cohort-volume finding."
       }
@@ -59,7 +67,7 @@
     {
       "op": "add_edge",
       "edge": {
-        "source": "F2",
+        "source": "F_AGENT_1",
         "target": "H1",
         "relation": "supports",
         "rationale": "The quantified cohort behavior supports the coordinated price-activity hypothesis."

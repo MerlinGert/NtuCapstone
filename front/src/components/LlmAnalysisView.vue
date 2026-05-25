@@ -307,7 +307,7 @@ export default {
       const nested = new Map()
       for (const [targetId, children] of grouped.entries()) {
         const synthesisNodes = children.filter(
-          (child) => child.relation === 'synthesizes' && this.nodeType(child.node) === 'Insight',
+          (child) => child.relation === 'synthesizes' && this.nodeType(child.node) === 'Finding',
         )
         if (synthesisNodes.length === 0) {
           nested.set(targetId, children)
@@ -315,7 +315,7 @@ export default {
         }
 
         const containedChildren = children.filter(
-          (child) => !(child.relation === 'synthesizes' && this.nodeType(child.node) === 'Insight'),
+          (child) => !(child.relation === 'synthesizes' && this.nodeType(child.node) === 'Finding'),
         )
         nested.set(targetId, [
           {

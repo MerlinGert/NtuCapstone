@@ -12,7 +12,8 @@
       "interactionType": "Visualization Action",
       "salience": "primary",
       "provenance": ["action:14", "screenshot:../images/action-0014-source-kline_chart-01.png"],
-      "confidence": "Direct evidence"
+      "confidence": "Direct evidence",
+      "explanation": "The user clicked a manipulation card to inspect the users associated with that card window."
     },
     {
       "id": "T1",
@@ -21,7 +22,8 @@
       "scope": "Low",
       "label": "Inspect card-user cohort",
       "provenance": ["action:14"],
-      "confidence": "Strong inference"
+      "confidence": "Strong inference",
+      "explanation": "The task was to inspect the cohort behind the selected manipulation card."
     },
     {
       "id": "F1",
@@ -30,16 +32,18 @@
       "scope": "Low",
       "label": "The 9-user cohort shows same-direction buying",
       "provenance": ["annotation:13", "action:14"],
-      "confidence": "Direct evidence"
+      "confidence": "Direct evidence",
+      "explanation": "The selected cohort was observed as a same-direction buying group in the card and Behavior Details context."
     },
     {
-      "id": "IN1",
-      "kind": "Insight",
+      "id": "F2",
+      "kind": "Finding",
       "space": "Finding",
       "scope": "High",
       "label": "The clicked cohort may be part of coordinated price activity",
       "provenance": ["inference:F1 plus K-line alignment"],
-      "confidence": "Strong inference"
+      "confidence": "Strong inference",
+      "explanation": "The local same-direction cohort finding is synthesized with K-line alignment into a higher-level coordination finding."
     },
     {
       "id": "H1",
@@ -48,7 +52,8 @@
       "scope": "High",
       "label": "Oct 25-27 behavior reflects coordinated price activity",
       "provenance": ["inference:trace synthesis"],
-      "confidence": "Weak hypothesis"
+      "confidence": "Weak hypothesis",
+      "explanation": "The hypothesis frames the observed cohort behavior as a possible coordinated price-activity case to test."
     }
   ],
   "edges": [
@@ -66,15 +71,15 @@
     },
     {
       "source": "F1",
-      "target": "IN1",
+      "target": "F2",
       "relation": "supports",
-      "rationale": "The local finding contributes to a higher-level coordination insight."
+      "rationale": "The local finding contributes to a higher-level coordination finding."
     },
     {
-      "source": "IN1",
+      "source": "F2",
       "target": "H1",
       "relation": "supports",
-      "rationale": "The coordination insight supports the price-activity hypothesis."
+      "rationale": "The coordination finding supports the price-activity hypothesis."
     },
     {
       "source": "H1",

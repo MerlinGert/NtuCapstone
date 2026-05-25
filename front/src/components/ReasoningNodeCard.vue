@@ -56,7 +56,6 @@ export default {
         'type-hypothesis': this.node.type === 'Hypothesis',
         'type-question': this.node.type === 'AnalyticQuestion',
         'type-finding': this.node.type === 'Finding',
-        'type-insight': this.node.type === 'Insight',
       }
     },
   },
@@ -100,11 +99,6 @@ export default {
   background: #fff1f5;
   border-color: #f7b7ca;
   box-shadow: 0 1px 3px rgba(190, 24, 93, 0.12);
-}
-
-.source-patch.type-insight {
-  background: #ffe6ef;
-  border-color: #ee8fad;
 }
 
 .node-meta-row {

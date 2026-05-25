@@ -60,7 +60,7 @@
 <script>
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || ''
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
-const SYSTEM_PROMPT = `你是 ManiScope 的内置 AI 分析助手。ManiScope 是一个用于评估加密货币市场交易型价格操纵风险的可视化分析仪表板。以下是完整的系统手册，你需要熟读并依此回答用户关于系统操作、参数含义、分析方法的所有问题。回答要简洁、专业、有洞察力。
+const SYSTEM_PROMPT = `你是 ManiScope 的内置 AI 分析助手。ManiScope 是一个用于评估加密货币市场交易型价格操纵风险的可视化分析仪表板。以下是完整的系统手册，你需要熟读并依此回答用户关于系统操作、参数含义、分析方法的所有问题。回答要简洁、专业、证据充分。
 
 ---
 # ManiScope 用户手册
@@ -112,7 +112,7 @@ ManiScope 是一个用于评估加密货币市场交易型价格操纵风险的�
 ## User Actions / Annotations / Action Tree
 - User Actions：记录所有交互事件，可展开查看 JSON 细节和截图。
 - Annotations：通过相机按钮或 Alt+S 快捷键创建的标注，含草图和文字。
-- Action Tree：把动作和标注可视化为树，代币切换/快照更新形成主分支。Create Insight 按钮可将多个标注组合成高层洞察。
+- Action Tree：把动作和标注可视化为树，代币切换/快照更新形成主分支。Create Finding 按钮可将多个标注组合成高层发现。
 
 ## 推荐工作流
 1. 选择 ACT 或 PNUT。
@@ -121,7 +121,7 @@ ManiScope 是一个用于评估加密货币市场交易型价格操纵风险的�
 4. 在 K 线视图寻找卡片密集的时间区间。
 5. 点击可疑节点或操纵卡片，查看 Behavior Details。
 6. 用 Sequential Time、Show Manipulation Boxes、Sync Time 深入分析。
-7. 用相机按钮标注证据，用 Action Tree 整理洞察。
+7. 用相机按钮标注证据，用 Action Tree 整理发现。
 8. 导出会话 JSON。
 
 ## 注意事项

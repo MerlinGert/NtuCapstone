@@ -1,6 +1,6 @@
 # Follow-up Investigation Execution
 
-Use this reference when executing a Recommendation Plan Forest or continuing a ManiScope trace investigation from existing recommendations. The goal is to combine raw data, backend endpoints, and rendered ManiScope views, then record evidence as Findings, Insights, and Reasoning Graph Patches.
+Use this reference when executing a Recommendation Plan Forest or continuing a ManiScope trace investigation from existing recommendations. The goal is to combine raw data, backend endpoints, and rendered ManiScope views, then record evidence as Findings, and Reasoning Graph Patches.
 
 This reference is operational. For methodology, graph schemas, Recommendation Plan Forests, and patch formats, use:
 
@@ -36,7 +36,7 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
    - Use raw trace data, local JSON/CSV data, or backend endpoints for exact counts, amounts, timestamps, and transfer relations.
    - Use `/api/user_behavior/sequences` to build `behaviorData` for Behavior Details renders.
    - Treat rendered images as visual evidence for timing, density, grouping, and qualitative role comparison.
-   - If a rendered image supports a Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch, save it as a PNG asset under `TRACE/analysis-results/` and cite it with `render:<relative-path>` provenance. Do not leave supporting visual evidence only as a transient browser data URL.
+   - If a rendered image supports a Finding, Hypothesis, recommendation, or reasoning-graph patch, save it as a PNG asset under `TRACE/analysis-results/` and cite it with `render:<relative-path>` provenance. Do not leave supporting visual evidence only as a transient browser data URL.
    - Do not infer exact event counts from Behavior Details dots when the row may be sampled. Use sequence payloads and render metadata for exact counts.
 
 4. **Render focused views**
@@ -55,9 +55,9 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
    - Recheck whether new candidates directly connect to the original clicked component before implying they are part of the same group.
 
 6. **Patch the reasoning graph**
-   - Convert actual follow-up results into real Interaction, Finding, Insight, or Hypothesis nodes.
+   - Convert actual follow-up results into real Interaction, Finding, or Hypothesis nodes.
    - New follow-up evidence nodes must include `actor`, `source`, `planRef`, `explanation`, `evidenceSummary`, `reasoningRole`, and `patchRationale`.
-   - Use `supports`, `refines`, or `contradicts` edges to attach new Findings or Insights to existing or new Hypotheses.
+   - Use `supports`, `refines`, or `contradicts` edges to attach new Findings to existing or new Hypotheses.
    - For every executed Hypothesis Expansion branch, explicitly resolve the proposed adjacent Hypothesis. If evidence supports it, add a new Hypothesis node and an `add_root` operation so the augmented forest contains a separate adjacent-hypothesis tree. If evidence does not support it, state that outcome in `continued-investigation-report.md` and avoid presenting the Expected Finding as evidence.
    - Apply the patch with `scripts/apply_reasoning_graph_patch.py` and regenerate the augmented forest.
    - If every branch is blocked and no new evidence exists, write `continued-investigation-report.md` and explicitly state why no patch was produced.
@@ -146,7 +146,7 @@ Keep the report focused on investigation content:
 Asset rules:
 
 - Save only images that support a report claim.
-- Save every rendered visualization used as evidence for a claim, Finding, Insight, Hypothesis, recommendation, or reasoning-graph patch.
+- Save every rendered visualization used as evidence for a claim, Finding, Hypothesis, recommendation, or reasoning-graph patch.
 - Put kept assets in `TRACE/analysis-results/continued-investigation-assets/` or another assets folder inside `analysis-results` named by the user.
 - Use evidence-oriented filenames, for example `kline-core-window.png`, `behavior-selected-wallets.png`, or `token-distribution-sibling-wallets.png`.
 - Delete unused intermediate captures before finishing.

@@ -5,20 +5,20 @@
       <div style="display: flex; align-items: center;">
         <div class="count-badge">{{ nodesCount }}</div>
         
-        <!-- ezio: Multi-select insight buttons -->
-        <div v-if="!readOnly" class="insight-controls" style="margin-left: 16px; display: flex; gap: 8px;">
-          <button v-if="!isMultiSelectMode" class="insight-btn" @click="startMultiSelect" title="Create Insight" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+        <!-- ezio: Multi-select finding buttons -->
+        <div v-if="!readOnly" class="finding-controls" style="margin-left: 16px; display: flex; gap: 8px;">
+          <button v-if="!isMultiSelectMode" class="finding-btn" @click="startMultiSelect" title="Create Finding" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center; gap: 4px;">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
           </button>
           <template v-else>
-            <button class="insight-btn cancel-btn" @click="cancelMultiSelect">Cancel</button>
-            <button class="insight-btn confirm-btn" @click="openInsightPopup" :disabled="selectedInsightAnnotations.length === 0">
-              Confirm ({{ selectedInsightAnnotations.length }})
+            <button class="finding-btn cancel-btn" @click="cancelMultiSelect">Cancel</button>
+            <button class="finding-btn confirm-btn" @click="openFindingPopup" :disabled="selectedFindingAnnotations.length === 0">
+              Confirm ({{ selectedFindingAnnotations.length }})
             </button>
           </template>
         </div>
 
-        <button v-if="!readOnly" class="insight-btn confirm-btn" @click="openAddNodeDialog" title="Add Custom Node" style="margin-left:8px;padding:4px 8px;font-size:12px;">+ Add Node</button>
+        <button v-if="!readOnly" class="finding-btn confirm-btn" @click="openAddNodeDialog" title="Add Custom Node" style="margin-left:8px;padding:4px 8px;font-size:12px;">+ Add Node</button>
       </div>
 
       <!-- Row 2: Legend -->
@@ -59,60 +59,60 @@
       </div>
     </div>
 
-    <!-- ezio: Popup for High-level Insight Creation -->
-    <div v-if="showInsightPopup" class="annotation-popup-overlay" @click.self="closeInsightPopup">
-      <div class="annotation-popup insight-popup">
+    <!-- ezio: Popup for High-level Finding Creation -->
+    <div v-if="showFindingPopup" class="annotation-popup-overlay" @click.self="closeFindingPopup">
+      <div class="annotation-popup finding-popup">
         <div class="popup-header">
-          <h3>Create High-Level Insight</h3>
-          <button class="close-btn" @click="closeInsightPopup">×</button>
+          <h3>Create High-Level Finding</h3>
+          <button class="close-btn" @click="closeFindingPopup">×</button>
         </div>
         <div class="popup-body">
-          <div class="insight-annotations-list">
-            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Selected Annotations ({{ selectedInsightAnnotations.length }})</h4>
-            <InsightAnnotationItem 
-              v-for="(anno, idx) in selectedInsightAnnotations" 
+          <div class="finding-annotations-list">
+            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Selected Annotations ({{ selectedFindingAnnotations.length }})</h4>
+            <FindingAnnotationItem
+              v-for="(anno, idx) in selectedFindingAnnotations"
               :key="anno.id !== undefined ? anno.id : idx" 
               :item-id="anno.id" 
               :annotations="annotations" 
               :actions="actions" 
             />
           </div>
-          <div class="insight-input-area">
-            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Insight Notes</h4>
-            <textarea v-model="insightText" placeholder="Enter high-level insights here..." class="insight-textarea"></textarea>
+          <div class="finding-input-area">
+            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Finding Notes</h4>
+            <textarea v-model="findingText" placeholder="Enter high-level findings here..." class="finding-textarea"></textarea>
           </div>
         </div>
         <div class="popup-footer">
-          <button class="insight-btn cancel-btn" @click="closeInsightPopup">Cancel</button>
-          <button class="insight-btn confirm-btn" @click="saveInsight" :disabled="!insightText.trim()">Save Insight</button>
+          <button class="finding-btn cancel-btn" @click="closeFindingPopup">Cancel</button>
+          <button class="finding-btn confirm-btn" @click="saveFinding" :disabled="!findingText.trim()">Save Finding</button>
         </div>
       </div>
     </div>
 
-    <!-- ezio: Popup for High-level Insight Viewing -->
-    <div v-if="selectedInsightToView" class="annotation-popup-overlay" @click.self="closeInsightViewPopup">
-      <div class="annotation-popup insight-popup">
+    <!-- ezio: Popup for High-level Finding Viewing -->
+    <div v-if="selectedFindingToView" class="annotation-popup-overlay" @click.self="closeFindingViewPopup">
+      <div class="annotation-popup finding-popup">
         <div class="popup-header">
-          <h3>High-Level Insight</h3>
-          <button class="close-btn" @click="closeInsightViewPopup">×</button>
+          <h3>High-Level Finding</h3>
+          <button class="close-btn" @click="closeFindingViewPopup">×</button>
         </div>
         <div class="popup-body">
           <div class="popup-time">
-            <span style="background: #3182ce; color: white; padding: 2px 4px; border-radius: 4px; font-size: 10px; margin-right: 4px;">Insight</span>
-            <span style="font-weight: bold; color: #718096; margin-right: 4px;">#{{ selectedInsightToView.id !== undefined ? selectedInsightToView.id : (selectedInsightToView.actionInfo?.id !== undefined ? selectedInsightToView.actionInfo.id : 'N/A') }}</span>
-            {{ new Date(selectedInsightToView.timestamp).toLocaleString() }}
+            <span style="background: #3182ce; color: white; padding: 2px 4px; border-radius: 4px; font-size: 10px; margin-right: 4px;">Finding</span>
+            <span style="font-weight: bold; color: #718096; margin-right: 4px;">#{{ selectedFindingToView.id !== undefined ? selectedFindingToView.id : (selectedFindingToView.actionInfo?.id !== undefined ? selectedFindingToView.actionInfo.id : 'N/A') }}</span>
+            {{ new Date(selectedFindingToView.timestamp).toLocaleString() }}
           </div>
           
-          <div class="insight-input-area" style="margin-top: 0; margin-bottom: 16px;">
+          <div class="finding-input-area" style="margin-top: 0; margin-bottom: 16px;">
             <div class="popup-text" style="background: #eef2f7; border-left-color: #3182ce;">
-              {{ selectedInsightToView.actionInfo ? selectedInsightToView.actionInfo.text : '' }}
+              {{ selectedFindingToView.actionInfo ? selectedFindingToView.actionInfo.text : '' }}
             </div>
           </div>
           
-          <div class="insight-annotations-list" v-if="selectedInsightToView.actionInfo && selectedInsightToView.actionInfo.refAnnotations && selectedInsightToView.actionInfo.refAnnotations.length > 0">
-            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Referenced Annotations ({{ selectedInsightToView.actionInfo.refAnnotations.length }})</h4>
-            <InsightAnnotationItem 
-              v-for="refId in selectedInsightToView.actionInfo.refAnnotations" 
+          <div class="finding-annotations-list" v-if="selectedFindingToView.actionInfo && selectedFindingToView.actionInfo.refAnnotations && selectedFindingToView.actionInfo.refAnnotations.length > 0">
+            <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #4a5568;">Referenced Annotations ({{ selectedFindingToView.actionInfo.refAnnotations.length }})</h4>
+            <FindingAnnotationItem
+              v-for="refId in selectedFindingToView.actionInfo.refAnnotations"
               :key="refId" 
               :item-id="refId" 
               :annotations="annotations" 
@@ -145,7 +145,7 @@
       <div class="popup-body">
         <div class="edit-field">
           <label class="edit-label">Text</label>
-          <textarea v-model="editDialog.text" class="insight-textarea" rows="4" placeholder="Annotation text..."></textarea>
+          <textarea v-model="editDialog.text" class="finding-textarea" rows="4" placeholder="Annotation text..."></textarea>
         </div>
         <div class="edit-field">
           <label class="edit-label">Node Color</label>
@@ -161,13 +161,13 @@
           <input type="file" accept="image/*" @change="editDialog_onImageChange" />
           <div v-if="editDialog.imageUrl" class="popup-image-container" style="margin-top:8px;">
             <img :src="editDialog.imageUrl" class="popup-image" alt="Preview" />
-            <button class="insight-btn cancel-btn" style="margin-top:6px;font-size:11px;" @click="editDialog.imageUrl = null">Remove Image</button>
+            <button class="finding-btn cancel-btn" style="margin-top:6px;font-size:11px;" @click="editDialog.imageUrl = null">Remove Image</button>
           </div>
         </div>
       </div>
       <div class="popup-footer">
-        <button class="insight-btn cancel-btn" @click="closeEditDialog">Cancel</button>
-        <button class="insight-btn confirm-btn" @click="saveEdit">Save</button>
+        <button class="finding-btn cancel-btn" @click="closeEditDialog">Cancel</button>
+        <button class="finding-btn confirm-btn" @click="saveEdit">Save</button>
       </div>
     </div>
   </div>
@@ -182,7 +182,7 @@
       <div class="popup-body">
         <div class="edit-field">
           <label class="edit-label">Text / Label</label>
-          <textarea v-model="addNodeDialog.text" class="insight-textarea" rows="3" placeholder="Enter annotation text..."></textarea>
+          <textarea v-model="addNodeDialog.text" class="finding-textarea" rows="3" placeholder="Enter annotation text..."></textarea>
         </div>
         <div class="edit-field">
           <label class="edit-label">Source View</label>
@@ -207,13 +207,13 @@
           <input type="file" accept="image/*" @change="addNode_onImageChange" />
           <div v-if="addNodeDialog.imageUrl" class="popup-image-container" style="margin-top:8px;">
             <img :src="addNodeDialog.imageUrl" class="popup-image" alt="Preview" />
-            <button class="insight-btn cancel-btn" style="margin-top:6px;font-size:11px;" @click="addNodeDialog.imageUrl = null">Remove Image</button>
+            <button class="finding-btn cancel-btn" style="margin-top:6px;font-size:11px;" @click="addNodeDialog.imageUrl = null">Remove Image</button>
           </div>
         </div>
       </div>
       <div class="popup-footer">
-        <button class="insight-btn cancel-btn" @click="closeAddNodeDialog">Cancel</button>
-        <button class="insight-btn confirm-btn" @click="saveNewNode" :disabled="!addNodeDialog.text.trim()">Add</button>
+        <button class="finding-btn cancel-btn" @click="closeAddNodeDialog">Cancel</button>
+        <button class="finding-btn confirm-btn" @click="saveNewNode" :disabled="!addNodeDialog.text.trim()">Add</button>
       </div>
     </div>
   </div>
@@ -222,14 +222,14 @@
 
 <script>
 import * as d3 from 'd3'
-import InsightAnnotationItem from './InsightAnnotationItem.vue'
+import FindingAnnotationItem from './FindingAnnotationItem.vue'
 
 export default {
   name: 'UserActionTree',
   components: {
-    InsightAnnotationItem
+    FindingAnnotationItem
   },
-  emits: ['add-insight-annotation', 'log-action', 'delete-action', 'delete-annotation', 'update-annotation', 'add-custom-annotation', 'reorder-action'],
+  emits: ['add-finding-annotation', 'log-action', 'delete-action', 'delete-annotation', 'update-annotation', 'add-custom-annotation', 'reorder-action'],
   props: {
     actions: {
       type: Array,
@@ -248,12 +248,12 @@ export default {
     return {
       nodesCount: 0,
       selectedAnnotation: null,
-      selectedInsightToView: null,
-      // ezio: high-level insight state
+      selectedFindingToView: null,
+      // ezio: high-level finding state
       isMultiSelectMode: false,
-      selectedInsightAnnotations: [],
-      showInsightPopup: false,
-      insightText: '',
+      selectedFindingAnnotations: [],
+      showFindingPopup: false,
+      findingText: '',
       // ezio: node editing state
       contextMenu: { visible: false, x: 0, y: 0, node: null },
       editDialog: { visible: false, annotationId: null, text: '', color: '#fde68a', imageUrl: null },
@@ -302,50 +302,50 @@ export default {
     closeAnnotationPopup() {
       this.selectedAnnotation = null
     },
-    // ezio: high level insight methods
+    // ezio: high level finding methods
     startMultiSelect() {
       if (this.readOnly) return
       this.isMultiSelectMode = true
-      this.selectedInsightAnnotations = []
+      this.selectedFindingAnnotations = []
       this.drawTree()
     },
     cancelMultiSelect() {
       this.isMultiSelectMode = false
-      this.selectedInsightAnnotations = []
+      this.selectedFindingAnnotations = []
       this.drawTree()
     },
-    openInsightPopup() {
+    openFindingPopup() {
       if (this.readOnly) return
-      if (this.selectedInsightAnnotations.length > 0) {
-        this.showInsightPopup = true
-        this.insightText = ''
+      if (this.selectedFindingAnnotations.length > 0) {
+        this.showFindingPopup = true
+        this.findingText = ''
       }
     },
-    closeInsightPopup() {
-      this.showInsightPopup = false
+    closeFindingPopup() {
+      this.showFindingPopup = false
     },
-    closeInsightViewPopup() {
-      this.selectedInsightToView = null
+    closeFindingViewPopup() {
+      this.selectedFindingToView = null
     },
-    saveInsight() {
+    saveFinding() {
       if (this.readOnly) return
-      if (!this.insightText.trim()) return
+      if (!this.findingText.trim()) return
       
       const payload = {
-        refAnnotations: this.selectedInsightAnnotations.map(a => a.id),
-        text: this.insightText
+        refAnnotations: this.selectedFindingAnnotations.map(a => a.id),
+        text: this.findingText
       }
       
-      this.$emit('log-action', 'high_level_insight', payload)
+      this.$emit('log-action', 'high_level_finding', payload)
       
       // Also emit to add to annotation records
-      this.$emit('add-insight-annotation', {
-        text: this.insightText,
+      this.$emit('add-finding-annotation', {
+        text: this.findingText,
         sourceView: 'system',
         selectedItems: payload.refAnnotations
       })
       
-      this.showInsightPopup = false
+      this.showFindingPopup = false
       this.cancelMultiSelect()
     },
 
@@ -462,18 +462,18 @@ export default {
     },
     buildTreeData() {
       // Merge actions and annotations, sort by time
-      // Filter out high_level_insight from actions to avoid duplicates with annotationRecords
-      let allEvents = this.actions.filter(a => a.actionType !== 'high_level_insight')
+      // Filter out high_level_finding from actions to avoid duplicates with annotationRecords
+      let allEvents = this.actions.filter(a => a.actionType !== 'high_level_finding')
       
       this.annotations.forEach(anno => {
         allEvents.push({
           ...anno,
-          actionType: anno.isInsight ? 'high_level_insight' : 'annotation',
+          actionType: anno.isFinding ? 'high_level_finding' : 'annotation',
           customColor: anno.customColor || null,
           actionInfo: { 
             id: anno.id, 
             text: anno.text, 
-            refAnnotations: anno.isInsight ? anno.selectedItems : undefined,
+            refAnnotations: anno.isFinding ? anno.selectedItems : undefined,
             selectedItems: anno.selectedItems, 
             sketchDataUrl: anno.sketchDataUrl, 
             timestamp: anno.timestamp 
@@ -512,12 +512,12 @@ export default {
         this.nodesCount++
         const isRootConfig = rootLevelActions.includes(event.actionType)
         const isUpdateSnapshot = event.actionType === 'update_snapshot'
-        const isHighLevelInsight = event.actionType === 'high_level_insight'
+        const isHighLevelFinding = event.actionType === 'high_level_finding'
         
         const newNode = {
           id: `node_${i}`,
           name: this.formatActionType(event.actionType),
-          type: (event.actionType === 'annotation' || isHighLevelInsight) ? 'annotation' : 'action',
+          type: (event.actionType === 'annotation' || isHighLevelFinding) ? 'annotation' : 'action',
           data: event,
           children: [],
           parent: null // will be set below
@@ -605,8 +605,8 @@ export default {
           return `Synchronized time window from ${summaryInfo.source === 'kline_chart' ? 'K-line Chart' : 'Behavior Details'}`
         }
         
-        if (type === 'high_level_insight') {
-          return `Insight: ${summaryInfo.text || 'No text provided'}`
+        if (type === 'high_level_finding') {
+          return `Finding: ${summaryInfo.text || 'No text provided'}`
         }
         
         // Fallback
@@ -895,7 +895,7 @@ export default {
         if (type.startsWith('hover_')) return 'hover'
         if (type.includes('select') || type.includes('click') || type.includes('toggle')) return 'interaction'
         if (type.includes('run') || type.includes('update') || type === 'change_coin') return 'system'
-        if (type === 'high_level_insight') return 'annotation'
+        if (type === 'high_level_finding') return 'annotation'
         return 'default'
       }
 
@@ -932,7 +932,7 @@ export default {
 
       const getStrokeColor = d => {
         if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
-          const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
+          const isSelected = this.selectedFindingAnnotations.some(a => a.id === d.data.data.actionInfo.id);
           if (isSelected) return '#e53e3e';
         }
         if (d.data.type === 'root') return '#2d3748'
@@ -944,7 +944,7 @@ export default {
 
       const getStrokeWidth = d => {
         if (this.isMultiSelectMode && d.data.type === 'annotation' && d.data.data && d.data.data.actionInfo) {
-          const isSelected = this.selectedInsightAnnotations.some(a => a.id === d.data.data.actionInfo.id);
+          const isSelected = this.selectedFindingAnnotations.some(a => a.id === d.data.data.actionInfo.id);
           if (isSelected) return 3;
         }
         return 1.5;
@@ -953,9 +953,9 @@ export default {
       // Node Rectangles based on type
       node.append('rect')
         .attr('class', 'node-rect')
-        .attr('x', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? -33 : -8)
+        .attr('x', d => (d.data.data && d.data.data.actionType === 'high_level_finding') ? -33 : -8)
         .attr('y', -8)
-        .attr('width', d => (d.data.data && d.data.data.actionType === 'high_level_insight') ? 66 : 16)
+        .attr('width', d => (d.data.data && d.data.data.actionType === 'high_level_finding') ? 66 : 16)
         .attr('height', 16)
         .attr('rx', 4) // Rounded corners
         .attr('fill', d => {
@@ -1015,7 +1015,7 @@ export default {
              let summary = ''
              
              // Annotations have their own text payload, actions use the formatter
-             if (actionType === 'annotation' || actionType === 'high_level_insight') {
+             if (actionType === 'annotation' || actionType === 'high_level_finding') {
                 summary = info.text || 'No description provided'
              } else {
                 summary = this.formatActionSummary(actionType, info)
@@ -1034,7 +1034,7 @@ export default {
             .style('left', (event.clientX + 15) + 'px')
             .style('top', (event.clientY - 30) + 'px')
 
-          if (d.data.data && d.data.data.actionType === 'high_level_insight') {
+          if (d.data.data && d.data.data.actionType === 'high_level_finding') {
              const refIds = d.data.data.actionInfo.refAnnotations || [];
              
              // Recursively get all nested refIds
@@ -1042,7 +1042,7 @@ export default {
                 let all = [...ids];
                 ids.forEach(id => {
                    const anno = this.annotations.find(a => a.id === id);
-                   if (anno && anno.isInsight && anno.selectedItems) {
+                   if (anno && anno.isFinding && anno.selectedItems) {
                       all = all.concat(getAllRefIds(anno.selectedItems));
                    }
                 });
@@ -1102,23 +1102,23 @@ export default {
               clickTimeout = null;
               // Double click logic
               if (d.data.type === 'annotation' && d.data.data) {
-                 if (d.data.data.actionType === 'high_level_insight') {
-                   // Allow selecting high_level_insight in multi-select mode
+                 if (d.data.data.actionType === 'high_level_finding') {
+                   // Allow selecting high_level_finding in multi-select mode
                    const id = d.data.data.actionInfo.id;
-                   const idx = this.selectedInsightAnnotations.findIndex(a => a.id === id);
+                   const idx = this.selectedFindingAnnotations.findIndex(a => a.id === id);
                    if (idx === -1) {
-                     this.selectedInsightAnnotations.push(d.data.data.actionInfo);
+                     this.selectedFindingAnnotations.push(d.data.data.actionInfo);
                    } else {
-                     this.selectedInsightAnnotations.splice(idx, 1);
+                     this.selectedFindingAnnotations.splice(idx, 1);
                    }
                    this.drawTree();
                  } else if (d.data.data.actionInfo) {
                    const id = d.data.data.actionInfo.id;
-                   const idx = this.selectedInsightAnnotations.findIndex(a => a.id === id);
+                   const idx = this.selectedFindingAnnotations.findIndex(a => a.id === id);
                    if (idx === -1) {
-                     this.selectedInsightAnnotations.push(d.data.data.actionInfo);
+                     this.selectedFindingAnnotations.push(d.data.data.actionInfo);
                    } else {
-                     this.selectedInsightAnnotations.splice(idx, 1);
+                     this.selectedFindingAnnotations.splice(idx, 1);
                    }
                    // re-render tree styles
                    this.drawTree();
@@ -1128,10 +1128,10 @@ export default {
               // Single click logic (deferred)
               clickTimeout = setTimeout(() => {
                 clickTimeout = null;
-                // If this is an insight node, show the insight details instead of normal annotation
+                // If this is a finding node, show the finding details instead of normal annotation
                 if (d.data.type === 'annotation' && d.data.data) {
-                  if (d.data.data.actionType === 'high_level_insight') {
-                    this.selectedInsightToView = d.data.data;
+                  if (d.data.data.actionType === 'high_level_finding') {
+                    this.selectedFindingToView = d.data.data;
                   } else {
                     this.selectedAnnotation = d.data.data.actionInfo || d.data.data;
                   }
@@ -1141,8 +1141,8 @@ export default {
          } else {
             // Normal mode: Single click is immediate
             if (d.data.type === 'annotation' && d.data.data) {
-              if (d.data.data.actionType === 'high_level_insight') {
-                this.selectedInsightToView = d.data.data;
+              if (d.data.data.actionType === 'high_level_finding') {
+                this.selectedFindingToView = d.data.data;
               } else {
                 this.selectedAnnotation = d.data.data.actionInfo || d.data.data;
               }
@@ -1236,8 +1236,8 @@ export default {
   word-wrap: break-word;
 }
 
-/* ezio: insight button styles */
-.insight-btn {
+/* ezio: finding button styles */
+.finding-btn {
   padding: 4px 10px;
   font-size: 12px;
   border-radius: 4px;
@@ -1247,34 +1247,34 @@ export default {
   cursor: pointer;
   transition: all 0.2s;
 }
-.insight-btn:hover:not(:disabled) {
+.finding-btn:hover:not(:disabled) {
   background: #edf2f7;
 }
-.insight-btn:disabled {
+.finding-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.insight-btn.cancel-btn {
+.finding-btn.cancel-btn {
   color: #e53e3e;
   border-color: #feb2b2;
   background: #fff5f5;
 }
-.insight-btn.cancel-btn:hover {
+.finding-btn.cancel-btn:hover {
   background: #fed7d7;
 }
-.insight-btn.confirm-btn {
+.finding-btn.confirm-btn {
   color: #3182ce;
   border-color: #bee3f8;
   background: #ebf8ff;
 }
-.insight-btn.confirm-btn:hover:not(:disabled) {
+.finding-btn.confirm-btn:hover:not(:disabled) {
   background: #bee3f8;
 }
 
-.insight-popup {
+.finding-popup {
   max-width: 800px;
 }
-.insight-annotations-list {
+.finding-annotations-list {
   max-height: 400px;
   overflow-y: auto;
   border: 1px solid #e2e8f0;
@@ -1282,11 +1282,11 @@ export default {
   padding: 8px;
   background: #f8fafc;
 }
-.insight-anno-item {
+.finding-anno-item {
   padding: 8px;
   border-bottom: 1px solid #e2e8f0;
 }
-.insight-anno-item:last-child {
+.finding-anno-item:last-child {
   border-bottom: none;
 }
 .anno-time {
@@ -1298,10 +1298,10 @@ export default {
   font-size: 13px;
   color: #2d3748;
 }
-.insight-input-area {
+.finding-input-area {
   margin-top: 16px;
 }
-.insight-textarea {
+.finding-textarea {
   width: 100%;
   height: 100px;
   padding: 8px;
@@ -1312,7 +1312,7 @@ export default {
   outline: none;
   box-sizing: border-box;
 }
-.insight-textarea:focus {
+.finding-textarea:focus {
   border-color: #4a5568;
 }
 .popup-footer {

@@ -47,7 +47,6 @@ Allowed `kind` values:
 - `AnalyticActivity`
 - `InvestigationStrategy`
 - `Finding`
-- `Insight`
 
 Required kind-specific fields:
 
@@ -68,7 +67,7 @@ Allowed `activityType` values:
 
 Allowed `salience` values:
 
-- `primary`: directly supports a major Finding, Insight, or Hypothesis.
+- `primary`: directly supports a major Finding or Hypothesis.
 - `supporting`: provides context or strengthens a reasoning path.
 - `low`: logged but weakly relevant, such as incidental hover, scroll, or layout navigation.
 
@@ -90,7 +89,7 @@ Rich detail fields keep compact graph labels understandable in HTML viewers and 
 - `reasoningRole`: how the node contributes to its parent, tree, or reasoning gap.
 - `patchRationale`: why an agent-created follow-up node was added to the original reasoning graph.
 
-Require `explanation` for every `Hypothesis`, `Insight`, `Finding`, `AnalyticQuestion`, `Task`, `InvestigationStrategy`, and `AnalyticActivity`. For `Interaction`, require `explanation` when `salience` is `primary` or the node was created by an agent follow-up. Low-salience logged interactions may stay compact when their label and provenance are sufficient.
+Require `explanation` for every `Hypothesis`, `Finding`, `AnalyticQuestion`, `Task`, `InvestigationStrategy`, and `AnalyticActivity`. For `Interaction`, require `explanation` when `salience` is `primary` or the node was created by an agent follow-up. Low-salience logged interactions may stay compact when their label and provenance are sufficient.
 
 ## Edge Schema
 
@@ -110,10 +109,10 @@ Allowed relations:
 | Relation | Direction | Meaning |
 |---|---|---|
 | `motivates` | Intention -> Action Space unit | A Task, Analytic Question, or Hypothesis explains why an Interaction, Analytic Activity, or Investigation Strategy happened. |
-| `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding or Insight. |
-| `supports` | Finding Space output -> Finding Space output or Intention | A Finding or Insight strengthens another Finding, an Insight, a Task interpretation, an Analytic Question, or a Hypothesis. |
-| `refines` | Finding Space output -> Intention | A Finding or Insight changes or narrows the intention. |
-| `contradicts` | Finding Space output -> Intention | A Finding or Insight weakens or falsifies the intention. |
+| `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding. |
+| `supports` | Finding Space output -> Finding Space output or Intention | A Finding strengthens another Finding, a Task interpretation, an Analytic Question, or a Hypothesis. |
+| `refines` | Finding Space output -> Intention | A Finding changes or narrows the intention. |
+| `contradicts` | Finding Space output -> Intention | A Finding weakens or falsifies the intention. |
 | `contains` | Higher-level unit -> lower-level unit | A Hypothesis contains Analytic Questions, an Analytic Activity contains Interactions, or another hierarchical containment relation is useful. |
 | `derived_from` | Analyst-inferred node -> evidence node | A node was inferred from raw trace evidence, screenshots, annotations, local data, or rendered visual evidence. |
 

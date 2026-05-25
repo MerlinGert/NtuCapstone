@@ -30,7 +30,6 @@ ALLOWED_KINDS = {
     "AnalyticActivity",
     "InvestigationStrategy",
     "Finding",
-    "Insight",
 }
 
 ALLOWED_SPACES = {"Intention", "Action", "Finding"}
@@ -59,7 +58,6 @@ KIND_ALLOWED_SPACES = {
     "AnalyticActivity": {"Action"},
     "InvestigationStrategy": {"Action"},
     "Finding": {"Finding"},
-    "Insight": {"Finding"},
 }
 
 KIND_ALLOWED_SCOPES = {
@@ -69,8 +67,7 @@ KIND_ALLOWED_SCOPES = {
     "Hypothesis": {"High"},
     "AnalyticActivity": {"Mid"},
     "InvestigationStrategy": {"High"},
-    "Finding": {"Low", "Mid"},
-    "Insight": {"High"},
+    "Finding": {"Low", "Mid", "High"},
 }
 
 SCOPE_RANK = {
@@ -87,18 +84,16 @@ SALIENCE_ORDER = {
 
 KIND_ORDER = {
     "Hypothesis": 0,
-    "Insight": 1,
-    "Finding": 2,
-    "AnalyticQuestion": 3,
-    "Task": 4,
-    "InvestigationStrategy": 5,
-    "AnalyticActivity": 6,
-    "Interaction": 7,
+    "Finding": 1,
+    "AnalyticQuestion": 2,
+    "Task": 3,
+    "InvestigationStrategy": 4,
+    "AnalyticActivity": 5,
+    "Interaction": 6,
 }
 
 REQUIRED_EXPLANATION_KINDS = {
     "Hypothesis",
-    "Insight",
     "Finding",
     "AnalyticQuestion",
     "Task",

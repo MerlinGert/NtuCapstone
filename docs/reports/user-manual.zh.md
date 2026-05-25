@@ -189,13 +189,13 @@ Annotations 标签页列出通过相机按钮或 Option+S 快捷键创建的快�
 
 Action Tree 标签页把动作和标注显示为一棵可视化树。图例区分 System、Interact、Zoom/Scroll、Hover、Annotation 和 Other 节点。代币切换和快照更新会形成主要分支，之后的交互会挂在当前分支下。
 
-相机形状的 **Create Insight** 按钮会开启标注节点多选模式。选择一个或多个标注节点，点击 Confirm，输入洞察备注并保存。高层洞察会重新加入标注记录，并且可以引用它所总结的标注。
+相机形状的 **Create Finding** 按钮会开启标注节点多选模式。选择一个或多个标注节点，点击 Confirm，输入发现备注并保存。高层发现会重新加入标注记录，并且可以引用它所总结的标注。
 
-点击标注节点会打开其细节。点击高层洞察节点会打开洞察文本及其引用的标注。
+点击标注节点会打开其细节。点击高层发现节点会打开发现文本及其引用的标注。
 
 ### LLM Analysis
 
-LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts/` 文件夹加载可用的 User Reasoning Forest 和 Reasoning Graph Patch JSON 文件。每个用户假设会被渲染为一张嵌套 reasoning card。来自 User Reasoning Forest 的节点使用默认卡片样式；来自 Reasoning Graph Patch 的智能体补丁节点会显示为粉色，并挂接到它所支持、限定或综合的假设或推理节点上。当某个补丁 Insight 对同一目标进行综合，并且该目标下还有低层级补丁 Finding 时，这个 Insight 会作为容器包住这些 Finding。点击卡片会打开细节，包括可用的 evidence summary 和 patch rationale。
+LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts/` 文件夹加载可用的 User Reasoning Forest 和 Reasoning Graph Patch JSON 文件。每个用户假设会被渲染为一张嵌套 reasoning card。来自 User Reasoning Forest 的节点使用默认卡片样式；来自 Reasoning Graph Patch 的智能体补丁节点会显示为粉色，并挂接到它所支持、限定或综合的假设或推理节点上。当某个补丁 Finding 对同一目标进行综合，并且该目标下还有低层级补丁 Finding 时，这个 Finding 会作为容器包住这些 Finding。点击卡片会打开细节，包括可用的 evidence summary 和 patch rationale。
 
 该标签页会在打开时、点击 Refresh 时、Codex 宣布新的相关 artifact 时刷新；当标签页处于激活状态时，也会进行轻量级周期检查。后端不会启动长期文件监听器，而是在请求时扫描会话 artifacts 并返回最新识别到的文件。
 
@@ -274,7 +274,7 @@ Token 快照可以选择持有者节点并显示选中节点细节。Behavior �
 7. 使用 Show Related Users、Sequential Time、Show Manipulation Boxes、缩放和 Sync Time，对比钱包行为与价格变化。
 8. 当发现值得记录的证据时，从 Token Distribution、K-line 或 Behavior Details 视图打开快照。
 9. 按需要添加标注文字、草图、选中节点或选中行为项目。
-10. 使用 Action Tree 回顾调查路径，并把标注组合成高层洞察。
+10. 使用 Action Tree 回顾调查路径，并把标注组合成高层发现。
 11. 当动作轨迹和标注准备好共享时，导出会话 JSON。
 
 ## UI 上不容易看出的事项
@@ -283,7 +283,7 @@ Update Snapshot 不只是视觉刷新。它会获取快照数据，并使用当�
 
 当基于实体的操纵规则处于启用状态时，Entity Detection 下的 Run Detection 也可能更新操纵结果。这是因为实体变化会改变用于实体级操纵检测的合并交易序列。
 
-中列下方的调查面板是分析状态的一部分。用户动作、标注和洞察都是会话数据，也是 Export 工作流会序列化的内容。
+中列下方的调查面板是分析状态的一部分。用户动作、标注和发现都是会话数据，也是 Export 工作流会序列化的内容。
 
 Import 按钮在当前前端中可见但被禁用。代码中有解析和冲突处理辅助函数，但用户无法从可见 UI 触发它们。
 
