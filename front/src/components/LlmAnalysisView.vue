@@ -95,20 +95,29 @@ export default {
       if (!this.userForest) return []
       const patchGraph = this.normalizedPatchGraph()
       const patchChildrenByTarget = this.buildPatchChildrenByTarget(patchGraph.nodes, patchGraph.edges)
+      const existingRootIds = new Set()
+      let userTrees = []
       if (Array.isArray(this.userForest.trees)) {
-        return this.userForest.trees
+        userTrees = this.userForest.trees
           .map((tree, index) => this.buildGeneratedForestTree(tree, {
             patchChildrenByTarget,
             patchNodes: patchGraph.nodes,
             path: `tree-${index}`,
           }))
           .filter(Boolean)
+        for (const tree of this.userForest.trees) {
+          if (tree?.root) existingRootIds.add(tree.root)
+        }
+        return [
+          ...userTrees,
+          ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
+        ]
       }
       if (!Array.isArray(this.userForest.roots)) return []
       const userNodes = this.userForest.nodes && typeof this.userForest.nodes === 'object'
         ? this.userForest.nodes
         : {}
-      return this.userForest.roots.map((root, index) =>
+      userTrees = this.userForest.roots.map((root, index) =>
         this.buildDisplayNode(root, {
           userNodes,
           patchChildrenByTarget,
@@ -117,6 +126,14 @@ export default {
           visited: new Set(),
         }),
       )
+      for (const root of this.userForest.roots) {
+        const id = typeof root === 'string' ? root : root?.id
+        if (id) existingRootIds.add(id)
+      }
+      return [
+        ...userTrees,
+        ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
+      ]
     },
     artifactSummary() {
       const current = this.manifest?.current || {}
@@ -274,10 +291,12 @@ export default {
               : [],
           ),
           edges: Array.isArray(this.graphPatch.edges) ? this.graphPatch.edges : [],
+          roots: Array.isArray(this.graphPatch.roots) ? this.graphPatch.roots : [],
         }
       }
       const nodes = new Map()
       const edges = []
+      const roots = []
       const operations = Array.isArray(this.graphPatch?.operations) ? this.graphPatch.operations : []
       for (const operation of operations) {
         if (operation?.op === 'add_node' && operation.node?.id) {
@@ -289,9 +308,29 @@ export default {
           })
         } else if (operation?.op === 'add_edge' && operation.edge) {
           edges.push(operation.edge)
+        } else if (operation?.op === 'add_root' && operation.id) {
+          roots.push(operation.id)
         }
       }
-      return { nodes, edges }
+      return { nodes, edges, roots }
+    },
+    buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds) {
+      return patchGraph.roots
+        .filter((rootId) => patchGraph.nodes.has(rootId) && !existingRootIds.has(rootId))
+        .map((rootId, index) => {
+          const rootNode = this.normalizeDisplayNode(patchGraph.nodes.get(rootId), {
+            source: 'patch',
+            relation: '',
+            instanceId: `patch-root-${index}-${rootId}`,
+          })
+          this.appendPatchChildren(rootNode, {
+            patchChildrenByTarget,
+            patchNodes: patchGraph.nodes,
+            path: `patch-root-${index}`,
+            visited: new Set([rootNode.id]),
+          })
+          return rootNode
+        })
     },
     buildPatchChildrenByTarget(patchNodes, edges) {
       const grouped = new Map()
