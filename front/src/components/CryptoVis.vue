@@ -176,6 +176,7 @@
     
     <div style="flex: 3; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
         <NotesPanel 
+            :session-id="maniscopeSessionId"
             :actions="userActionSequence"
             :annotations="annotationRecords"
             :read-only="isAgentWorkspace"

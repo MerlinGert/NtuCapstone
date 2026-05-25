@@ -165,9 +165,9 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
 
-## User Actions、Annotations 和 Action Tree
+## User Actions、Annotations、Action Tree 和 LLM Analysis
 
-中列下方的面板现在是调查工作流的一部分。它包含三个标签页：User Actions、Annotations 和 Action Tree。默认激活的标签页是 Action Tree。
+中列下方的面板现在是调查工作流的一部分。它包含四个标签页：User Actions、Annotations、Action Tree 和 LLM Analysis。默认激活的标签页是 Action Tree。
 
 ### User Actions
 
@@ -192,6 +192,10 @@ Action Tree 标签页把动作和标注显示为一棵可视化树。图例区�
 相机形状的 **Create Insight** 按钮会开启标注节点多选模式。选择一个或多个标注节点，点击 Confirm，输入洞察备注并保存。高层洞察会重新加入标注记录，并且可以引用它所总结的标注。
 
 点击标注节点会打开其细节。点击高层洞察节点会打开洞察文本及其引用的标注。
+
+### LLM Analysis
+
+LLM Analysis 标签页会显示当前会话中由 Codex 生成的 trace 分析 artifact，前提是会话包含 `artifacts/user-reasoning-forest.json` 和 `artifacts/reasoning-graph-patch.json`。每个用户假设会被渲染为一张嵌套 reasoning card。来自 User Reasoning Forest 的节点使用默认卡片样式；来自 Reasoning Graph Patch 的智能体补丁节点会显示为粉色，并挂接到它所支持、限定或综合的假设或推理节点上。当某个补丁 Insight 对同一目标进行综合，并且该目标下还有低层级补丁 Finding 时，这个 Insight 会作为容器包住这些 Finding。点击卡片会打开细节，包括可用的 evidence summary 和 patch rationale。
 
 ## 快照标注工作流
 

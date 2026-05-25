@@ -72,11 +72,8 @@
       />
     </div>
 
-    <div v-show="activeTab === 'llm_analysis'" style="flex:1; padding:10px; overflow-y:auto;">
-      <!-- LLM Analysis is initially blank -->
-      <div style="color:#a0aec0; font-size:12px; text-align:center; margin-top:20px;">
-        LLM Analysis will appear here...
-      </div>
+    <div v-show="activeTab === 'llm_analysis'" style="flex:1; padding:10px; overflow:hidden;">
+      <LlmAnalysisView :session-id="sessionId" />
     </div>
   </n-card>
 </template>
@@ -86,6 +83,7 @@ import { NCard } from 'naive-ui'
 import UserActionTree from './UserActionTree.vue'
 import UserActionTimeline from './UserActionTimeline.vue'
 import AnnotationTimeline from './AnnotationTimeline.vue'
+import LlmAnalysisView from './LlmAnalysisView.vue'
 
 export default {
   name: 'NotesPanel',
@@ -93,9 +91,14 @@ export default {
     NCard,
     UserActionTree,
     UserActionTimeline,
-    AnnotationTimeline
+    AnnotationTimeline,
+    LlmAnalysisView
   },
   props: {
+    sessionId: {
+      type: String,
+      default: ''
+    },
     actions: {
       type: Array,
       default: () => []
