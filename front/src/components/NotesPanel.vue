@@ -73,7 +73,7 @@
     </div>
 
     <div v-show="activeTab === 'llm_analysis'" style="flex:1; padding:10px; overflow:hidden;">
-      <LlmAnalysisView :session-id="sessionId" />
+      <LlmAnalysisView :session-id="sessionId" :active="activeTab === 'llm_analysis'" />
     </div>
   </n-card>
 </template>

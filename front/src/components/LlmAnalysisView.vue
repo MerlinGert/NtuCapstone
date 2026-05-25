@@ -7,10 +7,11 @@
           User forest with agent patch nodes overlaid as supporting or qualifying evidence.
         </div>
       </div>
-      <button class="refresh-btn" :disabled="loading || !sessionId" @click="loadAnalysis">
+      <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
         {{ loading ? 'Loading...' : 'Refresh' }}
       </button>
     </div>
+    <div v-if="artifactSummary" class="artifact-summary">{{ artifactSummary }}</div>
 
     <div class="legend-row">
       <span class="legend-item legend-hypothesis">Hypothesis</span>
@@ -21,7 +22,7 @@
     <div v-if="loading" class="empty-state">Loading LLM analysis artifacts...</div>
     <div v-else-if="error" class="empty-state error-state">{{ error }}</div>
     <div v-else-if="!hasAnalysis" class="empty-state">
-      No `user-reasoning-forest.json` and `reasoning-graph-patch.json` artifacts are available for this session yet.
+      No reasoning forest artifacts are available for this session yet.
     </div>
     <div v-else class="forest-grid">
       <section
@@ -55,8 +56,8 @@
 <script>
 import ReasoningNodeCard from './ReasoningNodeCard.vue'
 
-const USER_ARTIFACT = 'user-reasoning-forest.json'
-const PATCH_ARTIFACT = 'reasoning-graph-patch.json'
+const ARTIFACT_UPDATE_EVENT = 'maniscope-session-artifact-updated'
+const POLL_INTERVAL_MS = 5000
 
 export default {
   name: 'LlmAnalysisView',
@@ -68,15 +69,22 @@ export default {
       type: String,
       default: '',
     },
+    active: {
+      type: Boolean,
+      default: true,
+    },
   },
   data() {
     return {
       loading: false,
       error: '',
+      manifest: null,
       userForest: null,
       graphPatch: null,
       selectedNode: null,
       loadStarted: false,
+      lastManifestSignature: '',
+      pollTimer: null,
     }
   },
   computed: {
@@ -84,25 +92,40 @@ export default {
       return this.forestTrees.length > 0
     },
     forestTrees() {
-      if (!this.userForest || !Array.isArray(this.userForest.roots)) return []
+      if (!this.userForest) return []
+      const patchGraph = this.normalizedPatchGraph()
+      const patchChildrenByTarget = this.buildPatchChildrenByTarget(patchGraph.nodes, patchGraph.edges)
+      if (Array.isArray(this.userForest.trees)) {
+        return this.userForest.trees
+          .map((tree, index) => this.buildGeneratedForestTree(tree, {
+            patchChildrenByTarget,
+            patchNodes: patchGraph.nodes,
+            path: `tree-${index}`,
+          }))
+          .filter(Boolean)
+      }
+      if (!Array.isArray(this.userForest.roots)) return []
       const userNodes = this.userForest.nodes && typeof this.userForest.nodes === 'object'
         ? this.userForest.nodes
         : {}
-      const patchNodes = new Map(
-        Array.isArray(this.graphPatch?.nodes)
-          ? this.graphPatch.nodes.map((node) => [node.id, node])
-          : [],
-      )
-      const patchChildrenByTarget = this.buildPatchChildrenByTarget(patchNodes)
       return this.userForest.roots.map((root, index) =>
         this.buildDisplayNode(root, {
           userNodes,
           patchChildrenByTarget,
-          patchNodes,
+          patchNodes: patchGraph.nodes,
           path: `root-${index}`,
           visited: new Set(),
         }),
       )
+    },
+    artifactSummary() {
+      const current = this.manifest?.current || {}
+      const names = [
+        current.userReasoningForest?.name,
+        current.reasoningGraphPatch?.name,
+      ].filter(Boolean)
+      if (!names.length) return ''
+      return `Showing ${names.join(' + ')}`
     },
     selectedNodeDetails() {
       if (!this.selectedNode) return []
@@ -122,47 +145,156 @@ export default {
       immediate: true,
       handler() {
         this.loadStarted = false
+        this.manifest = null
         this.userForest = null
         this.graphPatch = null
         this.selectedNode = null
-        this.loadAnalysis()
+        this.lastManifestSignature = ''
+        if (this.active) this.loadAnalysis({ force: true })
+      },
+    },
+    active: {
+      immediate: true,
+      handler(isActive) {
+        if (isActive) {
+          this.startPolling()
+          this.loadAnalysis({ force: true, silent: this.loadStarted })
+        } else {
+          this.stopPolling()
+        }
       },
     },
   },
+  mounted() {
+    window.addEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
+    if (this.active) this.startPolling()
+  },
+  beforeUnmount() {
+    this.stopPolling()
+    window.removeEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
+  },
   methods: {
+    manifestUrl() {
+      return `/api/sessions/${this.sessionId}/analysis-artifacts`
+    },
     artifactUrl(name) {
       return `/api/sessions/${this.sessionId}/artifacts/${encodeURIComponent(name)}`
     },
-    async fetchArtifact(name) {
-      const response = await fetch(this.artifactUrl(name))
+    async fetchManifest() {
+      const response = await fetch(this.manifestUrl())
       if (response.status === 404 || response.status === 400) return null
-      if (!response.ok) throw new Error(`Failed to load ${name}: HTTP ${response.status}`)
+      if (!response.ok) throw new Error(`Failed to load analysis artifact manifest: HTTP ${response.status}`)
       return response.json()
     },
-    async loadAnalysis() {
+    artifactInfoUrl(info) {
+      if (!info) return ''
+      return info.url || this.artifactUrl(info.name)
+    },
+    async fetchArtifact(info) {
+      if (!info) return null
+      const response = await fetch(this.artifactInfoUrl(info))
+      if (response.status === 404 || response.status === 400) return null
+      if (!response.ok) throw new Error(`Failed to load ${info.name}: HTTP ${response.status}`)
+      return response.json()
+    },
+    manifestSignature(manifest) {
+      const current = manifest?.current || {}
+      return [
+        current.userReasoningForest?.name || '',
+        current.userReasoningForest?.modifiedAt || '',
+        current.reasoningGraphPatch?.name || '',
+        current.reasoningGraphPatch?.modifiedAt || '',
+        manifest?.latestModifiedAt || '',
+      ].join('|')
+    },
+    async refreshAnalysis() {
+      await this.loadAnalysis({ force: true })
+    },
+    async loadAnalysis(options = {}) {
       if (!this.sessionId) {
         this.error = 'No active ManiScope session.'
         return
       }
-      this.loading = true
-      this.error = ''
+      const { force = false, silent = false } = options
+      if (this.loading && silent) return
+      if (!silent) {
+        this.loading = true
+        this.error = ''
+      }
       this.loadStarted = true
       try {
+        const manifest = await this.fetchManifest()
+        const signature = this.manifestSignature(manifest)
+        if (!force && signature && signature === this.lastManifestSignature && this.userForest) return
+        this.manifest = manifest
+        this.lastManifestSignature = signature
+        const current = manifest?.current || {}
         const [userForest, graphPatch] = await Promise.all([
-          this.fetchArtifact(USER_ARTIFACT),
-          this.fetchArtifact(PATCH_ARTIFACT),
+          this.fetchArtifact(current.userReasoningForest),
+          this.fetchArtifact(current.reasoningGraphPatch),
         ])
         this.userForest = userForest
         this.graphPatch = graphPatch
       } catch (error) {
-        this.error = error && error.message ? error.message : String(error)
+        if (!silent) this.error = error && error.message ? error.message : String(error)
       } finally {
-        this.loading = false
+        if (!silent) this.loading = false
       }
     },
-    buildPatchChildrenByTarget(patchNodes) {
+    startPolling() {
+      this.stopPolling()
+      if (!this.sessionId) return
+      this.pollTimer = window.setInterval(() => {
+        this.loadAnalysis({ silent: true })
+      }, POLL_INTERVAL_MS)
+    },
+    stopPolling() {
+      if (!this.pollTimer) return
+      window.clearInterval(this.pollTimer)
+      this.pollTimer = null
+    },
+    handleArtifactUpdate(event) {
+      const detail = event?.detail || {}
+      if (detail.sessionId && detail.sessionId !== this.sessionId) return
+      const name = detail.artifact?.title || detail.artifact?.name || ''
+      if (!this.isAnalysisArtifactName(name)) return
+      if (this.active) this.loadAnalysis({ force: true, silent: true })
+    },
+    isAnalysisArtifactName(name) {
+      return name === 'user-reasoning-forest.json'
+        || name === 'reasoning-graph-patch.json'
+        || /^reasoning-graph-patch-[^.]+\.json$/.test(name)
+    },
+    normalizedPatchGraph() {
+      if (Array.isArray(this.graphPatch?.nodes) || Array.isArray(this.graphPatch?.edges)) {
+        return {
+          nodes: new Map(
+            Array.isArray(this.graphPatch.nodes)
+              ? this.graphPatch.nodes.map((node) => [node.id, node])
+              : [],
+          ),
+          edges: Array.isArray(this.graphPatch.edges) ? this.graphPatch.edges : [],
+        }
+      }
+      const nodes = new Map()
+      const edges = []
+      const operations = Array.isArray(this.graphPatch?.operations) ? this.graphPatch.operations : []
+      for (const operation of operations) {
+        if (operation?.op === 'add_node' && operation.node?.id) {
+          nodes.set(operation.node.id, operation.node)
+        } else if (operation?.op === 'update_node' && operation.node?.id) {
+          nodes.set(operation.node.id, {
+            ...(nodes.get(operation.node.id) || {}),
+            ...operation.node,
+          })
+        } else if (operation?.op === 'add_edge' && operation.edge) {
+          edges.push(operation.edge)
+        }
+      }
+      return { nodes, edges }
+    },
+    buildPatchChildrenByTarget(patchNodes, edges) {
       const grouped = new Map()
-      const edges = Array.isArray(this.graphPatch?.edges) ? this.graphPatch.edges : []
       for (const edge of edges) {
         if (!edge || !patchNodes.has(edge.source) || !edge.target) continue
         const children = grouped.get(edge.target) || []
@@ -175,7 +307,7 @@ export default {
       const nested = new Map()
       for (const [targetId, children] of grouped.entries()) {
         const synthesisNodes = children.filter(
-          (child) => child.relation === 'synthesizes' && child.node.type === 'Insight',
+          (child) => child.relation === 'synthesizes' && this.nodeType(child.node) === 'Insight',
         )
         if (synthesisNodes.length === 0) {
           nested.set(targetId, children)
@@ -183,7 +315,7 @@ export default {
         }
 
         const containedChildren = children.filter(
-          (child) => !(child.relation === 'synthesizes' && child.node.type === 'Insight'),
+          (child) => !(child.relation === 'synthesizes' && this.nodeType(child.node) === 'Insight'),
         )
         nested.set(targetId, [
           {
@@ -194,6 +326,38 @@ export default {
         ])
       }
       return nested
+    },
+    buildGeneratedForestTree(tree, context) {
+      const nodes = Array.isArray(tree?.nodes) ? tree.nodes : []
+      if (!nodes.length) return null
+      const nodesByInstance = new Map()
+      for (const rawNode of nodes) {
+        const displayNode = this.normalizeDisplayNode(rawNode, {
+          source: 'user',
+          relation: rawNode.relationToParent || '',
+          instanceId: rawNode.instanceId || rawNode.id || rawNode.canonicalId,
+        })
+        displayNode.children = []
+        nodesByInstance.set(displayNode.instanceId, displayNode)
+      }
+
+      for (const rawNode of nodes) {
+        if (!rawNode.parentInstanceId) continue
+        const parent = nodesByInstance.get(rawNode.parentInstanceId)
+        const child = nodesByInstance.get(rawNode.instanceId || rawNode.id || rawNode.canonicalId)
+        if (parent && child) parent.children.push(child)
+      }
+
+      for (const displayNode of nodesByInstance.values()) {
+        this.appendPatchChildren(displayNode, {
+          ...context,
+          visited: new Set([displayNode.id]),
+        })
+      }
+
+      return nodesByInstance.get(tree.root)
+        || Array.from(nodesByInstance.values()).find((node) => !node.parentInstanceId)
+        || nodesByInstance.values().next().value
     },
     buildDisplayNode(rawNode, context) {
       const canonical = context.patchNodes.has(rawNode.id)
@@ -206,14 +370,11 @@ export default {
             ...rawNode,
           }
       const isPatch = context.patchNodes.has(canonical.id)
-      const displayNode = {
-        ...canonical,
+      const displayNode = this.normalizeDisplayNode(canonical, {
         source: isPatch ? 'patch' : 'user',
         relation: rawNode.relation || '',
-        label: this.nodeLabel(canonical),
         instanceId: `${context.path}-${canonical.id}`,
-        children: [],
-      }
+      })
 
       if (context.visited.has(canonical.id)) return displayNode
       const nextVisited = new Set(context.visited)
@@ -242,18 +403,11 @@ export default {
       const patchChildren = context.patchChildrenByTarget.get(canonical.id) || []
       displayNode.children.push(
         ...patchChildren.map((patchChild, index) =>
-          this.buildDisplayNode(
-            {
-              ...patchChild.node,
-              relation: patchChild.relation,
-              nestedPatchChildren: patchChild.nestedPatchChildren || [],
-            },
-            {
-              ...context,
-              path: `${context.path}-p${index}`,
-              visited: nextVisited,
-            },
-          ),
+          this.buildPatchDisplayNode(patchChild, {
+            ...context,
+            path: `${context.path}-p${index}`,
+            visited: nextVisited,
+          }),
         ),
       )
 
@@ -262,18 +416,81 @@ export default {
         : []
       displayNode.children.push(
         ...nestedPatchChildren.map((patchChild, index) =>
-          this.buildDisplayNode(
-            { ...patchChild.node, relation: patchChild.relation },
-            {
-              ...context,
-              path: `${context.path}-nested${index}`,
-              visited: nextVisited,
-            },
-          ),
+          this.buildPatchDisplayNode(patchChild, {
+            ...context,
+            path: `${context.path}-nested${index}`,
+            visited: nextVisited,
+          }),
         ),
       )
 
       return displayNode
+    },
+    buildPatchDisplayNode(patchChild, context) {
+      const rawNode = {
+        ...patchChild.node,
+        relation: patchChild.relation,
+        nestedPatchChildren: patchChild.nestedPatchChildren || [],
+      }
+      const displayNode = this.normalizeDisplayNode(rawNode, {
+        source: 'patch',
+        relation: patchChild.relation || '',
+        instanceId: `${context.path}-${rawNode.id}`,
+      })
+      if (context.visited.has(displayNode.id)) return displayNode
+      const nextVisited = new Set(context.visited)
+      nextVisited.add(displayNode.id)
+      this.appendPatchChildren(displayNode, {
+        ...context,
+        visited: nextVisited,
+      })
+      return displayNode
+    },
+    appendPatchChildren(displayNode, context) {
+      const targetIds = [displayNode.id, displayNode.canonicalId, displayNode.instanceId].filter(Boolean)
+      const seenChildren = new Set()
+      for (const targetId of targetIds) {
+        const patchChildren = context.patchChildrenByTarget.get(targetId) || []
+        for (const patchChild of patchChildren) {
+          const childId = patchChild.node?.id
+          if (!childId || seenChildren.has(childId)) continue
+          seenChildren.add(childId)
+          displayNode.children.push(this.buildPatchDisplayNode(patchChild, {
+            ...context,
+            path: `${displayNode.instanceId || displayNode.id}-patch-${displayNode.children.length}`,
+          }))
+        }
+      }
+
+      const nestedPatchChildren = Array.isArray(displayNode.nestedPatchChildren)
+        ? displayNode.nestedPatchChildren
+        : []
+      for (const patchChild of nestedPatchChildren) {
+        const childId = patchChild.node?.id
+        if (!childId || seenChildren.has(childId)) continue
+        seenChildren.add(childId)
+        displayNode.children.push(this.buildPatchDisplayNode(patchChild, {
+          ...context,
+          path: `${displayNode.instanceId || displayNode.id}-nested-${displayNode.children.length}`,
+        }))
+      }
+    },
+    normalizeDisplayNode(node, overrides = {}) {
+      const id = node.id || node.canonicalId || node.instanceId || 'unknown'
+      const type = this.nodeType(node)
+      return {
+        ...node,
+        ...overrides,
+        id,
+        canonicalId: node.canonicalId || node.id || id,
+        type,
+        relation: overrides.relation || node.relation || node.relationToParent || '',
+        label: this.nodeLabel({ ...node, type }),
+        children: Array.isArray(node.children) ? [...node.children] : [],
+      }
+    },
+    nodeType(node) {
+      return node.type || node.kind || node.nodeType || 'Node'
     },
     nodeLabel(node) {
       return node.label || node.title || node.explanation || node.evidenceSummary || node.id || 'Untitled node'
@@ -316,6 +533,12 @@ export default {
   font-size: 11px;
   line-height: 1.3;
   margin-top: 2px;
+}
+
+.artifact-summary {
+  color: #64748b;
+  font-size: 10px;
+  margin: -2px 0 8px;
 }
 
 .refresh-btn,

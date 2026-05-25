@@ -638,6 +638,14 @@ export default {
       if (!this.sessionId || !artifact?.title) return '#'
       return `/api/sessions/${this.sessionId}/artifacts/${encodeURIComponent(artifact.title)}`
     },
+    notifySessionArtifactUpdated(artifact) {
+      window.dispatchEvent(new CustomEvent('maniscope-session-artifact-updated', {
+        detail: {
+          sessionId: this.sessionId,
+          artifact,
+        },
+      }))
+    },
     hasVisibleThinking(message) {
       return Boolean(message.ephemeralReasoning && message.thinkingOpen !== false)
     },
@@ -734,6 +742,7 @@ export default {
       } else if (event.type === 'artifact' && event.artifact) {
         const existing = assistantMessage.artifacts.some((artifact) => artifact.id === event.artifact.id)
         if (!existing) assistantMessage.artifacts.push(event.artifact)
+        this.notifySessionArtifactUpdated(event.artifact)
         this.addActivity(assistantMessage, {
           level: 'highlight',
           category: 'artifact',

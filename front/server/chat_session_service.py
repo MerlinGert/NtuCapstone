@@ -25,6 +25,20 @@ SESSIONS_DIR = CHAT_ROOT / "sessions"
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
 EXPORT_VERSION = "1.0"
 WORKSPACE_ROLES = {"human", "agent"}
+ANALYSIS_ARTIFACT_ROLES = {
+    "userReasoningForest": {
+        "label": "User Reasoning Forest",
+        "patterns": ("user-reasoning-forest.json",),
+    },
+    "reasoningGraphPatch": {
+        "label": "Reasoning Graph Patch",
+        "patterns": (
+            "reasoning-graph-patch.json",
+            "reasoning-graph-patch-001.json",
+            "reasoning-graph-patch-*.json",
+        ),
+    },
+}
 
 
 def _now_iso() -> str:
@@ -74,6 +88,64 @@ def _read_json(path: Path) -> dict[str, Any] | None:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail=f"Invalid JSON in {path.name}")
+
+
+def _analysis_artifact_info(session_id: str, path: Path, role: str, label: str, priority: int) -> dict[str, Any]:
+    stat = path.stat()
+    return {
+        "role": role,
+        "label": label,
+        "name": path.name,
+        "path": f"artifacts/{path.name}",
+        "url": f"/api/sessions/{session_id}/artifacts/{path.name}",
+        "size": stat.st_size,
+        "modifiedAt": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat().replace("+00:00", "Z"),
+        "mtime": stat.st_mtime,
+        "priority": priority,
+    }
+
+
+def _latest_artifact(items: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not items:
+        return None
+    return max(items, key=lambda item: (item["mtime"], item["name"]))
+
+
+def _current_artifact(items: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not items:
+        return None
+    return sorted(items, key=lambda item: (item["priority"], -item["mtime"], item["name"]))[0]
+
+
+def _analysis_artifact_manifest(session_id: str, session_dir: Path) -> dict[str, Any]:
+    artifacts_dir = session_dir / "artifacts"
+    current: dict[str, dict[str, Any] | None] = {}
+    artifacts: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for role, spec in ANALYSIS_ARTIFACT_ROLES.items():
+        role_items: list[dict[str, Any]] = []
+        for priority, pattern in enumerate(spec["patterns"]):
+            for path in artifacts_dir.glob(pattern):
+                if not path.is_file() or path.suffix.lower() != ".json":
+                    continue
+                key = (role, path.name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                item = _analysis_artifact_info(session_id, path, role, spec["label"], priority)
+                role_items.append(item)
+                artifacts.append(item)
+        current[role] = _current_artifact(role_items)
+
+    latest = _latest_artifact(artifacts)
+    return {
+        "sessionId": session_id,
+        "artifactRoot": "artifacts",
+        "current": current,
+        "artifacts": sorted(artifacts, key=lambda item: (item["role"], item["name"])),
+        "latestModifiedAt": latest["modifiedAt"] if latest else None,
+    }
 
 
 def _empty_live_session(session_id: str, coin: str | None = None) -> dict[str, Any]:
@@ -565,6 +637,12 @@ def get_session_artifact(session_id: str, artifact_name: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Artifact not found")
 
     return FileResponse(artifact_path)
+
+
+@router.get("/{session_id}/analysis-artifacts")
+def get_analysis_artifact_manifest(session_id: str) -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id)
+    return _analysis_artifact_manifest(session_id, session_dir)
 
 
 @router.get("/{session_id}/versions")
