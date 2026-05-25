@@ -7,10 +7,20 @@
     <div class="node-meta-row">
       <span class="node-type">{{ node.type || 'Node' }}</span>
       <span v-if="node.source === 'patch'" class="patch-pill">Patch</span>
+      <span class="meta-spacer"></span>
       <span v-if="node.relation" class="relation-pill">{{ node.relation }}</span>
+      <button
+        v-if="hasChildren"
+        class="collapse-btn"
+        type="button"
+        :aria-label="collapsed ? 'Expand node' : 'Collapse node'"
+        @click.stop="collapsed = !collapsed"
+      >
+        {{ collapsed ? '+' : '-' }}
+      </button>
     </div>
     <div class="node-title" :title="node.label">{{ node.label }}</div>
-    <div v-if="node.children && node.children.length" class="node-children">
+    <div v-if="hasChildren && !collapsed" class="node-children">
       <ReasoningNodeCard
         v-for="child in node.children"
         :key="child.instanceId || child.id"
@@ -30,7 +40,15 @@ export default {
       required: true,
     },
   },
+  data() {
+    return {
+      collapsed: this.shouldCollapseByDefault(),
+    }
+  },
   computed: {
+    hasChildren() {
+      return Array.isArray(this.node.children) && this.node.children.length > 0
+    },
     cardClasses() {
       return {
         'source-user': this.node.source !== 'patch',
@@ -40,6 +58,13 @@ export default {
         'type-finding': this.node.type === 'Finding',
         'type-insight': this.node.type === 'Insight',
       }
+    },
+  },
+  methods: {
+    shouldCollapseByDefault() {
+      if (this.node.type === 'AnalyticActivity') return true
+      const children = Array.isArray(this.node.children) ? this.node.children : []
+      return children.length > 0 && children.every((child) => child.type === 'Interaction')
     },
   },
 }
@@ -92,16 +117,22 @@ export default {
 
 .node-type,
 .patch-pill,
-.relation-pill {
+.relation-pill,
+.collapse-btn {
   display: inline-flex;
   align-items: center;
   min-width: 0;
   border-radius: 999px;
-  padding: 1px 6px;
   font-size: 10px;
   line-height: 16px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.node-type,
+.patch-pill,
+.relation-pill {
+  padding: 1px 6px;
 }
 
 .node-type {
@@ -117,10 +148,31 @@ export default {
 }
 
 .relation-pill {
-  margin-left: auto;
+  margin-right: 6px;
   color: #64748b;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.meta-spacer {
+  flex: 1 1 auto;
+  min-width: 12px;
+}
+
+.collapse-btn {
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.8);
+  color: #475569;
+  cursor: pointer;
+}
+
+.collapse-btn:hover {
+  background: #ffffff;
+  border-color: #94a3b8;
 }
 
 .node-title {
