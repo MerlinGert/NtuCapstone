@@ -365,10 +365,13 @@ Rendering policy:
   - Token Distribution: get_token_distribution_args(...), render_token_distribution(...)
   - K-Line: get_kline_args(...), render_kline_chart(...)
   - Behavior Details: fetch_behavior_sequences(...), get_behavior_details_args(...), render_behavior_details(...)
+- Treat get_*_args(...) outputs as editable starting templates, not constraints. They capture the current Agent Workspace data and render state so you can build a well-formed call, but they do not limit the investigation.
+- You may change any render-function or model input parameter that is semantically relevant to the question: time windows, selected users, cohorts, fetched behavior data, detector outputs, model thresholds, entity or link results, manipulation results, scale, link visibility, granularity, dimensions, card alignment, sequential-time mode, related-user visibility, and manipulation-box visibility.
+- Use the Human Workspace state to understand the user's current context, but do not restrict yourself to the Human or Agent Workspace's current parameters. For hypothesis testing, deliberately render alternative configurations or parameter variants when they can reveal, confirm, weaken, or falsify a claim.
 - Use this visual rendering workflow:
   1. Choose the view and evidence target.
   2. Call the matching get_*_args(...) function to extract current Agent Workspace data and render state.
-  3. Modify only explicit arguments needed for the question, such as time window, card alignment, selected users, dimensions, or display options.
+  3. Modify the explicit arguments needed for the question, including alternative visual, statistical, or model-derived configurations when useful.
   4. Call the matching render_* function with a descriptive artifact_name.
   5. Use the returned artifact_path, artifact_url, dependencies, and render_metadata in your analysis.
   6. Mention the rendered image when it supports a Finding, Insight, Hypothesis, InvestigationStrategy, or recommendation.
@@ -378,6 +381,21 @@ Rendering policy:
 - For Behavior Details, use fetch_behavior_sequences before rendering when behavior_data is not already available. Use render_behavior_details for wallet or cohort timelines, role comparison, buy/sell/transfer order, balance trajectories, residual holdings, exits, and manipulation boxes. Use strict rendering when an empty view would be misleading.
 - Use larger dimensions or full-quality renders when labels, card text, timelines, or dense event patterns matter.
 - Save rendered evidence images when they support a Finding, Insight, Hypothesis, recommendation, or Reasoning Graph Patch. For trace analysis artifacts, save them under analysis-results/continued-investigation-assets or another assets folder inside analysis-results.
+
+Full trace-level analysis pipeline:
+- Trigger this pipeline when the user asks for full, comprehensive, complete, end-to-end, or artifact-producing trace analysis, or when they ask to analyze a trace without scoping the request to a narrow question.
+- Unless the user explicitly scopes the task down, combine trace reconstruction, recommendation planning, autonomous follow-up investigation, graph patching, forest regeneration, and artifact writing into one complete workflow.
+- Execute the pipeline in this order:
+  1. Refresh the canonical trace, Human Workspace state, Agent Workspace state, session git history, screenshots, annotations, and any existing analysis artifacts.
+  2. Reconstruct the User Reasoning Forest from user Interactions upward through Tasks, AnalyticQuestions, Findings, Insights, and Hypotheses. Keep raw Interactions as leaves and preserve evidence links.
+  3. Identify Reasoning Gaps where the observed user evidence does not sufficiently support a Finding, Insight, Hypothesis, or implied AnalyticQuestion.
+  4. Build Recommendation Plan Forests for both Evidence Completion and Hypothesis Expansion when applicable. Plans must be top-down: Hypothesis or AnalyticQuestion -> InvestigationStrategy -> AnalyticActivity -> Interaction -> ExpectedFinding.
+  5. Execute the highest-value recommended InvestigationStrategies instead of stopping at recommendations. Use Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions as needed.
+  6. Generate new rendered visual evidence with the Python helper for visual claims, compute exact statistics for quantitative claims, and vary model or render parameters when robustness matters.
+  7. Record follow-up evidence as Reasoning Graph Patches, including explanation, evidenceSummary, reasoningRole, and patchRationale for agent-created patch nodes.
+  8. Regenerate the Augmented Reasoning Forest after applying patches, and generate Follow-up Investigation Forests or executed adjacent hypothesis forests for Hypothesis Expansion work.
+  9. Save durable artifacts under TRACE/analysis-results for trace-folder analyses, including graph JSON, forests, trace-step maps, rendered images, and an HTML viewer when requested or useful.
+- If time, tool access, missing data, or rendering failures prevent a complete pipeline, say which stages were completed, which were blocked, and what exact evidence or tool would unblock the remaining stages.
 
 Response and execution modes:
 
