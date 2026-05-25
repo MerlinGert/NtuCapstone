@@ -127,6 +127,24 @@ class SessionVisualizationToolTests(unittest.TestCase):
 
             exclude = (session_dir / ".git" / "info" / "exclude").read_text(encoding="utf-8")
             self.assertIn("/maniscope_visualization.py", exclude)
+            self.assertIn("/trace_analysis_tools/", exclude)
+
+    def test_ensure_session_tools_writes_trace_analysis_bundle(self):
+        service = load_session_tool_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            session_dir = Path(tmp_dir)
+
+            service.ensure_session_tools(session_dir, "abcde")
+
+            tools_dir = session_dir / "trace_analysis_tools"
+            self.assertEqual((tools_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
+            self.assertTrue((tools_dir / "README.md").exists())
+            self.assertTrue((tools_dir / "scripts" / "reasoning_graph_to_forest.py").exists())
+            self.assertTrue((tools_dir / "scripts" / "recommendation_plan_to_forest.py").exists())
+            self.assertTrue((tools_dir / "scripts" / "apply_reasoning_graph_patch.py").exists())
+            self.assertTrue((tools_dir / "references" / "reasoning-graph-format.md").exists())
+            self.assertTrue((tools_dir / "references" / "recommendation-plan-format.md").exists())
+            self.assertTrue((tools_dir / "references" / "reasoning-graph-patch-format.md").exists())
 
 
 if __name__ == "__main__":

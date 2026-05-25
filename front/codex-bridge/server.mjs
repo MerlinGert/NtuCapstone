@@ -382,19 +382,37 @@ Rendering policy:
 - Use larger dimensions or full-quality renders when labels, card text, timelines, or dense event patterns matter.
 - Save rendered evidence images when they support a Finding, Insight, Hypothesis, recommendation, or Reasoning Graph Patch. For trace analysis artifacts, save them under analysis-results/continued-investigation-assets or another assets folder inside analysis-results.
 
+Session-local trace-analysis tools:
+- This session includes a managed tool bundle at ${relativeSessionRoot}/trace_analysis_tools. Run graph, forest, plan, and patch validation scripts from ${relativeSessionRoot}.
+- Read the copied format references before writing durable artifacts:
+  - trace_analysis_tools/references/reasoning-graph-format.md
+  - trace_analysis_tools/references/recommendation-plan-format.md
+  - trace_analysis_tools/references/reasoning-graph-patch-format.md
+- Graph-first contract: write reasoning-graph.json first as the canonical source of truth. Then mechanically generate user-reasoning-forest.json and user-reasoning-forest.md with trace_analysis_tools/scripts/reasoning_graph_to_forest.py. Do not hand-author or manually edit user-reasoning-forest.json.
+- user-reasoning-forest.json is a generated projection with duplicated tree instances and canonical node references. It is not the source of truth; reasoning-graph.json is.
+- User-authored annotations that contain claims must become Finding or Insight nodes in reasoning-graph.json, with provenance such as annotation:<index>, action:<index>, and screenshot:<relative-path> when available. Do not leave user Findings or Insights only in prose or only in reasoning-graph-patch.json.
+- Agent follow-up evidence belongs in reasoning-graph-patch.json, then in augmented-reasoning-graph.json and augmented-reasoning-forest.json after applying the patch script.
+- For live chat session artifacts, write JSON and Markdown under ${relativeSessionRoot}/artifacts unless the user names a different path. For exported trace-folder analyses, write under TRACE/analysis-results.
+- Use these session-local commands for live chat artifacts:
+  - python3 trace_analysis_tools/scripts/reasoning_graph_to_forest.py artifacts/reasoning-graph.json --json-out artifacts/user-reasoning-forest.json --md-out artifacts/user-reasoning-forest.md
+  - python3 trace_analysis_tools/scripts/recommendation_plan_to_forest.py artifacts/recommendation-plan-graph.json --json-out artifacts/recommendation-plan-forest.json --md-out artifacts/recommendation-plan-forest.md
+  - python3 trace_analysis_tools/scripts/apply_reasoning_graph_patch.py artifacts/reasoning-graph.json artifacts/reasoning-graph-patch.json --out artifacts/augmented-reasoning-graph.json --forest-json-out artifacts/augmented-reasoning-forest.json --forest-md-out artifacts/augmented-reasoning-forest.md
+- Before finalizing a full trace artifact set, verify that reasoning-graph.json validates, that user-reasoning-forest.json was generated from it, and that trace annotations with user claims appear as user Finding or Insight nodes rather than being lost.
+
 Full trace-level analysis pipeline:
 - Trigger this pipeline when the user asks for full, comprehensive, complete, end-to-end, or artifact-producing trace analysis, or when they ask to analyze a trace without scoping the request to a narrow question.
 - Unless the user explicitly scopes the task down, combine trace reconstruction, recommendation planning, autonomous follow-up investigation, graph patching, forest regeneration, and artifact writing into one complete workflow.
 - Execute the pipeline in this order:
   1. Refresh the canonical trace, Human Workspace state, Agent Workspace state, session git history, screenshots, annotations, and any existing analysis artifacts.
-  2. Reconstruct the User Reasoning Forest from user Interactions upward through Tasks, AnalyticQuestions, Findings, Insights, and Hypotheses. Keep raw Interactions as leaves and preserve evidence links.
-  3. Identify Reasoning Gaps where the observed user evidence does not sufficiently support a Finding, Insight, Hypothesis, or implied AnalyticQuestion.
-  4. Build Recommendation Plan Forests for both Evidence Completion and Hypothesis Expansion when applicable. Plans must be top-down: Hypothesis or AnalyticQuestion -> InvestigationStrategy -> AnalyticActivity -> Interaction -> ExpectedFinding.
-  5. Execute the highest-value recommended InvestigationStrategies instead of stopping at recommendations. Use Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions as needed.
-  6. Generate new rendered visual evidence with the Python helper for visual claims, compute exact statistics for quantitative claims, and vary model or render parameters when robustness matters.
-  7. Record follow-up evidence as Reasoning Graph Patches, including explanation, evidenceSummary, reasoningRole, and patchRationale for agent-created patch nodes.
-  8. Regenerate the Augmented Reasoning Forest after applying patches, and generate Follow-up Investigation Forests or executed adjacent hypothesis forests for Hypothesis Expansion work.
-  9. Save durable artifacts under TRACE/analysis-results for trace-folder analyses, including graph JSON, forests, trace-step maps, rendered images, and an HTML viewer when requested or useful.
+  2. Build reasoning-graph.json first from user Interactions upward through Tasks, AnalyticQuestions, AnalyticActivities, Findings, Insights, and Hypotheses. Keep raw Interactions as leaves, preserve evidence links, and convert user-authored claim annotations into Finding or Insight nodes.
+  3. Run trace_analysis_tools/scripts/reasoning_graph_to_forest.py to generate user-reasoning-forest.json and user-reasoning-forest.md from reasoning-graph.json. If the generated forest is missing user Findings or Insights present in annotations, fix the graph and regenerate the forest.
+  4. Identify Reasoning Gaps where the observed user evidence does not sufficiently support a Finding, Insight, Hypothesis, or implied AnalyticQuestion.
+  5. Build Recommendation Plan Forests for both Evidence Completion and Hypothesis Expansion when applicable. Plans must be top-down: Hypothesis or AnalyticQuestion -> InvestigationStrategy -> AnalyticActivity -> Interaction -> ExpectedFinding.
+  6. Execute the highest-value recommended InvestigationStrategies instead of stopping at recommendations. Use Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions as needed.
+  7. Generate new rendered visual evidence with the Python helper for visual claims, compute exact statistics for quantitative claims, and vary model or render parameters when robustness matters.
+  8. Record follow-up evidence as Reasoning Graph Patches, including explanation, evidenceSummary, reasoningRole, and patchRationale for agent-created patch nodes.
+  9. Apply the patch script to regenerate the Augmented Reasoning Forest, and generate Follow-up Investigation Forests or executed adjacent hypothesis forests for Hypothesis Expansion work.
+  10. Save durable artifacts under TRACE/analysis-results for trace-folder analyses or ${relativeSessionRoot}/artifacts for live-chat session analyses, including graph JSON, forests, trace-step maps, rendered images, and an HTML viewer when requested or useful.
 - If time, tool access, missing data, or rendering failures prevent a complete pipeline, say which stages were completed, which were blocked, and what exact evidence or tool would unblock the remaining stages.
 
 Response and execution modes:
@@ -438,6 +456,7 @@ Mode F: artifact-writing.
 - Use chat-first output unless the user asks for files or durable analysis artifacts.
 - If writing full trace artifacts for a trace folder, place them under TRACE/analysis-results.
 - If writing session-local live-chat artifacts, place generated evidence under ${relativeSessionRoot}/artifacts unless the user names a different output path.
+- Write reasoning-graph.json first, then generate user-reasoning-forest.json and user-reasoning-forest.md with the session-local trace_analysis_tools script. Do not manually create a forest that bypasses graph validation.
 - Rich graph nodes should include explanation, evidenceSummary, and reasoningRole. Agent-created patch nodes must also include patchRationale.
 - Original trace evidence belongs to the User Reasoning Forest. Agent follow-up evidence belongs in a Reasoning Graph Patch and then in the Augmented Reasoning Forest.
 

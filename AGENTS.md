@@ -40,6 +40,28 @@ The helper calls the Codex bridge on `http://127.0.0.1:8787`. The bridge opens a
 
 Agent rendering uses Playwright Chromium from the `front/` package. If the bridge reports a missing browser runtime, run `bunx playwright install chromium` from `front/`.
 
+## Agent Trace Analysis Tools
+
+Every ManiScope chat session also contains a managed trace-analysis bundle at `.maniscope-chat/sessions/{sessionId}/trace_analysis_tools/`. Use the session-local scripts when writing durable reasoning artifacts from Codex Chat:
+
+```bash
+cd .maniscope-chat/sessions/{sessionId}
+python3 trace_analysis_tools/scripts/reasoning_graph_to_forest.py artifacts/reasoning-graph.json \
+  --json-out artifacts/user-reasoning-forest.json \
+  --md-out artifacts/user-reasoning-forest.md
+python3 trace_analysis_tools/scripts/recommendation_plan_to_forest.py artifacts/recommendation-plan-graph.json \
+  --json-out artifacts/recommendation-plan-forest.json \
+  --md-out artifacts/recommendation-plan-forest.md
+python3 trace_analysis_tools/scripts/apply_reasoning_graph_patch.py \
+  artifacts/reasoning-graph.json \
+  artifacts/reasoning-graph-patch.json \
+  --out artifacts/augmented-reasoning-graph.json \
+  --forest-json-out artifacts/augmented-reasoning-forest.json \
+  --forest-md-out artifacts/augmented-reasoning-forest.md
+```
+
+The trace-analysis contract is graph-first: create `reasoning-graph.json` as the canonical source of truth, validate it with the session-local script, and mechanically generate `user-reasoning-forest.json` and `.md`. Do not manually author generated forest files. User-authored claim annotations should appear as `Finding` or `Insight` nodes in `reasoning-graph.json`; agent follow-up evidence should be added through `reasoning-graph-patch.json` and then regenerated into augmented forests.
+
 ## Interaction Requirements
 
 - Always ask for clarification if the task specification is ambiguous or a reasonable assumption would be risky.
