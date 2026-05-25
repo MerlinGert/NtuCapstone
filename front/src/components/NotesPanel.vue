@@ -68,7 +68,6 @@
           @update-annotation="$emit('update-annotation', $event)"
           @add-custom-annotation="$emit('add-custom-annotation', $event)"
           @reorder-action="$emit('reorder-action', $event)"
-          style="height:100%;"
       />
     </div>
 
