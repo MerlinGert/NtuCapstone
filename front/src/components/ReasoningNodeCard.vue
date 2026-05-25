@@ -6,7 +6,7 @@
   >
     <div class="node-meta-row">
       <span class="node-type">{{ node.type || 'Node' }}</span>
-      <span v-if="node.source === 'patch'" class="patch-pill">Patch</span>
+      <span v-if="showPatchPill" class="patch-pill">Patch</span>
       <span class="meta-spacer"></span>
       <span v-if="node.relation" class="relation-pill">{{ node.relation }}</span>
       <button
@@ -25,6 +25,7 @@
         v-for="child in node.children"
         :key="child.instanceId || child.id"
         :node="child"
+        :hide-patch-label="childHidePatchLabel"
         @select-node="$emit('select-node', $event)"
       />
     </div>
@@ -39,6 +40,10 @@ export default {
       type: Object,
       required: true,
     },
+    hidePatchLabel: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
@@ -48,6 +53,12 @@ export default {
   computed: {
     hasChildren() {
       return Array.isArray(this.node.children) && this.node.children.length > 0
+    },
+    showPatchPill() {
+      return this.node.source === 'patch' && !this.hidePatchLabel
+    },
+    childHidePatchLabel() {
+      return this.hidePatchLabel || this.showPatchPill
     },
     cardClasses() {
       return {
