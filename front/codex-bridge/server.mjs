@@ -392,6 +392,7 @@ Session-local trace-analysis tools:
 - user-reasoning-forest.json is a generated projection with duplicated tree instances and canonical node references. It is not the source of truth; reasoning-graph.json is.
 - User-authored annotations that contain claims must become Finding or Insight nodes in reasoning-graph.json, with provenance such as annotation:<index>, action:<index>, and screenshot:<relative-path> when available. Do not leave user Findings or Insights only in prose or only in reasoning-graph-patch.json.
 - Agent follow-up evidence belongs in reasoning-graph-patch.json, then in augmented-reasoning-graph.json and augmented-reasoning-forest.json after applying the patch script.
+- For every executed Hypothesis Expansion branch, explicitly resolve the proposed adjacent Hypothesis in the follow-up evidence. If follow-up Findings or Insights support it, create a new agent-authored Hypothesis node in the Reasoning Graph Patch, connect supporting agent Findings or Insights to it, include an add_root operation, and regenerate the Augmented Reasoning Forest so the adjacent Hypothesis appears as a separate tree. If evidence does not support it, mark it rejected, deferred, or unsupported in the follow-up report and add a contradicts or refines Finding/Insight when evidence warrants it. Do not silently fold Hypothesis Expansion evidence into the original user Hypothesis only.
 - For live chat session artifacts, write JSON and Markdown under ${relativeSessionRoot}/artifacts unless the user names a different path. For exported trace-folder analyses, write under TRACE/analysis-results.
 - Use these session-local commands for live chat artifacts:
   - python3 trace_analysis_tools/scripts/reasoning_graph_to_forest.py artifacts/reasoning-graph.json --json-out artifacts/user-reasoning-forest.json --md-out artifacts/user-reasoning-forest.md
@@ -411,8 +412,9 @@ Full trace-level analysis pipeline:
   6. Execute the highest-value recommended InvestigationStrategies instead of stopping at recommendations. Use Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions as needed.
   7. Generate new rendered visual evidence with the Python helper for visual claims, compute exact statistics for quantitative claims, and vary model or render parameters when robustness matters.
   8. Record follow-up evidence as Reasoning Graph Patches, including explanation, evidenceSummary, reasoningRole, and patchRationale for agent-created patch nodes.
-  9. Apply the patch script to regenerate the Augmented Reasoning Forest, and generate Follow-up Investigation Forests or executed adjacent hypothesis forests for Hypothesis Expansion work.
-  10. Save durable artifacts under TRACE/analysis-results for trace-folder analyses or ${relativeSessionRoot}/artifacts for live-chat session analyses, including graph JSON, forests, trace-step maps, rendered images, and an HTML viewer when requested or useful.
+  9. For each executed Hypothesis Expansion branch, decide whether the proposed adjacent Hypothesis is supported, rejected, deferred, or unsupported. Supported adjacent Hypotheses must become new agent-authored Hypothesis nodes with supporting Finding/Insight edges and add_root operations. Rejected, deferred, or unsupported branches must be stated explicitly in the follow-up report, not hidden inside evidence for the original Hypothesis.
+  10. Apply the patch script to regenerate the Augmented Reasoning Forest, and generate Follow-up Investigation Forests or executed adjacent hypothesis forests for Hypothesis Expansion work.
+  11. Save durable artifacts under TRACE/analysis-results for trace-folder analyses or ${relativeSessionRoot}/artifacts for live-chat session analyses, including graph JSON, forests, trace-step maps, rendered images, and an HTML viewer when requested or useful.
 - If time, tool access, missing data, or rendering failures prevent a complete pipeline, say which stages were completed, which were blocked, and what exact evidence or tool would unblock the remaining stages.
 
 Response and execution modes:
@@ -450,6 +452,7 @@ Mode E: autonomous investigation.
 - Do not only cite old trace screenshots for a new visual investigation. Use newly rendered evidence when investigating a new visual question, then pair it with statistical or model checks when exact values or robustness matter.
 - For broad or deep investigations, ask the Codex runtime to spawn a subagent with functions.spawn_agent when that tool is available. Give the subagent a bounded evidence-gathering task and continue useful non-overlapping work locally. If no spawn tool is available, proceed in the current thread and say so briefly.
 - Convert recommendation-plan Interactions into concrete visual checks, data queries, model robustness checks, or synthesis steps.
+- For Hypothesis Expansion work, do not stop at plausibility language. Produce concrete follow-up Findings or Insights from executed Interactions, then either promote the adjacent Hypothesis with a patch add_root operation or explicitly mark it rejected, deferred, or unsupported.
 - Report completed checks, blocked checks, evidence, Findings, Insights, and unresolved gaps.
 
 Mode F: artifact-writing.
