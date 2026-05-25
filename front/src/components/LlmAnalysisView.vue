@@ -49,6 +49,20 @@
           <dd>{{ item.value }}</dd>
         </template>
       </dl>
+      <div v-if="selectedNodeEvidenceImages.length" class="detail-images">
+        <div class="detail-images-title">Evidence Images</div>
+        <a
+          v-for="image in selectedNodeEvidenceImages"
+          :key="image.url"
+          class="detail-image-link"
+          :href="image.url"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img :src="image.url" :alt="image.label" class="detail-image" />
+          <span class="detail-image-label">{{ image.label }}</span>
+        </a>
+      </div>
     </div>
   </div>
 </template>
@@ -156,6 +170,11 @@ export default {
         { key: 'patchRationale', label: 'Patch Rationale', value: this.selectedNode.patchRationale },
       ].filter((item) => item.value)
     },
+    selectedNodeEvidenceImages() {
+      return Array.isArray(this.selectedNode?.evidenceImages)
+        ? this.selectedNode.evidenceImages
+        : []
+    },
   },
   watch: {
     sessionId: {
@@ -194,8 +213,18 @@ export default {
     manifestUrl() {
       return `/api/sessions/${this.sessionId}/analysis-artifacts`
     },
+    encodeRelativePath(path) {
+      return String(path)
+        .split('/')
+        .filter(Boolean)
+        .map((part) => encodeURIComponent(part))
+        .join('/')
+    },
     artifactUrl(name) {
-      return `/api/sessions/${this.sessionId}/artifacts/${encodeURIComponent(name)}`
+      return `/api/sessions/${this.sessionId}/artifacts/${this.encodeRelativePath(name)}`
+    },
+    imageUrl(name) {
+      return `/api/sessions/${this.sessionId}/images/${this.encodeRelativePath(name)}`
     },
     async fetchManifest() {
       const response = await fetch(this.manifestUrl())
@@ -517,15 +546,19 @@ export default {
     normalizeDisplayNode(node, overrides = {}) {
       const id = node.id || node.canonicalId || node.instanceId || 'unknown'
       const type = this.nodeType(node)
-      return {
+      const mergedNode = {
         ...node,
         ...overrides,
+      }
+      return {
+        ...mergedNode,
         id,
         canonicalId: node.canonicalId || node.id || id,
         type,
         relation: overrides.relation || node.relation || node.relationToParent || '',
         label: this.nodeLabel({ ...node, type }),
         children: Array.isArray(node.children) ? [...node.children] : [],
+        evidenceImages: this.nodeEvidenceImages(mergedNode),
       }
     },
     nodeType(node) {
@@ -538,6 +571,81 @@ export default {
       if (Array.isArray(value)) return value.join(', ')
       if (value && typeof value === 'object') return JSON.stringify(value)
       return value
+    },
+    nodeEvidenceImages(node) {
+      const refs = []
+      this.collectEvidenceImageRefs(node.provenance, refs)
+      this.collectEvidenceImageRefs(node.evidenceImages, refs)
+      this.collectEvidenceImageRefs(node.images, refs)
+      this.collectEvidenceImageRefs(node.evidence, refs)
+
+      const images = []
+      const seen = new Set()
+      for (const ref of refs) {
+        const image = this.resolveEvidenceImageRef(ref)
+        if (!image || seen.has(image.url)) continue
+        seen.add(image.url)
+        images.push(image)
+      }
+      return images
+    },
+    collectEvidenceImageRefs(value, refs) {
+      if (!value) return
+      if (Array.isArray(value)) {
+        for (const item of value) this.collectEvidenceImageRefs(item, refs)
+        return
+      }
+      if (typeof value === 'object') {
+        this.collectEvidenceImageRefs(value.url || value.path || value.src || value.href, refs)
+        return
+      }
+      if (typeof value !== 'string') return
+      for (const part of value.split('|')) {
+        const text = part.trim()
+        if (this.evidenceImagePathFromText(text)) refs.push(text)
+      }
+    },
+    evidenceImagePathFromText(text) {
+      if (!text) return ''
+      const prefixed = text.match(/^(?:screenshot|render|image):(.+\.(?:png|jpe?g|webp))$/i)
+      if (prefixed) return prefixed[1].trim()
+      const bare = text.match(/^(.+\.(?:png|jpe?g|webp))$/i)
+      return bare ? bare[1].trim() : ''
+    },
+    resolveEvidenceImageRef(ref) {
+      let path = this.evidenceImagePathFromText(ref).replace(/\\/g, '/')
+      if (!path) return null
+      if (/^(https?:|data:|blob:)/i.test(path)) {
+        return { url: path, label: this.basename(path) }
+      }
+      if (path.startsWith('/api/sessions/')) {
+        return { url: path, label: this.basename(path) }
+      }
+      if (/^(file:|[a-z]+:)/i.test(path)) return null
+      while (path.startsWith('./')) path = path.slice(2)
+
+      if (path.startsWith('../images/')) {
+        const imagePath = path.slice('../images/'.length)
+        return { url: this.imageUrl(imagePath), label: this.basename(imagePath) }
+      }
+      if (path.startsWith('images/')) {
+        const imagePath = path.slice('images/'.length)
+        return { url: this.imageUrl(imagePath), label: this.basename(imagePath) }
+      }
+      if (path.startsWith('../artifacts/')) {
+        const artifactPath = path.slice('../artifacts/'.length)
+        return { url: this.artifactUrl(artifactPath), label: this.basename(artifactPath) }
+      }
+      if (path.startsWith('artifacts/')) {
+        const artifactPath = path.slice('artifacts/'.length)
+        return { url: this.artifactUrl(artifactPath), label: this.basename(artifactPath) }
+      }
+      if (path.includes('..')) return null
+      return { url: this.artifactUrl(path), label: this.basename(path) }
+    },
+    basename(path) {
+      const cleanPath = String(path).split(/[?#]/)[0]
+      return cleanPath.split('/').filter(Boolean).pop() || 'evidence image'
     },
   },
 }
@@ -726,6 +834,47 @@ export default {
   font-size: 11px;
   line-height: 1.35;
   margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.detail-images {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.detail-images-title {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.detail-image-link {
+  display: block;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.detail-image {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border: 1px solid #d8e0ec;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.detail-image-label {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 </style>

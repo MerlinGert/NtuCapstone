@@ -20,6 +20,18 @@
       </button>
     </div>
     <div class="node-title" :title="node.label">{{ node.label }}</div>
+    <div v-if="showThumbnails" class="node-thumbnails">
+      <img
+        v-for="image in visibleEvidenceImages"
+        :key="image.url"
+        class="node-thumbnail"
+        :src="image.url"
+        :alt="image.label"
+        :title="image.label"
+        loading="lazy"
+      />
+      <span v-if="extraImageCount > 0" class="thumbnail-count">+{{ extraImageCount }}</span>
+    </div>
     <div v-if="hasChildren && !collapsed" class="node-children">
       <ReasoningNodeCard
         v-for="child in node.children"
@@ -59,6 +71,18 @@ export default {
     },
     childHidePatchLabel() {
       return this.hidePatchLabel || this.showPatchPill
+    },
+    evidenceImages() {
+      return Array.isArray(this.node.evidenceImages) ? this.node.evidenceImages : []
+    },
+    showThumbnails() {
+      return this.evidenceImages.length > 0 && !this.collapsed
+    },
+    visibleEvidenceImages() {
+      return this.evidenceImages.slice(0, 3)
+    },
+    extraImageCount() {
+      return Math.max(0, this.evidenceImages.length - this.visibleEvidenceImages.length)
     },
     cardClasses() {
       return {
@@ -186,6 +210,35 @@ export default {
   font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+.node-thumbnails {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.node-thumbnail {
+  width: 64px;
+  height: 42px;
+  object-fit: cover;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 5px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.thumbnail-count {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  padding: 0 6px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .node-children {

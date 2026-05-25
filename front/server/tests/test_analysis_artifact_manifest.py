@@ -98,6 +98,70 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
                 "reasoning-graph-patch-001.json",
             )
 
+    def test_nested_artifact_file_can_be_served(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            original_sessions_dir = module.SESSIONS_DIR
+            try:
+                module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
+                artifact_path = (
+                    module.SESSIONS_DIR
+                    / "abcde"
+                    / "artifacts"
+                    / "continued-investigation-assets"
+                    / "kline.png"
+                )
+                artifact_path.parent.mkdir(parents=True)
+                artifact_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+                response = module.get_session_artifact(
+                    "abcde",
+                    "continued-investigation-assets/kline.png",
+                )
+
+                self.assertEqual(Path(response.path).resolve(), artifact_path.resolve())
+            finally:
+                module.SESSIONS_DIR = original_sessions_dir
+
+    def test_session_image_file_can_be_served(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            original_sessions_dir = module.SESSIONS_DIR
+            try:
+                module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
+                image_path = module.SESSIONS_DIR / "abcde" / "images" / "action-0001.png"
+                image_path.parent.mkdir(parents=True)
+                image_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+                response = module.get_session_image("abcde", "action-0001.png")
+
+                self.assertEqual(Path(response.path).resolve(), image_path.resolve())
+            finally:
+                module.SESSIONS_DIR = original_sessions_dir
+
+    def test_session_file_routes_reject_escapes(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            original_sessions_dir = module.SESSIONS_DIR
+            try:
+                module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
+                session_dir = module.SESSIONS_DIR / "abcde"
+                (session_dir / "artifacts").mkdir(parents=True)
+                outside_path = Path(tmp_dir) / "outside.png"
+                outside_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+                with self.assertRaises(Exception) as artifact_error:
+                    module.get_session_artifact("abcde", "../outside.png")
+                self.assertEqual(artifact_error.exception.status_code, 400)
+
+                symlink_path = session_dir / "artifacts" / "escape.png"
+                symlink_path.symlink_to(outside_path)
+                with self.assertRaises(Exception) as symlink_error:
+                    module.get_session_artifact("abcde", "escape.png")
+                self.assertEqual(symlink_error.exception.status_code, 400)
+            finally:
+                module.SESSIONS_DIR = original_sessions_dir
+
 
 if __name__ == "__main__":
     unittest.main()

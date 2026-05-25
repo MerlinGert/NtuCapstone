@@ -39,6 +39,8 @@ ANALYSIS_ARTIFACT_ROLES = {
         ),
     },
 }
+SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
+SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def _now_iso() -> str:
@@ -103,6 +105,38 @@ def _analysis_artifact_info(session_id: str, path: Path, role: str, label: str, 
         "mtime": stat.st_mtime,
         "priority": priority,
     }
+
+
+def _session_scoped_file_response(
+    session_dir: Path,
+    directory_name: str,
+    relative_path: str,
+    *,
+    allowed_suffixes: set[str],
+    invalid_detail: str,
+    unsupported_detail: str,
+    not_found_detail: str,
+) -> FileResponse:
+    if not relative_path or "\x00" in relative_path:
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    requested_path = Path(relative_path)
+    if requested_path.is_absolute():
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    base_dir = (session_dir / directory_name).resolve()
+    file_path = (base_dir / requested_path).resolve()
+    try:
+        file_path.relative_to(base_dir)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    if file_path.suffix.lower() not in allowed_suffixes:
+        raise HTTPException(status_code=400, detail=unsupported_detail)
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail=not_found_detail)
+
+    return FileResponse(file_path)
 
 
 def _latest_artifact(items: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -621,22 +655,32 @@ def put_session_workspace_state(session_id: str, role: str, body: dict[str, Any]
     }
 
 
-@router.get("/{session_id}/artifacts/{artifact_name}")
-def get_session_artifact(session_id: str, artifact_name: str) -> FileResponse:
+@router.get("/{session_id}/artifacts/{artifact_path:path}")
+def get_session_artifact(session_id: str, artifact_path: str) -> FileResponse:
     session_dir = _session_dir(session_id)
-    artifact_path = (session_dir / "artifacts" / artifact_name).resolve()
-    try:
-        artifact_path.relative_to((session_dir / "artifacts").resolve())
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid artifact path")
+    return _session_scoped_file_response(
+        session_dir,
+        "artifacts",
+        artifact_path,
+        allowed_suffixes=SERVABLE_SESSION_FILE_SUFFIXES,
+        invalid_detail="Invalid artifact path",
+        unsupported_detail="Unsupported artifact type",
+        not_found_detail="Artifact not found",
+    )
 
-    allowed_suffixes = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
-    if artifact_path.suffix.lower() not in allowed_suffixes:
-        raise HTTPException(status_code=400, detail="Unsupported artifact type")
-    if not artifact_path.exists() or not artifact_path.is_file():
-        raise HTTPException(status_code=404, detail="Artifact not found")
 
-    return FileResponse(artifact_path)
+@router.get("/{session_id}/images/{image_path:path}")
+def get_session_image(session_id: str, image_path: str) -> FileResponse:
+    session_dir = _session_dir(session_id)
+    return _session_scoped_file_response(
+        session_dir,
+        "images",
+        image_path,
+        allowed_suffixes=SERVABLE_IMAGE_SUFFIXES,
+        invalid_detail="Invalid image path",
+        unsupported_detail="Unsupported image type",
+        not_found_detail="Image not found",
+    )
 
 
 @router.get("/{session_id}/analysis-artifacts")
