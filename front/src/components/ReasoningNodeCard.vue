@@ -6,9 +6,7 @@
   >
     <div class="node-meta-row">
       <span class="node-type">{{ node.type || 'Node' }}</span>
-      <span v-if="showPatchPill" class="patch-pill">Patch</span>
       <span class="meta-spacer"></span>
-      <span v-if="node.relation" class="relation-pill">{{ node.relation }}</span>
       <button
         v-if="hasChildren"
         class="collapse-btn"
@@ -20,17 +18,24 @@
       </button>
     </div>
     <div class="node-title" :title="node.label">{{ node.label }}</div>
+    <div v-if="displayExplanation" class="node-explanation">
+      {{ displayExplanation }}
+    </div>
     <div v-if="showThumbnails" class="node-thumbnails">
-      <img
+      <div
         v-for="image in visibleEvidenceImages"
         :key="image.url"
-        class="node-thumbnail"
-        :src="image.url"
-        :alt="image.label"
-        :title="image.label"
-        loading="lazy"
-      />
-      <span v-if="extraImageCount > 0" class="thumbnail-count">+{{ extraImageCount }}</span>
+        class="node-thumbnail-wrap"
+      >
+        <img
+          class="node-thumbnail"
+          :src="image.url"
+          :alt="image.label"
+          :title="image.label"
+          loading="lazy"
+        />
+      </div>
+      <div v-if="extraImageCount > 0" class="thumbnail-count">+{{ extraImageCount }} more images</div>
     </div>
     <div v-if="hasChildren && !collapsed" class="node-children">
       <ReasoningNodeCard
@@ -66,11 +71,8 @@ export default {
     hasChildren() {
       return Array.isArray(this.node.children) && this.node.children.length > 0
     },
-    showPatchPill() {
-      return this.node.source === 'patch' && !this.hidePatchLabel
-    },
     childHidePatchLabel() {
-      return this.hidePatchLabel || this.showPatchPill
+      return this.hidePatchLabel
     },
     evidenceImages() {
       return Array.isArray(this.node.evidenceImages) ? this.node.evidenceImages : []
@@ -83,6 +85,20 @@ export default {
     },
     extraImageCount() {
       return Math.max(0, this.evidenceImages.length - this.visibleEvidenceImages.length)
+    },
+    displayExplanation() {
+      const candidates = [
+        this.node.displayExplanation,
+        this.node.displayEvidenceSummary,
+        this.node.displayReasoningRole,
+        this.node.explanation,
+        this.node.evidenceSummary,
+        this.node.patchRationale,
+      ]
+      const text = candidates.find(
+        (item) => typeof item === 'string' && item.trim() && item.trim() !== this.node.label,
+      )
+      return text ? text.trim() : ''
     },
     cardClasses() {
       return {
@@ -145,8 +161,6 @@ export default {
 }
 
 .node-type,
-.patch-pill,
-.relation-pill,
 .collapse-btn {
   display: inline-flex;
   align-items: center;
@@ -159,8 +173,7 @@ export default {
 }
 
 .node-type,
-.patch-pill,
-.relation-pill {
+.collapse-btn {
   padding: 1px 6px;
 }
 
@@ -168,19 +181,6 @@ export default {
   color: #334155;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.45);
-}
-
-.patch-pill {
-  color: #be185d;
-  background: #ffffff;
-  border: 1px solid #f9a8d4;
-}
-
-.relation-pill {
-  margin-right: 6px;
-  color: #64748b;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 .meta-spacer {
@@ -206,24 +206,38 @@ export default {
 
 .node-title {
   color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.node-explanation {
+  color: #475569;
   font-size: 12px;
-  font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.45;
+  margin-top: 6px;
   overflow-wrap: anywhere;
 }
 
 .node-thumbnails {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 8px;
   min-width: 0;
+  width: 100%;
+}
+
+.node-thumbnail-wrap {
+  width: 100%;
 }
 
 .node-thumbnail {
-  width: 64px;
-  height: 42px;
-  object-fit: cover;
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
   border: 1px solid rgba(148, 163, 184, 0.45);
   border-radius: 5px;
   background: #ffffff;
@@ -232,13 +246,14 @@ export default {
 
 .thumbnail-count {
   color: #64748b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 18px;
-  padding: 0 6px;
+  padding: 4px 8px;
   border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 999px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.78);
+  align-self: flex-start;
 }
 
 .node-children {

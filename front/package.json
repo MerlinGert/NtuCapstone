@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "codex-bridge": "node codex-bridge/server.mjs",
+    "codex-bridge": "CODEX_NETWORK_ACCESS=true CODEX_SANDBOX_MODE=danger-full-access node codex-bridge/server.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

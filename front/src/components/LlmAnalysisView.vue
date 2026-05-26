@@ -4,7 +4,7 @@
       <div>
         <div class="analysis-title">Reasoning Forest</div>
         <div class="analysis-subtitle">
-          User forest with agent patch nodes overlaid as supporting or qualifying evidence.
+          Showing only each hypothesis and its supporting hierarchical findings.
         </div>
       </div>
       <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
@@ -15,8 +15,7 @@
 
     <div class="legend-row">
       <span class="legend-item legend-hypothesis">Hypothesis</span>
-      <span class="legend-item legend-user">User reasoning node</span>
-      <span class="legend-item legend-patch">Agent patch node</span>
+      <span class="legend-item legend-finding">Finding</span>
     </div>
 
     <div v-if="loading" class="empty-state">Loading LLM analysis artifacts...</div>
@@ -34,36 +33,49 @@
       </section>
     </div>
 
-    <div v-if="selectedNode" class="node-detail-panel">
-      <div class="detail-header">
-        <div>
-          <span class="detail-type">{{ selectedNode.type }}</span>
-          <span v-if="selectedNode.source === 'patch'" class="detail-patch">Patch</span>
+    <teleport to="body">
+      <div
+        v-if="selectedNode"
+        class="detail-modal-overlay"
+        @click.self="closeSelectedNode"
+      >
+        <div class="detail-modal" role="dialog" aria-modal="true" :aria-label="selectedNode.label">
+          <div class="detail-header">
+            <div class="detail-header-copy">
+              <span class="detail-type">{{ selectedNode.type }}</span>
+              <div class="detail-title">{{ selectedNode.label }}</div>
+            </div>
+            <button class="detail-close" @click="closeSelectedNode">Close</button>
+          </div>
+          <div class="detail-body" :class="{ 'detail-body-single': !selectedNodeEvidenceImages.length }">
+            <div class="detail-text-panel">
+              <dl class="detail-list">
+                <template v-for="item in selectedNodeDetails" :key="item.key">
+                  <dt>{{ item.label }}</dt>
+                  <dd>{{ item.value }}</dd>
+                </template>
+              </dl>
+            </div>
+            <div v-if="selectedNodeEvidenceImages.length" class="detail-images-panel">
+              <div class="detail-images-title">Evidence Images</div>
+              <div class="detail-images-grid">
+                <a
+                  v-for="image in selectedNodeEvidenceImages"
+                  :key="image.url"
+                  class="detail-image-link"
+                  :href="image.url"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img :src="image.url" :alt="image.label" class="detail-image" />
+                  <span class="detail-image-label">{{ image.label }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
-        <button class="detail-close" @click="selectedNode = null">Close</button>
       </div>
-      <div class="detail-title">{{ selectedNode.label }}</div>
-      <dl class="detail-list">
-        <template v-for="item in selectedNodeDetails" :key="item.key">
-          <dt>{{ item.label }}</dt>
-          <dd>{{ item.value }}</dd>
-        </template>
-      </dl>
-      <div v-if="selectedNodeEvidenceImages.length" class="detail-images">
-        <div class="detail-images-title">Evidence Images</div>
-        <a
-          v-for="image in selectedNodeEvidenceImages"
-          :key="image.url"
-          class="detail-image-link"
-          :href="image.url"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <img :src="image.url" :alt="image.label" class="detail-image" />
-          <span class="detail-image-label">{{ image.label }}</span>
-        </a>
-      </div>
-    </div>
+    </teleport>
   </div>
 </template>
 
@@ -126,6 +138,8 @@ export default {
           ...userTrees,
           ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
         ]
+          .map((tree) => this.extractHypothesisTree(tree))
+          .filter(Boolean)
       }
       if (!Array.isArray(this.userForest.roots)) return []
       const userNodes = this.userForest.nodes && typeof this.userForest.nodes === 'object'
@@ -148,6 +162,8 @@ export default {
         ...userTrees,
         ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
       ]
+        .map((tree) => this.extractHypothesisTree(tree))
+        .filter(Boolean)
     },
     artifactSummary() {
       const current = this.manifest?.current || {}
@@ -160,14 +176,25 @@ export default {
     },
     selectedNodeDetails() {
       if (!this.selectedNode) return []
+      const explanation = this.preferredExplanation(this.selectedNode)
+      const support = this.supportingExplanation(this.selectedNode)
+      const reasoning = this.reasoningNarrative(this.selectedNode)
       return [
-        { key: 'id', label: 'ID', value: this.selectedNode.id },
-        { key: 'relation', label: 'Relation', value: this.selectedNode.relation },
-        { key: 'evidence', label: 'Evidence', value: this.formatValue(this.selectedNode.evidence) },
-        { key: 'explanation', label: 'Explanation', value: this.selectedNode.explanation },
-        { key: 'evidenceSummary', label: 'Evidence Summary', value: this.selectedNode.evidenceSummary },
-        { key: 'reasoningRole', label: 'Reasoning Role', value: this.selectedNode.reasoningRole },
-        { key: 'patchRationale', label: 'Patch Rationale', value: this.selectedNode.patchRationale },
+        {
+          key: 'story',
+          label: 'Story',
+          value: explanation,
+        },
+        {
+          key: 'support',
+          label: 'Visual / Evidence Pattern',
+          value: support,
+        },
+        {
+          key: 'reasoning',
+          label: 'Reasoning Link',
+          value: reasoning,
+        },
       ].filter((item) => item.value)
     },
     selectedNodeEvidenceImages() {
@@ -203,11 +230,13 @@ export default {
   },
   mounted() {
     window.addEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
+    window.addEventListener('keydown', this.handleKeydown)
     if (this.active) this.startPolling()
   },
   beforeUnmount() {
     this.stopPolling()
     window.removeEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
+    window.removeEventListener('keydown', this.handleKeydown)
   },
   methods: {
     manifestUrl() {
@@ -306,6 +335,12 @@ export default {
       if (!this.isAnalysisArtifactName(name)) return
       if (this.active) this.loadAnalysis({ force: true, silent: true })
     },
+    handleKeydown(event) {
+      if (event?.key === 'Escape' && this.selectedNode) this.closeSelectedNode()
+    },
+    closeSelectedNode() {
+      this.selectedNode = null
+    },
     isAnalysisArtifactName(name) {
       return name === 'user-reasoning-forest.json'
         || name === 'reasoning-graph-patch.json'
@@ -360,6 +395,53 @@ export default {
           })
           return rootNode
         })
+    },
+    extractHypothesisTree(tree) {
+      if (!tree || this.nodeType(tree) !== 'Hypothesis') return null
+      return {
+        ...tree,
+        children: this.collectHierarchicalFindings(tree),
+      }
+    },
+    collectHierarchicalFindings(node) {
+      const children = Array.isArray(node?.children) ? node.children : []
+      const results = []
+      for (const child of children) {
+        const type = this.nodeType(child)
+        if (type === 'Finding') {
+          results.push(this.pruneFindingNode(child))
+          continue
+        }
+        results.push(...this.collectHierarchicalFindings(child))
+      }
+      return this.dedupeNodes(results)
+    },
+    pruneFindingNode(node) {
+      const children = Array.isArray(node?.children) ? node.children : []
+      const findingChildren = []
+      for (const child of children) {
+        const type = this.nodeType(child)
+        if (type === 'Finding') {
+          findingChildren.push(this.pruneFindingNode(child))
+          continue
+        }
+        findingChildren.push(...this.collectHierarchicalFindings(child))
+      }
+      return {
+        ...node,
+        children: this.dedupeNodes(findingChildren),
+      }
+    },
+    dedupeNodes(nodes) {
+      const seen = new Set()
+      const results = []
+      for (const node of nodes) {
+        const key = node?.canonicalId || node?.id || node?.instanceId
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        results.push(node)
+      }
+      return results
     },
     buildPatchChildrenByTarget(patchNodes, edges) {
       const grouped = new Map()
@@ -550,13 +632,20 @@ export default {
         ...node,
         ...overrides,
       }
+      const label = this.nodeLabel({ ...node, type })
+      const displayExplanation = this.preferredExplanation(mergedNode)
+      const displayEvidenceSummary = this.supportingExplanation(mergedNode)
+      const displayReasoningRole = this.reasoningNarrative(mergedNode)
       return {
         ...mergedNode,
         id,
         canonicalId: node.canonicalId || node.id || id,
         type,
         relation: overrides.relation || node.relation || node.relationToParent || '',
-        label: this.nodeLabel({ ...node, type }),
+        label,
+        displayExplanation,
+        displayEvidenceSummary,
+        displayReasoningRole,
         children: Array.isArray(node.children) ? [...node.children] : [],
         evidenceImages: this.nodeEvidenceImages(mergedNode),
       }
@@ -565,7 +654,101 @@ export default {
       return node.type || node.kind || node.nodeType || 'Node'
     },
     nodeLabel(node) {
-      return node.label || node.title || node.explanation || node.evidenceSummary || node.id || 'Untitled node'
+      const label = node.label || node.title || node.explanation || node.evidenceSummary || node.id || 'Untitled node'
+      return this.cleanNarrativeText(this.humanReadableValue(label), { preserveShort: true })
+    },
+    preferredExplanation(node) {
+      return this.firstReadableNarrative(
+        node?.displayExplanation,
+        node?.explanation,
+        node?.label,
+        node?.title,
+        node?.evidenceSummary,
+      )
+    },
+    supportingExplanation(node) {
+      return this.firstReadableNarrative(
+        node?.displayEvidenceSummary,
+        node?.evidenceSummary,
+        node?.evidence,
+        node?.provenance,
+      )
+    },
+    reasoningNarrative(node) {
+      return this.firstReadableNarrative(
+        node?.displayReasoningRole,
+        node?.reasoningRole,
+        node?.patchRationale,
+      )
+    },
+    firstReadableNarrative(...values) {
+      for (const value of values) {
+        const text = this.cleanNarrativeText(this.humanReadableValue(value))
+        if (text) return text
+      }
+      return ''
+    },
+    cleanNarrativeText(value, options = {}) {
+      if (!value) return ''
+      const { preserveShort = false } = options
+      const compact = String(value).replace(/\s+/g, ' ').trim()
+      if (!compact) return ''
+      const sentences = compact
+        .split(/(?<=[.?!])\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+
+      const cleaned = sentences.filter((sentence) => !this.isMetaProcessSentence(sentence))
+      let text = cleaned.join(' ').trim() || compact
+      text = text
+        .replace(/^(This (finding|hypothesis|analysis)\s+(suggests|indicates|shows|means)\s+that\s+)/i, '')
+        .replace(/^(Based on (the )?(LLM|agent|assistant|model)[^,]*,\s*)/i, '')
+        .replace(/^(The (LLM|agent|assistant|model)\s+(analysis|reasoning|output)\s+(suggests|indicates|shows)\s+that\s+)/i, '')
+        .replace(/^(The (LLM|agent|assistant|model)\s+(analyzes?|analyzed|checked|examined|observed|identified|reasoned|concluded)\s+that\s+)/i, '')
+        .replace(/^(The (LLM|agent|assistant|model)\s+(analyzes?|analyzed|checked|examined|observed|identified|reasoned|concluded)\b[^.?!]*[.?!]\s*)/i, '')
+        .trim()
+
+      if (!preserveShort) {
+        text = text.replace(/^(There (is|are)\s+)/i, '')
+      }
+      return text
+    },
+    isMetaProcessSentence(sentence) {
+      return /^(As an? (LLM|assistant)|The (LLM|agent|assistant|model)\s+(analyzes?|analyzed|checked|examined|looked|reviewed|observed|identified|reasoned|concluded|generated)|This analysis\b|The analysis\b|We (analyze|observed|check|checked)\b|I (analyze|checked|observed)\b)/i.test(sentence)
+    },
+    humanReadableValue(value) {
+      if (!value) return ''
+      if (typeof value === 'string') return value.trim()
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => this.humanReadableValue(item))
+          .filter(Boolean)
+          .join('; ')
+      }
+      if (typeof value === 'object') {
+        const preferredKeys = [
+          'explanation',
+          'summary',
+          'text',
+          'label',
+          'title',
+          'evidenceSummary',
+          'reason',
+          'rationale',
+        ]
+        for (const key of preferredKeys) {
+          const text = this.humanReadableValue(value[key])
+          if (text) return text
+        }
+        return Object.entries(value)
+          .filter(([key, item]) =>
+            ['string', 'number', 'boolean'].includes(typeof item)
+            && !['actor', 'source', 'kind', 'type', 'space', 'scope', 'confidence'].includes(key),
+          )
+          .map(([key, item]) => `${key}: ${item}`)
+          .join('; ')
+      }
+      return String(value)
     },
     formatValue(value) {
       if (Array.isArray(value)) return value.join(', ')
@@ -726,15 +909,10 @@ export default {
   color: #334155;
 }
 
-.legend-user {
-  background: #ffffff;
-  color: #475569;
-}
-
-.legend-patch {
-  background: #fff1f5;
-  border-color: #f7b7ca;
-  color: #be185d;
+.legend-finding {
+  background: #ecfeef;
+  border-color: #9ae6b4;
+  color: #166534;
 }
 
 .forest-grid {
@@ -763,37 +941,53 @@ export default {
   color: #b91c1c;
 }
 
-.node-detail-panel {
-  flex: 0 0 auto;
-  margin-top: 10px;
-  border: 1px solid #d8e0ec;
-  border-radius: 8px;
+.detail-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.54);
+  backdrop-filter: blur(3px);
+}
+
+.detail-modal {
+  width: min(1120px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 18px;
   background: #ffffff;
   box-shadow:
-    0 10px 24px rgba(15, 23, 42, 0.12),
-    0 2px 8px rgba(15, 23, 42, 0.08),
-    0 0 0 1px rgba(148, 163, 184, 0.08);
-  padding: 10px;
-  max-height: 38%;
-  overflow-y: auto;
+    0 24px 60px rgba(15, 23, 42, 0.24),
+    0 10px 26px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
 }
 
 .detail-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 16px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
 }
 
-.detail-type,
-.detail-patch {
+.detail-header-copy {
+  min-width: 0;
+}
+
+.detail-type {
   display: inline-flex;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
-  line-height: 16px;
-  padding: 1px 7px;
+  line-height: 18px;
+  padding: 2px 9px;
 }
 
 .detail-type {
@@ -801,56 +995,77 @@ export default {
   color: #4338ca;
 }
 
-.detail-patch {
-  margin-left: 5px;
-  background: #fff1f5;
-  border: 1px solid #f7b7ca;
-  color: #be185d;
-}
-
 .detail-title {
   color: #111827;
-  font-size: 12px;
+  font-size: 22px;
   font-weight: 800;
-  line-height: 1.3;
-  margin-bottom: 8px;
+  line-height: 1.35;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+
+.detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(340px, 1.1fr);
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-body-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.detail-text-panel,
+.detail-images-panel {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.detail-text-panel {
+  padding: 24px;
+}
+
+.detail-images-panel {
+  padding: 24px;
+  border-left: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .detail-list {
   display: grid;
-  gap: 5px;
+  gap: 12px;
   margin: 0;
 }
 
 .detail-list dt {
   color: #64748b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .detail-list dd {
   color: #334155;
-  font-size: 11px;
-  line-height: 1.35;
-  margin: 0 0 4px;
+  font-size: 15px;
+  line-height: 1.72;
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
-.detail-images {
+.detail-images-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #e2e8f0;
+  gap: 18px;
+  margin-top: 14px;
 }
 
 .detail-images-title {
   color: #64748b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .detail-image-link {
@@ -862,19 +1077,40 @@ export default {
 .detail-image {
   display: block;
   width: 100%;
-  max-height: 240px;
+  max-height: 72vh;
   object-fit: contain;
   border: 1px solid #d8e0ec;
-  border-radius: 7px;
-  background: #f8fafc;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
 .detail-image-label {
   display: block;
-  margin-top: 4px;
+  margin-top: 8px;
   color: #64748b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 960px) {
+  .detail-modal-overlay {
+    padding: 12px;
+  }
+
+  .detail-modal {
+    width: min(100vw - 24px, 920px);
+    max-height: calc(100vh - 24px);
+  }
+
+  .detail-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detail-images-panel {
+    border-left: none;
+    border-top: 1px solid #e2e8f0;
+  }
 }
 </style>

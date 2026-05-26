@@ -65,7 +65,7 @@
         :content-style="{ display: 'flex', flexDirection: 'row', overflow: 'hidden', width: '100%', height: '100%', boxSizing: 'border-box' }"
       >
 
-<div style="flex: 5; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+<div style="flex: 4; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
         <!-- ezio: snapshot shortcut marker -->
         <n-card
             size="small"
@@ -174,7 +174,7 @@
         </n-card>
     </div>
     
-    <div style="flex: 3; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
+    <div style="flex: 4; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
         <NotesPanel 
             :session-id="maniscopeSessionId"
             :actions="userActionSequence"

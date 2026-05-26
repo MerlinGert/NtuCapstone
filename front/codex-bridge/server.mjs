@@ -239,10 +239,10 @@ function buildThreadOptions() {
   const options = {
     workingDirectory: REPO_ROOT,
     skipGitRepoCheck: false,
-    sandboxMode: process.env.CODEX_SANDBOX_MODE || 'workspace-write',
+    sandboxMode: process.env.CODEX_SANDBOX_MODE || 'danger-full-access',
     approvalPolicy: process.env.CODEX_APPROVAL_POLICY || 'never',
     modelReasoningEffort: process.env.CODEX_REASONING_EFFORT || 'high',
-    networkAccessEnabled: process.env.CODEX_NETWORK_ACCESS === 'true',
+    networkAccessEnabled: process.env.CODEX_NETWORK_ACCESS !== 'false',
     webSearchMode: process.env.CODEX_WEB_SEARCH || 'disabled',
   }
   if (process.env.CODEX_MODEL) {
@@ -462,6 +462,21 @@ Mode F: artifact-writing.
 - Write reasoning-graph.json first, then generate user-reasoning-forest.json and user-reasoning-forest.md with the session-local trace_analysis_tools script. Do not manually create a forest that bypasses graph validation.
 - Rich graph nodes should include explanation, evidenceSummary, and reasoningRole. Agent-created patch nodes must also include patchRationale.
 - Original trace evidence belongs to the User Reasoning Forest. Agent follow-up evidence belongs in a Reasoning Graph Patch and then in the Augmented Reasoning Forest.
+
+Narrative style for multi-agent outputs and graph node text:
+- Default to evidence-first storytelling, not agent-process narration.
+- Do not foreground phrases such as "the LLM analyzed", "the agent checked", "the model thinks", or "the assistant concluded" unless the process itself is materially relevant.
+- Write Hypothesis and Finding text as plain-language claims about the market behavior, the wallet cohort, the temporal sequence, or the visual pattern on screen.
+- Prefer this narrative order:
+  1. What is happening.
+  2. What visual or quantitative pattern supports it.
+  3. Why that pattern matters for the broader reasoning path.
+- For `explanation`, describe the story in concrete terms: actors, sequence, timing, contrast, and likely role. Make it understandable without mentioning internal analysis machinery.
+- For `evidenceSummary`, describe visible or measured evidence with GUI-grounded language such as cluster shape, card timing, repeated transfers, synchronized buys, exits, holding patterns, or alignment between behavior and price movement.
+- For `reasoningRole`, state the reasoning contribution in plain language, such as "This finding anchors the start of the suspected pump phase" or "This narrows the hypothesis from broad coordination to a smaller leading cohort."
+- Keep labels short and claim-oriented. Put nuance and caveats in `explanation` or `evidenceSummary`, not in verbose labels.
+- Avoid meta filler such as "this analysis suggests", "the above image shows", or "based on the LLM reasoning". Replace it with direct statements about the observed pattern.
+- When uncertainty exists, express it as an evidence caveat tied to the story, for example "The timing lines up visually, but exact overlap still needs transaction-level validation."
 
 Be visibly collaborative while working:
 - Send concise progress updates as user-facing working notes when you start reading context, inspect trace evidence, run a command, render a view, save an artifact, calculate statistics, rerun or vary model outputs, spawn a subagent, or change investigation direction.
