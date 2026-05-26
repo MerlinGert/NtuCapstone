@@ -39,11 +39,31 @@
       "id": "F2",
       "kind": "Finding",
       "space": "Finding",
-      "scope": "High",
-      "label": "The clicked cohort may be part of coordinated price activity",
+      "scope": "Mid",
+      "label": "The clicked cohort shows coordinated same-window behavior",
       "provenance": ["inference:F1 plus K-line alignment"],
       "confidence": "Strong inference",
-      "explanation": "The local same-direction cohort finding is synthesized with K-line alignment into a higher-level coordination finding."
+      "explanation": "The local same-direction cohort finding is synthesized with K-line alignment into a mid-level answer to the cohort-coordination question."
+    },
+    {
+      "id": "F3",
+      "kind": "Finding",
+      "space": "Finding",
+      "scope": "High",
+      "label": "The clicked cohort may be part of coordinated price activity",
+      "provenance": ["inference:F2 plus hypothesis-level trace synthesis"],
+      "confidence": "Strong inference",
+      "explanation": "The mid-level cohort answer is synthesized into a higher-level coordination finding that can support the hypothesis."
+    },
+    {
+      "id": "AQ1",
+      "kind": "AnalyticQuestion",
+      "space": "Intention",
+      "scope": "Mid",
+      "label": "Does the clicked cohort show coordinated behavior?",
+      "provenance": ["inference:card click and user annotation"],
+      "confidence": "Strong inference",
+      "explanation": "The user's card inspection raises a bounded question about whether the selected cohort behaves together in the marked time window."
     },
     {
       "id": "H1",
@@ -77,9 +97,27 @@
     },
     {
       "source": "F2",
+      "target": "F3",
+      "relation": "supports",
+      "rationale": "The mid-level answer contributes to a higher-level coordination finding."
+    },
+    {
+      "source": "F2",
+      "target": "AQ1",
+      "relation": "answers",
+      "rationale": "The synthesized cohort finding directly answers the coordination question."
+    },
+    {
+      "source": "F3",
       "target": "H1",
       "relation": "supports",
       "rationale": "The coordination finding supports the price-activity hypothesis."
+    },
+    {
+      "source": "H1",
+      "target": "AQ1",
+      "relation": "contains",
+      "rationale": "The cohort-coordination question is part of the hypothesis-centered reasoning tree."
     },
     {
       "source": "H1",

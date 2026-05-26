@@ -71,6 +71,7 @@ Example:
 Use normal reasoning graph relation types. Evidence completion commonly adds:
 
 - `Interaction -> Finding` with `produces`.
+- `Finding -> AnalyticQuestion` with `answers` when follow-up evidence directly resolves a question.
 - `Finding -> Hypothesis` with `supports`, `refines`, or `contradicts`.
 
 ```json

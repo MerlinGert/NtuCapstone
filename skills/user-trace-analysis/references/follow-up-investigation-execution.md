@@ -57,7 +57,7 @@ This reference is operational. For methodology, graph schemas, Recommendation Pl
 6. **Patch the reasoning graph**
    - Convert actual follow-up results into real Interaction, Finding, or Hypothesis nodes.
    - New follow-up evidence nodes must include `actor`, `source`, `planRef`, `explanation`, `evidenceSummary`, `reasoningRole`, and `patchRationale`.
-   - Use `supports`, `refines`, or `contradicts` edges to attach new Findings to existing or new Hypotheses.
+   - Use `answers` edges to attach new Findings to Analytic Questions they resolve, and use `supports`, `refines`, or `contradicts` edges to attach new Findings to existing or new Hypotheses.
    - For every executed Hypothesis Expansion branch, explicitly resolve the proposed adjacent Hypothesis. If evidence supports it, add a new Hypothesis node and an `add_root` operation so the augmented forest contains a separate adjacent-hypothesis tree. If evidence does not support it, state that outcome in `continued-investigation-report.md` and avoid presenting the Expected Finding as evidence.
    - Apply the patch with `scripts/apply_reasoning_graph_patch.py` and regenerate the augmented forest.
    - If every branch is blocked and no new evidence exists, write `continued-investigation-report.md` and explicitly state why no patch was produced.

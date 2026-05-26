@@ -15,6 +15,7 @@ from typing import Any
 ALLOWED_RELATIONS = {
     "motivates",
     "produces",
+    "answers",
     "supports",
     "refines",
     "contradicts",
@@ -243,6 +244,17 @@ def validate_relation_direction(
             )
         return
 
+    if relation == "answers":
+        if source_space != "Finding" or target.get("kind") != "AnalyticQuestion":
+            raise GraphError(
+                f"edges[{index}] answers must point from Finding to AnalyticQuestion"
+            )
+        if source_scope != "Mid":
+            raise GraphError(
+                f"edges[{index}] answers must use a Mid-scope Finding as source"
+            )
+        return
+
     if relation in {"refines", "contradicts"}:
         if source_space != "Finding" or target_space != "Intention":
             raise GraphError(
@@ -263,7 +275,32 @@ def validate_relation_direction(
     raise GraphError(f"edges[{index}] has unknown relation: {relation}")
 
 
-def validate_graph(graph: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], list[str]]:
+def validate_analytic_questions_answered(
+    nodes: dict[str, dict[str, Any]],
+    edges: list[dict[str, Any]],
+) -> None:
+    answered_question_ids = {
+        edge["target"]
+        for edge in edges
+        if edge.get("relation") == "answers"
+    }
+    unanswered_questions = [
+        node_id
+        for node_id, node in nodes.items()
+        if node.get("kind") == "AnalyticQuestion" and node_id not in answered_question_ids
+    ]
+    if unanswered_questions:
+        raise GraphError(
+            "AnalyticQuestion nodes must have incoming answers edges from Findings: "
+            + ", ".join(sorted(unanswered_questions))
+        )
+
+
+def validate_graph(
+    graph: dict[str, Any],
+    *,
+    require_answered_questions: bool = False,
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], list[str]]:
     if graph.get("version") != 1:
         raise GraphError("graph.version must be 1")
     require_string(graph.get("trace"), "graph.trace")
@@ -320,6 +357,9 @@ def validate_graph(graph: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], li
     if not roots:
         raise GraphError("no Hypothesis roots found")
 
+    if require_answered_questions:
+        validate_analytic_questions_answered(nodes, edges)
+
     return nodes, edges, roots
 
 
@@ -327,7 +367,7 @@ def projected_child_parent(edge: dict[str, Any]) -> tuple[str, str, str]:
     source = edge["source"]
     target = edge["target"]
     relation = edge["relation"]
-    if relation in {"produces", "supports", "refines", "contradicts"}:
+    if relation in {"produces", "answers", "supports", "refines", "contradicts"}:
         return source, target, relation
     if relation in {"motivates", "contains", "derived_from"}:
         return target, source, relation
@@ -572,7 +612,7 @@ def main() -> int:
 
     try:
         graph = read_json(graph_path)
-        nodes, edges, roots = validate_graph(graph)
+        nodes, edges, roots = validate_graph(graph, require_answered_questions=True)
         forest = build_forest(graph, nodes, edges, roots)
         write_outputs(forest, json_out, md_out)
     except GraphError as exc:

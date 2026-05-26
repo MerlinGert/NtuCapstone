@@ -4,7 +4,7 @@
       <div>
         <div class="analysis-title">Reasoning Forest</div>
         <div class="analysis-subtitle">
-          Showing only each hypothesis and its supporting hierarchical findings.
+          Findings hierarchy under top-level hypotheses, with agent patch findings overlaid.
         </div>
       </div>
       <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
@@ -15,7 +15,8 @@
 
     <div class="legend-row">
       <span class="legend-item legend-hypothesis">Hypothesis</span>
-      <span class="legend-item legend-finding">Finding</span>
+      <span class="legend-item legend-user">User finding</span>
+      <span class="legend-item legend-patch">Agent patch finding</span>
     </div>
 
     <div v-if="loading" class="empty-state">Loading LLM analysis artifacts...</div>
@@ -134,7 +135,7 @@ export default {
         for (const tree of this.userForest.trees) {
           if (tree?.root) existingRootIds.add(tree.root)
         }
-        return [
+        return this.projectReasoningForest([
           ...userTrees,
           ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
         ]
@@ -158,10 +159,10 @@ export default {
         const id = typeof root === 'string' ? root : root?.id
         if (id) existingRootIds.add(id)
       }
-      return [
+      return this.projectReasoningForest([
         ...userTrees,
         ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
-      ]
+      ])
         .map((tree) => this.extractHypothesisTree(tree))
         .filter(Boolean)
     },
@@ -345,6 +346,109 @@ export default {
       return name === 'user-reasoning-forest.json'
         || name === 'reasoning-graph-patch.json'
         || /^reasoning-graph-patch-[^.]+\.json$/.test(name)
+    },
+    projectReasoningForest(trees) {
+      const projectedTrees = trees
+        .flatMap((tree) => this.projectReasoningNode(tree).nodes)
+        .filter(Boolean)
+      return this.dedupeReasoningNodes(projectedTrees)
+    },
+    projectReasoningNode(node) {
+      if (!node) return { nodes: [], liftedEvidenceImages: [] }
+      const childResults = (Array.isArray(node.children) ? node.children : [])
+        .map((child) => this.projectReasoningNode(child))
+      const visibleChildren = this.dedupeReasoningNodes(
+        childResults.flatMap((result) => result.nodes),
+      )
+      const liftedChildImages = this.mergeEvidenceImages(
+        ...childResults.map((result) => result.liftedEvidenceImages),
+      )
+      const ownImages = Array.isArray(node.evidenceImages) ? node.evidenceImages : []
+
+      if (this.isVisibleReasoningNode(node)) {
+        return {
+          nodes: [
+            {
+              ...node,
+              children: visibleChildren,
+              evidenceImages: this.mergeEvidenceImages(ownImages, liftedChildImages),
+            },
+          ],
+          liftedEvidenceImages: [],
+        }
+      }
+
+      return {
+        nodes: visibleChildren,
+        liftedEvidenceImages: this.mergeEvidenceImages(ownImages, liftedChildImages),
+      }
+    },
+    dedupeReasoningNodes(nodes) {
+      const deduped = []
+      const byCanonicalNode = new Map()
+      for (const node of nodes) {
+        if (!node) continue
+        const key = this.reasoningNodeDedupKey(node)
+        if (!key || !byCanonicalNode.has(key)) {
+          if (key) byCanonicalNode.set(key, node)
+          deduped.push(node)
+          continue
+        }
+
+        const existing = byCanonicalNode.get(key)
+        existing.children = this.dedupeReasoningNodes([
+          ...(Array.isArray(existing.children) ? existing.children : []),
+          ...(Array.isArray(node.children) ? node.children : []),
+        ])
+        existing.evidenceImages = this.mergeEvidenceImages(
+          existing.evidenceImages,
+          node.evidenceImages,
+        )
+        if (!existing.relation && node.relation) existing.relation = node.relation
+      }
+      return this.pruneDuplicateVisibleAncestors(deduped)
+    },
+    pruneDuplicateVisibleAncestors(nodes) {
+      const descendantKeys = new Set()
+      for (const node of nodes) {
+        this.collectDescendantReasoningKeys(node, descendantKeys)
+      }
+      return nodes.filter((node) => {
+        const key = this.reasoningNodeDedupKey(node)
+        return !key || !descendantKeys.has(key)
+      })
+    },
+    collectDescendantReasoningKeys(node, keys) {
+      const children = Array.isArray(node.children) ? node.children : []
+      for (const child of children) {
+        const key = this.reasoningNodeDedupKey(child)
+        if (key) keys.add(key)
+        this.collectDescendantReasoningKeys(child, keys)
+      }
+    },
+    reasoningNodeDedupKey(node) {
+      const type = this.nodeType(node)
+      if (type !== 'Hypothesis' && type !== 'Finding') return ''
+      const canonicalId = node.canonicalId || node.id
+      if (!canonicalId) return ''
+      return `${node.source || 'user'}:${type}:${canonicalId}`
+    },
+    isVisibleReasoningNode(node) {
+      const type = this.nodeType(node)
+      return type === 'Hypothesis' || type === 'Finding'
+    },
+    mergeEvidenceImages(...imageGroups) {
+      const merged = []
+      const seen = new Set()
+      for (const group of imageGroups) {
+        if (!Array.isArray(group)) continue
+        for (const image of group) {
+          if (!image?.url || seen.has(image.url)) continue
+          seen.add(image.url)
+          merged.push(image)
+        }
+      }
+      return merged
     },
     normalizedPatchGraph() {
       if (Array.isArray(this.graphPatch?.nodes) || Array.isArray(this.graphPatch?.edges)) {

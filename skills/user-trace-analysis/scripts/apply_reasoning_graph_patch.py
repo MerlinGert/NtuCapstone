@@ -167,7 +167,7 @@ def apply_patch(base_graph: dict[str, Any], patch: dict[str, Any]) -> dict[str, 
         }
     )
 
-    validate_graph(graph)
+    validate_graph(graph, require_answered_questions=True)
     return graph
 
 
@@ -202,7 +202,10 @@ def main() -> int:
         print(f"wrote {out}")
 
         if not args.no_forest:
-            nodes, edges, roots = validate_graph(augmented_graph)
+            nodes, edges, roots = validate_graph(
+                augmented_graph,
+                require_answered_questions=True,
+            )
             forest = build_forest(augmented_graph, nodes, edges, roots)
             write_outputs(forest, forest_json_out, forest_md_out)
             print(f"wrote {forest_json_out}")
