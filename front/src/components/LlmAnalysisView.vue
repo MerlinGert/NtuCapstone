@@ -312,15 +312,18 @@ export default {
         || /^reasoning-graph-patch-[^.]+\.json$/.test(name)
     },
     projectReasoningForest(trees) {
-      return trees
+      const projectedTrees = trees
         .flatMap((tree) => this.projectReasoningNode(tree).nodes)
         .filter(Boolean)
+      return this.dedupeReasoningNodes(projectedTrees)
     },
     projectReasoningNode(node) {
       if (!node) return { nodes: [], liftedEvidenceImages: [] }
       const childResults = (Array.isArray(node.children) ? node.children : [])
         .map((child) => this.projectReasoningNode(child))
-      const visibleChildren = childResults.flatMap((result) => result.nodes)
+      const visibleChildren = this.dedupeReasoningNodes(
+        childResults.flatMap((result) => result.nodes),
+      )
       const liftedChildImages = this.mergeEvidenceImages(
         ...childResults.map((result) => result.liftedEvidenceImages),
       )
@@ -343,6 +346,56 @@ export default {
         nodes: visibleChildren,
         liftedEvidenceImages: this.mergeEvidenceImages(ownImages, liftedChildImages),
       }
+    },
+    dedupeReasoningNodes(nodes) {
+      const deduped = []
+      const byCanonicalNode = new Map()
+      for (const node of nodes) {
+        if (!node) continue
+        const key = this.reasoningNodeDedupKey(node)
+        if (!key || !byCanonicalNode.has(key)) {
+          if (key) byCanonicalNode.set(key, node)
+          deduped.push(node)
+          continue
+        }
+
+        const existing = byCanonicalNode.get(key)
+        existing.children = this.dedupeReasoningNodes([
+          ...(Array.isArray(existing.children) ? existing.children : []),
+          ...(Array.isArray(node.children) ? node.children : []),
+        ])
+        existing.evidenceImages = this.mergeEvidenceImages(
+          existing.evidenceImages,
+          node.evidenceImages,
+        )
+        if (!existing.relation && node.relation) existing.relation = node.relation
+      }
+      return this.pruneDuplicateVisibleAncestors(deduped)
+    },
+    pruneDuplicateVisibleAncestors(nodes) {
+      const descendantKeys = new Set()
+      for (const node of nodes) {
+        this.collectDescendantReasoningKeys(node, descendantKeys)
+      }
+      return nodes.filter((node) => {
+        const key = this.reasoningNodeDedupKey(node)
+        return !key || !descendantKeys.has(key)
+      })
+    },
+    collectDescendantReasoningKeys(node, keys) {
+      const children = Array.isArray(node.children) ? node.children : []
+      for (const child of children) {
+        const key = this.reasoningNodeDedupKey(child)
+        if (key) keys.add(key)
+        this.collectDescendantReasoningKeys(child, keys)
+      }
+    },
+    reasoningNodeDedupKey(node) {
+      const type = this.nodeType(node)
+      if (type !== 'Hypothesis' && type !== 'Finding') return ''
+      const canonicalId = node.canonicalId || node.id
+      if (!canonicalId) return ''
+      return `${node.source || 'user'}:${type}:${canonicalId}`
     },
     isVisibleReasoningNode(node) {
       const type = this.nodeType(node)

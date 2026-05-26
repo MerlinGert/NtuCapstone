@@ -110,7 +110,7 @@ Allowed relations:
 |---|---|---|
 | `motivates` | Intention -> Action Space unit | A Task, Analytic Question, or Hypothesis explains why an Interaction, Analytic Activity, or Investigation Strategy happened. |
 | `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding. |
-| `answers` | Finding Space output -> Analytic Question | A Finding directly answers, partially answers, bounds, or caveats an Analytic Question. |
+| `answers` | Mid-level Finding -> Analytic Question | A mid-level Finding directly answers, partially answers, bounds, or caveats an Analytic Question. |
 | `supports` | Finding Space output -> Finding Space output or Intention | A Finding strengthens another Finding, a Task interpretation, an Analytic Question, or a Hypothesis. |
 | `refines` | Finding Space output -> Intention | A Finding changes or narrows the intention. |
 | `contradicts` | Finding Space output -> Intention | A Finding weakens or falsifies the intention. |
@@ -157,7 +157,15 @@ Shared canonical nodes are duplicated mechanically. Each tree node instance must
 
 The forest must preserve raw Interaction leaves by default. If a compact Step view is also useful, keep it in `trace-step-map.md`, not as a replacement for Interaction leaves in the User Reasoning Forest.
 
-Every `AnalyticQuestion` should have at least one incoming `answers` edge from a `Finding`. If the trace only yields a partial or uncertain answer, encode that caveat in the Finding's label, confidence, `explanation`, and `reasoningRole`. If the trace does not answer the question at all, create a clearly unresolved Finding and mark the missing evidence as a Reasoning Gap in the Recommendation Plan.
+Every `AnalyticQuestion` should have at least one incoming `answers` edge from a mid-level `Finding`. If the trace only yields a partial or uncertain answer, encode that caveat in the Finding's label, confidence, `explanation`, and `reasoningRole`. If the trace does not answer the question at all, create a clearly unresolved mid-level Finding and mark the missing evidence as a Reasoning Gap in the Recommendation Plan.
+
+Use a real Finding hierarchy when the trace contains enough evidence:
+
+- Low-level Findings record concrete observations from one Interaction or one narrow Analytic Activity, such as a displayed count, a visible cluster, a clicked card cohort, an exact script-derived volume, or a single rendered view check.
+- Mid-level Findings answer Analytic Questions by synthesizing one or more low-level Findings. These are the normal source nodes for `answers` edges.
+- High-level Findings synthesize several mid-level Findings into a session-level claim, caveat, or interpretation. They should support, refine, or contradict Hypotheses.
+
+Avoid connecting the same mid-level Finding directly to both an Analytic Question and that question's parent Hypothesis when a high-level Finding can synthesize the answer first. Prefer `low Finding -> mid Finding -> high Finding -> Hypothesis`, while keeping the explicit `mid Finding -> AnalyticQuestion` `answers` edge for traceability.
 
 ## Validation Expectations
 
@@ -182,7 +190,8 @@ The script should fail if:
 - an edge is a self-edge,
 - a relation is unknown,
 - a relation points in the wrong direction for its type,
-- an Analytic Question has no incoming `answers` edge from a Finding,
+- an Analytic Question has no incoming `answers` edge from a mid-level Finding,
+- an `answers` edge uses a non-mid-level Finding as its source,
 - an edge lacks a non-empty `rationale`,
 - an Interaction lacks `salience`,
 - an Interaction lacks `interactionType`,

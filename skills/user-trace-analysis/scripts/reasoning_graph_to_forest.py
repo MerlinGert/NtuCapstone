@@ -249,6 +249,10 @@ def validate_relation_direction(
             raise GraphError(
                 f"edges[{index}] answers must point from Finding to AnalyticQuestion"
             )
+        if source_scope != "Mid":
+            raise GraphError(
+                f"edges[{index}] answers must use a Mid-scope Finding as source"
+            )
         return
 
     if relation in {"refines", "contradicts"}:

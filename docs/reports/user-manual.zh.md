@@ -197,7 +197,7 @@ Action Tree 标签页把动作和标注显示为一棵可视化树。图例区�
 
 ### LLM Analysis
 
-LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载可用的 User Reasoning Forest 和 Reasoning Graph Patch JSON 文件。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 JSON 中用于追溯。智能体生成的补丁 Finding 会显示为粉色，并挂接到它所支持、回答、限定或综合的假设或 Finding 上。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括可用的 evidence summary、patch rationale 和较大的证据图片。
+LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载可用的 User Reasoning Forest 和 Reasoning Graph Patch JSON 文件。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 JSON 中用于追溯。回答隐藏 Analytic Question 的中层 Finding 仍会显示在 Finding 层级中；如果同一个 canonical Finding 因为隐藏节点投影而重复出现，界面会把它折叠为一个卡片，避免同一个答案在一个 Hypothesis 下重复显示。智能体生成的补丁 Finding 会显示为粉色，并挂接到它所支持、回答、限定或综合的假设或 Finding 上。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括可用的 evidence summary、patch rationale 和较大的证据图片。
 
 该标签页会在打开时、点击 Refresh 时、Codex 宣布新的相关 artifact 时刷新；当标签页处于激活状态时，也会进行轻量级周期检查。后端不会启动长期文件监听器，而是在请求时扫描会话 artifacts 并返回最新识别到的文件。
 

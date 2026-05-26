@@ -234,7 +234,7 @@ Use this relation taxonomy in `reasoning-graph.json`:
 |---|---|---|
 | `motivates` | Intention -> Action Space unit | A Task, Analytic Question, or Hypothesis explains why an Interaction, Analytic Activity, or Investigation Strategy happened. |
 | `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding. |
-| `answers` | Finding Space output -> Analytic Question | A Finding directly answers, partially answers, bounds, or caveats an Analytic Question. |
+| `answers` | Mid-level Finding -> Analytic Question | A mid-level Finding directly answers, partially answers, bounds, or caveats an Analytic Question. |
 | `supports` | Finding Space output -> Finding Space output or Intention | A Finding strengthens another Finding, a Task interpretation, an Analytic Question, or a Hypothesis. |
 | `refines` | Finding Space output -> Intention | A Finding changes or narrows the intention. |
 | `contradicts` | Finding Space output -> Intention | A Finding weakens or falsifies the intention. |
@@ -249,7 +249,15 @@ Every Interaction node in `reasoning-graph.json` should include `salience`:
 
 The User Reasoning Forest must use raw Interaction leaves by default. Do not replace Interactions with compact Step nodes in the forest unless the user explicitly asks for a compact view.
 
-Every Analytic Question should have at least one evidence-backed Finding connected with an explicit `answers` edge. Do not rely only on shared Hypothesis membership, nearby action nodes, or prose explanations for the reader to infer the answer. If the trace does not provide enough evidence to answer an Analytic Question, add a caveated Finding such as "the trace does not provide enough evidence to answer ..." and mark the missing support as a Reasoning Gap in the Recommendation Plan.
+Every Analytic Question should have at least one evidence-backed mid-level Finding connected with an explicit `answers` edge. Do not rely only on shared Hypothesis membership, nearby action nodes, or prose explanations for the reader to infer the answer. If the trace does not provide enough evidence to answer an Analytic Question, add a caveated mid-level Finding such as "the trace does not provide enough evidence to answer ..." and mark the missing support as a Reasoning Gap in the Recommendation Plan.
+
+Build a readable Finding hierarchy when the trace contains enough evidence:
+
+- **Low-level Findings** are concrete observations from one Interaction or one narrow Analytic Activity, such as a displayed count, a visible cluster, a clicked card cohort, an exact script-derived volume, or a single rendered view check.
+- **Mid-level Findings** synthesize low-level Findings and answer Analytic Questions. These should be the source of `answers` edges.
+- **High-level Findings** synthesize several mid-level Findings into a session-level interpretation, caveat, or claim, then support, refine, or contradict Hypotheses.
+
+Avoid flat forests where every Finding directly supports a Hypothesis. Prefer `low Finding -> mid Finding -> high Finding -> Hypothesis`, plus explicit `mid Finding -> AnalyticQuestion` `answers` edges. Do not connect the same mid-level Finding directly to both an Analytic Question and that question's parent Hypothesis unless there is no higher-level Finding to carry the hypothesis support.
 
 ### Recommendation and Follow-up Lifecycle
 
@@ -707,7 +715,8 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - In `trace-step-map.md`, high-level claims must be connected to multiple supporting steps unless the rationale explains otherwise.
 - In `trace-step-map.md`, graph edges should represent reasoning dependencies, not just chronological order.
 - `reasoning-graph.json` must validate with `scripts/reasoning_graph_to_forest.py`.
-- Every `AnalyticQuestion` must have at least one incoming `answers` edge from a `Finding`.
+- Every `AnalyticQuestion` must have at least one incoming `answers` edge from a mid-level `Finding`.
+- Low-level Findings should feed mid-level Findings; mid-level Findings should answer Analytic Questions; high-level Findings should synthesize mid-level Findings before supporting Hypotheses when the trace evidence allows it.
 - Every Interaction node in `reasoning-graph.json` must have `salience`.
 - Every `user-reasoning-forest.md` tree must be rooted at one Hypothesis.
 - The User Reasoning Forest must preserve raw Interaction leaves by default.
