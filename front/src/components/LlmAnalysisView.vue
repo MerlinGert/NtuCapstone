@@ -48,7 +48,7 @@
             </div>
             <button class="detail-close" @click="closeSelectedNode">Close</button>
           </div>
-          <div class="detail-body" :class="{ 'detail-body-single': !selectedNodeEvidenceImages.length }">
+          <div class="detail-body" :class="{ 'detail-body-single': !selectedNodeImageGroups.length }">
             <div class="detail-text-panel">
               <dl class="detail-list">
                 <template v-for="item in selectedNodeDetails" :key="item.key">
@@ -56,20 +56,40 @@
                   <dd>{{ item.value }}</dd>
                 </template>
               </dl>
+              <div v-if="selectedNodeInternalFindings.length" class="detail-findings-section">
+                <div class="detail-section-title">Internal Findings</div>
+                <div class="detail-findings-list">
+                  <article
+                    v-for="finding in selectedNodeInternalFindings"
+                    :key="finding.key"
+                    class="detail-finding-card"
+                  >
+                    <div class="detail-finding-title">{{ finding.label }}</div>
+                    <p v-if="finding.explanation" class="detail-finding-copy">{{ finding.explanation }}</p>
+                    <p v-if="finding.evidenceSummary" class="detail-finding-copy">
+                      {{ finding.evidenceSummary }}
+                    </p>
+                    <p v-if="finding.reasoningRole" class="detail-finding-copy">{{ finding.reasoningRole }}</p>
+                  </article>
+                </div>
+              </div>
             </div>
-            <div v-if="selectedNodeEvidenceImages.length" class="detail-images-panel">
+            <div v-if="selectedNodeImageGroups.length" class="detail-images-panel">
               <div class="detail-images-title">Evidence Images</div>
               <div class="detail-images-grid">
                 <a
-                  v-for="image in selectedNodeEvidenceImages"
-                  :key="image.url"
+                  v-for="group in selectedNodeImageGroups"
+                  :key="group.image.url"
                   class="detail-image-link"
-                  :href="image.url"
+                  :href="group.image.url"
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <img :src="image.url" :alt="image.label" class="detail-image" />
-                  <span class="detail-image-label">{{ image.label }}</span>
+                  <img :src="group.image.url" :alt="group.image.label" class="detail-image" />
+                  <span class="detail-image-label">{{ group.image.label }}</span>
+                  <span v-if="group.findings.length" class="detail-image-finding-list">
+                    {{ group.findings.map((finding) => finding.label).join(' | ') }}
+                  </span>
                 </a>
               </div>
             </div>
@@ -141,6 +161,7 @@ export default {
         ])
           .map((tree) => this.extractHypothesisTree(tree))
           .filter(Boolean)
+          .map((tree) => this.prepareNodeForDisplay(tree))
       }
       if (!Array.isArray(this.userForest.roots)) return []
       const userNodes = this.userForest.nodes && typeof this.userForest.nodes === 'object'
@@ -165,6 +186,7 @@ export default {
       ])
         .map((tree) => this.extractHypothesisTree(tree))
         .filter(Boolean)
+        .map((tree) => this.prepareNodeForDisplay(tree))
     },
     artifactSummary() {
       const current = this.manifest?.current || {}
@@ -198,10 +220,22 @@ export default {
         },
       ].filter((item) => item.value)
     },
-    selectedNodeEvidenceImages() {
-      return Array.isArray(this.selectedNode?.evidenceImages)
+    selectedNodeInternalFindings() {
+      if (!this.shouldShowInternalFindings(this.selectedNode)) return []
+      return this.collectConcreteDescendantFindings(this.selectedNode)
+    },
+    selectedNodeImageGroups() {
+      if (!this.selectedNode) return []
+      if (this.selectedNodeInternalFindings.length > 0) {
+        return this.groupFindingImages(this.selectedNodeInternalFindings)
+      }
+      const images = Array.isArray(this.selectedNode.evidenceImages)
         ? this.selectedNode.evidenceImages
         : []
+      return images.map((image) => ({
+        image,
+        findings: [],
+      }))
     },
   },
   watch: {
@@ -253,22 +287,28 @@ export default {
     artifactUrl(name) {
       return `/api/sessions/${this.sessionId}/artifacts/${this.encodeRelativePath(name)}`
     },
+    cacheBustedUrl(url, token) {
+      if (!token) return url
+      const separator = String(url).includes('?') ? '&' : '?'
+      return `${url}${separator}v=${encodeURIComponent(token)}`
+    },
     imageUrl(name) {
       return `/api/sessions/${this.sessionId}/images/${this.encodeRelativePath(name)}`
     },
     async fetchManifest() {
-      const response = await fetch(this.manifestUrl())
+      const response = await fetch(this.manifestUrl(), { cache: 'no-store' })
       if (response.status === 404 || response.status === 400) return null
       if (!response.ok) throw new Error(`Failed to load analysis artifact manifest: HTTP ${response.status}`)
       return response.json()
     },
     artifactInfoUrl(info) {
       if (!info) return ''
-      return info.url || this.artifactUrl(info.name)
+      const url = info.url || this.artifactUrl(info.name)
+      return this.cacheBustedUrl(url, info.modifiedAt || info.mtime || info.size)
     },
     async fetchArtifact(info) {
       if (!info) return null
-      const response = await fetch(this.artifactInfoUrl(info))
+      const response = await fetch(this.artifactInfoUrl(info), { cache: 'no-store' })
       if (response.status === 404 || response.status === 400) return null
       if (!response.ok) throw new Error(`Failed to load ${info.name}: HTTP ${response.status}`)
       return response.json()
@@ -536,6 +576,42 @@ export default {
         children: this.dedupeNodes(findingChildren),
       }
     },
+    prepareNodeForDisplay(node) {
+      if (!node) return null
+      const rawChildren = Array.isArray(node.children) ? node.children : []
+      const siblingSeenImages = new Set()
+      const children = rawChildren
+        .map((child) => this.prepareNodeForDisplay(child))
+        .filter(Boolean)
+        .map((child) => this.withSiblingDisplayImages(child, siblingSeenImages))
+      return this.withSiblingDisplayImages({
+        ...node,
+        children,
+      })
+    },
+    withSiblingDisplayImages(node, siblingSeenImages = null) {
+      const ownImages = Array.isArray(node?.evidenceImages) ? node.evidenceImages : []
+      if (!this.shouldRenderNodeImages(node)) {
+        return {
+          ...node,
+          displayEvidenceImages: [],
+        }
+      }
+      if (!siblingSeenImages) {
+        return {
+          ...node,
+          displayEvidenceImages: ownImages,
+        }
+      }
+      return {
+        ...node,
+        displayEvidenceImages: ownImages.filter((image) => {
+          if (!image?.url || siblingSeenImages.has(image.url)) return false
+          siblingSeenImages.add(image.url)
+          return true
+        }),
+      }
+    },
     dedupeNodes(nodes) {
       const seen = new Set()
       const results = []
@@ -756,6 +832,71 @@ export default {
     },
     nodeType(node) {
       return node.type || node.kind || node.nodeType || 'Node'
+    },
+    isSynthesisFindingNode(node) {
+      if (this.nodeType(node) !== 'Finding') return false
+      const children = Array.isArray(node?.children) ? node.children : []
+      return children.some((child) => this.nodeType(child) === 'Finding')
+    },
+    isConcreteFindingNode(node) {
+      return this.nodeType(node) === 'Finding' && !this.isSynthesisFindingNode(node)
+    },
+    shouldRenderNodeImages(node) {
+      return this.isConcreteFindingNode(node)
+    },
+    shouldShowInternalFindings(node) {
+      if (!node) return false
+      return this.nodeType(node) === 'Hypothesis' || this.isSynthesisFindingNode(node)
+    },
+    collectConcreteDescendantFindings(node) {
+      const results = []
+      const seen = new Set()
+      const visit = (current) => {
+        const children = Array.isArray(current?.children) ? current.children : []
+        for (const child of children) {
+          if (this.isConcreteFindingNode(child)) {
+            const key = child.instanceId || child.canonicalId || child.id
+            if (key && !seen.has(key)) {
+              seen.add(key)
+              results.push({
+                key,
+                label: child.label,
+                explanation: this.preferredExplanation(child),
+                evidenceSummary: this.supportingExplanation(child),
+                reasoningRole: this.reasoningNarrative(child),
+                images: Array.isArray(child.evidenceImages) ? child.evidenceImages : [],
+              })
+            }
+            continue
+          }
+          visit(child)
+        }
+      }
+      visit(node)
+      return results
+    },
+    groupFindingImages(findings) {
+      const grouped = new Map()
+      for (const finding of findings) {
+        const images = Array.isArray(finding.images) ? finding.images : []
+        for (const image of images) {
+          if (!image?.url) continue
+          if (!grouped.has(image.url)) {
+            grouped.set(image.url, {
+              image,
+              findings: [],
+            })
+          }
+          const group = grouped.get(image.url)
+          if (!group.findings.some((item) => item.key === finding.key)) {
+            group.findings.push({
+              key: finding.key,
+              label: finding.label,
+            })
+          }
+        }
+      }
+      return Array.from(grouped.values())
     },
     nodeLabel(node) {
       const label = node.label || node.title || node.explanation || node.evidenceSummary || node.id || 'Untitled node'
@@ -1163,6 +1304,46 @@ export default {
   overflow-wrap: anywhere;
 }
 
+.detail-findings-section {
+  margin-top: 24px;
+}
+
+.detail-section-title {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.detail-findings-list {
+  display: grid;
+  gap: 12px;
+}
+
+.detail-finding-card {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.detail-finding-title {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.detail-finding-copy {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .detail-images-grid {
   display: flex;
   flex-direction: column;
@@ -1201,6 +1382,15 @@ export default {
   color: #64748b;
   font-size: 11px;
   font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.detail-image-finding-list {
+  display: block;
+  margin-top: 6px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 

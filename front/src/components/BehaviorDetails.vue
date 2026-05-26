@@ -10,10 +10,6 @@
             Card Users ({{ selectedUsersList.length }})
           </h3>
           <h3 class="user-id" v-else>User: {{ selectedUser }}</h3>
-          <div v-if="entityInfo && (!selectedUsersList || selectedUsersList.length === 0)" class="entity-info">
-            <span class="entity-badge">Part of Entity</span>
-            <span class="entity-members">Members: {{ entityInfo.users.length }}</span>
-          </div>
         </div>
         <div class="controls">
           <button 
@@ -1402,26 +1398,6 @@ export default {
   font-size: 14px;
   color: #2d3748;
   word-break: break-all;
-}
-
-.entity-info {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.entity-badge {
-  background-color: #ebf4ff;
-  color: #3182ce;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.entity-members {
-  font-size: 12px;
-  color: #718096;
 }
 
 .controls {

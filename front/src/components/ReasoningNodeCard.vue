@@ -75,10 +75,22 @@ export default {
       return this.hidePatchLabel
     },
     evidenceImages() {
-      return Array.isArray(this.node.evidenceImages) ? this.node.evidenceImages : []
+      return Array.isArray(this.node.displayEvidenceImages)
+        ? this.node.displayEvidenceImages
+        : Array.isArray(this.node.evidenceImages)
+          ? this.node.evidenceImages
+          : []
+    },
+    isSynthesisFinding() {
+      if (this.node.type !== 'Finding') return false
+      const children = Array.isArray(this.node.children) ? this.node.children : []
+      return children.some((child) => child.type === 'Finding')
     },
     showThumbnails() {
-      return this.evidenceImages.length > 0 && !this.collapsed
+      return this.node.type === 'Finding'
+        && !this.isSynthesisFinding
+        && this.evidenceImages.length > 0
+        && !this.collapsed
     },
     visibleEvidenceImages() {
       return this.evidenceImages.slice(0, 3)
