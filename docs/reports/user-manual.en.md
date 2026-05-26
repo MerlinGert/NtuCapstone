@@ -157,6 +157,8 @@ The floating Codex Chat sidebar lets you ask the agent to inspect the current se
 
 Chat history and generated artifacts are shared at the session level. The agent prompt distinguishes three kinds of context: the shared canonical trace, the human current state, and the agent's private exploratory state. Agent visual exploration should use the Agent Workspace and should not append to the human action trace unless you explicitly ask for durable artifacts or reasoning patches.
 
+Codex SDK network access is enabled by default for the chat agent so it can reach the local ManiScope services and fetch external references when an investigation needs them. For restricted offline runs, start the bridge with `CODEX_NETWORK_ACCESS=false`.
+
 The Codex Chat panel is floating. Drag its header to move it, or drag the lower corners to resize it. The panel keeps its local position and size in the browser.
 
 During an agent turn, Thinking and Agent Activity appear above the assistant response. When the turn completes, these sections collapse, while the latest activity remains visible as a compact status card.

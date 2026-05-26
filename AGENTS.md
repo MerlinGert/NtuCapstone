@@ -30,7 +30,7 @@ The frontend dev server is configured in `front/vite.config.js` to bind `127.0.0
 
 The backend direct-run default in `front/server/main.py` is `127.0.0.1:8099`, overridable with `MANISCOPE_BACKEND_HOST` and `MANISCOPE_BACKEND_PORT`.
 
-The Codex bridge default in `front/codex-bridge/server.mjs` is `8787`, overridable with `CODEX_BRIDGE_PORT`. The backend chat service defaults to `http://127.0.0.1:8787`, overridable with `CODEX_BRIDGE_URL`.
+The Codex bridge default in `front/codex-bridge/server.mjs` is `8787`, overridable with `CODEX_BRIDGE_PORT`. Codex SDK network access is enabled by default for ManiScope chat agents; set `CODEX_NETWORK_ACCESS=false` before `bun run codex-bridge` only when a restricted offline run is required. The backend chat service defaults to `http://127.0.0.1:8787`, overridable with `CODEX_BRIDGE_URL`.
 
 ## Agent Visualization Helper
 

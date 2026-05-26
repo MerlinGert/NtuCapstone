@@ -157,6 +157,8 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 聊天历史和生成的 artifacts 在会话层级共享。智能体提示词会区分三类上下文：共享的 canonical trace、人的当前状态，以及智能体私有的探索状态。智能体的可视探索应使用 Agent Workspace，并且不应追加到人的动作 trace，除非你明确要求生成持久 artifacts 或 reasoning patches。
 
+Codex SDK 的网络访问默认对聊天智能体开启，因此它可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。对于受限的离线运行，可以用 `CODEX_NETWORK_ACCESS=false` 启动 bridge。
+
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
 
 在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。回合完成后，这些区域会折叠，但最新一条活动会以紧凑状态卡的形式保留可见。
