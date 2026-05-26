@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-05-25.2"
+TOOL_VERSION = "2026-05-26.1"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
 TRACE_ANALYSIS_TOOLS_DIR_NAME = "trace_analysis_tools"
 BASE_DIR = Path(__file__).resolve().parent

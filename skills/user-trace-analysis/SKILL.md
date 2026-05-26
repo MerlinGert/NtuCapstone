@@ -187,7 +187,7 @@ Map the spaces with these reasoning edges:
 ```text
 Intention motivates Action Space unit
 Action Space unit produces Finding Space output
-Finding Space output supports, refines, or contradicts Intention
+Finding Space output answers an Analytic Question or supports, refines, or contradicts higher-level reasoning
 ```
 
 Use same-scope mappings when possible:
@@ -234,6 +234,7 @@ Use this relation taxonomy in `reasoning-graph.json`:
 |---|---|---|
 | `motivates` | Intention -> Action Space unit | A Task, Analytic Question, or Hypothesis explains why an Interaction, Analytic Activity, or Investigation Strategy happened. |
 | `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding. |
+| `answers` | Finding Space output -> Analytic Question | A Finding directly answers, partially answers, bounds, or caveats an Analytic Question. |
 | `supports` | Finding Space output -> Finding Space output or Intention | A Finding strengthens another Finding, a Task interpretation, an Analytic Question, or a Hypothesis. |
 | `refines` | Finding Space output -> Intention | A Finding changes or narrows the intention. |
 | `contradicts` | Finding Space output -> Intention | A Finding weakens or falsifies the intention. |
@@ -247,6 +248,8 @@ Every Interaction node in `reasoning-graph.json` should include `salience`:
 - `low`: logged but weakly relevant, such as incidental hover, scroll, or layout navigation.
 
 The User Reasoning Forest must use raw Interaction leaves by default. Do not replace Interactions with compact Step nodes in the forest unless the user explicitly asks for a compact view.
+
+Every Analytic Question should have at least one evidence-backed Finding connected with an explicit `answers` edge. Do not rely only on shared Hypothesis membership, nearby action nodes, or prose explanations for the reader to infer the answer. If the trace does not provide enough evidence to answer an Analytic Question, add a caveated Finding such as "the trace does not provide enough evidence to answer ..." and mark the missing support as a Reasoning Gap in the Recommendation Plan.
 
 ### Recommendation and Follow-up Lifecycle
 
@@ -652,7 +655,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 
 - `version`, `trace`, `nodes`, `edges`, and `roots`.
 - One canonical node for every Interaction, Task, Analytic Question, Analytic Activity, Finding, Hypothesis, and Investigation Strategy used in the trace-step map.
-- Relation types limited to `motivates`, `produces`, `supports`, `refines`, `contradicts`, `contains`, and `derived_from`.
+- Relation types limited to `motivates`, `produces`, `answers`, `supports`, `refines`, `contradicts`, `contains`, and `derived_from`.
 - Every Interaction node must include `interactionType` and `salience`.
 - Every Analytic Activity node must include `activityType`.
 - Every node should include provenance such as action indices, annotation indices, screenshots, local data checks, or rendered visual evidence.
@@ -704,6 +707,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - In `trace-step-map.md`, high-level claims must be connected to multiple supporting steps unless the rationale explains otherwise.
 - In `trace-step-map.md`, graph edges should represent reasoning dependencies, not just chronological order.
 - `reasoning-graph.json` must validate with `scripts/reasoning_graph_to_forest.py`.
+- Every `AnalyticQuestion` must have at least one incoming `answers` edge from a `Finding`.
 - Every Interaction node in `reasoning-graph.json` must have `salience`.
 - Every `user-reasoning-forest.md` tree must be rooted at one Hypothesis.
 - The User Reasoning Forest must preserve raw Interaction leaves by default.

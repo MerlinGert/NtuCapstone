@@ -46,6 +46,16 @@
       "explanation": "The local same-direction cohort finding is synthesized with K-line alignment into a higher-level coordination finding."
     },
     {
+      "id": "AQ1",
+      "kind": "AnalyticQuestion",
+      "space": "Intention",
+      "scope": "Mid",
+      "label": "Does the clicked cohort show coordinated behavior?",
+      "provenance": ["inference:card click and user annotation"],
+      "confidence": "Strong inference",
+      "explanation": "The user's card inspection raises a bounded question about whether the selected cohort behaves together in the marked time window."
+    },
+    {
       "id": "H1",
       "kind": "Hypothesis",
       "space": "Intention",
@@ -77,9 +87,21 @@
     },
     {
       "source": "F2",
+      "target": "AQ1",
+      "relation": "answers",
+      "rationale": "The synthesized cohort finding directly answers the coordination question."
+    },
+    {
+      "source": "F2",
       "target": "H1",
       "relation": "supports",
       "rationale": "The coordination finding supports the price-activity hypothesis."
+    },
+    {
+      "source": "H1",
+      "target": "AQ1",
+      "relation": "contains",
+      "rationale": "The cohort-coordination question is part of the hypothesis-centered reasoning tree."
     },
     {
       "source": "H1",

@@ -68,6 +68,15 @@
       "op": "add_edge",
       "edge": {
         "source": "F_AGENT_1",
+        "target": "AQ1",
+        "relation": "answers",
+        "rationale": "The quantified follow-up finding directly answers the cohort-coordination question."
+      }
+    },
+    {
+      "op": "add_edge",
+      "edge": {
+        "source": "F_AGENT_1",
         "target": "H1",
         "relation": "supports",
         "rationale": "The quantified cohort behavior supports the coordinated price-activity hypothesis."

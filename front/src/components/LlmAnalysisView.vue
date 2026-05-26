@@ -4,7 +4,7 @@
       <div>
         <div class="analysis-title">Reasoning Forest</div>
         <div class="analysis-subtitle">
-          User forest with agent patch nodes overlaid as supporting or qualifying evidence.
+          Findings hierarchy under top-level hypotheses, with agent patch findings overlaid.
         </div>
       </div>
       <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
@@ -15,8 +15,8 @@
 
     <div class="legend-row">
       <span class="legend-item legend-hypothesis">Hypothesis</span>
-      <span class="legend-item legend-user">User reasoning node</span>
-      <span class="legend-item legend-patch">Agent patch node</span>
+      <span class="legend-item legend-user">User finding</span>
+      <span class="legend-item legend-patch">Agent patch finding</span>
     </div>
 
     <div v-if="loading" class="empty-state">Loading LLM analysis artifacts...</div>
@@ -122,10 +122,10 @@ export default {
         for (const tree of this.userForest.trees) {
           if (tree?.root) existingRootIds.add(tree.root)
         }
-        return [
+        return this.projectReasoningForest([
           ...userTrees,
           ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
-        ]
+        ])
       }
       if (!Array.isArray(this.userForest.roots)) return []
       const userNodes = this.userForest.nodes && typeof this.userForest.nodes === 'object'
@@ -144,10 +144,10 @@ export default {
         const id = typeof root === 'string' ? root : root?.id
         if (id) existingRootIds.add(id)
       }
-      return [
+      return this.projectReasoningForest([
         ...userTrees,
         ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
-      ]
+      ])
     },
     artifactSummary() {
       const current = this.manifest?.current || {}
@@ -310,6 +310,56 @@ export default {
       return name === 'user-reasoning-forest.json'
         || name === 'reasoning-graph-patch.json'
         || /^reasoning-graph-patch-[^.]+\.json$/.test(name)
+    },
+    projectReasoningForest(trees) {
+      return trees
+        .flatMap((tree) => this.projectReasoningNode(tree).nodes)
+        .filter(Boolean)
+    },
+    projectReasoningNode(node) {
+      if (!node) return { nodes: [], liftedEvidenceImages: [] }
+      const childResults = (Array.isArray(node.children) ? node.children : [])
+        .map((child) => this.projectReasoningNode(child))
+      const visibleChildren = childResults.flatMap((result) => result.nodes)
+      const liftedChildImages = this.mergeEvidenceImages(
+        ...childResults.map((result) => result.liftedEvidenceImages),
+      )
+      const ownImages = Array.isArray(node.evidenceImages) ? node.evidenceImages : []
+
+      if (this.isVisibleReasoningNode(node)) {
+        return {
+          nodes: [
+            {
+              ...node,
+              children: visibleChildren,
+              evidenceImages: this.mergeEvidenceImages(ownImages, liftedChildImages),
+            },
+          ],
+          liftedEvidenceImages: [],
+        }
+      }
+
+      return {
+        nodes: visibleChildren,
+        liftedEvidenceImages: this.mergeEvidenceImages(ownImages, liftedChildImages),
+      }
+    },
+    isVisibleReasoningNode(node) {
+      const type = this.nodeType(node)
+      return type === 'Hypothesis' || type === 'Finding'
+    },
+    mergeEvidenceImages(...imageGroups) {
+      const merged = []
+      const seen = new Set()
+      for (const group of imageGroups) {
+        if (!Array.isArray(group)) continue
+        for (const image of group) {
+          if (!image?.url || seen.has(image.url)) continue
+          seen.add(image.url)
+          merged.push(image)
+        }
+      }
+      return merged
     },
     normalizedPatchGraph() {
       if (Array.isArray(this.graphPatch?.nodes) || Array.isArray(this.graphPatch?.edges)) {

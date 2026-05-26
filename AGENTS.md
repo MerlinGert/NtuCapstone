@@ -60,7 +60,7 @@ python3 trace_analysis_tools/scripts/apply_reasoning_graph_patch.py \
   --forest-md-out artifacts/augmented-reasoning-forest.md
 ```
 
-The trace-analysis contract is graph-first: create `reasoning-graph.json` as the canonical source of truth, validate it with the session-local script, and mechanically generate `user-reasoning-forest.json` and `.md`. Do not manually author generated forest files. User-authored claim annotations should appear as `Finding` nodes in `reasoning-graph.json`; agent follow-up evidence should be added through `reasoning-graph-patch.json` and then regenerated into augmented forests.
+The trace-analysis contract is graph-first: create `reasoning-graph.json` as the canonical source of truth, validate it with the session-local script, and mechanically generate `user-reasoning-forest.json` and `.md`. Do not manually author generated forest files. User-authored claim annotations should appear as `Finding` nodes in `reasoning-graph.json`. Every `AnalyticQuestion` should have explicit answer Findings connected with `answers` edges from `Finding` to `AnalyticQuestion`; do not rely only on nearby activities or shared hypotheses to imply the answer. Agent follow-up evidence should be added through `reasoning-graph-patch.json` and then regenerated into augmented forests.
 
 ## Interaction Requirements
 

@@ -110,6 +110,7 @@ Allowed relations:
 |---|---|---|
 | `motivates` | Intention -> Action Space unit | A Task, Analytic Question, or Hypothesis explains why an Interaction, Analytic Activity, or Investigation Strategy happened. |
 | `produces` | Action Space unit -> Finding Space output | An Interaction, Analytic Activity, or Investigation Strategy generated a Finding. |
+| `answers` | Finding Space output -> Analytic Question | A Finding directly answers, partially answers, bounds, or caveats an Analytic Question. |
 | `supports` | Finding Space output -> Finding Space output or Intention | A Finding strengthens another Finding, a Task interpretation, an Analytic Question, or a Hypothesis. |
 | `refines` | Finding Space output -> Intention | A Finding changes or narrows the intention. |
 | `contradicts` | Finding Space output -> Intention | A Finding weakens or falsifies the intention. |
@@ -139,6 +140,7 @@ The transformer converts relations to child -> parent tree edges as follows:
 | Source relation | Tree child | Tree parent |
 |---|---|---|
 | `produces` | edge source | edge target |
+| `answers` | edge source | edge target |
 | `supports` | edge source | edge target |
 | `refines` | edge source | edge target |
 | `contradicts` | edge source | edge target |
@@ -154,6 +156,8 @@ Shared canonical nodes are duplicated mechanically. Each tree node instance must
 - `canonicalId`: original node ID from `reasoning-graph.json`.
 
 The forest must preserve raw Interaction leaves by default. If a compact Step view is also useful, keep it in `trace-step-map.md`, not as a replacement for Interaction leaves in the User Reasoning Forest.
+
+Every `AnalyticQuestion` should have at least one incoming `answers` edge from a `Finding`. If the trace only yields a partial or uncertain answer, encode that caveat in the Finding's label, confidence, `explanation`, and `reasoningRole`. If the trace does not answer the question at all, create a clearly unresolved Finding and mark the missing evidence as a Reasoning Gap in the Recommendation Plan.
 
 ## Validation Expectations
 
@@ -178,6 +182,7 @@ The script should fail if:
 - an edge is a self-edge,
 - a relation is unknown,
 - a relation points in the wrong direction for its type,
+- an Analytic Question has no incoming `answers` edge from a Finding,
 - an edge lacks a non-empty `rationale`,
 - an Interaction lacks `salience`,
 - an Interaction lacks `interactionType`,
