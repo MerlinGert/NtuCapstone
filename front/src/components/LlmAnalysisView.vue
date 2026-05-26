@@ -138,7 +138,7 @@ export default {
         return this.projectReasoningForest([
           ...userTrees,
           ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
-        ]
+        ])
           .map((tree) => this.extractHypothesisTree(tree))
           .filter(Boolean)
       }
@@ -1013,10 +1013,16 @@ export default {
   color: #334155;
 }
 
-.legend-finding {
+.legend-user {
   background: #ecfeef;
   border-color: #9ae6b4;
   color: #166534;
+}
+
+.legend-patch {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
 }
 
 .forest-grid {

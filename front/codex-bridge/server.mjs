@@ -491,10 +491,10 @@ Narrative style for multi-agent outputs and graph node text:
   1. What is happening.
   2. What visual or quantitative pattern supports it.
   3. Why that pattern matters for the broader reasoning path.
-- For `explanation`, describe the story in concrete terms: actors, sequence, timing, contrast, and likely role. Make it understandable without mentioning internal analysis machinery.
-- For `evidenceSummary`, describe visible or measured evidence with GUI-grounded language such as cluster shape, card timing, repeated transfers, synchronized buys, exits, holding patterns, or alignment between behavior and price movement.
-- For `reasoningRole`, state the reasoning contribution in plain language, such as "This finding anchors the start of the suspected pump phase" or "This narrows the hypothesis from broad coordination to a smaller leading cohort."
-- Keep labels short and claim-oriented. Put nuance and caveats in `explanation` or `evidenceSummary`, not in verbose labels.
+- For \`explanation\`, describe the story in concrete terms: actors, sequence, timing, contrast, and likely role. Make it understandable without mentioning internal analysis machinery.
+- For \`evidenceSummary\`, describe visible or measured evidence with GUI-grounded language such as cluster shape, card timing, repeated transfers, synchronized buys, exits, holding patterns, or alignment between behavior and price movement.
+- For \`reasoningRole\`, state the reasoning contribution in plain language, such as "This finding anchors the start of the suspected pump phase" or "This narrows the hypothesis from broad coordination to a smaller leading cohort."
+- Keep labels short and claim-oriented. Put nuance and caveats in \`explanation\` or \`evidenceSummary\`, not in verbose labels.
 - Avoid meta filler such as "this analysis suggests", "the above image shows", or "based on the LLM reasoning". Replace it with direct statements about the observed pattern.
 - When uncertainty exists, express it as an evidence caveat tied to the story, for example "The timing lines up visually, but exact overlap still needs transaction-level validation."
 
