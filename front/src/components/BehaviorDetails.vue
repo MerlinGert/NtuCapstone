@@ -76,6 +76,86 @@
           No behavior data available for this user and its relations.
         </div>
         <div v-else class="behavior-list" ref="chartContainer" style="position: relative;">
+          <button
+            class="legend-toggle-btn"
+            type="button"
+            :aria-expanded="showLegend ? 'true' : 'false'"
+            aria-label="Toggle legend"
+            @click="showLegend = !showLegend"
+          >
+            <span class="legend-toggle-glyph" aria-hidden="true">i</span>
+          </button>
+          <div v-if="showLegend" class="behavior-legend">
+            <div class="behavior-legend-title">Legend</div>
+            <div class="behavior-legend-grid">
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-holder-row"></span>
+                </span>
+                <span>Holder Row</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-selected-holder">A..</span>
+                </span>
+                <span>Selected Holder Label</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-entity-holder">A..</span>
+                </span>
+                <span>Entity Member Label</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-related-holder">A..</span>
+                </span>
+                <span>Related Holder Label</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-balance-area"></span>
+                </span>
+                <span>Balance Area</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-earning-bar"></span>
+                </span>
+                <span>Profit / Loss Bar</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-transfer-line"></span>
+                </span>
+                <span>Transfer Line</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-transfer-dot"></span>
+                </span>
+                <span>Transfer Event</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-trade-dot legend-buy-dot"></span>
+                </span>
+                <span>Buy Event</span>
+              </div>
+              <div class="behavior-legend-item">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-trade-dot legend-sell-dot"></span>
+                </span>
+                <span>Sell Event</span>
+              </div>
+              <div class="behavior-legend-item behavior-legend-item-wide">
+                <span class="behavior-legend-swatch">
+                  <span class="legend-manipulation-box"></span>
+                </span>
+                <span>Manipulation Highlight Box</span>
+              </div>
+            </div>
+          </div>
           <!-- The D3 chart will be drawn here -->
           <div ref="tooltip" class="custom-tooltip" style="opacity: 0; display: none;"></div>
         </div>
@@ -141,6 +221,7 @@ export default {
       showManipulationBoxes: true,
       showRelatedUsers: false,
       useSequentialTime: false, // New property for Sequential Time
+      showLegend: false,
       // ezio: snapshot state
       showSnapshot: false,
       snapshotPayload: null,
@@ -1469,6 +1550,185 @@ input:checked + .slider:before {
 .behavior-list {
   height: 100%;
   overflow: hidden;
+}
+
+.legend-toggle-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #475569;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.legend-toggle-btn:hover {
+  background: #ffffff;
+  color: #334155;
+  border-color: #94a3b8;
+}
+
+.legend-toggle-glyph {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.behavior-legend {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  z-index: 6;
+  min-width: 260px;
+  max-width: 360px;
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.behavior-legend-title {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.behavior-legend-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+}
+
+.behavior-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.behavior-legend-item-wide {
+  grid-column: 1 / -1;
+}
+
+.behavior-legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 16px;
+  flex: 0 0 22px;
+}
+
+.legend-holder-row {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.legend-selected-holder,
+.legend-entity-holder,
+.legend-related-holder {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.legend-selected-holder {
+  color: #2d3748;
+}
+
+.legend-entity-holder {
+  color: #3182ce;
+}
+
+.legend-related-holder {
+  color: #718096;
+}
+
+.legend-balance-area {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  background: rgba(144, 205, 244, 0.75);
+  clip-path: polygon(0 100%, 0 55%, 45% 35%, 100% 0, 100% 100%);
+}
+
+.legend-earning-bar {
+  display: inline-block;
+  width: 12px;
+  height: 14px;
+  background: linear-gradient(180deg, #68d391 0%, #68d391 52%, #fc8181 52%, #fc8181 100%);
+  border-radius: 2px;
+}
+
+.legend-transfer-line {
+  position: relative;
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid #a0aec0;
+}
+
+.legend-transfer-line::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid #a0aec0;
+}
+
+.legend-transfer-dot,
+.legend-trade-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.legend-transfer-dot {
+  background: #a0aec0;
+  border: 1px solid #7c8aa0;
+}
+
+.legend-buy-dot {
+  background: #4299e1;
+  border: 1px solid #2b6cb0;
+}
+
+.legend-sell-dot {
+  background: #ed64a6;
+  border: 1px solid #d53f8c;
+}
+
+.legend-manipulation-box {
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  border-radius: 4px;
+  background: rgba(255, 0, 0, 0.08);
+  border: 1px solid rgba(255, 0, 0, 0.45);
 }
 
 .debug-data {

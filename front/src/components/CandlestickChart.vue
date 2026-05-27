@@ -40,6 +40,84 @@
     </div>
     
     <div class="candlestick-wrap" ref="wrap">
+      <button
+        class="legend-toggle-btn"
+        type="button"
+        :aria-expanded="showLegend ? 'true' : 'false'"
+        aria-label="Toggle legend"
+        @click="showLegend = !showLegend"
+      >
+        <span class="legend-toggle-glyph" aria-hidden="true">i</span>
+      </button>
+      <div v-if="showLegend" class="kline-legend">
+        <div class="kline-legend-title">Legend</div>
+        <div class="kline-legend-grid">
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-candle legend-bull"></span>
+            </span>
+            <span>Bull Candle</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-candle legend-bear"></span>
+            </span>
+            <span>Bear Candle</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-volume-bar"></span>
+            </span>
+            <span>Volume Bar</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-mask"></span>
+            </span>
+            <span>Manipulation Highlight</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-card legend-card-top"></span>
+            </span>
+            <span>Round Trip Card</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-card legend-card-bottom"></span>
+            </span>
+            <span>Same Direction Card</span>
+          </div>
+          <div class="kline-legend-section">Card Mini View</div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-user-row"></span>
+            </span>
+            <span>Holder Row</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-time-axis">
+                <span class="legend-time-axis-dot"></span>
+              </span>
+            </span>
+            <span>Time Position</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-event-dot legend-buy-dot"></span>
+            </span>
+            <span>Buy Event</span>
+          </div>
+          <div class="kline-legend-item">
+            <span class="kline-legend-swatch">
+              <span class="legend-event-dot legend-sell-dot"></span>
+            </span>
+            <span>Sell Event</span>
+          </div>
+          <div class="kline-legend-note">Within each card, event dot size indicates trade amount.</div>
+        </div>
+      </div>
       <!-- Overlay SVG for connection bands -->
       <svg ref="bandsOverlay" class="bands-overlay"></svg>
 
@@ -153,6 +231,7 @@ export default {
       // ezio: snapshot state
       showSnapshot: false,
       snapshotPayload: null,
+      showLegend: false,
     }
   },
   computed: {
@@ -1515,6 +1594,203 @@ export default {
   flex-direction: column;
   justify-content: center;
   overflow: hidden;
+}
+
+.legend-toggle-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #475569;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.legend-toggle-btn:hover {
+  background: #ffffff;
+  color: #334155;
+  border-color: #94a3b8;
+}
+
+.legend-toggle-glyph {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.kline-legend {
+  position: absolute;
+  top: 44px;
+  left: 12px;
+  z-index: 7;
+  min-width: 250px;
+  max-width: 330px;
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.kline-legend-title {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.kline-legend-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+}
+
+.kline-legend-section,
+.kline-legend-note {
+  grid-column: 1 / -1;
+}
+
+.kline-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.kline-legend-section {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.kline-legend-note {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.kline-legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 16px;
+  flex: 0 0 22px;
+}
+
+.legend-candle {
+  display: inline-block;
+  width: 10px;
+  height: 14px;
+  border: 1px solid transparent;
+}
+
+.legend-bull {
+  background: #26a69a;
+  border-color: #26a69a;
+}
+
+.legend-bear {
+  background: #ef5350;
+  border-color: #ef5350;
+}
+
+.legend-volume-bar {
+  display: inline-block;
+  width: 12px;
+  height: 14px;
+  border-radius: 2px 2px 0 0;
+  background: #78909c;
+}
+
+.legend-mask {
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  border-radius: 3px;
+  background: rgba(100, 150, 255, 0.18);
+  border: 1px solid rgba(100, 150, 255, 0.25);
+}
+
+.legend-card {
+  display: inline-block;
+  width: 18px;
+  height: 12px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
+.legend-card-top {
+  box-shadow: inset 0 3px 0 0 rgba(38, 166, 154, 0.22);
+}
+
+.legend-card-bottom {
+  box-shadow: inset 0 -3px 0 0 rgba(239, 83, 80, 0.22);
+}
+
+.legend-user-row {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.legend-time-axis {
+  position: relative;
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.legend-time-axis-dot {
+  position: absolute;
+  top: -3px;
+  left: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.legend-event-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  opacity: 0.65;
+  border: 1px solid transparent;
+}
+
+.legend-buy-dot {
+  background: #4299e1;
+  border-color: #2b6cb0;
+}
+
+.legend-sell-dot {
+  background: #ed64a6;
+  border-color: #d53f8c;
 }
 
 .bands-overlay {

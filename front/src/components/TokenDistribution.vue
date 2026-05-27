@@ -33,6 +33,71 @@
         <div style="flex:1;position:relative;overflow:hidden;height:0;min-height:0;" ref="chart_container">
             <!-- ezio: data-snapshot-target marks the main chart SVG for viewSnapshot capture -->
             <svg class="tokenDistribution" data-snapshot-target></svg>
+            <button
+                class="legend-toggle-btn"
+                type="button"
+                :aria-expanded="showLegend ? 'true' : 'false'"
+                aria-label="Toggle legend"
+                @click="showLegend = !showLegend"
+            >
+                <span class="legend-toggle-glyph" aria-hidden="true">i</span>
+            </button>
+            <div v-if="showLegend" class="token-legend">
+                <div class="token-legend-title">Legend</div>
+                <div class="token-legend-grid">
+                    <div class="token-legend-item">
+                        <span class="token-legend-swatch">
+                            <span class="legend-circle legend-main-user"></span>
+                        </span>
+                        <span>Main Holder</span>
+                    </div>
+                    <div class="token-legend-item">
+                        <span class="token-legend-swatch">
+                            <span class="legend-circle legend-related-user"></span>
+                        </span>
+                        <span>Related Holder</span>
+                    </div>
+                    <div class="token-legend-item">
+                        <span class="token-legend-swatch">
+                            <span class="legend-circle legend-suspicious-user"></span>
+                        </span>
+                        <span>Suspicious Holder</span>
+                    </div>
+                    <div class="token-legend-item">
+                        <span class="token-legend-swatch">
+                            <span class="legend-circle legend-entity-group"></span>
+                        </span>
+                        <span>Entity Group</span>
+                    </div>
+                    <div class="token-legend-item">
+                        <span class="token-legend-swatch">
+                            <span class="legend-line legend-link-line"></span>
+                        </span>
+                        <span>Link Relation</span>
+                    </div>
+                    <div class="token-legend-item">
+                        <span class="token-legend-swatch">
+                            <span class="legend-line legend-entity-line"></span>
+                        </span>
+                        <span>Entity Relation</span>
+                    </div>
+                    <div class="token-legend-item token-legend-item-wide">
+                        <span class="token-legend-swatch">
+                            <span class="legend-ring"></span>
+                        </span>
+                        <span>Outer Ring: Others / related-holder zone</span>
+                    </div>
+                    <div class="token-legend-scale">
+                        <div class="token-legend-scale-label">Node Color: balance mapping</div>
+                        <div class="token-legend-scale-bar" :style="nodeColorLegendStyle"></div>
+                        <div class="token-legend-scale-range">
+                            <span>{{ formattedLegendNodeMin }}</span>
+                            <span>{{ formattedLegendNodeMax }}</span>
+                        </div>
+                    </div>
+                    <div class="token-legend-note">Bubble size indicates balance.</div>
+                </div>
+            </div>
             <div v-if="loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">
                 Loading data...
             </div>
@@ -79,6 +144,7 @@ export default {
       showSnapshot: false,
       snapshotPayload: null,
       showLinks: true, // Controls visibility of links
+      showLegend: false,
       // ezio: track hovered node for snapshot preservation
       hoveredNode: null,
     }
@@ -151,6 +217,42 @@ export default {
         ? this.snapshotData.time.replace(' UTC', '')
         : 'Unknown Time'
     },
+    legendNodeValues() {
+      const values = []
+      const balances = this.snapshotData?.balances
+      if (balances?.users) {
+        Object.entries(balances.users).forEach(([owner, balance]) => {
+          if (owner !== 'Others' && balance > 0) values.push(balance)
+        })
+      }
+      if (balances?.related_users) {
+        Object.values(balances.related_users).forEach((balance) => {
+          if (balance > 0) values.push(balance)
+        })
+      }
+      const max = values.length > 0 ? d3.max(values) : 0
+      return {
+        min: 0,
+        max: Number.isFinite(max) ? max : 0,
+      }
+    },
+    nodeColorLegendStyle() {
+      return {
+        background: `linear-gradient(90deg,
+          ${d3.interpolateBlues(0)} 0%,
+          ${d3.interpolateBlues(0.2)} 20%,
+          ${d3.interpolateBlues(0.4)} 40%,
+          ${d3.interpolateBlues(0.6)} 60%,
+          ${d3.interpolateBlues(0.8)} 80%,
+          ${d3.interpolateBlues(1)} 100%)`,
+      }
+    },
+    formattedLegendNodeMin() {
+      return this.formatLegendValue(this.legendNodeValues.min)
+    },
+    formattedLegendNodeMax() {
+      return this.formatLegendValue(this.legendNodeValues.max)
+    },
     detectedEntities() {
       return this.entityDetectionResults || []
     },
@@ -166,6 +268,15 @@ export default {
     window.removeEventListener('resize', this.setSvg)
   },
   methods: {
+    formatLegendValue(value) {
+      if (!Number.isFinite(value)) return '0'
+      if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`
+      if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
+      if (value >= 100) return value.toFixed(0)
+      if (value >= 1) return value.toFixed(2)
+      if (value === 0) return '0'
+      return value.toPrecision(2)
+    },
     onScaleChange() {
       this.drawChart()
       this.$emit('log-action', 'scale_change', { scaleFactor: this.scaleFactor })
@@ -1228,6 +1339,181 @@ export default {
 .tokenDistribution {
     width: 100%;
     height: 100%;
+}
+
+.token-legend {
+  position: absolute;
+  left: 12px;
+  top: 44px;
+  z-index: 6;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.legend-toggle-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #475569;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.legend-toggle-btn:hover {
+  background: #ffffff;
+  color: #334155;
+  border-color: #94a3b8;
+}
+
+.legend-toggle-glyph {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.token-legend-title {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.token-legend-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+}
+
+.token-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.token-legend-item-wide,
+.token-legend-scale,
+.token-legend-note {
+  grid-column: 1 / -1;
+}
+
+.token-legend-scale {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.token-legend-scale-label {
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.token-legend-scale-bar {
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.token-legend-scale-range {
+  display: flex;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.token-legend-note {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.token-legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 16px;
+  flex: 0 0 22px;
+}
+
+.legend-circle {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid #5976ba;
+  background: #90cdf4;
+}
+
+.legend-main-user {
+  opacity: 0.6;
+}
+
+.legend-related-user {
+  opacity: 0.3;
+}
+
+.legend-suspicious-user {
+  opacity: 0.6;
+  border-color: #ff0000;
+}
+
+.legend-entity-group {
+  width: 14px;
+  height: 14px;
+  background: transparent;
+  border-color: #ff9800;
+  border-style: dashed;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 2px solid #999999;
+}
+
+.legend-link-line {
+  opacity: 0.7;
+}
+
+.legend-entity-line {
+  border-top-color: #ff9800;
+  border-top-style: dashed;
+}
+
+.legend-ring {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(227, 242, 253, 0.7);
+  border: 1px solid rgba(144, 205, 244, 0.9);
 }
 
 .toggle-switch {
