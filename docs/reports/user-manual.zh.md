@@ -161,11 +161,13 @@ Codex SDK 的网络访问默认对聊天智能体开启，因此它可以访问�
 
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
 
-在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。回合完成后，这些区域会折叠，但最新一条活动会以紧凑状态卡的形式保留可见。
+在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。Agent Activity 默认折叠，只保留最新一条活动作为紧凑状态卡可见；你可以展开查看完整活动流。回合完成后，这些区域会再次折叠。
 
 助手回复可以包含 Markdown 文本、生成的 artifact、JSON 文件、Markdown 报告和图片预览。当智能体在回复中提到本地图片、Markdown 或 JSON 路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的 artifact 根目录下，ManiScope 会通过会话 artifact 接口生成链接。有效图片会被复制到会话的 `artifacts/` 文件夹用于预览；Markdown 和 JSON 输出会显示为可下载的 artifact 链接。聊天中生成的文件通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析 artifact 则应保存到对应 trace 的 `analysis-results/` 文件夹。
 
 对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
+
+对于完整的 trace 分析，每个会话还会包含一个托管的 skeptical-review skill。可用时，智能体可以派生一个聚焦的子智能体，专门寻找削弱主要假设的负面证据、误报、良性解释或模型参数不稳定性。主智能体需要先验证这些候选负面发现，然后才会把它们作为 `contradicts`、`refines` 或 Reasoning Gap 条目加入分析 artifact。
 
 ## User Actions、Annotations、Action Tree 和 LLM Analysis
 
@@ -197,7 +199,7 @@ Action Tree 标签页把动作和标注显示为一棵可视化树。图例区�
 
 ### LLM Analysis
 
-LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载可用的 User Reasoning Forest 和 Reasoning Graph Patch JSON 文件。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 JSON 中用于追溯。回答隐藏 Analytic Question 的中层 Finding 仍会显示在 Finding 层级中；如果同一个 canonical Finding 因为隐藏节点投影而重复出现，界面会把它折叠为一个卡片，避免同一个答案在一个 Hypothesis 下重复显示。智能体生成的补丁 Finding 会显示为粉色，并挂接到它所支持、回答、限定或综合的假设或 Finding 上。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括可用的 evidence summary、patch rationale 和较大的证据图片。
+LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载 `reasoning-graph.json` 和所有可用的 `reasoning-graph-patch*.json` 文件。该标签页会在浏览器中验证 graph 和 patch，按确定顺序应用 patch，并派生出用于显示的 forest。生成的 forest JSON 或 Markdown 文件只作为可选导出，不再作为 UI 的数据源。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 graph 中用于追溯。回答隐藏 Analytic Question 的中层 Finding 仍会显示在 Finding 层级中；如果同一个 canonical Finding 因为隐藏节点投影而重复出现，界面会把它折叠为一个卡片，避免同一个答案在一个 Hypothesis 下重复显示。Finding 的来源会显示在节点标记中：用户 Finding 使用绿色 `User Finding` 标记，智能体生成的补丁 Finding 使用琥珀色 `Agent Finding` 标记。关系标记会区分支持性证据、直接回答、细化结论和反驳关系。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括它与父节点的关系、可用的 evidence summary、patch rationale 和较大的证据图片。
 
 该标签页会在打开时、点击 Refresh 时、Codex 宣布新的相关 artifact 时刷新；当标签页处于激活状态时，也会进行轻量级周期检查。后端不会启动长期文件监听器，而是在请求时扫描会话 artifacts 并返回最新识别到的文件。
 

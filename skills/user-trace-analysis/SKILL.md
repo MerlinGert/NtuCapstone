@@ -12,14 +12,14 @@ For a full trace analysis, produce all analysis artifacts inside `TRACE/analysis
 - `TRACE/analysis-results/analysis-report.md`: narrative analysis with evidence, rationale, caveats, intentions, findings, and recommendations.
 - `TRACE/analysis-results/trace-step-map.md`: traceability map linking logged Interactions and annotations to intentions, findings, and recommendations.
 - `TRACE/analysis-results/reasoning-graph.json`: canonical shared-node graph for the trace. This is the source of truth for reasoning support.
-- `TRACE/analysis-results/user-reasoning-forest.md`: readable derived forest rooted at user Hypotheses.
-- `TRACE/analysis-results/user-reasoning-forest.json`: machine-readable derived forest when using the transformer script.
+- `TRACE/analysis-results/user-reasoning-forest.md`: optional readable derived forest rooted at user Hypotheses.
+- `TRACE/analysis-results/user-reasoning-forest.json`: optional machine-readable derived forest when static exports are requested.
 - `TRACE/analysis-results/recommendation-plan-graph.json` and `TRACE/analysis-results/recommendation-plan-forest.md`: prescriptive plan artifacts for Evidence Completion and Hypothesis Expansion.
 - `TRACE/analysis-results/continued-investigation-report.md`: evidence-backed follow-up execution report.
-- `TRACE/analysis-results/reasoning-graph-patch-001.json`: follow-up evidence patch.
-- `TRACE/analysis-results/augmented-reasoning-graph.json`, `TRACE/analysis-results/augmented-reasoning-forest.json`, and `TRACE/analysis-results/augmented-reasoning-forest.md`: regenerated reasoning artifacts after applying the follow-up patch.
+- `TRACE/analysis-results/reasoning-graph-patch-*.json`: follow-up evidence patches. Use `reasoning-graph-patch.json` for main follow-up evidence and `reasoning-graph-patch-skeptical.json` for verified disconfirmation or counterevidence.
+- `TRACE/analysis-results/augmented-reasoning-graph.json`, `TRACE/analysis-results/augmented-reasoning-forest.json`, and `TRACE/analysis-results/augmented-reasoning-forest.md`: optional regenerated reasoning exports after applying follow-up patches.
 
-For the canonical graph schema, relation taxonomy, salience field, and forest transformation rules, read `references/reasoning-graph-format.md`. Use `scripts/reasoning_graph_to_forest.py` to mechanically derive `user-reasoning-forest.json` and `user-reasoning-forest.md` from `reasoning-graph.json`.
+For the canonical graph schema, relation taxonomy, salience field, and forest transformation rules, read `references/reasoning-graph-format.md`. In live ManiScope sessions, validate `reasoning-graph.json` and all `reasoning-graph-patch*.json` files with the copied TypeScript validator at `trace_analysis_tools/reasoning_graph/cli.ts`. Use the Python forest scripts only for static exports when requested.
 
 For a full trace analysis, also read:
 
@@ -27,8 +27,8 @@ For a full trace analysis, also read:
 - `references/reasoning-graph-patch-format.md`: patch format for adding agent follow-up evidence back into the canonical reasoning graph.
 - `references/follow-up-investigation-execution.md`: practical workflow for executing Recommendation Plan Forests with local data, backend endpoints, rendered ManiScope views, evidence images, and follow-up reports.
 
-Use `scripts/recommendation_plan_to_forest.py` to mechanically derive `recommendation-plan-forest.json` and `recommendation-plan-forest.md` from `recommendation-plan-graph.json`.
-Use `scripts/apply_reasoning_graph_patch.py` to apply a follow-up evidence patch to `reasoning-graph.json`, producing `augmented-reasoning-graph.json` and regenerated `augmented-reasoning-forest.md`.
+Use `scripts/recommendation_plan_to_forest.py` to mechanically derive `recommendation-plan-forest.json` and `recommendation-plan-forest.md` from `recommendation-plan-graph.json` when a readable static plan export is needed.
+Use `scripts/apply_reasoning_graph_patch.py` only when a static augmented graph or forest export is requested. The frontend derives its displayed forest directly from `reasoning-graph.json` plus all patch files.
 
 Path convention:
 
@@ -227,6 +227,7 @@ Use these terms when building traceability outputs:
 - **Follow-up Investigation Forest**: a descriptive forest for evidence produced by executing a Recommendation Plan Forest.
 - **Reasoning Graph Patch**: a machine-readable set of additions or updates that merges follow-up evidence into the canonical Reasoning Support Graph.
 - **Augmented Reasoning Forest**: the regenerated reasoning forest after applying one or more Reasoning Graph Patches.
+- **Disconfirmation Review**: a skeptical pass over major Hypotheses and high-level Findings that searches for counterevidence, false positives, benign alternatives, model-instability, or missing support. Candidate negative Findings must be verified before being integrated as `contradicts`, `refines`, or Reasoning Gap entries.
 
 Use this relation taxonomy in `reasoning-graph.json`:
 
@@ -240,6 +241,8 @@ Use this relation taxonomy in `reasoning-graph.json`:
 | `contradicts` | Finding Space output -> Intention | A Finding weakens or falsifies the intention. |
 | `contains` | Higher-level unit -> lower-level unit | A Hypothesis contains Analytic Questions, an Analytic Activity contains Interactions, or another hierarchical containment relation is useful. |
 | `derived_from` | Analyst-inferred node -> evidence node | A node was inferred from raw trace evidence, screenshots, annotations, local data, or rendered visual evidence. |
+
+Skeptical and disconfirmation evidence has a stricter relation rule. In `reasoning-graph-patch-skeptical.json`, every added `Finding` must have at least one outgoing `refines` or `contradicts` edge to the relevant Intention node. Use `refines` when evidence narrows, qualifies, or caveats a claim. Use `contradicts` when evidence weakens or falsifies a claim. Do not encode a skeptical Finding with only `supports` edges. A `supports` edge is allowed only as an additional placement or synthesis edge to a related Finding.
 
 Every Interaction node in `reasoning-graph.json` should include `salience`:
 
@@ -272,18 +275,20 @@ Required lifecycle for a full trace analysis:
 
 ```text
 analysis-results/reasoning-graph.json
-  -> user-reasoning-forest.md
+  -> validate graph
   -> recommendation-plan-graph.json
   -> recommendation-plan-forest.md
   -> agent executes recommended Interactions
   -> continued-investigation-report.md
-  -> reasoning-graph-patch-001.json
-  -> augmented-reasoning-graph.json
-  -> augmented-reasoning-forest.json
-  -> augmented-reasoning-forest.md
+  -> reasoning-graph-patch.json
+  -> reasoning-graph-patch-skeptical.json when verified counterevidence exists
+  -> validate reasoning-graph.json plus all patch files
+  -> optional static forest or augmented-graph exports when requested
 ```
 
 Do not stop after producing a Recommendation Plan Forest in a full trace analysis. Execute the plan unless the user explicitly asks for analysis-only, recommendation-only, or planning-only output.
+
+For full trace analyses, include a Disconfirmation Review before finalizing the graph and follow-up plan. If a session-local skeptical-review skill is available at `.maniscope-chat/sessions/{sessionId}/skills/maniscope-disconfirmation/SKILL.md`, a main agent should spawn a bounded subagent to read that skill and actively search for negative evidence. The subagent should report candidate negative Findings only. The main agent must verify each candidate before adding it to `reasoning-graph.json` or `reasoning-graph-patch-*.json`. Verified skeptical Findings must be encoded with `refines` or `contradicts`; `supports` alone is invalid because it makes caveats look like positive support.
 
 For **Evidence Completion Recommendations**, attach the plan to an existing Reasoning Gap. After execution, create real Interaction or Finding nodes with `actor: "agent"` and `source: "followup_investigation"`, then patch them into the original graph with `supports`, `refines`, or `contradicts` edges to the original target node.
 
@@ -552,14 +557,13 @@ Recommendation mapping:
 - Make Investigation Strategies depend on Findings that aggregate multiple Findings.
 - If the full report contains many Interactions, map only the Investigation Strategies and the most important Analytic Activities unless the user asks for an Interaction-level graph.
 
-After building `trace-step-map.md`, produce `reasoning-graph.json` using the schema in `references/reasoning-graph-format.md`. Then run:
+After building `trace-step-map.md`, produce `reasoning-graph.json` using the schema in `references/reasoning-graph-format.md`. In a live ManiScope session, validate graph artifacts with:
 
 ```bash
-python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py \
-  TRACE/analysis-results/reasoning-graph.json
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 ```
 
-The generated `user-reasoning-forest.md` should show one bottom-up reasoning support tree per Hypothesis. Duplicate shared canonical nodes mechanically so each tree node instance has at most one parent.
+For exported trace folders where the TypeScript session tool is unavailable, use the Python validator or forest script as a fallback. Static `user-reasoning-forest.md` exports, when requested, should show one bottom-up reasoning support tree per Hypothesis. Duplicate shared canonical nodes mechanically so each tree node instance has at most one parent.
 
 ### Step 7: Build the Recommendation Plan Forest
 
@@ -592,18 +596,17 @@ Execution requirements:
 - Save rendered visualization evidence as trace-local PNG files whenever a visual check supports a Finding, Hypothesis, recommendation, or patch node.
 - For every executed Hypothesis Expansion branch, either promote the proposed adjacent Hypothesis into a new evidence-backed graph root with `add_root`, or explicitly mark it rejected, deferred, or unsupported in `continued-investigation-report.md`. Do not only attach its evidence to the original Hypothesis.
 - Write `continued-investigation-report.md` with executed checks, blocked checks, evidence, Findings, and bottom line.
-- Create `reasoning-graph-patch-001.json` for all evidence-backed follow-up results. If all branches are blocked and no new evidence exists, write the report and explicitly state why no patch was produced.
-- Apply the patch and regenerate augmented artifacts whenever at least one evidence-backed follow-up node exists.
+- Create `reasoning-graph-patch.json` for main evidence-backed follow-up results. Create `reasoning-graph-patch-skeptical.json` for verified disconfirmation or counterevidence Findings. If all branches are blocked and no new evidence exists, write the report and explicitly state why no patch was produced.
+- In `reasoning-graph-patch-skeptical.json`, every added Finding must include an outgoing `refines` or `contradicts` edge. Use additional `supports` edges only to nest the skeptical Finding under the related Finding it qualifies.
+- Validate the base graph plus all patch files. Generate augmented forest exports only when requested.
 
-Patch flow:
+Patch validation flow in a live ManiScope session:
 
 ```bash
-python skills/user-trace-analysis/scripts/apply_reasoning_graph_patch.py \
-  TRACE/analysis-results/reasoning-graph.json \
-  TRACE/analysis-results/reasoning-graph-patch-001.json
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 ```
 
-The patch script writes `augmented-reasoning-graph.json`, `augmented-reasoning-forest.json`, and `augmented-reasoning-forest.md` by default. Use the patch format in `references/reasoning-graph-patch-format.md`.
+For exported trace folders outside a live session, use the same schema and relation rules. If a static augmented graph or forest is needed, use `scripts/apply_reasoning_graph_patch.py` after validation. Use the patch format in `references/reasoning-graph-patch-format.md`.
 
 ## 6. Requirements For The Deliverables
 
@@ -664,6 +667,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - `version`, `trace`, `nodes`, `edges`, and `roots`.
 - One canonical node for every Interaction, Task, Analytic Question, Analytic Activity, Finding, Hypothesis, and Investigation Strategy used in the trace-step map.
 - Relation types limited to `motivates`, `produces`, `answers`, `supports`, `refines`, `contradicts`, `contains`, and `derived_from`.
+- `reasoning-graph-patch-skeptical.json` must not contain support-only skeptical Findings. Each added Finding in that file must have an outgoing `refines` or `contradicts` edge.
 - Every Interaction node must include `interactionType` and `salience`.
 - Every Analytic Activity node must include `activityType`.
 - Every node should include provenance such as action indices, annotation indices, screenshots, local data checks, or rendered visual evidence.
@@ -682,9 +686,9 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - `recommendation-plan-forest.md`: readable plan forest. It must show Reasoning Gaps or Expansion Rationales above Investigation Strategies, Analytic Activities, Recommended Interactions, and Expected Findings.
 - `continued-investigation-report.md`: execution report for every recommendation branch, including completed checks, blocked checks, evidence, Findings, and unresolved gaps.
 - `reasoning-graph-patch-*.json`: follow-up evidence patch. New evidence nodes must include `actor`, `source`, `planRef`, `explanation`, `evidenceSummary`, `reasoningRole`, and `patchRationale`.
-- `augmented-reasoning-graph.json`: canonical reasoning graph after patch application.
-- `augmented-reasoning-forest.json`: machine-readable regenerated forest from the augmented graph.
-- `augmented-reasoning-forest.md`: regenerated forest from the augmented graph. It may include both original user evidence and agent follow-up evidence.
+- `augmented-reasoning-graph.json`: optional export of the canonical reasoning graph after patch application.
+- `augmented-reasoning-forest.json`: optional machine-readable regenerated forest from the augmented graph.
+- `augmented-reasoning-forest.md`: optional regenerated forest from the augmented graph. It may include both original user evidence and agent follow-up evidence.
 
 ### Hard requirements
 
@@ -714,15 +718,14 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - In `trace-step-map.md`, every graph node ID must also appear in a table.
 - In `trace-step-map.md`, high-level claims must be connected to multiple supporting steps unless the rationale explains otherwise.
 - In `trace-step-map.md`, graph edges should represent reasoning dependencies, not just chronological order.
-- `reasoning-graph.json` must validate with `scripts/reasoning_graph_to_forest.py`.
+- `reasoning-graph.json` and all `reasoning-graph-patch*.json` files must validate with the session-local TypeScript validator when available.
 - Every `AnalyticQuestion` must have at least one incoming `answers` edge from a mid-level `Finding`.
 - Low-level Findings should feed mid-level Findings; mid-level Findings should answer Analytic Questions; high-level Findings should synthesize mid-level Findings before supporting Hypotheses when the trace evidence allows it.
 - Every Interaction node in `reasoning-graph.json` must have `salience`.
-- Every `user-reasoning-forest.md` tree must be rooted at one Hypothesis.
-- The User Reasoning Forest must preserve raw Interaction leaves by default.
-- Shared canonical nodes should be duplicated mechanically in the forest and retain `canonicalId`.
+- Static forest exports, when produced, must be rooted at Hypotheses, preserve raw Interaction leaves by default, and duplicate shared canonical nodes mechanically while retaining `canonicalId`.
 - Recommendation Plan Forests must not present Expected Findings as evidence-backed Findings.
 - Full trace analyses must execute the Recommendation Plan Forest after generating it unless the user explicitly requested analysis-only, recommendation-only, or planning-only output.
+- Full trace analyses must include a Disconfirmation Review for major Hypotheses and high-level Findings. Prefer a skeptical subagent when available; otherwise perform a smaller skeptical pass in the main thread.
 - Follow-up evidence must be merged through `reasoning-graph-patch-*.json`, not by manually editing generated forests.
 - Agent-added follow-up nodes must include `actor`, `source`, and `planRef`.
 
@@ -779,15 +782,15 @@ Before delivering, verify:
 - External claims are not overstated.
 - The bottom line states the strongest supported conclusion and the weakest unresolved claim.
 - The trace-step map has step nodes, claim nodes, a traceability matrix, and a Mermaid graph.
-- `reasoning-graph.json` validates with `scripts/reasoning_graph_to_forest.py`.
-- `user-reasoning-forest.md` is generated from `reasoning-graph.json`, not manually edited.
+- `reasoning-graph.json` and all patch files validate with the session-local TypeScript validator when available.
+- Static forest exports, if requested, are generated from graph data and not manually edited.
 - Recommendation plans distinguish Evidence Completion from Hypothesis Expansion.
 - Expected Findings are labeled as expected-only plan targets, not evidence.
 - In a full trace analysis, the Recommendation Plan Forest has been executed, not merely written.
 - `continued-investigation-report.md` exists for a full trace analysis and covers every recommendation branch as executed or blocked.
 - For every non-blocked follow-up branch, new evidence appears in `reasoning-graph-patch-*.json` with `actor`, `source`, and `planRef`.
-- Follow-up evidence patches validate with `scripts/apply_reasoning_graph_patch.py`.
-- Augmented forests are regenerated from patched graphs, not manually edited.
+- Follow-up evidence patches validate together with `reasoning-graph.json`.
+- Augmented graph or forest exports, if requested, are regenerated from patched graphs and not manually edited.
 - Every step node includes logged Interaction or annotation evidence.
 - Every ID used in the graph also appears in the claim-node tables.
 - Mermaid syntax is simple enough to render in common Markdown viewers.

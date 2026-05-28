@@ -46,21 +46,12 @@ Every ManiScope chat session also contains a managed trace-analysis bundle at `.
 
 ```bash
 cd .maniscope-chat/sessions/{sessionId}
-python3 trace_analysis_tools/scripts/reasoning_graph_to_forest.py artifacts/reasoning-graph.json \
-  --json-out artifacts/user-reasoning-forest.json \
-  --md-out artifacts/user-reasoning-forest.md
-python3 trace_analysis_tools/scripts/recommendation_plan_to_forest.py artifacts/recommendation-plan-graph.json \
-  --json-out artifacts/recommendation-plan-forest.json \
-  --md-out artifacts/recommendation-plan-forest.md
-python3 trace_analysis_tools/scripts/apply_reasoning_graph_patch.py \
-  artifacts/reasoning-graph.json \
-  artifacts/reasoning-graph-patch.json \
-  --out artifacts/augmented-reasoning-graph.json \
-  --forest-json-out artifacts/augmented-reasoning-forest.json \
-  --forest-md-out artifacts/augmented-reasoning-forest.md
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 ```
 
-The trace-analysis contract is graph-first: create `reasoning-graph.json` as the canonical source of truth, validate it with the session-local script, and mechanically generate `user-reasoning-forest.json` and `.md`. Do not manually author generated forest files. User-authored claim annotations should appear as `Finding` nodes in `reasoning-graph.json`. Every `AnalyticQuestion` should have explicit answer Findings connected with `answers` edges from `Finding` to `AnalyticQuestion`; do not rely only on nearby activities or shared hypotheses to imply the answer. Agent follow-up evidence should be added through `reasoning-graph-patch.json` and then regenerated into augmented forests.
+The trace-analysis contract is graph-first: create `reasoning-graph.json` as the canonical source of truth, validate it with the session-local TypeScript validator, and add agent follow-up evidence through `reasoning-graph-patch*.json`. The frontend reads `reasoning-graph.json` plus all valid patch files and derives the display forest itself. Do not rely on generated forest JSON/Markdown as UI source data. User-authored claim annotations should appear as `Finding` nodes in `reasoning-graph.json`. Every `AnalyticQuestion` should have explicit mid-level answer Findings connected with `answers` edges from `Finding` to `AnalyticQuestion`; do not rely only on nearby activities or shared hypotheses to imply the answer. Main follow-up evidence should be added through `reasoning-graph-patch.json`; verified skeptical or counterevidence Findings should be added through `reasoning-graph-patch-skeptical.json`. In `reasoning-graph-patch-skeptical.json`, every added Finding must have an outgoing `refines` or `contradicts` edge. Do not encode skeptical caveats with only `supports` edges.
+
+Every ManiScope chat session also contains a managed skeptical-review skill at `.maniscope-chat/sessions/{sessionId}/skills/maniscope-disconfirmation/SKILL.md`. Use it when spawning or instructing a subagent to search for negative evidence against major Hypotheses or high-level Findings. The skeptical subagent should return candidate negative Findings and suggested `contradicts`, `refines`, or Reasoning Gap links, never `supports` as the primary skeptical relation; the main agent must verify candidates before updating graph artifacts.
 
 ## Interaction Requirements
 
