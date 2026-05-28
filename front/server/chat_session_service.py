@@ -25,20 +25,9 @@ SESSIONS_DIR = CHAT_ROOT / "sessions"
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
 EXPORT_VERSION = "1.0"
 WORKSPACE_ROLES = {"human", "agent"}
-ANALYSIS_ARTIFACT_ROLES = {
-    "userReasoningForest": {
-        "label": "User Reasoning Forest",
-        "patterns": ("user-reasoning-forest.json",),
-    },
-    "reasoningGraphPatch": {
-        "label": "Reasoning Graph Patch",
-        "patterns": (
-            "reasoning-graph-patch.json",
-            "reasoning-graph-patch-001.json",
-            "reasoning-graph-patch-*.json",
-        ),
-    },
-}
+ANALYSIS_EXPORT_SUFFIXES = {".json", ".md"}
+REASONING_GRAPH_NAME = "reasoning-graph.json"
+REASONING_GRAPH_PATCH_RE = re.compile(r"^reasoning-graph-patch(?:-.+)?\.json$")
 SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
@@ -107,6 +96,41 @@ def _analysis_artifact_info(session_id: str, path: Path, role: str, label: str, 
     }
 
 
+def _patch_sort_key(name: str) -> tuple[int, int, str]:
+    if name == "reasoning-graph-patch.json":
+        return (0, 0, name)
+    numbered = re.fullmatch(r"reasoning-graph-patch-(\d+)\.json", name)
+    if numbered:
+        return (1, int(numbered.group(1)), name)
+    if name == "reasoning-graph-patch-skeptical.json":
+        return (2, 0, name)
+    if REASONING_GRAPH_PATCH_RE.fullmatch(name):
+        return (3, 0, name)
+    return (4, 0, name)
+
+
+def _json_run_id(path: Path) -> str | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    run_id = data.get("runId")
+    return run_id if isinstance(run_id, str) and run_id.strip() else None
+
+
+def _dedupe_patch_artifacts(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen_run_ids: set[str] = set()
+    for item in sorted(items, key=lambda artifact: _patch_sort_key(artifact["name"])):
+        run_id = item.get("runId")
+        if isinstance(run_id, str) and run_id:
+            if run_id in seen_run_ids:
+                continue
+            seen_run_ids.add(run_id)
+        deduped.append(item)
+    return deduped
+
+
 def _session_scoped_file_response(
     session_dir: Path,
     directory_name: str,
@@ -153,30 +177,64 @@ def _current_artifact(items: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 def _analysis_artifact_manifest(session_id: str, session_dir: Path) -> dict[str, Any]:
     artifacts_dir = session_dir / "artifacts"
-    current: dict[str, dict[str, Any] | None] = {}
     artifacts: list[dict[str, Any]] = []
-    seen: set[tuple[str, str]] = set()
+    exports: list[dict[str, Any]] = []
 
-    for role, spec in ANALYSIS_ARTIFACT_ROLES.items():
-        role_items: list[dict[str, Any]] = []
-        for priority, pattern in enumerate(spec["patterns"]):
-            for path in artifacts_dir.glob(pattern):
-                if not path.is_file() or path.suffix.lower() != ".json":
-                    continue
-                key = (role, path.name)
-                if key in seen:
-                    continue
-                seen.add(key)
-                item = _analysis_artifact_info(session_id, path, role, spec["label"], priority)
-                role_items.append(item)
-                artifacts.append(item)
-        current[role] = _current_artifact(role_items)
+    reasoning_graph = None
+    graph_path = artifacts_dir / REASONING_GRAPH_NAME
+    if graph_path.is_file():
+        reasoning_graph = _analysis_artifact_info(
+            session_id,
+            graph_path,
+            "reasoningGraph",
+            "Reasoning Graph",
+            0,
+        )
+        artifacts.append(reasoning_graph)
 
+    patch_items: list[dict[str, Any]] = []
+    for path in artifacts_dir.glob("reasoning-graph-patch*.json"):
+        if not path.is_file() or not REASONING_GRAPH_PATCH_RE.fullmatch(path.name):
+            continue
+        item = _analysis_artifact_info(
+            session_id,
+            path,
+            "reasoningGraphPatch",
+            "Reasoning Graph Patch",
+            _patch_sort_key(path.name)[0],
+        )
+        run_id = _json_run_id(path)
+        if run_id:
+            item["runId"] = run_id
+        patch_items.append(item)
+    patches = _dedupe_patch_artifacts(patch_items)
+    artifacts.extend(patches)
+
+    source_names = {REASONING_GRAPH_NAME, *(item["name"] for item in patches)}
+    for path in sorted(artifacts_dir.iterdir() if artifacts_dir.exists() else []):
+        if not path.is_file() or path.suffix.lower() not in ANALYSIS_EXPORT_SUFFIXES:
+            continue
+        if path.name in source_names or REASONING_GRAPH_PATCH_RE.fullmatch(path.name):
+            continue
+        item = _analysis_artifact_info(session_id, path, "analysisExport", "Analysis Export", 0)
+        exports.append(item)
+        artifacts.append(item)
+
+    legacy_user_forest = next((item for item in exports if item["name"] == "user-reasoning-forest.json"), None)
+    legacy_patch = patches[0] if patches else None
     latest = _latest_artifact(artifacts)
     return {
         "sessionId": session_id,
         "artifactRoot": "artifacts",
-        "current": current,
+        "current": {
+            "reasoningGraph": reasoning_graph,
+            "patches": patches,
+            "userReasoningForest": legacy_user_forest,
+            "reasoningGraphPatch": legacy_patch,
+        },
+        "reasoningGraph": reasoning_graph,
+        "patches": patches,
+        "exports": exports,
         "artifacts": sorted(artifacts, key=lambda item: (item["role"], item["name"])),
         "latestModifiedAt": latest["modifiedAt"] if latest else None,
     }

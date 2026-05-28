@@ -26,39 +26,52 @@ def load_chat_session_service():
 
 
 class AnalysisArtifactManifestTests(unittest.TestCase):
-    def test_manifest_selects_current_reasoning_artifacts(self):
+    def test_manifest_returns_graph_and_ordered_patches(self):
         module = load_chat_session_service()
         with tempfile.TemporaryDirectory() as tmp_dir:
             session_dir = Path(tmp_dir)
             artifacts_dir = session_dir / "artifacts"
             artifacts_dir.mkdir()
 
+            graph_path = artifacts_dir / "reasoning-graph.json"
             forest_path = artifacts_dir / "user-reasoning-forest.json"
             old_patch_path = artifacts_dir / "reasoning-graph-patch-001.json"
             current_patch_path = artifacts_dir / "reasoning-graph-patch.json"
+            skeptical_patch_path = artifacts_dir / "reasoning-graph-patch-skeptical.json"
+            graph_path.write_text('{"version":1}\n', encoding="utf-8")
             forest_path.write_text('{"trees":[]}\n', encoding="utf-8")
-            old_patch_path.write_text('{"operations":[]}\n', encoding="utf-8")
-            current_patch_path.write_text('{"operations":[]}\n', encoding="utf-8")
+            old_patch_path.write_text('{"runId":"old","operations":[]}\n', encoding="utf-8")
+            current_patch_path.write_text('{"runId":"current","operations":[]}\n', encoding="utf-8")
+            skeptical_patch_path.write_text('{"runId":"skeptical","operations":[]}\n', encoding="utf-8")
             os.utime(old_patch_path, (100, 100))
             os.utime(current_patch_path, (200, 200))
+            os.utime(skeptical_patch_path, (300, 300))
 
             manifest = module._analysis_artifact_manifest("abcde", session_dir)
 
             self.assertEqual(
+                manifest["current"]["reasoningGraph"]["name"],
+                "reasoning-graph.json",
+            )
+            self.assertEqual(
+                [item["name"] for item in manifest["current"]["patches"]],
+                [
+                    "reasoning-graph-patch.json",
+                    "reasoning-graph-patch-001.json",
+                    "reasoning-graph-patch-skeptical.json",
+                ],
+            )
+            self.assertEqual(
+                manifest["current"]["patches"][0]["url"],
+                "/api/sessions/abcde/artifacts/reasoning-graph-patch.json",
+            )
+            self.assertEqual(
                 manifest["current"]["userReasoningForest"]["name"],
                 "user-reasoning-forest.json",
             )
-            self.assertEqual(
-                manifest["current"]["reasoningGraphPatch"]["name"],
-                "reasoning-graph-patch.json",
-            )
-            self.assertEqual(
-                manifest["current"]["reasoningGraphPatch"]["url"],
-                "/api/sessions/abcde/artifacts/reasoning-graph-patch.json",
-            )
-            self.assertEqual(len(manifest["artifacts"]), 3)
+            self.assertEqual(len(manifest["artifacts"]), 5)
 
-    def test_manifest_prefers_canonical_patch_over_hashed_copy(self):
+    def test_manifest_deduplicates_patch_run_ids(self):
         module = load_chat_session_service()
         with tempfile.TemporaryDirectory() as tmp_dir:
             session_dir = Path(tmp_dir)
@@ -67,16 +80,16 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
 
             canonical_path = artifacts_dir / "reasoning-graph-patch.json"
             hashed_path = artifacts_dir / "reasoning-graph-patch-001-abcdef0123456789.json"
-            canonical_path.write_text('{"operations":[]}\n', encoding="utf-8")
-            hashed_path.write_text('{"operations":[]}\n', encoding="utf-8")
+            canonical_path.write_text('{"runId":"same","operations":[]}\n', encoding="utf-8")
+            hashed_path.write_text('{"runId":"same","operations":[]}\n', encoding="utf-8")
             os.utime(canonical_path, (100, 100))
             os.utime(hashed_path, (200, 200))
 
             manifest = module._analysis_artifact_manifest("abcde", session_dir)
 
             self.assertEqual(
-                manifest["current"]["reasoningGraphPatch"]["name"],
-                "reasoning-graph-patch.json",
+                [item["name"] for item in manifest["current"]["patches"]],
+                ["reasoning-graph-patch.json"],
             )
 
     def test_manifest_falls_back_to_numbered_patch(self):
@@ -86,7 +99,7 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
             artifacts_dir = session_dir / "artifacts"
             artifacts_dir.mkdir()
             (artifacts_dir / "reasoning-graph-patch-001.json").write_text(
-                '{"operations":[]}\n',
+                '{"runId":"numbered","operations":[]}\n',
                 encoding="utf-8",
             )
 
@@ -94,8 +107,8 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
 
             self.assertIsNone(manifest["current"]["userReasoningForest"])
             self.assertEqual(
-                manifest["current"]["reasoningGraphPatch"]["name"],
-                "reasoning-graph-patch-001.json",
+                [item["name"] for item in manifest["current"]["patches"]],
+                ["reasoning-graph-patch-001.json"],
             )
 
     def test_nested_artifact_file_can_be_served(self):

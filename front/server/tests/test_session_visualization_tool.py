@@ -128,6 +128,7 @@ class SessionVisualizationToolTests(unittest.TestCase):
             exclude = (session_dir / ".git" / "info" / "exclude").read_text(encoding="utf-8")
             self.assertIn("/maniscope_visualization.py", exclude)
             self.assertIn("/trace_analysis_tools/", exclude)
+            self.assertIn("/skills/maniscope-disconfirmation/", exclude)
 
     def test_ensure_session_tools_writes_trace_analysis_bundle(self):
         service = load_session_tool_service()
@@ -145,6 +146,20 @@ class SessionVisualizationToolTests(unittest.TestCase):
             self.assertTrue((tools_dir / "references" / "reasoning-graph-format.md").exists())
             self.assertTrue((tools_dir / "references" / "recommendation-plan-format.md").exists())
             self.assertTrue((tools_dir / "references" / "reasoning-graph-patch-format.md").exists())
+            self.assertTrue((tools_dir / "reasoning_graph" / "index.ts").exists())
+            self.assertTrue((tools_dir / "reasoning_graph" / "cli.ts").exists())
+
+    def test_ensure_session_tools_writes_disconfirmation_skill(self):
+        service = load_session_tool_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            session_dir = Path(tmp_dir)
+
+            service.ensure_session_tools(session_dir, "abcde")
+
+            skill_dir = session_dir / "skills" / "maniscope-disconfirmation"
+            self.assertEqual((skill_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
+            skill_content = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn("ManiScope Disconfirmation Review", skill_content)
 
 
 if __name__ == "__main__":

@@ -2,13 +2,18 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-05-26.2"
+TOOL_VERSION = "2026-05-28.2"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
 TRACE_ANALYSIS_TOOLS_DIR_NAME = "trace_analysis_tools"
+REASONING_GRAPH_TS_DIR_NAME = "reasoning_graph"
+SESSION_SKILLS_DIR_NAME = "skills"
+DISCONFIRMATION_SKILL_NAME = "maniscope-disconfirmation"
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
 TEMPLATE_PATH = BASE_DIR / "session_tools" / VISUALIZATION_TOOL_NAME
 TRACE_ANALYSIS_SKILL_DIR = PROJECT_ROOT / "skills" / "user-trace-analysis"
+REASONING_GRAPH_TS_SOURCE_DIR = PROJECT_ROOT / "front" / "src" / "reasoning-graph"
+DISCONFIRMATION_SKILL_DIR = PROJECT_ROOT / "skills" / DISCONFIRMATION_SKILL_NAME
 TRACE_ANALYSIS_TOOL_FILES = [
     Path("scripts/reasoning_graph_to_forest.py"),
     Path("scripts/recommendation_plan_to_forest.py"),
@@ -22,6 +27,7 @@ GIT_EXCLUDE_MARKER = "# ManiScope runtime session tools"
 GIT_EXCLUDE_ENTRIES = [
     f"/{VISUALIZATION_TOOL_NAME}",
     f"/{TRACE_ANALYSIS_TOOLS_DIR_NAME}/",
+    f"/{SESSION_SKILLS_DIR_NAME}/{DISCONFIRMATION_SKILL_NAME}/",
 ]
 
 
@@ -32,6 +38,7 @@ def ensure_session_tools(session_dir: Path, session_id: str) -> None:
     if _visualization_tool_needs_update(target_path, session_id):
         target_path.write_text(content, encoding="utf-8")
     _ensure_trace_analysis_tools(session_dir)
+    _ensure_session_skills(session_dir)
     _ensure_git_exclude(session_dir)
 
 
@@ -69,6 +76,7 @@ def _ensure_trace_analysis_tools(session_dir: Path) -> None:
         target_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, target_path)
 
+    shutil.copytree(REASONING_GRAPH_TS_SOURCE_DIR, tools_dir / REASONING_GRAPH_TS_DIR_NAME)
     (tools_dir / "README.md").write_text(_trace_analysis_tools_readme(), encoding="utf-8")
     version_path.write_text(f"{TOOL_VERSION}\n", encoding="utf-8")
 
@@ -93,18 +101,31 @@ Tool version: `{TOOL_VERSION}`
 Use these tools from the session directory when creating durable trace-analysis artifacts:
 
 ```bash
-python3 trace_analysis_tools/scripts/reasoning_graph_to_forest.py artifacts/reasoning-graph.json
-python3 trace_analysis_tools/scripts/recommendation_plan_to_forest.py artifacts/recommendation-plan-graph.json
-python3 trace_analysis_tools/scripts/apply_reasoning_graph_patch.py \\
-  artifacts/reasoning-graph.json \\
-  artifacts/reasoning-graph-patch.json \\
-  --out artifacts/augmented-reasoning-graph.json \\
-  --forest-json-out artifacts/augmented-reasoning-forest.json \\
-  --forest-md-out artifacts/augmented-reasoning-forest.md
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 ```
 
-The format references copied under `trace_analysis_tools/references/` define the required graph, plan, and patch schemas.
+The TypeScript validator applies all `reasoning-graph-patch*.json` files in the same order as the frontend. The Python scripts remain available under `trace_analysis_tools/scripts/` for static Markdown/JSON exports when requested. The copied format references under `trace_analysis_tools/references/` define the graph, plan, and patch schemas.
 """
+
+
+def _ensure_session_skills(session_dir: Path) -> None:
+    skill_target = session_dir / SESSION_SKILLS_DIR_NAME / DISCONFIRMATION_SKILL_NAME
+    version_path = skill_target / "TOOL_VERSION"
+    if _session_skill_needs_update(version_path):
+        if skill_target.exists():
+            shutil.rmtree(skill_target)
+        shutil.copytree(DISCONFIRMATION_SKILL_DIR, skill_target)
+        version_path.write_text(f"{TOOL_VERSION}\n", encoding="utf-8")
+
+
+def _session_skill_needs_update(version_path: Path) -> bool:
+    if not version_path.exists():
+        return True
+    try:
+        existing = version_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return True
+    return existing != TOOL_VERSION
 
 
 def _ensure_git_exclude(session_dir: Path) -> None:
