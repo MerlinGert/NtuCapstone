@@ -943,7 +943,7 @@ export default {
           loading: true,
           activity: [],
           artifacts: [],
-          activityOpen: true,
+          activityOpen: false,
           thinkingOpen: true,
           ephemeralReasoning: '',
           createdAt: new Date().toISOString(),

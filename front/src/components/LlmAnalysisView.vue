@@ -13,10 +13,18 @@
     </div>
     <div v-if="artifactSummary" class="artifact-summary">{{ artifactSummary }}</div>
 
-    <div class="legend-row">
-      <span class="legend-item legend-hypothesis">Hypothesis</span>
-      <span class="legend-item legend-user">User finding</span>
-      <span class="legend-item legend-patch">Agent patch finding</span>
+    <div class="legend-block">
+      <div class="legend-row">
+        <span class="legend-item legend-hypothesis">Hypothesis</span>
+        <span class="legend-item legend-user">User Finding</span>
+        <span class="legend-item legend-patch">Agent Finding</span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-item relation-legend relation-supports">Supports</span>
+        <span class="legend-item relation-legend relation-answers">Answers</span>
+        <span class="legend-item relation-legend relation-refines">Refines</span>
+        <span class="legend-item relation-legend relation-contradicts">Contradicts</span>
+      </div>
     </div>
 
     <div v-if="loading" class="empty-state">Loading LLM analysis artifacts...</div>
@@ -43,7 +51,16 @@
         <div class="detail-modal" role="dialog" aria-modal="true" :aria-label="selectedNode.label">
           <div class="detail-header">
             <div class="detail-header-copy">
-              <span class="detail-type">{{ selectedNode.type }}</span>
+              <div class="detail-badges">
+                <span class="detail-type" :class="selectedNodeTypeClass">{{ selectedNodeTypeLabel }}</span>
+                <span
+                  v-if="selectedNodeRelationLabel"
+                  class="detail-relation"
+                  :class="selectedNodeRelationClass"
+                >
+                  {{ selectedNodeRelationLabel }}
+                </span>
+              </div>
               <div class="detail-title">{{ selectedNode.label }}</div>
             </div>
             <button class="detail-close" @click="closeSelectedNode">Close</button>
@@ -63,8 +80,18 @@
                     v-for="finding in selectedNodeInternalFindings"
                     :key="finding.key"
                     class="detail-finding-card"
+                    :class="finding.relationClass"
                   >
-                    <div class="detail-finding-title">{{ finding.label }}</div>
+                    <div class="detail-finding-header">
+                      <span
+                        v-if="finding.relationLabel"
+                        class="detail-finding-relation"
+                        :class="finding.relationClass"
+                      >
+                        {{ finding.relationLabel }}
+                      </span>
+                      <div class="detail-finding-title">{{ finding.label }}</div>
+                    </div>
                     <p v-if="finding.explanation" class="detail-finding-copy">{{ finding.explanation }}</p>
                     <p v-if="finding.evidenceSummary" class="detail-finding-copy">
                       {{ finding.evidenceSummary }}
@@ -102,6 +129,12 @@
 
 <script>
 import ReasoningNodeCard from './ReasoningNodeCard.vue'
+import {
+  applyReasoningPatches,
+  orderPatchLayers,
+  projectGraphToDisplayForest,
+  validateReasoningGraph,
+} from '../reasoning-graph'
 
 const ARTIFACT_UPDATE_EVENT = 'maniscope-session-artifact-updated'
 const POLL_INTERVAL_MS = 5000
@@ -126,8 +159,9 @@ export default {
       loading: false,
       error: '',
       manifest: null,
-      userForest: null,
-      graphPatch: null,
+      reasoningGraph: null,
+      graphPatches: [],
+      displayTrees: [],
       selectedNode: null,
       loadStarted: false,
       lastManifestSignature: '',
@@ -139,61 +173,17 @@ export default {
       return this.forestTrees.length > 0
     },
     forestTrees() {
-      if (!this.userForest) return []
-      const patchGraph = this.normalizedPatchGraph()
-      const patchChildrenByTarget = this.buildPatchChildrenByTarget(patchGraph.nodes, patchGraph.edges)
-      const existingRootIds = new Set()
-      let userTrees = []
-      if (Array.isArray(this.userForest.trees)) {
-        userTrees = this.userForest.trees
-          .map((tree, index) => this.buildGeneratedForestTree(tree, {
-            patchChildrenByTarget,
-            patchNodes: patchGraph.nodes,
-            path: `tree-${index}`,
-          }))
-          .filter(Boolean)
-        for (const tree of this.userForest.trees) {
-          if (tree?.root) existingRootIds.add(tree.root)
-        }
-        return this.projectReasoningForest([
-          ...userTrees,
-          ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
-        ])
-          .map((tree) => this.extractHypothesisTree(tree))
-          .filter(Boolean)
-          .map((tree) => this.prepareNodeForDisplay(tree))
-      }
-      if (!Array.isArray(this.userForest.roots)) return []
-      const userNodes = this.userForest.nodes && typeof this.userForest.nodes === 'object'
-        ? this.userForest.nodes
-        : {}
-      userTrees = this.userForest.roots.map((root, index) =>
-        this.buildDisplayNode(root, {
-          userNodes,
-          patchChildrenByTarget,
-          patchNodes: patchGraph.nodes,
-          path: `root-${index}`,
-          visited: new Set(),
-        }),
-      )
-      for (const root of this.userForest.roots) {
-        const id = typeof root === 'string' ? root : root?.id
-        if (id) existingRootIds.add(id)
-      }
-      return this.projectReasoningForest([
-        ...userTrees,
-        ...this.buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds),
-      ])
-        .map((tree) => this.extractHypothesisTree(tree))
-        .filter(Boolean)
-        .map((tree) => this.prepareNodeForDisplay(tree))
+      return this.displayTrees
     },
     artifactSummary() {
       const current = this.manifest?.current || {}
-      const names = [
-        current.userReasoningForest?.name,
-        current.reasoningGraphPatch?.name,
-      ].filter(Boolean)
+      const graphName = current.reasoningGraph?.name || this.manifest?.reasoningGraph?.name
+      const patches = Array.isArray(current.patches)
+        ? current.patches
+        : Array.isArray(this.manifest?.patches)
+          ? this.manifest.patches
+          : []
+      const names = [graphName, ...patches.map((patch) => patch.name)].filter(Boolean)
       if (!names.length) return ''
       return `Showing ${names.join(' + ')}`
     },
@@ -202,7 +192,13 @@ export default {
       const explanation = this.preferredExplanation(this.selectedNode)
       const support = this.supportingExplanation(this.selectedNode)
       const reasoning = this.reasoningNarrative(this.selectedNode)
+      const relation = this.relationLabel(this.selectedNode.displayRelation || this.selectedNode.relation)
       return [
+        {
+          key: 'relation',
+          label: 'Relation To Parent',
+          value: relation,
+        },
         {
           key: 'story',
           label: 'Story',
@@ -219,6 +215,28 @@ export default {
           value: reasoning,
         },
       ].filter((item) => item.value)
+    },
+    selectedNodeRelationName() {
+      if (!this.selectedNode) return ''
+      return this.normalizedRelation(this.selectedNode.displayRelation || this.selectedNode.relation)
+    },
+    selectedNodeTypeLabel() {
+      if (!this.selectedNode) return ''
+      if (this.selectedNode.type === 'Finding') {
+        return this.selectedNode.source === 'patch' ? 'Agent Finding' : 'User Finding'
+      }
+      return this.selectedNode.type || 'Node'
+    },
+    selectedNodeTypeClass() {
+      if (!this.selectedNode || this.selectedNode.type !== 'Finding') return ''
+      return this.selectedNode.source === 'patch' ? 'detail-type-agent-finding' : 'detail-type-user-finding'
+    },
+    selectedNodeRelationLabel() {
+      if (!this.selectedNode) return ''
+      return this.relationLabel(this.selectedNode.displayRelation || this.selectedNode.relation)
+    },
+    selectedNodeRelationClass() {
+      return this.selectedNodeRelationName ? `relation-${this.selectedNodeRelationName}` : ''
     },
     selectedNodeInternalFindings() {
       if (!this.shouldShowInternalFindings(this.selectedNode)) return []
@@ -244,8 +262,9 @@ export default {
       handler() {
         this.loadStarted = false
         this.manifest = null
-        this.userForest = null
-        this.graphPatch = null
+        this.reasoningGraph = null
+        this.graphPatches = []
+        this.displayTrees = []
         this.selectedNode = null
         this.lastManifestSignature = ''
         if (this.active) this.loadAnalysis({ force: true })
@@ -315,11 +334,15 @@ export default {
     },
     manifestSignature(manifest) {
       const current = manifest?.current || {}
+      const patches = Array.isArray(current.patches)
+        ? current.patches
+        : Array.isArray(manifest?.patches)
+          ? manifest.patches
+          : []
       return [
-        current.userReasoningForest?.name || '',
-        current.userReasoningForest?.modifiedAt || '',
-        current.reasoningGraphPatch?.name || '',
-        current.reasoningGraphPatch?.modifiedAt || '',
+        current.reasoningGraph?.name || manifest?.reasoningGraph?.name || '',
+        current.reasoningGraph?.modifiedAt || manifest?.reasoningGraph?.modifiedAt || '',
+        ...patches.flatMap((patch) => [patch.name || '', patch.modifiedAt || '']),
         manifest?.latestModifiedAt || '',
       ].join('|')
     },
@@ -341,18 +364,49 @@ export default {
       try {
         const manifest = await this.fetchManifest()
         const signature = this.manifestSignature(manifest)
-        if (!force && signature && signature === this.lastManifestSignature && this.userForest) return
+        if (!force && signature && signature === this.lastManifestSignature && this.reasoningGraph) return
         this.manifest = manifest
         this.lastManifestSignature = signature
         const current = manifest?.current || {}
-        const [userForest, graphPatch] = await Promise.all([
-          this.fetchArtifact(current.userReasoningForest),
-          this.fetchArtifact(current.reasoningGraphPatch),
+        const graphInfo = current.reasoningGraph || manifest?.reasoningGraph
+        const patchInfos = Array.isArray(current.patches)
+          ? current.patches
+          : Array.isArray(manifest?.patches)
+            ? manifest.patches
+            : []
+        const [reasoningGraph, ...patches] = await Promise.all([
+          this.fetchArtifact(graphInfo),
+          ...patchInfos.map((patchInfo) => this.fetchArtifact(patchInfo)),
         ])
-        this.userForest = userForest
-        this.graphPatch = graphPatch
+        if (!reasoningGraph) {
+          this.reasoningGraph = null
+          this.graphPatches = []
+          this.displayTrees = []
+          return
+        }
+        validateReasoningGraph(reasoningGraph, {
+          requireAnsweredQuestions: true,
+          fileName: graphInfo?.path || graphInfo?.name || 'reasoning-graph.json',
+        })
+        const patchLayers = orderPatchLayers(
+          patches
+            .map((patch, index) => (patch ? {
+              name: patchInfos[index]?.name || `reasoning-graph-patch-${index + 1}.json`,
+              patch,
+            } : null))
+            .filter(Boolean),
+        )
+        const augmentedGraph = applyReasoningPatches(reasoningGraph, patchLayers)
+        this.reasoningGraph = reasoningGraph
+        this.graphPatches = patchLayers
+        this.displayTrees = projectGraphToDisplayForest(augmentedGraph)
+          .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
+          .filter(Boolean)
       } catch (error) {
-        if (!silent) this.error = error && error.message ? error.message : String(error)
+        const message = error && error.message ? error.message : String(error)
+        this.displayTrees = []
+        if (!silent) this.error = message
+        else this.error = message
       } finally {
         if (!silent) this.loading = false
       }
@@ -383,197 +437,19 @@ export default {
       this.selectedNode = null
     },
     isAnalysisArtifactName(name) {
-      return name === 'user-reasoning-forest.json'
+      return name === 'reasoning-graph.json'
+        || name === 'user-reasoning-forest.json'
         || name === 'reasoning-graph-patch.json'
-        || /^reasoning-graph-patch-[^.]+\.json$/.test(name)
+        || /^reasoning-graph-patch(?:-.+)?\.json$/.test(name)
     },
-    projectReasoningForest(trees) {
-      const projectedTrees = trees
-        .flatMap((tree) => this.projectReasoningNode(tree).nodes)
-        .filter(Boolean)
-      return this.dedupeReasoningNodes(projectedTrees)
-    },
-    projectReasoningNode(node) {
-      if (!node) return { nodes: [], liftedEvidenceImages: [] }
-      const childResults = (Array.isArray(node.children) ? node.children : [])
-        .map((child) => this.projectReasoningNode(child))
-      const visibleChildren = this.dedupeReasoningNodes(
-        childResults.flatMap((result) => result.nodes),
-      )
-      const liftedChildImages = this.mergeEvidenceImages(
-        ...childResults.map((result) => result.liftedEvidenceImages),
-      )
-      const ownImages = Array.isArray(node.evidenceImages) ? node.evidenceImages : []
-
-      if (this.isVisibleReasoningNode(node)) {
-        return {
-          nodes: [
-            {
-              ...node,
-              children: visibleChildren,
-              evidenceImages: this.mergeEvidenceImages(ownImages, liftedChildImages),
-            },
-          ],
-          liftedEvidenceImages: [],
-        }
-      }
-
-      return {
-        nodes: visibleChildren,
-        liftedEvidenceImages: this.mergeEvidenceImages(ownImages, liftedChildImages),
-      }
-    },
-    dedupeReasoningNodes(nodes) {
-      const deduped = []
-      const byCanonicalNode = new Map()
-      for (const node of nodes) {
-        if (!node) continue
-        const key = this.reasoningNodeDedupKey(node)
-        if (!key || !byCanonicalNode.has(key)) {
-          if (key) byCanonicalNode.set(key, node)
-          deduped.push(node)
-          continue
-        }
-
-        const existing = byCanonicalNode.get(key)
-        existing.children = this.dedupeReasoningNodes([
-          ...(Array.isArray(existing.children) ? existing.children : []),
-          ...(Array.isArray(node.children) ? node.children : []),
-        ])
-        existing.evidenceImages = this.mergeEvidenceImages(
-          existing.evidenceImages,
-          node.evidenceImages,
-        )
-        if (!existing.relation && node.relation) existing.relation = node.relation
-      }
-      return this.pruneDuplicateVisibleAncestors(deduped)
-    },
-    pruneDuplicateVisibleAncestors(nodes) {
-      const descendantKeys = new Set()
-      for (const node of nodes) {
-        this.collectDescendantReasoningKeys(node, descendantKeys)
-      }
-      return nodes.filter((node) => {
-        const key = this.reasoningNodeDedupKey(node)
-        return !key || !descendantKeys.has(key)
-      })
-    },
-    collectDescendantReasoningKeys(node, keys) {
-      const children = Array.isArray(node.children) ? node.children : []
-      for (const child of children) {
-        const key = this.reasoningNodeDedupKey(child)
-        if (key) keys.add(key)
-        this.collectDescendantReasoningKeys(child, keys)
-      }
-    },
-    reasoningNodeDedupKey(node) {
-      const type = this.nodeType(node)
-      if (type !== 'Hypothesis' && type !== 'Finding') return ''
-      const canonicalId = node.canonicalId || node.id
-      if (!canonicalId) return ''
-      return `${node.source || 'user'}:${type}:${canonicalId}`
-    },
-    isVisibleReasoningNode(node) {
-      const type = this.nodeType(node)
-      return type === 'Hypothesis' || type === 'Finding'
-    },
-    mergeEvidenceImages(...imageGroups) {
-      const merged = []
-      const seen = new Set()
-      for (const group of imageGroups) {
-        if (!Array.isArray(group)) continue
-        for (const image of group) {
-          if (!image?.url || seen.has(image.url)) continue
-          seen.add(image.url)
-          merged.push(image)
-        }
-      }
-      return merged
-    },
-    normalizedPatchGraph() {
-      if (Array.isArray(this.graphPatch?.nodes) || Array.isArray(this.graphPatch?.edges)) {
-        return {
-          nodes: new Map(
-            Array.isArray(this.graphPatch.nodes)
-              ? this.graphPatch.nodes.map((node) => [node.id, node])
-              : [],
-          ),
-          edges: Array.isArray(this.graphPatch.edges) ? this.graphPatch.edges : [],
-          roots: Array.isArray(this.graphPatch.roots) ? this.graphPatch.roots : [],
-        }
-      }
-      const nodes = new Map()
-      const edges = []
-      const roots = []
-      const operations = Array.isArray(this.graphPatch?.operations) ? this.graphPatch.operations : []
-      for (const operation of operations) {
-        if (operation?.op === 'add_node' && operation.node?.id) {
-          nodes.set(operation.node.id, operation.node)
-        } else if (operation?.op === 'update_node' && operation.node?.id) {
-          nodes.set(operation.node.id, {
-            ...(nodes.get(operation.node.id) || {}),
-            ...operation.node,
-          })
-        } else if (operation?.op === 'add_edge' && operation.edge) {
-          edges.push(operation.edge)
-        } else if (operation?.op === 'add_root' && operation.id) {
-          roots.push(operation.id)
-        }
-      }
-      return { nodes, edges, roots }
-    },
-    buildPatchRootTrees(patchGraph, patchChildrenByTarget, existingRootIds) {
-      return patchGraph.roots
-        .filter((rootId) => patchGraph.nodes.has(rootId) && !existingRootIds.has(rootId))
-        .map((rootId, index) => {
-          const rootNode = this.normalizeDisplayNode(patchGraph.nodes.get(rootId), {
-            source: 'patch',
-            relation: '',
-            instanceId: `patch-root-${index}-${rootId}`,
-          })
-          this.appendPatchChildren(rootNode, {
-            patchChildrenByTarget,
-            patchNodes: patchGraph.nodes,
-            path: `patch-root-${index}`,
-            visited: new Set([rootNode.id]),
-          })
-          return rootNode
-        })
-    },
-    extractHypothesisTree(tree) {
-      if (!tree || this.nodeType(tree) !== 'Hypothesis') return null
-      return {
-        ...tree,
-        children: this.collectHierarchicalFindings(tree),
-      }
-    },
-    collectHierarchicalFindings(node) {
-      const children = Array.isArray(node?.children) ? node.children : []
-      const results = []
-      for (const child of children) {
-        const type = this.nodeType(child)
-        if (type === 'Finding') {
-          results.push(this.pruneFindingNode(child))
-          continue
-        }
-        results.push(...this.collectHierarchicalFindings(child))
-      }
-      return this.dedupeNodes(results)
-    },
-    pruneFindingNode(node) {
-      const children = Array.isArray(node?.children) ? node.children : []
-      const findingChildren = []
-      for (const child of children) {
-        const type = this.nodeType(child)
-        if (type === 'Finding') {
-          findingChildren.push(this.pruneFindingNode(child))
-          continue
-        }
-        findingChildren.push(...this.collectHierarchicalFindings(child))
-      }
+    attachEvidenceImages(node) {
+      if (!node) return null
       return {
         ...node,
-        children: this.dedupeNodes(findingChildren),
+        evidenceImages: this.nodeEvidenceImages(node),
+        children: Array.isArray(node.children)
+          ? node.children.map((child) => this.attachEvidenceImages(child)).filter(Boolean)
+          : [],
       }
     },
     prepareNodeForDisplay(node) {
@@ -612,224 +488,6 @@ export default {
         }),
       }
     },
-    dedupeNodes(nodes) {
-      const seen = new Set()
-      const results = []
-      for (const node of nodes) {
-        const key = node?.canonicalId || node?.id || node?.instanceId
-        if (!key || seen.has(key)) continue
-        seen.add(key)
-        results.push(node)
-      }
-      return results
-    },
-    buildPatchChildrenByTarget(patchNodes, edges) {
-      const grouped = new Map()
-      for (const edge of edges) {
-        if (!edge || !patchNodes.has(edge.source) || !edge.target) continue
-        const children = grouped.get(edge.target) || []
-        children.push({
-          node: patchNodes.get(edge.source),
-          relation: edge.relation || '',
-        })
-        grouped.set(edge.target, children)
-      }
-      const nested = new Map()
-      for (const [targetId, children] of grouped.entries()) {
-        const synthesisNodes = children.filter(
-          (child) => child.relation === 'synthesizes' && this.nodeType(child.node) === 'Finding',
-        )
-        if (synthesisNodes.length === 0) {
-          nested.set(targetId, children)
-          continue
-        }
-
-        const containedChildren = children.filter(
-          (child) => !(child.relation === 'synthesizes' && this.nodeType(child.node) === 'Finding'),
-        )
-        nested.set(targetId, [
-          {
-            ...synthesisNodes[0],
-            nestedPatchChildren: containedChildren,
-          },
-          ...synthesisNodes.slice(1),
-        ])
-      }
-      return nested
-    },
-    buildGeneratedForestTree(tree, context) {
-      const nodes = Array.isArray(tree?.nodes) ? tree.nodes : []
-      if (!nodes.length) return null
-      const nodesByInstance = new Map()
-      for (const rawNode of nodes) {
-        const displayNode = this.normalizeDisplayNode(rawNode, {
-          source: 'user',
-          relation: rawNode.relationToParent || '',
-          instanceId: rawNode.instanceId || rawNode.id || rawNode.canonicalId,
-        })
-        displayNode.children = []
-        nodesByInstance.set(displayNode.instanceId, displayNode)
-      }
-
-      for (const rawNode of nodes) {
-        if (!rawNode.parentInstanceId) continue
-        const parent = nodesByInstance.get(rawNode.parentInstanceId)
-        const child = nodesByInstance.get(rawNode.instanceId || rawNode.id || rawNode.canonicalId)
-        if (parent && child) parent.children.push(child)
-      }
-
-      for (const displayNode of nodesByInstance.values()) {
-        this.appendPatchChildren(displayNode, {
-          ...context,
-          visited: new Set([displayNode.id]),
-        })
-      }
-
-      return nodesByInstance.get(tree.root)
-        || Array.from(nodesByInstance.values()).find((node) => !node.parentInstanceId)
-        || nodesByInstance.values().next().value
-    },
-    buildDisplayNode(rawNode, context) {
-      const canonical = context.patchNodes.has(rawNode.id)
-        ? {
-            ...context.patchNodes.get(rawNode.id),
-            ...rawNode,
-          }
-        : {
-            ...(context.userNodes[rawNode.id] || {}),
-            ...rawNode,
-          }
-      const isPatch = context.patchNodes.has(canonical.id)
-      const displayNode = this.normalizeDisplayNode(canonical, {
-        source: isPatch ? 'patch' : 'user',
-        relation: rawNode.relation || '',
-        instanceId: `${context.path}-${canonical.id}`,
-      })
-
-      if (context.visited.has(canonical.id)) return displayNode
-      const nextVisited = new Set(context.visited)
-      nextVisited.add(canonical.id)
-
-      const userChildren = Array.isArray(canonical.children)
-        ? canonical.children
-        : []
-      displayNode.children.push(
-        ...userChildren
-          .map((childId, index) => {
-            const childRaw = context.userNodes[childId]
-            if (!childRaw) return null
-            return this.buildDisplayNode(
-              { ...childRaw, id: childId },
-              {
-                ...context,
-                path: `${context.path}-u${index}`,
-                visited: nextVisited,
-              },
-            )
-          })
-          .filter(Boolean),
-      )
-
-      const patchChildren = context.patchChildrenByTarget.get(canonical.id) || []
-      displayNode.children.push(
-        ...patchChildren.map((patchChild, index) =>
-          this.buildPatchDisplayNode(patchChild, {
-            ...context,
-            path: `${context.path}-p${index}`,
-            visited: nextVisited,
-          }),
-        ),
-      )
-
-      const nestedPatchChildren = Array.isArray(canonical.nestedPatchChildren)
-        ? canonical.nestedPatchChildren
-        : []
-      displayNode.children.push(
-        ...nestedPatchChildren.map((patchChild, index) =>
-          this.buildPatchDisplayNode(patchChild, {
-            ...context,
-            path: `${context.path}-nested${index}`,
-            visited: nextVisited,
-          }),
-        ),
-      )
-
-      return displayNode
-    },
-    buildPatchDisplayNode(patchChild, context) {
-      const rawNode = {
-        ...patchChild.node,
-        relation: patchChild.relation,
-        nestedPatchChildren: patchChild.nestedPatchChildren || [],
-      }
-      const displayNode = this.normalizeDisplayNode(rawNode, {
-        source: 'patch',
-        relation: patchChild.relation || '',
-        instanceId: `${context.path}-${rawNode.id}`,
-      })
-      if (context.visited.has(displayNode.id)) return displayNode
-      const nextVisited = new Set(context.visited)
-      nextVisited.add(displayNode.id)
-      this.appendPatchChildren(displayNode, {
-        ...context,
-        visited: nextVisited,
-      })
-      return displayNode
-    },
-    appendPatchChildren(displayNode, context) {
-      const targetIds = [displayNode.id, displayNode.canonicalId, displayNode.instanceId].filter(Boolean)
-      const seenChildren = new Set()
-      for (const targetId of targetIds) {
-        const patchChildren = context.patchChildrenByTarget.get(targetId) || []
-        for (const patchChild of patchChildren) {
-          const childId = patchChild.node?.id
-          if (!childId || seenChildren.has(childId)) continue
-          seenChildren.add(childId)
-          displayNode.children.push(this.buildPatchDisplayNode(patchChild, {
-            ...context,
-            path: `${displayNode.instanceId || displayNode.id}-patch-${displayNode.children.length}`,
-          }))
-        }
-      }
-
-      const nestedPatchChildren = Array.isArray(displayNode.nestedPatchChildren)
-        ? displayNode.nestedPatchChildren
-        : []
-      for (const patchChild of nestedPatchChildren) {
-        const childId = patchChild.node?.id
-        if (!childId || seenChildren.has(childId)) continue
-        seenChildren.add(childId)
-        displayNode.children.push(this.buildPatchDisplayNode(patchChild, {
-          ...context,
-          path: `${displayNode.instanceId || displayNode.id}-nested-${displayNode.children.length}`,
-        }))
-      }
-    },
-    normalizeDisplayNode(node, overrides = {}) {
-      const id = node.id || node.canonicalId || node.instanceId || 'unknown'
-      const type = this.nodeType(node)
-      const mergedNode = {
-        ...node,
-        ...overrides,
-      }
-      const label = this.nodeLabel({ ...node, type })
-      const displayExplanation = this.preferredExplanation(mergedNode)
-      const displayEvidenceSummary = this.supportingExplanation(mergedNode)
-      const displayReasoningRole = this.reasoningNarrative(mergedNode)
-      return {
-        ...mergedNode,
-        id,
-        canonicalId: node.canonicalId || node.id || id,
-        type,
-        relation: overrides.relation || node.relation || node.relationToParent || '',
-        label,
-        displayExplanation,
-        displayEvidenceSummary,
-        displayReasoningRole,
-        children: Array.isArray(node.children) ? [...node.children] : [],
-        evidenceImages: this.nodeEvidenceImages(mergedNode),
-      }
-    },
     nodeType(node) {
       return node.type || node.kind || node.nodeType || 'Node'
     },
@@ -861,6 +519,10 @@ export default {
               results.push({
                 key,
                 label: child.label,
+                relationLabel: this.relationLabel(child.displayRelation || child.relation),
+                relationClass: this.normalizedRelation(child.displayRelation || child.relation)
+                  ? `relation-${this.normalizedRelation(child.displayRelation || child.relation)}`
+                  : '',
                 explanation: this.preferredExplanation(child),
                 evidenceSummary: this.supportingExplanation(child),
                 reasoningRole: this.reasoningNarrative(child),
@@ -1075,6 +737,38 @@ export default {
       const cleanPath = String(path).split(/[?#]/)[0]
       return cleanPath.split('/').filter(Boolean).pop() || 'evidence image'
     },
+    normalizedRelation(relation) {
+      const normalized = String(relation || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+      const aliases = {
+        answer: 'answers',
+        contradict: 'contradicts',
+        counterevidence: 'contradicts',
+        refine: 'refines',
+        support: 'supports',
+        synthesize: 'synthesizes',
+      }
+      return aliases[normalized] || normalized
+    },
+    relationLabel(relation) {
+      const normalized = this.normalizedRelation(relation)
+      const labels = {
+        answers: 'Answers',
+        contains: 'Contains',
+        contradicts: 'Contradicts',
+        derived_from: 'Derived from',
+        motivates: 'Motivates',
+        produces: 'Produces',
+        refines: 'Refines',
+        supports: 'Supports',
+        synthesizes: 'Synthesizes',
+      }
+      if (labels[normalized]) return labels[normalized]
+      const text = String(relation || '').trim()
+      if (!text) return ''
+      return text
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    },
   },
 }
 </script>
@@ -1133,11 +827,17 @@ export default {
   opacity: 0.6;
 }
 
+.legend-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
 .legend-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
 }
 
 .legend-item {
@@ -1164,6 +864,34 @@ export default {
   background: #fff7ed;
   border-color: #fdba74;
   color: #c2410c;
+}
+
+.relation-legend {
+  background: #ffffff;
+}
+
+.relation-supports {
+  background: #ecfdf3;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.relation-answers {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.relation-refines {
+  background: #fffbeb;
+  border-color: #fbbf24;
+  color: #92400e;
+}
+
+.relation-contradicts {
+  background: #fff1f2;
+  border-color: #fb7185;
+  color: #be123c;
 }
 
 .forest-grid {
@@ -1232,7 +960,15 @@ export default {
   min-width: 0;
 }
 
-.detail-type {
+.detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.detail-type,
+.detail-relation {
   display: inline-flex;
   border-radius: 999px;
   font-size: 11px;
@@ -1244,6 +980,22 @@ export default {
 .detail-type {
   background: #eef2ff;
   color: #4338ca;
+}
+
+.detail-type-user-finding {
+  color: #166534;
+  background: #ecfdf3;
+  border: 1px solid #86efac;
+}
+
+.detail-type-agent-finding {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fbbf24;
+}
+
+.detail-relation {
+  border: 1px solid #d8e0ec;
 }
 
 .detail-title {
@@ -1327,6 +1079,36 @@ export default {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
+}
+
+.detail-finding-card.relation-contradicts {
+  background: #fff1f2;
+  border-color: #fb7185;
+}
+
+.detail-finding-card.relation-refines {
+  background: #fffbeb;
+  border-color: #fbbf24;
+}
+
+.detail-finding-card.relation-answers {
+  border-color: #93c5fd;
+}
+
+.detail-finding-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-finding-relation {
+  align-self: flex-start;
+  border: 1px solid #d8e0ec;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  padding: 1px 7px;
 }
 
 .detail-finding-title {

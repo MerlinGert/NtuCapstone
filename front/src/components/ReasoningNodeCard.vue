@@ -5,7 +5,10 @@
     @click.stop="$emit('select-node', node)"
   >
     <div class="node-meta-row">
-      <span class="node-type">{{ node.type || 'Node' }}</span>
+      <span class="node-type" :class="nodeTypeClass">{{ nodeTypeLabel }}</span>
+      <span v-if="relationLabel" class="relation-pill" :class="relationClass">
+        {{ relationLabel }}
+      </span>
       <span class="meta-spacer"></span>
       <button
         v-if="hasChildren"
@@ -37,7 +40,11 @@
       </div>
       <div v-if="extraImageCount > 0" class="thumbnail-count">+{{ extraImageCount }} more images</div>
     </div>
-    <div v-if="hasChildren && !collapsed" class="node-children">
+    <div
+      v-if="hasChildren && !collapsed"
+      class="node-children"
+      :class="{ 'node-children-single': node.children.length === 1 }"
+    >
       <ReasoningNodeCard
         v-for="child in node.children"
         :key="child.instanceId || child.id"
@@ -117,9 +124,43 @@ export default {
         'source-user': this.node.source !== 'patch',
         'source-patch': this.node.source === 'patch',
         'type-hypothesis': this.node.type === 'Hypothesis',
+        'root-hypothesis': this.node.type === 'Hypothesis' && !this.node.parentInstanceId,
         'type-question': this.node.type === 'AnalyticQuestion',
         'type-finding': this.node.type === 'Finding',
+        [`relation-${this.relationName}`]: Boolean(this.relationName),
       }
+    },
+    nodeTypeLabel() {
+      if (this.node.type === 'Finding') {
+        return this.node.source === 'patch' ? 'Agent Finding' : 'User Finding'
+      }
+      return this.node.type || 'Node'
+    },
+    nodeTypeClass() {
+      return {
+        'node-type-user-finding': this.node.type === 'Finding' && this.node.source !== 'patch',
+        'node-type-agent-finding': this.node.type === 'Finding' && this.node.source === 'patch',
+      }
+    },
+    relationName() {
+      return this.normalizedRelation(this.node.displayRelation || this.node.relation)
+    },
+    relationLabel() {
+      const labels = {
+        answers: 'Answers',
+        contains: 'Contains',
+        contradicts: 'Contradicts',
+        derived_from: 'Derived from',
+        motivates: 'Motivates',
+        produces: 'Produces',
+        refines: 'Refines',
+        supports: 'Supports',
+        synthesizes: 'Synthesizes',
+      }
+      return labels[this.relationName] || this.humanizeRelation(this.node.displayRelation || this.node.relation)
+    },
+    relationClass() {
+      return this.relationName ? `relation-pill-${this.relationName}` : ''
     },
   },
   methods: {
@@ -127,6 +168,25 @@ export default {
       if (this.node.type === 'AnalyticActivity') return true
       const children = Array.isArray(this.node.children) ? this.node.children : []
       return children.length > 0 && children.every((child) => child.type === 'Interaction')
+    },
+    normalizedRelation(relation) {
+      const normalized = String(relation || '').trim().toLowerCase().replace(/[\s-]+/g, '_')
+      const aliases = {
+        answer: 'answers',
+        contradict: 'contradicts',
+        counterevidence: 'contradicts',
+        refine: 'refines',
+        support: 'supports',
+        synthesize: 'synthesizes',
+      }
+      return aliases[normalized] || normalized
+    },
+    humanizeRelation(relation) {
+      const text = String(relation || '').trim()
+      if (!text) return ''
+      return text
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase())
     },
   },
 }
@@ -148,7 +208,7 @@ export default {
   margin-top: 8px;
 }
 
-.source-user.type-hypothesis {
+.root-hypothesis {
   background: #d9e3ff;
   border-color: #aabce8;
 }
@@ -156,12 +216,6 @@ export default {
 .source-user.type-question {
   background: #ffffff;
   border-color: #cbd5e1;
-}
-
-.source-patch {
-  background: #fff1f5;
-  border-color: #f7b7ca;
-  box-shadow: 0 1px 3px rgba(190, 24, 93, 0.12);
 }
 
 .node-meta-row {
@@ -173,6 +227,7 @@ export default {
 }
 
 .node-type,
+.relation-pill,
 .collapse-btn {
   display: inline-flex;
   align-items: center;
@@ -185,6 +240,7 @@ export default {
 }
 
 .node-type,
+.relation-pill,
 .collapse-btn {
   padding: 1px 6px;
 }
@@ -193,6 +249,64 @@ export default {
   color: #334155;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.45);
+}
+
+.node-type-user-finding {
+  color: #166534;
+  background: #ecfdf3;
+  border-color: #86efac;
+}
+
+.node-type-agent-finding {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fbbf24;
+}
+
+.relation-pill {
+  max-width: 58%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+}
+
+.relation-pill-supports {
+  color: #166534;
+  background: #ecfdf3;
+  border-color: #86efac;
+}
+
+.relation-pill-answers {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.relation-pill-contradicts {
+  color: #be123c;
+  background: #fff1f2;
+  border-color: #fb7185;
+}
+
+.relation-pill-refines {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fbbf24;
+}
+
+.relation-pill-synthesizes {
+  color: #5b21b6;
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+}
+
+.relation-pill-produces,
+.relation-pill-motivates,
+.relation-pill-contains,
+.relation-pill-derived_from {
+  color: #475569;
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .meta-spacer {
@@ -277,5 +391,11 @@ export default {
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.52);
   border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.node-children-single {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 </style>
