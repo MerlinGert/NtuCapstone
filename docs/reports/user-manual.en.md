@@ -12,7 +12,7 @@ The dashboard fills the browser window. The current UI is arranged as three vert
 
 ```
 +---------------------------------------------------------------------------------------------+
-| ManiScope | Session | Human Workspace | Open Agent Workspace | Coin: ACT PNUT | Export Import |
+| ManiScope | Session | Human Workspace | Codex Chat | Coin: ACT PNUT | Export Import |
 +------------------+------------------------------+------------------------------+
 | Control Panel    | Token Distribution           | ACT or PNUT K-Line           |
 |                  |                              | round-trip cards             |
@@ -24,7 +24,7 @@ The dashboard fills the browser window. The current UI is arranged as three vert
 +------------------+------------------------------+------------------------------+
 ```
 
-The header contains the product name, the session chip, a workspace badge, the Codex Chat button, the ACT and PNUT radio buttons, and session import/export controls. In the Human Workspace, the header also includes **Open Agent Workspace**, which opens the same session in a separate `/agent` page for side-by-side analysis.
+The header contains the product name, the session chip, a workspace badge, the Codex Chat button, the ACT and PNUT radio buttons, and session import/export controls.
 
 The left column is the Control Panel. The middle column contains the Token Distribution view on top and a tabbed investigation panel on the bottom. The right column contains the K-line and manipulation-card view on top and Behavior Details on the bottom.
 
@@ -160,6 +160,8 @@ Chat history and generated artifacts are shared at the session level. The agent 
 Codex SDK network access is enabled by default for the chat agent so it can reach the local ManiScope services and fetch external references when an investigation needs them. For restricted offline runs, start the bridge with `CODEX_NETWORK_ACCESS=false`.
 
 The Codex Chat panel is floating. Drag its header to move it, or drag the lower corners to resize it. The panel keeps its local position and size in the browser.
+
+The **Run Full Analysis** button above the message box sends a preset request: `please run a pass of full trace analysis with a subagent for finding counter-evidence.` This is a shortcut for starting a comprehensive trace-analysis pass without manually typing the prompt.
 
 During an agent turn, Thinking and Agent Activity appear above the assistant response. Agent Activity starts collapsed by default, with the latest activity visible as a compact status card. You can expand it to inspect the full activity stream. When the turn completes, these sections collapse again.
 

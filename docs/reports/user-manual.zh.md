@@ -12,7 +12,7 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 
 ```
 +---------------------------------------------------------------------------------------------+
-| ManiScope | Session | Human Workspace | Open Agent Workspace | Coin: ACT PNUT | Export Import |
+| ManiScope | Session | Human Workspace | Codex Chat | Coin: ACT PNUT | Export Import |
 +------------------+------------------------------+------------------------------+
 | Control Panel    | Token Distribution           | ACT or PNUT K-Line           |
 |                  |                              | round-trip cards             |
@@ -24,7 +24,7 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 +------------------+------------------------------+------------------------------+
 ```
 
-标题栏包含产品名、会话标记、工作区标记、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。在 Human Workspace 中，标题栏还会显示 **Open Agent Workspace**，用于把同一个会话以 `/agent` 页面在新标签页中打开，方便并排分析。
+标题栏包含产品名、会话标记、工作区标记、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。
 
 左列是 Control Panel。中列上方是 Token Distribution 视图，下方是带标签页的调查面板。右列上方是 K 线和操纵卡片视图，下方是 Behavior Details。
 
@@ -160,6 +160,8 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 Codex SDK 的网络访问默认对聊天智能体开启，因此它可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。对于受限的离线运行，可以用 `CODEX_NETWORK_ACCESS=false` 启动 bridge。
 
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
+
+消息输入框上方的 **Run Full Analysis** 按钮会发送一个预设请求：`please run a pass of full trace analysis with a subagent for finding counter-evidence.` 这是启动完整 trace 分析流程的快捷方式，不需要手动输入这段 prompt。
 
 在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。Agent Activity 默认折叠，只保留最新一条活动作为紧凑状态卡可见；你可以展开查看完整活动流。回合完成后，这些区域会再次折叠。
 

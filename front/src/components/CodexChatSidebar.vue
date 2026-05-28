@@ -142,6 +142,15 @@
     <div v-if="dragging" class="codex-chat-drop-hint">Drop images to attach</div>
 
     <div class="codex-chat-input-area">
+      <button
+        class="codex-chat-preset-btn"
+        type="button"
+        title="Run full trace analysis with counter-evidence search"
+        :disabled="sending"
+        @click="sendFullAnalysisPrompt"
+      >
+        Run Full Analysis
+      </button>
       <textarea
         ref="inputEl"
         v-model="draft"
@@ -153,35 +162,42 @@
         @paste="handlePaste"
       ></textarea>
       <div class="codex-chat-actions">
-        <button class="codex-chat-secondary" type="button" title="Attach images" @click="$refs.fileInput.click()">
-          Attach
-        </button>
         <button
-          class="codex-chat-secondary"
+          class="codex-chat-action-btn codex-chat-secondary"
           type="button"
-          title="Clear this Codex thread"
-          :disabled="sending || messages.length === 0"
-          @click="clearChat"
+          title="Attach images"
+          aria-label="Attach images"
+          @click="$refs.fileInput.click()"
         >
-          Clear
+          <svg class="chat-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M21.4 11.6 12 21a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-9.9 9.9a2 2 0 0 1-2.8-2.8l9.4-9.4" />
+          </svg>
         </button>
         <button
           v-if="sending"
-          class="codex-chat-stop"
+          class="codex-chat-action-btn codex-chat-stop"
           type="button"
-          title="Stop the current Codex turn"
+          :title="stopRequested ? 'Stopping Codex turn' : 'Stop the current Codex turn'"
+          :aria-label="stopRequested ? 'Stopping Codex turn' : 'Stop the current Codex turn'"
           :disabled="stopRequested"
           @click="stopCodexTurn"
         >
-          {{ stopRequested ? 'Stopping...' : 'Stop' }}
+          <svg class="chat-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="7" y="7" width="10" height="10" rx="1.5" />
+          </svg>
         </button>
         <button
-          class="codex-chat-send"
+          class="codex-chat-action-btn codex-chat-send"
           type="button"
+          title="Send message"
+          aria-label="Send message"
           :disabled="sending || (!draft.trim() && attachments.length === 0)"
-          @click="sendMessage"
+          @click="sendMessage()"
         >
-          {{ sending ? 'Sending...' : 'Send' }}
+          <svg class="chat-action-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M22 2 11 13" />
+            <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+          </svg>
         </button>
       </div>
       <input
@@ -210,6 +226,7 @@
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 
+const FULL_ANALYSIS_PROMPT = 'please run a pass of full trace analysis with a subagent for finding counter-evidence.'
 const markdown = new MarkdownIt({
   breaks: true,
   linkify: true,
@@ -558,27 +575,6 @@ export default {
         }),
       })
     },
-    async clearChat() {
-      if (this.sending) return
-      this.messages = []
-      this.nextMessageId = 1
-      this.nextActivityId = 1
-      this.stopRequested = false
-      if (!this.sessionId) return
-
-      const response = await fetch(`/api/chat/${this.sessionId}/threads/trace-analysis`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        this.messages.push({
-          id: this.nextMessageId++,
-          role: 'assistant',
-          content: `Error clearing chat: HTTP ${response.status}`,
-          activity: [],
-          artifacts: [],
-        })
-      }
-    },
     handleKeydown(event) {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault()
@@ -897,13 +893,24 @@ export default {
         }
       }
     },
-    async sendMessage() {
-      const content = this.draft.trim()
-      if (this.sending || (!content && this.attachments.length === 0)) return
+    async sendFullAnalysisPrompt() {
+      await this.sendMessage({
+        contentOverride: FULL_ANALYSIS_PROMPT,
+        includeAttachments: false,
+        clearDraft: false,
+      })
+    },
+    async sendMessage(options = {}) {
+      const contentOverride = typeof options.contentOverride === 'string' ? options.contentOverride : null
+      const includeAttachments = options.includeAttachments !== false
+      const clearDraft = options.clearDraft !== false
+      const content = (contentOverride ?? this.draft).trim()
+      const attachmentSource = includeAttachments ? this.attachments : []
+      if (this.sending || (!content && attachmentSource.length === 0)) return
 
       let assistantMessage = null
-      const pendingAttachments = [...this.attachments]
-      const attachments = this.attachments.map((attachment) => ({
+      const pendingAttachments = [...attachmentSource]
+      const attachments = attachmentSource.map((attachment) => ({
         id: attachment.id,
         name: attachment.name,
         type: attachment.file.type,
@@ -916,7 +923,7 @@ export default {
         attachments,
         createdAt: new Date().toISOString(),
       })
-      this.draft = ''
+      if (clearDraft) this.draft = ''
       this.sending = true
       this.stopRequested = false
       this.scrollToBottom()
@@ -929,8 +936,10 @@ export default {
             dataUrl: await this.readFileAsDataUrl(attachment.file),
           })),
         )
-        pendingAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
-        this.attachments = []
+        if (includeAttachments) {
+          pendingAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
+          this.attachments = []
+        }
 
         if (this.beforeSend) {
           await this.beforeSend()
@@ -1510,6 +1519,31 @@ export default {
   flex-shrink: 0;
 }
 
+.codex-chat-preset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  padding: 5px 10px;
+}
+
+.codex-chat-preset-btn:hover {
+  background: #dbeafe;
+}
+
+.codex-chat-preset-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .panel-resize-handle {
   position: absolute;
   bottom: 0;
@@ -1573,14 +1607,31 @@ export default {
   margin-top: 8px;
 }
 
-.codex-chat-secondary,
-.codex-chat-stop,
-.codex-chat-send {
+.codex-chat-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
   border: none;
   border-radius: 6px;
-  padding: 7px 10px;
-  font-size: 12px;
+  padding: 0;
   cursor: pointer;
+}
+
+.chat-action-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chat-action-icon rect {
+  fill: currentColor;
+  stroke: none;
 }
 
 .codex-chat-secondary {

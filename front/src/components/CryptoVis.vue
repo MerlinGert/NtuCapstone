@@ -16,14 +16,6 @@
             {{ workspaceLabel }}
           </span>
           <button
-            v-if="isHumanWorkspace && maniscopeSessionId"
-            class="session-io-btn"
-            @click="openAgentWorkspace"
-            title="Open the agent workspace in a separate page"
-          >
-            Open Agent Workspace
-          </button>
-          <button
             class="ai-chat-btn"
             @click="chatBoxOpen = !chatBoxOpen"
             :class="{ active: chatBoxOpen }"
@@ -897,10 +889,6 @@ export default {
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(url).catch(() => {})
       }
-    },
-    openAgentWorkspace() {
-      if (!this.maniscopeSessionId || typeof window === 'undefined') return
-      window.open(`${window.location.origin}/${this.maniscopeSessionId}/agent`, '_blank', 'noopener')
     },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
