@@ -3,6 +3,7 @@
 Use `reasoning-graph-patch-*.json` after executing a Recommendation Plan Forest. A patch records evidence-backed additions from follow-up investigation and merges them into the canonical `reasoning-graph.json`.
 
 Do not manually edit generated forest Markdown. Apply patches to the graph, then regenerate forests.
+For live sessions, prefer the session-local TypeScript graph tool for validation, materialization, and checkpointing.
 
 ## Patch Shape
 
@@ -10,10 +11,44 @@ Do not manually edit generated forest Markdown. Apply patches to the graph, then
 {
   "version": 1,
   "runId": "investigation-run-001",
+  "patchType": "main",
   "description": "Quantified clicked cohort behavior for H3",
   "operations": []
 }
 ```
+
+Use these patch types:
+
+- `main`: primary agent follow-up evidence from executed Investigation Strategies.
+- `skeptical`: verified disconfirmation or counterevidence, normally saved as `reasoning-graph-patch-skeptical.json`.
+- `incremental`: evidence from new user Interactions or annotations after an earlier anchored analysis.
+
+Incremental patches must be named `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json` and include both anchors:
+
+```json
+{
+  "version": 1,
+  "runId": "incremental-37-52-001",
+  "patchType": "incremental",
+  "baseAnchor": {
+    "sessionId": "abcde",
+    "traceRevision": 37,
+    "actionCount": 25,
+    "annotationCount": 18,
+    "traceDigest": "sha256:..."
+  },
+  "targetAnchor": {
+    "sessionId": "abcde",
+    "traceRevision": 52,
+    "actionCount": 31,
+    "annotationCount": 22,
+    "traceDigest": "sha256:..."
+  },
+  "operations": []
+}
+```
+
+The base anchor must match the latest graph anchor after applying existing patches. If the trace digest indicates that old trace content changed rather than only being appended, stop incremental work and run full reanalysis or explicit reconciliation.
 
 Allowed operations:
 
@@ -112,6 +147,21 @@ Use `add_root` when a Hypothesis Expansion follow-up creates an evidence-backed 
 ```
 
 ## Applying A Patch
+
+For live sessions, validate and materialize with:
+
+```bash
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
+bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts
+```
+
+If the active deduplicated patch count reaches 8, compact the patch stack with:
+
+```bash
+bun trace_analysis_tools/reasoning_graph/cli.ts checkpoint artifacts
+```
+
+For static exported trace folders, the Python script can still produce optional forest exports:
 
 ```bash
 python skills/user-trace-analysis/scripts/apply_reasoning_graph_patch.py \

@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-05-28.2"
+TOOL_VERSION = "2026-05-28.3"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
 TRACE_ANALYSIS_TOOLS_DIR_NAME = "trace_analysis_tools"
 REASONING_GRAPH_TS_DIR_NAME = "reasoning_graph"
@@ -102,9 +102,11 @@ Use these tools from the session directory when creating durable trace-analysis 
 
 ```bash
 bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
+bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts
+bun trace_analysis_tools/reasoning_graph/cli.ts checkpoint artifacts
 ```
 
-The TypeScript validator applies all `reasoning-graph-patch*.json` files in the same order as the frontend. The Python scripts remain available under `trace_analysis_tools/scripts/` for static Markdown/JSON exports when requested. The copied format references under `trace_analysis_tools/references/` define the graph, plan, and patch schemas.
+The TypeScript validator applies all `reasoning-graph-patch*.json` files in the same order as the frontend. Use `materialize` to write `current-reasoning-graph.json` as a complete reading aid before incremental analysis. Use `checkpoint` to archive the old base graph and active patches, then replace `reasoning-graph.json` with the materialized graph when the active deduplicated patch count reaches 8 or the user explicitly asks for compaction. The Python scripts remain available under `trace_analysis_tools/scripts/` for static Markdown/JSON exports when requested. The copied format references under `trace_analysis_tools/references/` define the graph, plan, and patch schemas.
 """
 
 

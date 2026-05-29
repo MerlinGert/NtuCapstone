@@ -12,14 +12,15 @@ For a full trace analysis, produce all analysis artifacts inside `TRACE/analysis
 - `TRACE/analysis-results/analysis-report.md`: narrative analysis with evidence, rationale, caveats, intentions, findings, and recommendations.
 - `TRACE/analysis-results/trace-step-map.md`: traceability map linking logged Interactions and annotations to intentions, findings, and recommendations.
 - `TRACE/analysis-results/reasoning-graph.json`: canonical shared-node graph for the trace. This is the source of truth for reasoning support.
+- `TRACE/analysis-results/current-reasoning-graph.json`: optional materialized graph generated from the base graph plus patches. Use it for global context during incremental analysis; do not treat it as the frontend source of truth.
 - `TRACE/analysis-results/user-reasoning-forest.md`: optional readable derived forest rooted at user Hypotheses.
 - `TRACE/analysis-results/user-reasoning-forest.json`: optional machine-readable derived forest when static exports are requested.
 - `TRACE/analysis-results/recommendation-plan-graph.json` and `TRACE/analysis-results/recommendation-plan-forest.md`: prescriptive plan artifacts for Evidence Completion and Hypothesis Expansion.
 - `TRACE/analysis-results/continued-investigation-report.md`: evidence-backed follow-up execution report.
-- `TRACE/analysis-results/reasoning-graph-patch-*.json`: follow-up evidence patches. Use `reasoning-graph-patch.json` for main follow-up evidence and `reasoning-graph-patch-skeptical.json` for verified disconfirmation or counterevidence.
+- `TRACE/analysis-results/reasoning-graph-patch-*.json`: follow-up evidence patches. Use `reasoning-graph-patch.json` for main follow-up evidence, `reasoning-graph-patch-skeptical.json` for verified disconfirmation or counterevidence, and `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json` for new user trace deltas after an anchored analysis.
 - `TRACE/analysis-results/augmented-reasoning-graph.json`, `TRACE/analysis-results/augmented-reasoning-forest.json`, and `TRACE/analysis-results/augmented-reasoning-forest.md`: optional regenerated reasoning exports after applying follow-up patches.
 
-For the canonical graph schema, relation taxonomy, salience field, and forest transformation rules, read `references/reasoning-graph-format.md`. In live ManiScope sessions, validate `reasoning-graph.json` and all `reasoning-graph-patch*.json` files with the copied TypeScript validator at `trace_analysis_tools/reasoning_graph/cli.ts`. Use the Python forest scripts only for static exports when requested.
+For the canonical graph schema, trace anchors, relation taxonomy, salience field, materialization, checkpointing, and forest transformation rules, read `references/reasoning-graph-format.md`. In live ManiScope sessions, validate `reasoning-graph.json` and all `reasoning-graph-patch*.json` files with the copied TypeScript validator at `trace_analysis_tools/reasoning_graph/cli.ts`. Use `materialize` before incremental work when patches already exist. Use `checkpoint` when active deduplicated patch count reaches 8 unless the user asks to preserve the patch stack. Use the Python forest scripts only for static exports when requested.
 
 For a full trace analysis, also read:
 
@@ -664,13 +665,22 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 
 ### `reasoning-graph.json` required content
 
-- `version`, `trace`, `nodes`, `edges`, and `roots`.
+- `version`, `trace`, `analysisAnchor` when a trace version is available, `nodes`, `edges`, and `roots`.
 - One canonical node for every Interaction, Task, Analytic Question, Analytic Activity, Finding, Hypothesis, and Investigation Strategy used in the trace-step map.
 - Relation types limited to `motivates`, `produces`, `answers`, `supports`, `refines`, `contradicts`, `contains`, and `derived_from`.
 - `reasoning-graph-patch-skeptical.json` must not contain support-only skeptical Findings. Each added Finding in that file must have an outgoing `refines` or `contradicts` edge.
 - Every Interaction node must include `interactionType` and `salience`.
 - Every Analytic Activity node must include `activityType`.
 - Every node should include provenance such as action indices, annotation indices, screenshots, local data checks, or rendered visual evidence.
+
+### Incremental analysis and materialized graphs
+
+- Use incremental analysis when existing graph artifacts are present and the live trace has advanced through new user Interactions or annotations.
+- Compare the latest graph or patch `targetAnchor` with the current live trace `traceAnchor`. Git history is audit context, not the semantic anchor.
+- Run `bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts` before incremental work when patch files exist. Read `current-reasoning-graph.json` for the complete current graph, but keep writing new evidence as patches.
+- Write incremental evidence to `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json` with `patchType: "incremental"`, `baseAnchor`, and `targetAnchor`.
+- If the old trace digest no longer matches the current trace prefix, stop incremental work and perform full reanalysis or explicit reconciliation.
+- If the active deduplicated root-level patch count reaches 8, run `bun trace_analysis_tools/reasoning_graph/cli.ts checkpoint artifacts` unless the user explicitly asks to preserve the unsquashed patch stack. Checkpointing archives the old base and patches, then replaces `reasoning-graph.json` with the materialized graph.
 
 ### `user-reasoning-forest.md` required sections
 

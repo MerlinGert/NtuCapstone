@@ -406,6 +406,7 @@ Session-local trace-analysis tools:
   - trace_analysis_tools/references/recommendation-plan-format.md
   - trace_analysis_tools/references/reasoning-graph-patch-format.md
 - Graph-first contract: write reasoning-graph.json first as the canonical source of truth. The frontend reads reasoning-graph.json plus every reasoning-graph-patch*.json file, validates them, applies patches in deterministic order, and renders the derived forest itself.
+- Reasoning graphs should include analysisAnchor metadata for the live trace snapshot they cover. Incremental patches must include baseAnchor and targetAnchor metadata, plus patchType="incremental". Use reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json for incremental user-trace deltas.
 - user-reasoning-forest.json, augmented-reasoning-forest.json, and their Markdown forms are optional static exports. Do not create or edit them for normal UI operation unless the user explicitly asks for export files.
 - For every AnalyticQuestion node, create at least one evidence-backed mid-level Finding node that answers it, unless the trace truly provides no answer. Add explicit "answers" edges from mid-level Finding -> AnalyticQuestion. Do not rely only on shared Hypothesis membership, nearby AnalyticActivities, or prose explanations. If the answer is partial or caveated, encode that in the Finding label, confidence, explanation, and rationale.
 - Build a readable Finding hierarchy when the trace contains enough evidence: low-level Findings for concrete visual/statistical/model observations, mid-level Findings that synthesize those observations and answer AnalyticQuestions, and high-level Findings that synthesize multiple mid-level Findings before supporting Hypotheses.
@@ -418,6 +419,8 @@ Session-local trace-analysis tools:
 - For live chat session artifacts, write JSON and Markdown under ${relativeSessionRoot}/artifacts unless the user names a different path. For exported trace-folder analyses, write under TRACE/analysis-results.
 - Use this session-local command before finalizing live chat artifacts:
   - bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
+- Use bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts when reasoning-graph-patch*.json files already exist and you need a complete current graph for global context. Read current-reasoning-graph.json as a derived aid only; keep writing new evidence as patch files.
+- Use bun trace_analysis_tools/reasoning_graph/cli.ts checkpoint artifacts when the active deduplicated patch count reaches 8 or the validator reports "Checkpoint recommended", unless the user explicitly asks to preserve the unsquashed patch stack. Checkpointing archives the old base graph and active patches, then replaces reasoning-graph.json with the materialized graph.
 - The validator applies all reasoning-graph-patch*.json files. Fix validation errors before reporting completion.
 - Before finalizing a full trace artifact set, verify that reasoning-graph.json and all patch files validate, that every AnalyticQuestion has at least one incoming "answers" edge from a mid-level Finding or is marked as an unresolved Reasoning Gap, that the Finding hierarchy is not unnecessarily flat, and that trace annotations with user claims appear as user Finding nodes rather than being lost.
 
@@ -439,6 +442,17 @@ Full trace-level analysis pipeline:
   12. Save durable artifacts under TRACE/analysis-results for trace-folder analyses or ${relativeSessionRoot}/artifacts for live-chat session analyses, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
 - If time, tool access, missing data, or rendering failures prevent a complete pipeline, say which stages were completed, which were blocked, and what exact evidence or tool would unblock the remaining stages.
 
+Incremental trace analysis pipeline:
+- Trigger this pipeline when the user asks what changed, asks to continue or refine an existing analysis, or when reasoning-graph.json already exists and the live trace has advanced beyond the latest graph or patch anchor.
+- Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest. Compare the latest applied graph anchor with the current live traceAnchor. Git history is useful audit context, but the semantic boundary is the trace anchor.
+- If reasoning-graph-patch*.json files exist, run bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts first and read current-reasoning-graph.json to understand the full patched graph.
+- If the prior anchor is missing or the old trace digest no longer matches the current trace prefix, do not guess. Explain that incremental analysis is unsafe and recommend full reanalysis or explicit reconciliation.
+- Analyze only the new user Interactions and annotations after the baseAnchor, while using the current materialized graph as context.
+- Write new evidence to reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json with patchType="incremental", baseAnchor, targetAnchor, explanation/evidenceSummary/reasoningRole/patchRationale on agent-created nodes, and precise provenance for the new trace range.
+- Use update_node only to refine metadata on existing nodes; use add_node/add_edge for new Findings, Hypotheses, Interactions, and support/refine/contradict relationships.
+- If the new trace adds no material evidence, report that no patch was produced and explain the checked delta.
+- Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts after writing the patch. If it reports checkpoint recommended because active patch count is at least 8, run checkpoint before reporting completion unless the user asked to keep the full patch stack.
+
 Response and execution modes:
 
 Mode A: lightweight chat.
@@ -448,7 +462,7 @@ Mode A: lightweight chat.
 
 Mode B: trace refresh and trace-dependent Q&A.
 - Inspect the session git log or diff when the user asks what changed, continues after using the UI, or asks a follow-up that may depend on new trace patches.
-- Update your interpretation of the User Reasoning Forest when new user Interactions or annotations appear.
+- If prior graph artifacts exist, compare their latest trace anchor to the current live traceAnchor. Use incremental trace analysis when new user Interactions or annotations appear.
 - Explain whether the answer is based on the previous analysis, new trace evidence, or both.
 
 Mode C: full trace analysis.

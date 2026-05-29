@@ -7,8 +7,30 @@ Use `reasoning-graph.json` as the canonical shared-node representation for a Man
 For a full trace analysis, place these files in `TRACE/analysis-results/`:
 
 - `reasoning-graph.json`: canonical graph with shared nodes.
+- `current-reasoning-graph.json`: optional derived graph produced by applying all current patch files; use as a reading aid for global context, not as the UI source of truth.
 - `user-reasoning-forest.json`: generated tree instances with duplicated shared nodes.
 - `user-reasoning-forest.md`: generated Markdown and Mermaid forest.
+
+## Trace Anchors
+
+Use anchors to record which trace version a graph or patch covers. A base graph should include `analysisAnchor`; materialized graphs and applied patch stacks may also include `latestAnchor`.
+
+```json
+{
+  "analysisAnchor": {
+    "sessionId": "abcde",
+    "traceRevision": 37,
+    "actionCount": 25,
+    "annotationCount": 18,
+    "lastActionId": "24",
+    "lastAnnotationId": "18",
+    "traceDigest": "sha256:...",
+    "gitCommit": "optional"
+  }
+}
+```
+
+`traceRevision`, `actionCount`, and `annotationCount` must be non-negative integers. `traceDigest` is the semantic digest of the canonical trace content. A git commit may be included for audit, but it is not the semantic boundary for incremental analysis.
 
 ## Node Schema
 
@@ -123,6 +145,13 @@ Allowed relations:
 {
   "version": 1,
   "trace": "maniscope-session-ACT-20260501-025125",
+  "analysisAnchor": {
+    "sessionId": "abcde",
+    "traceRevision": 37,
+    "actionCount": 25,
+    "annotationCount": 18,
+    "traceDigest": "sha256:..."
+  },
   "roots": ["H3"],
   "nodes": [],
   "edges": []
@@ -169,17 +198,33 @@ Avoid connecting the same mid-level Finding directly to both an Analytic Questio
 
 ## Validation Expectations
 
-Before using a graph in a report:
+Before using a graph in a report or live session:
 
 ```bash
-python skills/user-trace-analysis/scripts/reasoning_graph_to_forest.py \
-  TRACE/analysis-results/reasoning-graph.json
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 ```
+
+When patch files exist and an agent needs the full current graph, materialize first:
+
+```bash
+bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts
+```
+
+This writes `current-reasoning-graph.json` as a derived reading aid. It does not replace `reasoning-graph.json`.
+
+When the active deduplicated root-level patch count reaches 8, checkpoint the stack unless the user asks to preserve the unsquashed patch history:
+
+```bash
+bun trace_analysis_tools/reasoning_graph/cli.ts checkpoint artifacts
+```
+
+Checkpointing archives the old base graph and active patches, then writes a new materialized `reasoning-graph.json` baseline.
 
 The script should fail if:
 
 - `version` is not `1`,
 - `trace` is missing,
+- `analysisAnchor` or `latestAnchor`, when present, is malformed,
 - node IDs are duplicated,
 - a node is missing `id`, `kind`, `space`, `scope`, `label`, `confidence`, or `provenance`,
 - a non-trivial reasoning node is missing `explanation`,
