@@ -7,19 +7,23 @@
           Findings hierarchy under top-level hypotheses, with agent patch findings overlaid.
         </div>
       </div>
-      <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
-        {{ loading ? 'Loading...' : 'Refresh' }}
-      </button>
+      <div class="toolbar-actions">
+        <button class="export-btn" :disabled="loading || !hasAnalysis" @click="exportAnalysis">
+          Export JSON
+        </button>
+        <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
+          {{ loading ? 'Loading...' : 'Refresh' }}
+        </button>
+      </div>
     </div>
     <div v-if="artifactSummary" class="artifact-summary">{{ artifactSummary }}</div>
 
     <div class="legend-block">
-      <div class="legend-row">
+      <div class="legend-row legend-row-single">
         <span class="legend-item legend-hypothesis">Hypothesis</span>
+        <span class="legend-item legend-derived-hypothesis">Derived Hypothesis</span>
         <span class="legend-item legend-user">User Finding</span>
         <span class="legend-item legend-patch">Agent Finding</span>
-      </div>
-      <div class="legend-row">
         <span class="legend-item relation-legend relation-supports">Supports</span>
         <span class="legend-item relation-legend relation-answers">Answers</span>
         <span class="legend-item relation-legend relation-refines">Refines</span>
@@ -80,7 +84,7 @@
                     v-for="finding in selectedNodeInternalFindings"
                     :key="finding.key"
                     class="detail-finding-card"
-                    :class="finding.relationClass"
+                    :class="[finding.sourceClass, finding.relationClass]"
                   >
                     <div class="detail-finding-header">
                       <span
@@ -160,6 +164,7 @@ export default {
       error: '',
       manifest: null,
       reasoningGraph: null,
+      augmentedReasoningGraph: null,
       graphPatches: [],
       displayTrees: [],
       selectedNode: null,
@@ -222,13 +227,20 @@ export default {
     },
     selectedNodeTypeLabel() {
       if (!this.selectedNode) return ''
+      if (this.selectedNode.type === 'Hypothesis' && this.selectedNode.source === 'patch') {
+        return 'Derived Hypothesis'
+      }
       if (this.selectedNode.type === 'Finding') {
         return this.selectedNode.source === 'patch' ? 'Agent Finding' : 'User Finding'
       }
       return this.selectedNode.type || 'Node'
     },
     selectedNodeTypeClass() {
-      if (!this.selectedNode || this.selectedNode.type !== 'Finding') return ''
+      if (!this.selectedNode) return ''
+      if (this.selectedNode.type === 'Hypothesis' && this.selectedNode.source === 'patch') {
+        return 'detail-type-derived-hypothesis'
+      }
+      if (this.selectedNode.type !== 'Finding') return ''
       return this.selectedNode.source === 'patch' ? 'detail-type-agent-finding' : 'detail-type-user-finding'
     },
     selectedNodeRelationLabel() {
@@ -263,6 +275,7 @@ export default {
         this.loadStarted = false
         this.manifest = null
         this.reasoningGraph = null
+        this.augmentedReasoningGraph = null
         this.graphPatches = []
         this.displayTrees = []
         this.selectedNode = null
@@ -349,6 +362,63 @@ export default {
     async refreshAnalysis() {
       await this.loadAnalysis({ force: true })
     },
+    exportAnalysis() {
+      if (!this.reasoningGraph || !this.hasAnalysis) return
+      const payload = {
+        exportVersion: 1,
+        exportFormat: 'maniscope-llm-analysis-json',
+        exportedAt: new Date().toISOString(),
+        sessionId: this.sessionId || null,
+        artifactSummary: this.artifactSummary || null,
+        currentArtifacts: this.currentAnalysisArtifacts(),
+        reasoningGraph: this.reasoningGraph,
+        graphPatches: this.graphPatches.map((layer) => ({
+          name: layer.name,
+          patch: layer.patch,
+        })),
+        augmentedReasoningGraph: this.augmentedReasoningGraph,
+        displayForest: this.displayTrees,
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = this.buildAnalysisExportFileName()
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    },
+    currentAnalysisArtifacts() {
+      const current = this.manifest?.current || {}
+      const graphInfo = current.reasoningGraph || this.manifest?.reasoningGraph || null
+      const patchInfos = Array.isArray(current.patches)
+        ? current.patches
+        : Array.isArray(this.manifest?.patches)
+          ? this.manifest.patches
+          : []
+      return {
+        reasoningGraph: graphInfo,
+        patches: patchInfos,
+      }
+    },
+    buildAnalysisExportFileName() {
+      const date = new Date()
+      const stamp = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+      ].join('') + '-'
+        + [
+          String(date.getHours()).padStart(2, '0'),
+          String(date.getMinutes()).padStart(2, '0'),
+          String(date.getSeconds()).padStart(2, '0'),
+        ].join('')
+      const sessionPart = String(this.sessionId || 'session')
+        .replace(/[^a-z0-9_-]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+      return `maniscope-llm-analysis-${sessionPart || 'session'}-${stamp}.json`
+    },
     async loadAnalysis(options = {}) {
       if (!this.sessionId) {
         this.error = 'No active ManiScope session.'
@@ -380,6 +450,7 @@ export default {
         ])
         if (!reasoningGraph) {
           this.reasoningGraph = null
+          this.augmentedReasoningGraph = null
           this.graphPatches = []
           this.displayTrees = []
           return
@@ -398,6 +469,7 @@ export default {
         )
         const augmentedGraph = applyReasoningPatches(reasoningGraph, patchLayers)
         this.reasoningGraph = reasoningGraph
+        this.augmentedReasoningGraph = augmentedGraph
         this.graphPatches = patchLayers
         this.displayTrees = projectGraphToDisplayForest(augmentedGraph)
           .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
@@ -520,6 +592,7 @@ export default {
                 key,
                 label: child.label,
                 relationLabel: this.relationLabel(child.displayRelation || child.relation),
+                sourceClass: child.source === 'patch' ? 'detail-finding-agent' : 'detail-finding-user',
                 relationClass: this.normalizedRelation(child.displayRelation || child.relation)
                   ? `relation-${this.normalizedRelation(child.displayRelation || child.relation)}`
                   : '',
@@ -791,6 +864,13 @@ export default {
   margin-bottom: 8px;
 }
 
+.toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .analysis-title {
   color: #334155;
   font-size: 13px;
@@ -811,6 +891,7 @@ export default {
 }
 
 .refresh-btn,
+.export-btn,
 .detail-close {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
@@ -823,6 +904,11 @@ export default {
 }
 
 .refresh-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.export-btn:disabled {
   cursor: default;
   opacity: 0.6;
 }
@@ -840,6 +926,10 @@ export default {
   gap: 6px;
 }
 
+.legend-row-single {
+  align-items: center;
+}
+
 .legend-item {
   border-radius: 999px;
   border: 1px solid #d8e0ec;
@@ -854,16 +944,22 @@ export default {
   color: #334155;
 }
 
+.legend-derived-hypothesis {
+  background: #fff0f7;
+  border-color: #f3b4d0;
+  color: #be185d;
+}
+
 .legend-user {
-  background: #ecfeef;
-  border-color: #9ae6b4;
-  color: #166534;
+  background: #edf4ff;
+  border-color: #b8cdf8;
+  color: #1d4ed8;
 }
 
 .legend-patch {
-  background: #fff7ed;
-  border-color: #fdba74;
-  color: #c2410c;
+  background: #fff0f7;
+  border-color: #f3b4d0;
+  color: #be185d;
 }
 
 .relation-legend {
@@ -978,20 +1074,27 @@ export default {
 }
 
 .detail-type {
-  background: #eef2ff;
-  color: #4338ca;
+  background: #d9e3ff;
+  color: #334155;
+  border: 1px solid #aabce8;
 }
 
 .detail-type-user-finding {
-  color: #166534;
-  background: #ecfdf3;
-  border: 1px solid #86efac;
+  color: #1d4ed8;
+  background: #edf4ff;
+  border: 1px solid #b8cdf8;
+}
+
+.detail-type-derived-hypothesis {
+  color: #be185d;
+  background: #fff0f7;
+  border: 1px solid #f3b4d0;
 }
 
 .detail-type-agent-finding {
-  color: #92400e;
-  background: #fffbeb;
-  border: 1px solid #fbbf24;
+  color: #be185d;
+  background: #fff0f7;
+  border: 1px solid #f3b4d0;
 }
 
 .detail-relation {
@@ -1081,14 +1184,14 @@ export default {
   background: #f8fafc;
 }
 
-.detail-finding-card.relation-contradicts {
-  background: #fff1f2;
-  border-color: #fb7185;
+.detail-finding-card.detail-finding-user {
+  background: #edf4ff;
+  border-color: #b8cdf8;
 }
 
-.detail-finding-card.relation-refines {
-  background: #fffbeb;
-  border-color: #fbbf24;
+.detail-finding-card.detail-finding-agent {
+  background: #fff0f7;
+  border-color: #f3b4d0;
 }
 
 .detail-finding-card.relation-answers {
