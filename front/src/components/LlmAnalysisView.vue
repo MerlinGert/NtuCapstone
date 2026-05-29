@@ -8,12 +8,18 @@
         </div>
       </div>
       <div class="toolbar-actions">
-        <button class="export-btn" :disabled="loading || !hasAnalysis" @click="exportAnalysis">
+        <button class="export-btn" :disabled="loading || !canExportAnalysis" @click="exportAnalysis">
           Export JSON
         </button>
-        <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
+        <button
+          v-if="!isImportedMode"
+          class="refresh-btn"
+          :disabled="loading || !sessionId"
+          @click="refreshAnalysis"
+        >
           {{ loading ? 'Loading...' : 'Refresh' }}
         </button>
+        <span v-else class="imported-mode-badge">Imported JSON</span>
       </div>
     </div>
     <div v-if="artifactSummary" class="artifact-summary">{{ artifactSummary }}</div>
@@ -157,6 +163,10 @@ export default {
       type: Boolean,
       default: true,
     },
+    analysisPayload: {
+      type: Object,
+      default: null,
+    },
   },
   data() {
     return {
@@ -174,13 +184,20 @@ export default {
     }
   },
   computed: {
+    isImportedMode() {
+      return Boolean(this.analysisPayload)
+    },
     hasAnalysis() {
       return this.forestTrees.length > 0
+    },
+    canExportAnalysis() {
+      return this.hasAnalysis || Boolean(this.reasoningGraph) || Boolean(this.augmentedReasoningGraph)
     },
     forestTrees() {
       return this.displayTrees
     },
     artifactSummary() {
+      if (this.analysisPayload?.artifactSummary) return this.analysisPayload.artifactSummary
       const current = this.manifest?.current || {}
       const graphName = current.reasoningGraph?.name || this.manifest?.reasoningGraph?.name
       const patches = Array.isArray(current.patches)
@@ -269,9 +286,19 @@ export default {
     },
   },
   watch: {
+    analysisPayload: {
+      immediate: true,
+      handler(payload) {
+        if (payload) {
+          this.stopPolling()
+          this.applyImportedAnalysis(payload)
+        }
+      },
+    },
     sessionId: {
       immediate: true,
       handler() {
+        if (this.isImportedMode) return
         this.loadStarted = false
         this.manifest = null
         this.reasoningGraph = null
@@ -286,6 +313,7 @@ export default {
     active: {
       immediate: true,
       handler(isActive) {
+        if (this.isImportedMode) return
         if (isActive) {
           this.startPolling()
           this.loadAnalysis({ force: true, silent: this.loadStarted })
@@ -298,7 +326,7 @@ export default {
   mounted() {
     window.addEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
     window.addEventListener('keydown', this.handleKeydown)
-    if (this.active) this.startPolling()
+    if (this.active && !this.isImportedMode) this.startPolling()
   },
   beforeUnmount() {
     this.stopPolling()
@@ -360,15 +388,63 @@ export default {
       ].join('|')
     },
     async refreshAnalysis() {
+      if (this.isImportedMode) {
+        this.applyImportedAnalysis(this.analysisPayload)
+        return
+      }
       await this.loadAnalysis({ force: true })
     },
+    cloneJson(value) {
+      if (value == null) return value
+      try {
+        return JSON.parse(JSON.stringify(value))
+      } catch (error) {
+        return value
+      }
+    },
+    applyImportedAnalysis(payload) {
+      const snapshot = this.cloneJson(payload) || {}
+      const displayForest = Array.isArray(snapshot.displayForest)
+        ? snapshot.displayForest
+          .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
+          .filter(Boolean)
+        : []
+      const patchLayers = Array.isArray(snapshot.graphPatches)
+        ? snapshot.graphPatches
+          .map((layer) => {
+            if (!layer) return null
+            const name = layer.name || 'reasoning-graph-patch.json'
+            const patch = layer.patch || layer
+            if (!patch || typeof patch !== 'object') return null
+            return { name, patch }
+          })
+          .filter(Boolean)
+        : []
+      const currentArtifacts = snapshot.currentArtifacts || {}
+      this.loading = false
+      this.error = displayForest.length || snapshot.reasoningGraph || snapshot.augmentedReasoningGraph
+        ? ''
+        : 'Imported analysis JSON does not contain a displayable reasoning forest.'
+      this.manifest = {
+        current: currentArtifacts,
+        reasoningGraph: currentArtifacts.reasoningGraph || null,
+        patches: Array.isArray(currentArtifacts.patches) ? currentArtifacts.patches : [],
+      }
+      this.reasoningGraph = snapshot.reasoningGraph || null
+      this.augmentedReasoningGraph = snapshot.augmentedReasoningGraph || snapshot.reasoningGraph || null
+      this.graphPatches = patchLayers
+      this.displayTrees = displayForest
+      this.selectedNode = null
+      this.lastManifestSignature = ''
+      this.loadStarted = true
+    },
     exportAnalysis() {
-      if (!this.reasoningGraph || !this.hasAnalysis) return
+      if (!this.canExportAnalysis) return
       const payload = {
         exportVersion: 1,
         exportFormat: 'maniscope-llm-analysis-json',
         exportedAt: new Date().toISOString(),
-        sessionId: this.sessionId || null,
+        sessionId: this.sessionId || this.analysisPayload?.sessionId || null,
         artifactSummary: this.artifactSummary || null,
         currentArtifacts: this.currentAnalysisArtifacts(),
         reasoningGraph: this.reasoningGraph,
@@ -390,6 +466,9 @@ export default {
       window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     },
     currentAnalysisArtifacts() {
+      if (this.analysisPayload?.currentArtifacts) {
+        return this.cloneJson(this.analysisPayload.currentArtifacts)
+      }
       const current = this.manifest?.current || {}
       const graphInfo = current.reasoningGraph || this.manifest?.reasoningGraph || null
       const patchInfos = Array.isArray(current.patches)
@@ -414,12 +493,13 @@ export default {
           String(date.getMinutes()).padStart(2, '0'),
           String(date.getSeconds()).padStart(2, '0'),
         ].join('')
-      const sessionPart = String(this.sessionId || 'session')
+      const sessionPart = String(this.sessionId || this.analysisPayload?.sessionId || 'session')
         .replace(/[^a-z0-9_-]+/gi, '-')
         .replace(/^-+|-+$/g, '')
       return `maniscope-llm-analysis-${sessionPart || 'session'}-${stamp}.json`
     },
     async loadAnalysis(options = {}) {
+      if (this.isImportedMode) return
       if (!this.sessionId) {
         this.error = 'No active ManiScope session.'
         return
@@ -485,6 +565,7 @@ export default {
     },
     startPolling() {
       this.stopPolling()
+      if (this.isImportedMode) return
       if (!this.sessionId) return
       this.pollTimer = window.setInterval(() => {
         this.loadAnalysis({ silent: true })
@@ -496,6 +577,7 @@ export default {
       this.pollTimer = null
     },
     handleArtifactUpdate(event) {
+      if (this.isImportedMode) return
       const detail = event?.detail || {}
       if (detail.sessionId && detail.sessionId !== this.sessionId) return
       const name = detail.artifact?.title || detail.artifact?.name || ''
@@ -869,6 +951,19 @@ export default {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.imported-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  padding: 2px 8px;
 }
 
 .analysis-title {

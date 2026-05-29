@@ -16,6 +16,15 @@
             {{ workspaceLabel }}
           </span>
           <button
+            v-if="isHumanWorkspace"
+            class="workspace-link-tag"
+            type="button"
+            title="Open imported LLM analysis page"
+            @click="openImportedAnalysisPage"
+          >
+            Analysis Import
+          </button>
+          <button
             class="ai-chat-btn"
             @click="chatBoxOpen = !chatBoxOpen"
             :class="{ active: chatBoxOpen }"
@@ -889,6 +898,9 @@ export default {
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(url).catch(() => {})
       }
+    },
+    openImportedAnalysisPage() {
+      window.open(`${window.location.origin}/analysis-import`, '_blank', 'noopener')
     },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
@@ -2648,6 +2660,25 @@ a {
   background: #f0fff4;
   color: #276749;
   border-color: #9ae6b4;
+}
+
+.workspace-link-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workspace-link-tag:hover {
+  background: #ede9fe;
+  border-color: #c4b5fd;
 }
 
 .ai-chat-btn {
