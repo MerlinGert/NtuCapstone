@@ -19,6 +19,8 @@ const PORT = Number(process.env.CODEX_BRIDGE_PORT || DEFAULT_CODEX_BRIDGE_PORT)
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8099'
 const BACKEND_URL = process.env.MANISCOPE_BACKEND_URL || DEFAULT_BACKEND_URL
 const DEFAULT_CODEX_NETWORK_ACCESS_ENABLED = true
+const CODEX_AGENT_MODEL = 'gpt-5.5'
+const CODEX_AGENT_REASONING_EFFORT = 'xhigh'
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
 const agentBrowser = new AgentBrowserManager()
@@ -251,15 +253,13 @@ function buildThreadOptions() {
     skipGitRepoCheck: false,
     sandboxMode: process.env.CODEX_SANDBOX_MODE || 'workspace-write',
     approvalPolicy: process.env.CODEX_APPROVAL_POLICY || 'never',
-    modelReasoningEffort: process.env.CODEX_REASONING_EFFORT || 'high',
+    model: CODEX_AGENT_MODEL,
+    modelReasoningEffort: CODEX_AGENT_REASONING_EFFORT,
     networkAccessEnabled: booleanEnv(
       'CODEX_NETWORK_ACCESS',
       DEFAULT_CODEX_NETWORK_ACCESS_ENABLED,
     ),
     webSearchMode: process.env.CODEX_WEB_SEARCH || 'disabled',
-  }
-  if (process.env.CODEX_MODEL) {
-    options.model = process.env.CODEX_MODEL
   }
   return options
 }
