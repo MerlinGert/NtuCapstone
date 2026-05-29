@@ -49,12 +49,43 @@ export interface ReasoningEdge {
   [key: string]: unknown
 }
 
+export interface TraceAnchor {
+  sessionId: string
+  traceRevision: number
+  actionCount: number
+  annotationCount: number
+  lastActionId?: string
+  lastAnnotationId?: string
+  traceDigest: string
+  gitCommit?: string
+  [key: string]: unknown
+}
+
+export type ReasoningGraphPatchType = 'main' | 'skeptical' | 'incremental' | string
+
+export interface MaterializedGraphSource {
+  base: string
+  patches: Array<{
+    name: string
+    runId: string
+    patchType?: ReasoningGraphPatchType
+    operationCount: number
+  }>
+  generatedAt: string
+  patchCount: number
+  checkpointRecommended: boolean
+}
+
 export interface ReasoningGraph {
   version: 1
   trace: string
   nodes: ReasoningNode[]
   edges: ReasoningEdge[]
   roots?: string[]
+  analysisAnchor?: TraceAnchor
+  latestAnchor?: TraceAnchor
+  materializedFrom?: MaterializedGraphSource
+  checkpointHistory?: Array<Record<string, unknown>>
   patchesApplied?: Array<Record<string, unknown>>
   [key: string]: unknown
 }
@@ -68,7 +99,10 @@ export type PatchOperation =
 export interface ReasoningGraphPatch {
   version: 1
   runId: string
+  patchType?: ReasoningGraphPatchType
   description?: string
+  baseAnchor?: TraceAnchor
+  targetAnchor?: TraceAnchor
   operations: PatchOperation[]
   [key: string]: unknown
 }
@@ -259,6 +293,8 @@ const PATCH_NODE_REQUIRED_FIELDS = [
   'reasoningRole',
   'patchRationale',
 ] as const
+export const CHECKPOINT_PATCH_THRESHOLD = 8
+export const CURRENT_REASONING_GRAPH_NAME = 'current-reasoning-graph.json'
 
 function fail(message: string, fileName?: string): never {
   throw new ReasoningGraphError(message, fileName)
@@ -291,6 +327,44 @@ function requireStringList(value: unknown, path: string, fileName?: string): str
     }
   })
   return list as string[]
+}
+
+function requireNonNegativeInteger(value: unknown, path: string, fileName?: string): number {
+  if (!Number.isInteger(value) || Number(value) < 0) fail(`${path} must be a non-negative integer`, fileName)
+  return Number(value)
+}
+
+function validateOptionalString(value: unknown, path: string, fileName?: string): void {
+  if (value != null) requireString(value, path, fileName)
+}
+
+export function validateTraceAnchor(anchor: unknown, path = 'anchor', fileName?: string): TraceAnchor {
+  const value = requireObject(anchor, path, fileName)
+  requireString(value.sessionId, `${path}.sessionId`, fileName)
+  requireNonNegativeInteger(value.traceRevision, `${path}.traceRevision`, fileName)
+  requireNonNegativeInteger(value.actionCount, `${path}.actionCount`, fileName)
+  requireNonNegativeInteger(value.annotationCount, `${path}.annotationCount`, fileName)
+  validateOptionalString(value.lastActionId, `${path}.lastActionId`, fileName)
+  validateOptionalString(value.lastAnnotationId, `${path}.lastAnnotationId`, fileName)
+  requireString(value.traceDigest, `${path}.traceDigest`, fileName)
+  validateOptionalString(value.gitCommit, `${path}.gitCommit`, fileName)
+  return value as unknown as TraceAnchor
+}
+
+function anchorsMatch(left: TraceAnchor, right: TraceAnchor): boolean {
+  return left.sessionId === right.sessionId
+    && left.traceRevision === right.traceRevision
+    && left.actionCount === right.actionCount
+    && left.annotationCount === right.annotationCount
+    && left.traceDigest === right.traceDigest
+}
+
+function describeAnchor(anchor: TraceAnchor): string {
+  return `${anchor.sessionId}@${anchor.traceRevision}/${anchor.actionCount}/${anchor.annotationCount}/${anchor.traceDigest}`
+}
+
+export function latestGraphAnchor(graph: ReasoningGraph): TraceAnchor | undefined {
+  return graph.latestAnchor || graph.analysisAnchor
 }
 
 function validateOptionalDetailFields(node: Record<string, unknown>, nodeId: string, fileName?: string): void {
@@ -420,6 +494,8 @@ export function validateReasoningGraph(
   const root = requireObject(graph, 'graph', fileName)
   if (root.version !== 1) fail('graph.version must be 1', fileName)
   requireString(root.trace, 'graph.trace', fileName)
+  if (root.analysisAnchor != null) validateTraceAnchor(root.analysisAnchor, 'graph.analysisAnchor', fileName)
+  if (root.latestAnchor != null) validateTraceAnchor(root.latestAnchor, 'graph.latestAnchor', fileName)
 
   const rawNodes = requireArray(root.nodes, 'graph.nodes', fileName)
   const rawEdges = requireArray(root.edges, 'graph.edges', fileName)
@@ -482,6 +558,46 @@ function isSkepticalPatchFile(fileName?: string): boolean {
   return /(^|[/\\])reasoning-graph-patch-skeptical\.json$/i.test(String(fileName || ''))
 }
 
+function isIncrementalPatchFile(fileName?: string): boolean {
+  return /(^|[/\\])reasoning-graph-patch-incremental-\d+-\d+\.json$/i.test(String(fileName || ''))
+}
+
+function inferredPatchType(fileName?: string): ReasoningGraphPatchType {
+  if (isSkepticalPatchFile(fileName)) return 'skeptical'
+  if (isIncrementalPatchFile(fileName)) return 'incremental'
+  return 'main'
+}
+
+function validatePatchAnchors(root: Record<string, unknown>, patchType: ReasoningGraphPatchType, fileName?: string): void {
+  const hasBase = root.baseAnchor != null
+  const hasTarget = root.targetAnchor != null
+
+  if (patchType === 'incremental' && (!hasBase || !hasTarget)) {
+    fail('incremental patches must include baseAnchor and targetAnchor', fileName)
+  }
+
+  const baseAnchor = hasBase ? validateTraceAnchor(root.baseAnchor, 'patch.baseAnchor', fileName) : null
+  const targetAnchor = hasTarget ? validateTraceAnchor(root.targetAnchor, 'patch.targetAnchor', fileName) : null
+
+  if (baseAnchor && targetAnchor) {
+    if (baseAnchor.sessionId !== targetAnchor.sessionId) {
+      fail('patch.baseAnchor and patch.targetAnchor must use the same sessionId', fileName)
+    }
+    if (patchType === 'incremental' && targetAnchor.traceRevision <= baseAnchor.traceRevision) {
+      fail('incremental patch targetAnchor.traceRevision must be greater than baseAnchor.traceRevision', fileName)
+    }
+    if (targetAnchor.traceRevision < baseAnchor.traceRevision) {
+      fail('patch.targetAnchor.traceRevision must be greater than or equal to patch.baseAnchor.traceRevision', fileName)
+    }
+    if (targetAnchor.actionCount < baseAnchor.actionCount) {
+      fail('patch.targetAnchor.actionCount must be greater than or equal to patch.baseAnchor.actionCount', fileName)
+    }
+    if (targetAnchor.annotationCount < baseAnchor.annotationCount) {
+      fail('patch.targetAnchor.annotationCount must be greater than or equal to patch.baseAnchor.annotationCount', fileName)
+    }
+  }
+}
+
 function validateSkepticalPatchFindings(rawOperations: unknown[], fileName?: string): void {
   const addedFindings = new Set<string>()
   const qualifiedFindings = new Set<string>()
@@ -522,6 +638,10 @@ export function validateReasoningGraphPatch(
   const root = requireObject(patch, 'patch', fileName)
   if (root.version !== 1) fail('patch.version must be 1', fileName)
   requireString(root.runId, 'patch.runId', fileName)
+  const patchType = root.patchType == null
+    ? inferredPatchType(fileName)
+    : requireString(root.patchType, 'patch.patchType', fileName)
+  validatePatchAnchors(root, patchType, fileName)
   const rawOperations = requireArray(root.operations, 'patch.operations', fileName)
   if (!rawOperations.length) fail('patch.operations must not be empty', fileName)
 
@@ -558,6 +678,13 @@ function cloneJson<T>(value: T): T {
 export function applyReasoningPatch(baseGraph: ReasoningGraph, patch: ReasoningGraphPatch, fileName?: string): ReasoningGraph {
   validateReasoningGraph(baseGraph, { requireAnsweredQuestions: true })
   const validatedPatch = validateReasoningGraphPatch(patch, { fileName })
+  const graphAnchor = latestGraphAnchor(baseGraph)
+  if (graphAnchor && validatedPatch.baseAnchor && !anchorsMatch(graphAnchor, validatedPatch.baseAnchor)) {
+    fail(
+      `patch baseAnchor ${describeAnchor(validatedPatch.baseAnchor)} does not match graph latest anchor ${describeAnchor(graphAnchor)}`,
+      fileName,
+    )
+  }
   const graph = cloneJson(baseGraph)
   graph.nodes = Array.isArray(graph.nodes) ? graph.nodes : []
   graph.edges = Array.isArray(graph.edges) ? graph.edges : []
@@ -603,27 +730,34 @@ export function applyReasoningPatch(baseGraph: ReasoningGraph, patch: ReasoningG
     ...(Array.isArray(graph.patchesApplied) ? graph.patchesApplied : []),
     {
       runId: validatedPatch.runId,
+      patchType: validatedPatch.patchType || inferredPatchType(fileName),
       description: validatedPatch.description || '',
       operationCount: validatedPatch.operations.length,
+      baseAnchor: validatedPatch.baseAnchor,
+      targetAnchor: validatedPatch.targetAnchor,
     },
   ]
+  if (validatedPatch.targetAnchor) graph.latestAnchor = cloneJson(validatedPatch.targetAnchor)
+  else if (!graph.latestAnchor && graph.analysisAnchor) graph.latestAnchor = cloneJson(graph.analysisAnchor)
   validateReasoningGraph(graph, { requireAnsweredQuestions: true, fileName: fileName ? `${fileName} applied` : undefined })
   return graph
 }
 
-function patchSortKey(name: string): [number, number, string] {
-  if (name === 'reasoning-graph-patch.json') return [0, 0, name]
+function patchSortKey(name: string): [number, number, number, string] {
+  if (name === 'reasoning-graph-patch.json') return [0, 0, 0, name]
   const numbered = name.match(/^reasoning-graph-patch-(\d+)\.json$/)
-  if (numbered) return [1, Number(numbered[1]), name]
-  if (name === 'reasoning-graph-patch-skeptical.json') return [2, 0, name]
-  if (/^reasoning-graph-patch-.+\.json$/.test(name)) return [3, 0, name]
-  return [4, 0, name]
+  if (numbered) return [1, Number(numbered[1]), 0, name]
+  if (name === 'reasoning-graph-patch-skeptical.json') return [2, 0, 0, name]
+  const incremental = name.match(/^reasoning-graph-patch-incremental-(\d+)-(\d+)\.json$/)
+  if (incremental) return [3, Number(incremental[1]), Number(incremental[2]), name]
+  if (/^reasoning-graph-patch-.+\.json$/.test(name)) return [4, 0, 0, name]
+  return [5, 0, 0, name]
 }
 
 export function comparePatchNames(a: string, b: string): number {
   const left = patchSortKey(a)
   const right = patchSortKey(b)
-  return left[0] - right[0] || left[1] - right[1] || left[2].localeCompare(right[2])
+  return left[0] - right[0] || left[1] - right[1] || left[2] - right[2] || left[3].localeCompare(right[3])
 }
 
 export function orderPatchLayers<T extends { name: string; patch?: ReasoningGraphPatch }>(layers: T[]): T[] {
@@ -643,6 +777,35 @@ export function applyReasoningPatches(baseGraph: ReasoningGraph, layers: PatchLa
     (graph, layer) => applyReasoningPatch(graph, layer.patch, layer.name),
     cloneJson(baseGraph),
   )
+}
+
+export function checkpointRecommended(layers: PatchLayer[], threshold = CHECKPOINT_PATCH_THRESHOLD): boolean {
+  return orderPatchLayers(layers).length >= threshold
+}
+
+export function materializeReasoningGraph(
+  baseGraph: ReasoningGraph,
+  layers: PatchLayer[],
+  options: { baseName?: string; generatedAt?: string; threshold?: number } = {},
+): ReasoningGraph {
+  const orderedPatches = orderPatchLayers(layers)
+  const materialized = applyReasoningPatches(baseGraph, orderedPatches)
+  const generatedAt = options.generatedAt || new Date().toISOString()
+  const latestAnchor = latestGraphAnchor(materialized)
+  if (latestAnchor) materialized.latestAnchor = cloneJson(latestAnchor)
+  materialized.materializedFrom = {
+    base: options.baseName || 'reasoning-graph.json',
+    patches: orderedPatches.map((layer) => ({
+      name: layer.name,
+      runId: layer.patch.runId,
+      patchType: layer.patch.patchType || inferredPatchType(layer.name),
+      operationCount: layer.patch.operations.length,
+    })),
+    generatedAt,
+    patchCount: orderedPatches.length,
+    checkpointRecommended: checkpointRecommended(orderedPatches, options.threshold),
+  }
+  return materialized
 }
 
 function projectedChildParent(edge: ReasoningEdge): { child: string; parent: string; relation: ReasoningRelation } {

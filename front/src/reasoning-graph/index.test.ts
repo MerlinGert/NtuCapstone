@@ -1,18 +1,41 @@
 import { describe, expect, test } from 'bun:test'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   applyReasoningPatches,
+  checkpointRecommended,
+  materializeReasoningGraph,
   orderPatchLayers,
   projectGraphToDisplayForest,
   validateReasoningGraph,
   validateReasoningGraphPatch,
   type ReasoningGraph,
   type ReasoningGraphPatch,
+  type TraceAnchor,
 } from './index'
+
+const TEST_DIR = dirname(fileURLToPath(import.meta.url))
+
+function anchor(traceRevision: number, actionCount = traceRevision, annotationCount = 0): TraceAnchor {
+  return {
+    sessionId: 'abcde',
+    traceRevision,
+    actionCount,
+    annotationCount,
+    lastActionId: actionCount ? `A${actionCount}` : undefined,
+    lastAnnotationId: annotationCount ? `N${annotationCount}` : undefined,
+    traceDigest: `sha256:${traceRevision}-${actionCount}-${annotationCount}`,
+  }
+}
 
 function baseGraph(): ReasoningGraph {
   return {
     version: 1,
     trace: 'fixture',
+    analysisAnchor: anchor(3, 3, 1),
+    latestAnchor: anchor(3, 3, 1),
     roots: ['H1'],
     nodes: [
       {
@@ -96,6 +119,7 @@ function patch(id = 'F_AGENT1', relation: 'supports' | 'refines' | 'contradicts'
   return {
     version: 1,
     runId: `patch-${id}`,
+    patchType: 'main',
     description: 'Agent follow-up evidence.',
     operations: [
       {
@@ -160,6 +184,16 @@ function patch(id = 'F_AGENT1', relation: 'supports' | 'refines' | 'contradicts'
   }
 }
 
+function incrementalPatch(id = 'F_INC1', from = anchor(3, 3, 1), to = anchor(4, 4, 1)): ReasoningGraphPatch {
+  return {
+    ...patch(id, 'supports'),
+    runId: `incremental-${from.traceRevision}-${to.traceRevision}`,
+    patchType: 'incremental',
+    baseAnchor: from,
+    targetAnchor: to,
+  }
+}
+
 describe('reasoning graph validation', () => {
   test('accepts a valid graph', () => {
     const result = validateReasoningGraph(baseGraph(), { requireAnsweredQuestions: true })
@@ -216,6 +250,28 @@ describe('reasoning graph patches', () => {
     })).toThrow(/skeptical patch Finding F_SKEPTICAL_SUPPORT/)
   })
 
+  test('requires anchors for incremental patches', () => {
+    const badPatch = patch('F_INCREMENTAL', 'supports')
+    badPatch.patchType = 'incremental'
+    expect(() => validateReasoningGraphPatch(badPatch, {
+      fileName: 'reasoning-graph-patch-incremental-3-4.json',
+    })).toThrow(/incremental patches must include baseAnchor and targetAnchor/)
+  })
+
+  test('applies incremental patches only when the base anchor matches', () => {
+    const graph = baseGraph()
+    const goodPatch = incrementalPatch('F_INCREMENTAL_OK')
+    const augmented = applyReasoningPatches(graph, [
+      { name: 'reasoning-graph-patch-incremental-3-4.json', patch: goodPatch },
+    ])
+    expect(augmented.latestAnchor?.traceRevision).toBe(4)
+
+    const badPatch = incrementalPatch('F_INCREMENTAL_BAD', anchor(99, 99, 1), anchor(100, 100, 1))
+    expect(() => applyReasoningPatches(graph, [
+      { name: 'reasoning-graph-patch-incremental-99-100.json', patch: badPatch },
+    ])).toThrow(/does not match graph latest anchor/)
+  })
+
   test('orders and deduplicates patches by preferred names and runId', () => {
     const canonical = patch('F_AGENT1', 'supports')
     canonical.runId = 'same-run'
@@ -231,6 +287,99 @@ describe('reasoning graph patches', () => {
       'reasoning-graph-patch.json',
       'reasoning-graph-patch-skeptical.json',
     ])
+  })
+
+  test('orders incremental patches by numeric trace revision', () => {
+    const ordered = orderPatchLayers([
+      { name: 'reasoning-graph-patch-incremental-10-11.json', patch: incrementalPatch('F_INC11', anchor(10), anchor(11)) },
+      { name: 'reasoning-graph-patch-incremental-4-5.json', patch: incrementalPatch('F_INC5', anchor(4), anchor(5)) },
+      { name: 'reasoning-graph-patch-skeptical.json', patch: patch('F_SKEPTICAL', 'contradicts') },
+    ])
+    expect(ordered.map((item) => item.name)).toEqual([
+      'reasoning-graph-patch-skeptical.json',
+      'reasoning-graph-patch-incremental-4-5.json',
+      'reasoning-graph-patch-incremental-10-11.json',
+    ])
+  })
+
+  test('materializes graph with source metadata and checkpoint recommendation', () => {
+    const graph = baseGraph()
+    const layers = Array.from({ length: 8 }, (_, index) => {
+      const from = anchor(index + 3, index + 3, 1)
+      const to = anchor(index + 4, index + 4, 1)
+      return {
+        name: `reasoning-graph-patch-incremental-${from.traceRevision}-${to.traceRevision}.json`,
+        patch: incrementalPatch(`F_INC_${index}`, from, to),
+      }
+    })
+    const materialized = materializeReasoningGraph(graph, layers, {
+      generatedAt: '2026-05-28T00:00:00Z',
+    })
+    expect(materialized.materializedFrom?.base).toBe('reasoning-graph.json')
+    expect(materialized.materializedFrom?.patches).toHaveLength(8)
+    expect(materialized.materializedFrom?.checkpointRecommended).toBe(true)
+    expect(materialized.latestAnchor?.traceRevision).toBe(11)
+    expect(checkpointRecommended(layers)).toBe(true)
+  })
+})
+
+describe('reasoning graph cli', () => {
+  function writeFixtureArtifacts(patchCount = 8): string {
+    const dir = mkdtempSync(join(tmpdir(), 'reasoning-graph-'))
+    const graph = baseGraph()
+    writeFileSync(join(dir, 'reasoning-graph.json'), `${JSON.stringify(graph, null, 2)}\n`, 'utf8')
+    Array.from({ length: patchCount }, (_, index) => {
+      const from = anchor(index + 3, index + 3, 1)
+      const to = anchor(index + 4, index + 4, 1)
+      const layer = incrementalPatch(`F_CLI_${index}`, from, to)
+      writeFileSync(
+        join(dir, `reasoning-graph-patch-incremental-${from.traceRevision}-${to.traceRevision}.json`),
+        `${JSON.stringify(layer, null, 2)}\n`,
+        'utf8',
+      )
+    })
+    return dir
+  }
+
+  test('materialize command writes current-reasoning-graph.json', () => {
+    const dir = writeFixtureArtifacts(1)
+    const result = Bun.spawnSync({
+      cmd: ['bun', join(TEST_DIR, 'cli.ts'), 'materialize', dir],
+      cwd: TEST_DIR,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    expect(result.exitCode).toBe(0)
+    expect(existsSync(join(dir, 'current-reasoning-graph.json'))).toBe(true)
+    const materialized = JSON.parse(readFileSync(join(dir, 'current-reasoning-graph.json'), 'utf8'))
+    expect(materialized.materializedFrom.patches).toHaveLength(1)
+  })
+
+  test('checkpoint command archives old base and patches and writes new base', () => {
+    const dir = writeFixtureArtifacts(8)
+    const duplicate = incrementalPatch('F_DUPLICATE', anchor(3, 3, 1), anchor(4, 4, 1))
+    duplicate.runId = 'incremental-3-4'
+    writeFileSync(
+      join(dir, 'reasoning-graph-patch-incremental-3-4-copy.json'),
+      `${JSON.stringify(duplicate, null, 2)}\n`,
+      'utf8',
+    )
+    const result = Bun.spawnSync({
+      cmd: ['bun', join(TEST_DIR, 'cli.ts'), 'checkpoint', dir],
+      cwd: TEST_DIR,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    expect(result.exitCode).toBe(0)
+    expect(readdirSync(dir).filter((name) => /^reasoning-graph-patch/.test(name))).toHaveLength(0)
+    const checkpointDirs = readdirSync(join(dir, 'checkpoints'))
+    expect(checkpointDirs).toHaveLength(1)
+    const archiveDir = join(dir, 'checkpoints', checkpointDirs[0])
+    expect(existsSync(join(archiveDir, 'reasoning-graph.json'))).toBe(true)
+    expect(readdirSync(archiveDir).filter((name) => /^reasoning-graph-patch/.test(name))).toHaveLength(9)
+    const newBase = JSON.parse(readFileSync(join(dir, 'reasoning-graph.json'), 'utf8'))
+    expect(newBase.checkpointHistory).toHaveLength(1)
+    expect(newBase.materializedFrom.patches).toHaveLength(8)
   })
 })
 
