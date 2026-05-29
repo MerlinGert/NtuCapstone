@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 SERVER_DIR = Path(__file__).resolve().parents[1]
@@ -38,14 +39,17 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
             old_patch_path = artifacts_dir / "reasoning-graph-patch-001.json"
             current_patch_path = artifacts_dir / "reasoning-graph-patch.json"
             skeptical_patch_path = artifacts_dir / "reasoning-graph-patch-skeptical.json"
+            incremental_patch_path = artifacts_dir / "reasoning-graph-patch-incremental-10-11.json"
             graph_path.write_text('{"version":1}\n', encoding="utf-8")
             forest_path.write_text('{"trees":[]}\n', encoding="utf-8")
             old_patch_path.write_text('{"runId":"old","operations":[]}\n', encoding="utf-8")
             current_patch_path.write_text('{"runId":"current","operations":[]}\n', encoding="utf-8")
             skeptical_patch_path.write_text('{"runId":"skeptical","operations":[]}\n', encoding="utf-8")
+            incremental_patch_path.write_text('{"runId":"incremental","operations":[]}\n', encoding="utf-8")
             os.utime(old_patch_path, (100, 100))
             os.utime(current_patch_path, (200, 200))
             os.utime(skeptical_patch_path, (300, 300))
+            os.utime(incremental_patch_path, (400, 400))
 
             manifest = module._analysis_artifact_manifest("abcde", session_dir)
 
@@ -59,6 +63,7 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
                     "reasoning-graph-patch.json",
                     "reasoning-graph-patch-001.json",
                     "reasoning-graph-patch-skeptical.json",
+                    "reasoning-graph-patch-incremental-10-11.json",
                 ],
             )
             self.assertEqual(
@@ -69,7 +74,7 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
                 manifest["current"]["userReasoningForest"]["name"],
                 "user-reasoning-forest.json",
             )
-            self.assertEqual(len(manifest["artifacts"]), 5)
+            self.assertEqual(len(manifest["artifacts"]), 6)
 
     def test_manifest_deduplicates_patch_run_ids(self):
         module = load_chat_session_service()
@@ -172,6 +177,67 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
                 with self.assertRaises(Exception) as symlink_error:
                     module.get_session_artifact("abcde", "escape.png")
                 self.assertEqual(symlink_error.exception.status_code, 400)
+            finally:
+                module.SESSIONS_DIR = original_sessions_dir
+
+    def test_debug_append_import_is_disabled_by_default(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            original_sessions_dir = module.SESSIONS_DIR
+            try:
+                module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
+                with patch.dict(os.environ, {module.DEBUG_TRACE_API_ENV: ""}, clear=False):
+                    with self.assertRaises(Exception) as error:
+                        module.append_imported_trace_slice("abcde", {"userActionSequence": []})
+                self.assertEqual(error.exception.status_code, 404)
+            finally:
+                module.SESSIONS_DIR = original_sessions_dir
+
+    def test_debug_append_import_preserves_trace_slice_and_returns_anchors(self):
+        module = load_chat_session_service()
+        png_data_url = "data:image/png;base64,iVBORw0KGgo="
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            original_sessions_dir = module.SESSIONS_DIR
+            try:
+                module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
+                with patch.dict(os.environ, {module.DEBUG_TRACE_API_ENV: "true"}, clear=False):
+                    result = module.append_imported_trace_slice(
+                        "abcde",
+                        {
+                            "coin": "ACT",
+                            "userActionSequence": [
+                                {
+                                    "actionType": "select_card",
+                                    "sourceView": "kline_chart",
+                                    "sourceSnapshot": [
+                                        {"viewName": "kline_chart", "dataUrl": png_data_url}
+                                    ],
+                                }
+                            ],
+                            "annotationRecords": [
+                                {
+                                    "id": 7,
+                                    "sourceView": "behavior_details",
+                                    "sketchDataUrl": png_data_url,
+                                }
+                            ],
+                            "images": {
+                                "images/imported-extra.png": png_data_url,
+                            },
+                            "currentState": {"selectedUsers": ["wallet"]},
+                        },
+                    )
+
+                live_session = module._read_json(module.SESSIONS_DIR / "abcde" / "live-session.json")
+                self.assertEqual(result["beforeAnchor"]["traceRevision"], 0)
+                self.assertEqual(result["afterAnchor"]["traceRevision"], 1)
+                self.assertEqual(result["afterAnchor"]["actionCount"], 1)
+                self.assertEqual(result["afterAnchor"]["annotationCount"], 1)
+                self.assertEqual(live_session["traceAnchor"], result["afterAnchor"])
+                self.assertEqual(live_session["userActionSequence"][0]["sourceSnapshot"][0]["imagePath"], "images/action-0001-source-kline_chart-01.png")
+                self.assertEqual(live_session["annotationRecords"][0]["sketchImagePath"], "images/annotation-0007-behavior_details.png")
+                self.assertTrue((module.SESSIONS_DIR / "abcde" / "images" / "imported-extra.png").exists())
+                self.assertTrue(result["git"]["committed"])
             finally:
                 module.SESSIONS_DIR = original_sessions_dir
 

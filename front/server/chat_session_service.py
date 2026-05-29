@@ -1,5 +1,6 @@
 import base64
 import copy
+import hashlib
 import json
 import os
 import re
@@ -30,6 +31,7 @@ REASONING_GRAPH_NAME = "reasoning-graph.json"
 REASONING_GRAPH_PATCH_RE = re.compile(r"^reasoning-graph-patch(?:-.+)?\.json$")
 SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+DEBUG_TRACE_API_ENV = "MANISCOPE_ENABLE_DEBUG_TRACE_API"
 
 
 def _now_iso() -> str:
@@ -81,6 +83,61 @@ def _read_json(path: Path) -> dict[str, Any] | None:
         raise HTTPException(status_code=500, detail=f"Invalid JSON in {path.name}")
 
 
+def _stable_trace_digest(live_session: dict[str, Any]) -> str:
+    trace_payload = {
+        "coin": live_session.get("coin"),
+        "config": live_session.get("config") or {},
+        "annotationSeqId": live_session.get("annotationSeqId"),
+        "userActionSequence": live_session.get("userActionSequence") or [],
+        "annotationRecords": live_session.get("annotationRecords") or [],
+    }
+    encoded = json.dumps(trace_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _last_action_id(actions: list[Any]) -> str | None:
+    if not actions:
+        return None
+    action = actions[-1]
+    if isinstance(action, dict):
+        for key in ("id", "actionId", "seqId"):
+            value = action.get(key)
+            if value is not None:
+                return str(value)
+    return str(len(actions) - 1)
+
+
+def _last_annotation_id(annotations: list[Any]) -> str | None:
+    if not annotations:
+        return None
+    annotation = annotations[-1]
+    if isinstance(annotation, dict) and annotation.get("id") is not None:
+        return str(annotation["id"])
+    return str(len(annotations) - 1)
+
+
+def _trace_anchor(session_id: str, live_session: dict[str, Any]) -> dict[str, Any]:
+    actions, annotations = _normalize_trace_lists(live_session)
+    anchor: dict[str, Any] = {
+        "sessionId": session_id,
+        "traceRevision": int(live_session.get("traceRevision") or 0),
+        "actionCount": len(actions),
+        "annotationCount": len(annotations),
+        "traceDigest": _stable_trace_digest(live_session),
+    }
+    last_action_id = _last_action_id(actions)
+    last_annotation_id = _last_annotation_id(annotations)
+    if last_action_id is not None:
+        anchor["lastActionId"] = last_action_id
+    if last_annotation_id is not None:
+        anchor["lastAnnotationId"] = last_annotation_id
+    return anchor
+
+
+def _debug_trace_api_enabled() -> bool:
+    return os.environ.get(DEBUG_TRACE_API_ENV, "").lower() in {"1", "true", "yes", "on"}
+
+
 def _analysis_artifact_info(session_id: str, path: Path, role: str, label: str, priority: int) -> dict[str, Any]:
     stat = path.stat()
     return {
@@ -96,17 +153,20 @@ def _analysis_artifact_info(session_id: str, path: Path, role: str, label: str, 
     }
 
 
-def _patch_sort_key(name: str) -> tuple[int, int, str]:
+def _patch_sort_key(name: str) -> tuple[int, int, int, str]:
     if name == "reasoning-graph-patch.json":
-        return (0, 0, name)
+        return (0, 0, 0, name)
     numbered = re.fullmatch(r"reasoning-graph-patch-(\d+)\.json", name)
     if numbered:
-        return (1, int(numbered.group(1)), name)
+        return (1, int(numbered.group(1)), 0, name)
     if name == "reasoning-graph-patch-skeptical.json":
-        return (2, 0, name)
+        return (2, 0, 0, name)
+    incremental = re.fullmatch(r"reasoning-graph-patch-incremental-(\d+)-(\d+)\.json", name)
+    if incremental:
+        return (3, int(incremental.group(1)), int(incremental.group(2)), name)
     if REASONING_GRAPH_PATCH_RE.fullmatch(name):
-        return (3, 0, name)
-    return (4, 0, name)
+        return (4, 0, 0, name)
+    return (5, 0, 0, name)
 
 
 def _json_run_id(path: Path) -> str | None:
@@ -247,6 +307,7 @@ def _empty_live_session(session_id: str, coin: str | None = None) -> dict[str, A
         "sessionId": session_id,
         "exportedAt": None,
         "lastUpdatedAt": None,
+        "traceRevision": 0,
         "coin": coin,
         "includesSnapshots": True,
         "imageDirectory": "images",
@@ -406,6 +467,26 @@ def _process_current_state_images(
     return image_count
 
 
+def _process_imported_image_map(session_dir: Path, images: Any) -> int:
+    if images is None:
+        return 0
+    if not isinstance(images, dict):
+        raise HTTPException(status_code=400, detail="images must be an object mapping image paths to data URLs")
+    image_count = 0
+    base_dir = session_dir.resolve()
+    for relative_path, data_url in images.items():
+        if not isinstance(relative_path, str) or not relative_path.startswith("images/"):
+            raise HTTPException(status_code=400, detail="Imported image paths must be relative images/ paths")
+        target_path = (session_dir / relative_path).resolve()
+        try:
+            target_path.relative_to(base_dir)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Imported image path escapes the session directory")
+        if _write_data_url_image(session_dir, relative_path, data_url):
+            image_count += 1
+    return image_count
+
+
 def _data_url_for_image(session_dir: Path, image_path: str | None) -> str | None:
     if not image_path:
         return None
@@ -508,6 +589,7 @@ def _write_trace_state(
         image_count += _process_current_state_images(session_dir, current_state)
 
     now = _now_iso()
+    trace_revision = int(live_session.get("traceRevision") or 0) + 1
     live_session.update(
         {
             "exportVersion": EXPORT_VERSION,
@@ -515,12 +597,14 @@ def _write_trace_state(
             "sessionId": session_id,
             "exportedAt": None,
             "lastUpdatedAt": now,
+            "traceRevision": trace_revision,
             "includesSnapshots": True,
             "imageDirectory": "images",
             "imageCount": image_count,
         }
     )
     live_session.setdefault("config", {})
+    live_session["traceAnchor"] = _trace_anchor(session_id, live_session)
 
     if current_state is None:
         current_state = _read_json(session_dir / "current-state.json") or {}
@@ -555,6 +639,7 @@ def _write_trace_state(
         "actionCount": len(actions),
         "annotationCount": len(annotations),
         "lastUpdatedAt": now,
+        "traceAnchor": live_session["traceAnchor"],
         "git": git_result,
     }
 
@@ -762,6 +847,64 @@ def get_session_versions(session_id: str, limit: int = 50) -> dict[str, Any]:
     }
 
 
+@router.post("/{session_id}/debug/trace/append-import")
+def append_imported_trace_slice(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    if not _debug_trace_api_enabled():
+        raise HTTPException(status_code=404, detail="Debug trace API is disabled")
+
+    appended_actions = copy.deepcopy(body.get("userActionSequence") or [])
+    appended_annotations = copy.deepcopy(body.get("annotationRecords") or [])
+    current_state = copy.deepcopy(body.get("currentState") or {})
+    if not isinstance(appended_actions, list):
+        raise HTTPException(status_code=400, detail="userActionSequence must be an array")
+    if not isinstance(appended_annotations, list):
+        raise HTTPException(status_code=400, detail="annotationRecords must be an array")
+    if not isinstance(current_state, dict):
+        raise HTTPException(status_code=400, detail="currentState must be an object")
+
+    session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"))
+    live_session = _load_live_session(session_dir, session_id, coin=body.get("coin"))
+    existing_current_state = _read_json(session_dir / "current-state.json") or {}
+    before_anchor = _trace_anchor(session_id, live_session)
+    actions, annotations = _normalize_trace_lists(live_session)
+    actions.extend(appended_actions)
+    annotations.extend(appended_annotations)
+    imported_image_count = _process_imported_image_map(session_dir, body.get("images"))
+
+    _apply_trace_context(
+        live_session,
+        existing_current_state,
+        {
+            "coin": body.get("coin"),
+            "annotationSeqId": body.get("annotationSeqId"),
+            "snapshotCategories": body.get("snapshotCategories"),
+            "snapshotQuality": body.get("snapshotQuality"),
+            "currentState": current_state,
+        },
+    )
+    result = _write_trace_state(
+        session_id,
+        session_dir,
+        meta,
+        live_session,
+        existing_current_state,
+        "trace_append_import",
+        {
+            "coin": body.get("coin"),
+            "appendedActions": len(appended_actions),
+            "appendedAnnotations": len(appended_annotations),
+        },
+    )
+    return {
+        **result,
+        "beforeAnchor": before_anchor,
+        "afterAnchor": result["traceAnchor"],
+        "appendedActionCount": len(appended_actions),
+        "appendedAnnotationCount": len(appended_annotations),
+        "importedImageCount": imported_image_count,
+    }
+
+
 @router.post("/{session_id}/events/user-actions")
 def append_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     action = copy.deepcopy(body.get("action"))
@@ -940,6 +1083,7 @@ def update_session_settings_event(session_id: str, body: dict[str, Any]) -> dict
 @router.post("/{session_id}/sync")
 def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"))
+    existing_live_session = _load_live_session(session_dir, session_id, coin=body.get("coin"))
 
     actions = copy.deepcopy(body.get("userActionSequence") or [])
     annotations = copy.deepcopy(body.get("annotationRecords") or [])
@@ -958,6 +1102,7 @@ def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         "sessionId": session_id,
         "exportedAt": None,
         "lastUpdatedAt": None,
+        "traceRevision": existing_live_session.get("traceRevision", 0),
         "coin": body.get("coin"),
         "includesSnapshots": True,
         "imageDirectory": "images",

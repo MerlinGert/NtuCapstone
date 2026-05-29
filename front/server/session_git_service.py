@@ -96,7 +96,7 @@ def _commit_message(
         f"Updated: {updated_at}",
     ]
 
-    for key in ("actionIndex", "actionType", "annotationId", "sourceView", "targetView", "coin"):
+    for key in ("actionIndex", "actionType", "annotationId", "sourceView", "targetView", "coin", "appendedActions", "appendedAnnotations"):
         value = detail.get(key)
         if value is not None:
             body_lines.append(f"{key}: {value}")
@@ -121,6 +121,8 @@ def _commit_subject(event_type: str, detail: dict[str, Any]) -> str:
         return "annotation: delete annotation"
     if event_type == "trace_reorder":
         return "event: reorder trace"
+    if event_type == "trace_append_import":
+        return "debug: append imported trace slice"
     if event_type == "settings_update":
         return "settings: update trace settings"
     if event_type == "full_sync":
