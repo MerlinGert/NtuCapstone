@@ -1,15 +1,19 @@
 <script>
 import CryptoVis from './components/CryptoVis.vue'
+import ImportedAnalysisWorkspace from './components/ImportedAnalysisWorkspace.vue'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const WORKSPACE_ROLES = new Set(['human', 'agent'])
+const IMPORTED_ANALYSIS_ROUTE = '/analysis-import'
 
 export default {
   components: {
     CryptoVis,
+    ImportedAnalysisWorkspace,
   },
   data() {
     return {
+      routeMode: 'session',
       sessionId: null,
       workspaceRole: 'human',
       sessionError: '',
@@ -21,6 +25,11 @@ export default {
   methods: {
     async initializeRouteSession() {
       const path = window.location.pathname.replace(/\/+$/, '') || '/'
+      if (path === IMPORTED_ANALYSIS_ROUTE) {
+        this.routeMode = 'imported_analysis'
+        this.sessionId = null
+        return
+      }
       if (path === '/') {
         try {
           const response = await fetch('/api/sessions', {
@@ -55,7 +64,8 @@ export default {
 </script>
 
 <template>
-  <CryptoVis v-if="sessionId" :session-id="sessionId" :workspace-role="workspaceRole" />
+  <ImportedAnalysisWorkspace v-if="routeMode === 'imported_analysis'" />
+  <CryptoVis v-else-if="sessionId" :session-id="sessionId" :workspace-role="workspaceRole" />
   <div v-else class="session-bootstrap">
     <div v-if="sessionError" class="session-bootstrap-error">
       Failed to initialize session: {{ sessionError }}

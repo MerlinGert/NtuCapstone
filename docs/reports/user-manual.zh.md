@@ -24,7 +24,7 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 +------------------+------------------------------+------------------------------+
 ```
 
-标题栏包含产品名、会话标记、工作区标记、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。
+标题栏包含产品名、会话标记、工作区标记、`Analysis Import` 标签、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。
 
 左列是 Control Panel。中列上方是 Token Distribution 视图，下方是带标签页的调查面板。右列上方是 K 线和操纵卡片视图，下方是 Behavior Details。
 
@@ -201,7 +201,7 @@ Action Tree 标签页把动作和标注显示为一棵可视化树。图例区�
 
 ### LLM Analysis
 
-LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载 `reasoning-graph.json` 和所有可用的 `reasoning-graph-patch*.json` 文件。该标签页会在浏览器中验证 graph 和 patch，按确定顺序应用 patch，并派生出用于显示的 forest。生成的 forest JSON 或 Markdown 文件只作为可选导出，不再作为 UI 的数据源。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 graph 中用于追溯。回答隐藏 Analytic Question 的中层 Finding 仍会显示在 Finding 层级中；如果同一个 canonical Finding 因为隐藏节点投影而重复出现，界面会把它折叠为一个卡片，避免同一个答案在一个 Hypothesis 下重复显示。Finding 的来源会显示在节点标记中：用户 Finding 使用绿色 `User Finding` 标记，智能体生成的补丁 Finding 使用琥珀色 `Agent Finding` 标记。关系标记会区分支持性证据、直接回答、细化结论和反驳关系。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括它与父节点的关系、可用的 evidence summary、patch rationale 和较大的证据图片。
+LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载 `reasoning-graph.json` 和所有可用的 `reasoning-graph-patch*.json` 文件。该标签页会在浏览器中验证 graph 和 patch，按确定顺序应用 patch，并派生出用于显示的 forest。生成的 forest JSON 或 Markdown 文件只作为可选导出，不再作为 UI 的数据源。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 graph 中用于追溯。回答隐藏 Analytic Question 的中层 Finding 仍会显示在 Finding 层级中；如果同一个 canonical Finding 因为隐藏节点投影而重复出现，界面会把它折叠为一个卡片，避免同一个答案在一个 Hypothesis 下重复显示。Finding 的来源会显示在节点标记中：用户 Finding 使用蓝色 `User Finding` 标记，智能体生成的补丁 Finding 使用粉色 `Agent Finding` 标记，来自补丁的 Hypothesis 会显示为粉色 `Derived Hypothesis`。关系标记会区分支持性证据、直接回答、细化结论和反驳关系。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括它与父节点的关系、可用的 evidence summary、patch rationale 和较大的证据图片。工具栏还提供 **Export JSON** 按钮，可下载当前分析包，其中包含已加载的 reasoning graph、按顺序应用的 patch 列表、augmented graph，以及当前界面展示的 forest，便于后续离线分析和复查。Human Workspace 标记旁边的 `Analysis Import` 标签会在新页面打开导入界面；选择刚导出的 JSON 后，会按当前右侧 LLM Analysis 的方式恢复卡片层级和详情视图，便于单独查看与复盘。
 
 该标签页会在打开时、点击 Refresh 时、Codex 宣布新的相关 artifact 时刷新；当标签页处于激活状态时，也会进行轻量级周期检查。后端不会启动长期文件监听器，而是在请求时扫描会话 artifacts 并返回最新识别到的文件。
 

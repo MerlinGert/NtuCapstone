@@ -9,6 +9,7 @@
     <template #header>
       <div style="display:flex; gap:10px; margin-top: 5px;">
         <button
+          v-if="!analysisOnly"
           class="tab-btn"
           :class="{ active: activeTab === 'actions' }"
           @click="activeTab = 'actions'"
@@ -16,6 +17,7 @@
           :style="activeTab === 'actions' ? 'color:#3182ce; border-bottom-color:#3182ce;' : ''"
         >User Actions</button>
         <button
+          v-if="!analysisOnly"
           class="tab-btn"
           :class="{ active: activeTab === 'annotations' }"
           @click="activeTab = 'annotations'"
@@ -23,6 +25,7 @@
           :style="activeTab === 'annotations' ? 'color:#d97706; border-bottom-color:#d97706;' : ''"
         >Annotations</button>
         <button
+          v-if="!analysisOnly"
           class="tab-btn"
           :class="{ active: activeTab === 'tree' }"
           @click="activeTab = 'tree'"
@@ -39,7 +42,7 @@
       </div>
     </template>
 
-    <div v-show="activeTab === 'actions'" style="flex:1; overflow:hidden;">
+    <div v-if="!analysisOnly" v-show="activeTab === 'actions'" style="flex:1; overflow:hidden;">
       <UserActionTimeline
           :actions="actions"
           :snapshot-categories="snapshotCategories"
@@ -50,14 +53,18 @@
       />
     </div>
 
-    <div v-show="activeTab === 'annotations'" style="flex:1; overflow:hidden;">
+    <div v-if="!analysisOnly" v-show="activeTab === 'annotations'" style="flex:1; overflow:hidden;">
       <AnnotationTimeline
           :annotations="annotations"
           style="height:100%;"
       />
     </div>
 
-    <div v-show="activeTab === 'tree'" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+    <div
+      v-if="!analysisOnly"
+      v-show="activeTab === 'tree'"
+      style="flex:1; display:flex; flex-direction:column; overflow:hidden;"
+    >
       <UserActionTree
           :actions="actions"
           :annotations="annotations"
@@ -72,7 +79,11 @@
     </div>
 
     <div v-show="activeTab === 'llm_analysis'" style="flex:1; padding:10px; overflow:hidden;">
-      <LlmAnalysisView :session-id="sessionId" :active="activeTab === 'llm_analysis'" />
+      <LlmAnalysisView
+        :session-id="sessionId"
+        :active="activeTab === 'llm_analysis'"
+        :analysis-payload="analysisPayload"
+      />
     </div>
   </n-card>
 </template>
@@ -117,11 +128,31 @@ export default {
     snapshotQuality: {
       type: Number,
       default: 0.8
+    },
+    analysisPayload: {
+      type: Object,
+      default: null
+    },
+    initialTab: {
+      type: String,
+      default: 'tree'
+    },
+    analysisOnly: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
     return {
-      activeTab: 'tree'
+      activeTab: this.analysisOnly ? 'llm_analysis' : this.initialTab
+    }
+  },
+  watch: {
+    initialTab(nextTab) {
+      if (!this.analysisOnly && nextTab) this.activeTab = nextTab
+    },
+    analysisOnly(enabled) {
+      if (enabled) this.activeTab = 'llm_analysis'
     }
   }
 }
