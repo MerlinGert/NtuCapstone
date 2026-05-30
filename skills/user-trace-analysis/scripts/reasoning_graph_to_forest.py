@@ -278,7 +278,7 @@ def validate_relation_direction(
 def validate_analytic_questions_answered(
     nodes: dict[str, dict[str, Any]],
     edges: list[dict[str, Any]],
-) -> None:
+) -> str | None:
     answered_question_ids = {
         edge["target"]
         for edge in edges
@@ -289,11 +289,14 @@ def validate_analytic_questions_answered(
         for node_id, node in nodes.items()
         if node.get("kind") == "AnalyticQuestion" and node_id not in answered_question_ids
     ]
-    if unanswered_questions:
-        raise GraphError(
-            "AnalyticQuestion nodes must have incoming answers edges from Findings: "
-            + ", ".join(sorted(unanswered_questions))
-        )
+    if not unanswered_questions:
+        return None
+    return (
+        "AnalyticQuestion nodes without incoming answers edges from Mid Findings: "
+        + ", ".join(sorted(unanswered_questions))
+        + ". This is allowed if the user trace does not answer them; if they are central "
+        + "and answerable, investigate them and add follow-up Findings in reasoning-graph-patch*.json."
+    )
 
 
 def validate_graph(
@@ -358,7 +361,9 @@ def validate_graph(
         raise GraphError("no Hypothesis roots found")
 
     if require_answered_questions:
-        validate_analytic_questions_answered(nodes, edges)
+        warning = validate_analytic_questions_answered(nodes, edges)
+        if warning:
+            raise GraphError(warning)
 
     return nodes, edges, roots
 
@@ -612,7 +617,10 @@ def main() -> int:
 
     try:
         graph = read_json(graph_path)
-        nodes, edges, roots = validate_graph(graph, require_answered_questions=True)
+        nodes, edges, roots = validate_graph(graph)
+        warning = validate_analytic_questions_answered(nodes, edges)
+        if warning:
+            print(f"warning: {warning}", file=sys.stderr)
         forest = build_forest(graph, nodes, edges, roots)
         write_outputs(forest, json_out, md_out)
     except GraphError as exc:

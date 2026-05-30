@@ -252,7 +252,7 @@ Every Interaction node in `reasoning-graph.json` should include `salience`:
 
 The User Reasoning Forest must use raw Interaction leaves by default. Do not replace Interactions with compact Step nodes in the forest unless the user explicitly asks for a compact view.
 
-Every Analytic Question should have at least one evidence-backed mid-level Finding connected with an explicit `answers` edge. Do not rely only on shared Hypothesis membership, nearby action nodes, or prose explanations for the reader to infer the answer. If the trace does not provide enough evidence to answer an Analytic Question, add a caveated mid-level Finding such as "the trace does not provide enough evidence to answer ..." and mark the missing support as a Reasoning Gap in the Recommendation Plan.
+Every answerable Analytic Question should have at least one evidence-backed mid-level Finding connected with an explicit `answers` edge. Do not rely only on shared Hypothesis membership, nearby action nodes, or prose explanations for the reader to infer the answer. If the user trace does not provide enough evidence to answer an Analytic Question, leave it unanswered in the base reasoning graph. Treat the validator warning as a follow-up instruction: if the question is central and answerable through additional visual, statistical, or model work, investigate it and add answer Findings through a patch.
 
 Build a readable Finding hierarchy when the trace contains enough evidence:
 
@@ -719,7 +719,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - In `trace-step-map.md`, high-level claims must be connected to multiple supporting steps unless the rationale explains otherwise.
 - In `trace-step-map.md`, graph edges should represent reasoning dependencies, not just chronological order.
 - `reasoning-graph.json` and all `reasoning-graph-patch*.json` files must validate with the session-local TypeScript validator when available.
-- Every `AnalyticQuestion` must have at least one incoming `answers` edge from a mid-level `Finding`.
+- Every answerable `AnalyticQuestion` should have at least one incoming `answers` edge from a mid-level `Finding`. Missing `answers` edges are warnings, not graph errors, when the user trace does not answer the question.
 - Low-level Findings should feed mid-level Findings; mid-level Findings should answer Analytic Questions; high-level Findings should synthesize mid-level Findings before supporting Hypotheses when the trace evidence allows it.
 - Every Interaction node in `reasoning-graph.json` must have `salience`.
 - Static forest exports, when produced, must be rooted at Hypotheses, preserve raw Interaction leaves by default, and duplicate shared canonical nodes mechanically while retaining `canonicalId`.
