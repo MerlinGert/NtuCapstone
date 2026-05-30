@@ -162,9 +162,10 @@ function patch(id = 'F_AGENT1', relation: 'supports' | 'refines' | 'contradicts'
 
 describe('reasoning graph validation', () => {
   test('accepts a valid graph', () => {
-    const result = validateReasoningGraph(baseGraph(), { requireAnsweredQuestions: true })
+    const result = validateReasoningGraph(baseGraph())
     expect(result.nodes.size).toBe(6)
     expect(result.edges.length).toBe(7)
+    expect(result.warnings).toHaveLength(0)
   })
 
   test('rejects invalid refines target direction', () => {
@@ -175,13 +176,21 @@ describe('reasoning graph validation', () => {
       relation: 'refines',
       rationale: 'Invalidly refines a Finding.',
     })
-    expect(() => validateReasoningGraph(graph, { requireAnsweredQuestions: true })).toThrow(/refines must point/)
+    expect(() => validateReasoningGraph(graph)).toThrow(/refines must point/)
   })
 
-  test('requires analytic questions to have mid-level answer findings', () => {
+  test('warns by default when analytic questions have no mid-level answer findings', () => {
     const graph = baseGraph()
     graph.edges = graph.edges.filter((edge) => edge.relation !== 'answers')
-    expect(() => validateReasoningGraph(graph, { requireAnsweredQuestions: true })).toThrow(/incoming answers edges/)
+    const result = validateReasoningGraph(graph)
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]).toContain('AnalyticQuestion nodes without incoming answers edges')
+  })
+
+  test('can reject unanswered analytic questions in error mode', () => {
+    const graph = baseGraph()
+    graph.edges = graph.edges.filter((edge) => edge.relation !== 'answers')
+    expect(() => validateReasoningGraph(graph, { answeredQuestions: 'error' })).toThrow(/without incoming answers edges/)
   })
 })
 

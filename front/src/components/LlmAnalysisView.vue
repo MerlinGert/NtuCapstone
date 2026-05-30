@@ -23,6 +23,12 @@
       </div>
     </div>
     <div v-if="artifactSummary" class="artifact-summary">{{ artifactSummary }}</div>
+    <div v-if="validationWarnings.length" class="validation-warnings">
+      <div class="validation-warning-title">Graph warnings</div>
+      <ul>
+        <li v-for="warning in validationWarnings" :key="warning">{{ warning }}</li>
+      </ul>
+    </div>
 
     <div class="legend-block">
       <div class="legend-row legend-row-single">
@@ -176,6 +182,7 @@ export default {
       reasoningGraph: null,
       augmentedReasoningGraph: null,
       graphPatches: [],
+      validationWarnings: [],
       displayTrees: [],
       selectedNode: null,
       loadStarted: false,
@@ -304,6 +311,7 @@ export default {
         this.reasoningGraph = null
         this.augmentedReasoningGraph = null
         this.graphPatches = []
+        this.validationWarnings = []
         this.displayTrees = []
         this.selectedNode = null
         this.lastManifestSignature = ''
@@ -433,6 +441,7 @@ export default {
       this.reasoningGraph = snapshot.reasoningGraph || null
       this.augmentedReasoningGraph = snapshot.augmentedReasoningGraph || snapshot.reasoningGraph || null
       this.graphPatches = patchLayers
+      this.validationWarnings = []
       this.displayTrees = displayForest
       this.selectedNode = null
       this.lastManifestSignature = ''
@@ -511,10 +520,12 @@ export default {
         this.error = ''
       }
       this.loadStarted = true
+      let previousSignature = this.lastManifestSignature
       try {
         const manifest = await this.fetchManifest()
         const signature = this.manifestSignature(manifest)
         if (!force && signature && signature === this.lastManifestSignature && this.reasoningGraph) return
+        previousSignature = this.lastManifestSignature
         this.manifest = manifest
         this.lastManifestSignature = signature
         const current = manifest?.current || {}
@@ -532,11 +543,12 @@ export default {
           this.reasoningGraph = null
           this.augmentedReasoningGraph = null
           this.graphPatches = []
+          this.validationWarnings = []
           this.displayTrees = []
           return
         }
-        validateReasoningGraph(reasoningGraph, {
-          requireAnsweredQuestions: true,
+        const baseValidation = validateReasoningGraph(reasoningGraph, {
+          answeredQuestions: 'warn',
           fileName: graphInfo?.path || graphInfo?.name || 'reasoning-graph.json',
         })
         const patchLayers = orderPatchLayers(
@@ -548,17 +560,29 @@ export default {
             .filter(Boolean),
         )
         const augmentedGraph = applyReasoningPatches(reasoningGraph, patchLayers)
+        const augmentedValidation = validateReasoningGraph(augmentedGraph, {
+          answeredQuestions: 'warn',
+          fileName: 'augmented reasoning graph',
+        })
         this.reasoningGraph = reasoningGraph
         this.augmentedReasoningGraph = augmentedGraph
         this.graphPatches = patchLayers
+        this.validationWarnings = Array.from(new Set([
+          ...baseValidation.warnings,
+          ...augmentedValidation.warnings,
+        ]))
         this.displayTrees = projectGraphToDisplayForest(augmentedGraph)
           .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
           .filter(Boolean)
       } catch (error) {
-        const message = error && error.message ? error.message : String(error)
-        this.displayTrees = []
-        if (!silent) this.error = message
-        else this.error = message
+        console.error('Failed to load LLM analysis artifacts:', error)
+        if (this.hasAnalysis) {
+          this.lastManifestSignature = previousSignature || this.lastManifestSignature
+        } else {
+          this.displayTrees = []
+          this.validationWarnings = []
+        }
+        this.error = ''
       } finally {
         if (!silent) this.loading = false
       }
@@ -983,6 +1007,27 @@ export default {
   color: #64748b;
   font-size: 10px;
   margin: -2px 0 8px;
+}
+
+.validation-warnings {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 10px;
+  line-height: 1.4;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+}
+
+.validation-warning-title {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.validation-warnings ul {
+  margin: 0;
+  padding-left: 16px;
 }
 
 .refresh-btn,

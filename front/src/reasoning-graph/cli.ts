@@ -34,7 +34,6 @@ if (!existsSync(graphPath)) {
 try {
   const graph = readJson(graphPath) as ReasoningGraph
   const base = validateReasoningGraph(graph, {
-    requireAnsweredQuestions: true,
     fileName: 'reasoning-graph.json',
   })
 
@@ -47,14 +46,20 @@ try {
 
   const orderedPatches = orderPatchLayers(patchLayers)
   const augmentedGraph = applyReasoningPatches(graph, orderedPatches)
+  const augmented = validateReasoningGraph(augmentedGraph, { fileName: 'augmented reasoning graph' })
   const forest = buildReasoningForest(augmentedGraph)
   const displayTrees = projectGraphToDisplayForest(augmentedGraph)
+  const warnings = Array.from(new Set([...base.warnings, ...augmented.warnings]))
 
   console.log('Reasoning artifacts validated.')
   console.log(`Base graph: ${base.nodes.size} nodes, ${base.edges.length} edges, ${base.roots.length} roots`)
   console.log(`Patch layers: ${orderedPatches.length}${orderedPatches.length ? ` (${orderedPatches.map((patch) => patch.name).join(', ')})` : ''}`)
   console.log(`Augmented graph: ${augmentedGraph.nodes.length} nodes, ${augmentedGraph.edges.length} edges, ${(augmentedGraph.roots || []).length} roots`)
   console.log(`Projected forest: ${forest.trees.length} trees; UI display trees: ${displayTrees.length}`)
+  if (warnings.length) {
+    console.warn('Warnings:')
+    for (const warning of warnings) console.warn(`- ${warning}`)
+  }
 } catch (error) {
   console.error(`error: ${error instanceof Error ? error.message : String(error)}`)
   process.exit(1)

@@ -83,6 +83,14 @@ export interface ValidationResult {
   nodes: Map<string, ReasoningNode>
   edges: ReasoningEdge[]
   roots: string[]
+  warnings: string[]
+}
+
+export type AnsweredQuestionsMode = 'warn' | 'error'
+
+export interface ValidationOptions {
+  answeredQuestions?: AnsweredQuestionsMode
+  fileName?: string
 }
 
 export interface ForestNode {
@@ -398,25 +406,24 @@ function validateRelationDirection(edge: ReasoningEdge, index: number, nodes: Ma
   fail(`edges[${index}] has unknown relation: ${edge.relation}`, fileName)
 }
 
-function validateAnalyticQuestionsAnswered(nodes: Map<string, ReasoningNode>, edges: ReasoningEdge[], fileName?: string): void {
+function unansweredAnalyticQuestionWarning(nodes: Map<string, ReasoningNode>, edges: ReasoningEdge[]): string | null {
   const answeredQuestionIds = new Set(edges.filter((edge) => edge.relation === 'answers').map((edge) => edge.target))
   const unansweredQuestions = Array.from(nodes.entries())
     .filter(([, node]) => node.kind === 'AnalyticQuestion')
     .map(([nodeId]) => nodeId)
     .filter((nodeId) => !answeredQuestionIds.has(nodeId))
-  if (unansweredQuestions.length) {
-    fail(
-      `AnalyticQuestion nodes must have incoming answers edges from Findings: ${unansweredQuestions.sort().join(', ')}`,
-      fileName,
-    )
-  }
+  if (!unansweredQuestions.length) return null
+  return `AnalyticQuestion nodes without incoming answers edges from Mid Findings: ${unansweredQuestions.sort().join(', ')}. This is allowed if the user trace does not answer them; if they are central and answerable, investigate them and add follow-up Findings in reasoning-graph-patch*.json.`
 }
 
 export function validateReasoningGraph(
   graph: unknown,
-  options: { requireAnsweredQuestions?: boolean; fileName?: string } = {},
+  options: ValidationOptions = {},
 ): ValidationResult {
-  const { requireAnsweredQuestions = false, fileName } = options
+  const { answeredQuestions = 'warn', fileName } = options
+  if (!['warn', 'error'].includes(answeredQuestions)) {
+    fail(`answeredQuestions must be "warn" or "error"`, fileName)
+  }
   const root = requireObject(graph, 'graph', fileName)
   if (root.version !== 1) fail('graph.version must be 1', fileName)
   requireString(root.trace, 'graph.trace', fileName)
@@ -457,8 +464,13 @@ export function validateReasoningGraph(
   if (nonHypothesisRoots.length) fail(`graph.roots must contain only Hypothesis nodes: ${nonHypothesisRoots.join(', ')}`, fileName)
   if (!roots.length) fail('no Hypothesis roots found', fileName)
 
-  if (requireAnsweredQuestions) validateAnalyticQuestionsAnswered(nodes, edges, fileName)
-  return { nodes, edges, roots }
+  const warnings: string[] = []
+  const unansweredWarning = unansweredAnalyticQuestionWarning(nodes, edges)
+  if (unansweredWarning) {
+    if (answeredQuestions === 'error') fail(unansweredWarning, fileName)
+    warnings.push(fileName ? `${fileName}: ${unansweredWarning}` : unansweredWarning)
+  }
+  return { nodes, edges, roots, warnings }
 }
 
 function validatePatchNode(node: Record<string, unknown>, index: number, fileName?: string): ReasoningNode {
@@ -556,7 +568,7 @@ function cloneJson<T>(value: T): T {
 }
 
 export function applyReasoningPatch(baseGraph: ReasoningGraph, patch: ReasoningGraphPatch, fileName?: string): ReasoningGraph {
-  validateReasoningGraph(baseGraph, { requireAnsweredQuestions: true })
+  validateReasoningGraph(baseGraph)
   const validatedPatch = validateReasoningGraphPatch(patch, { fileName })
   const graph = cloneJson(baseGraph)
   graph.nodes = Array.isArray(graph.nodes) ? graph.nodes : []
@@ -607,7 +619,7 @@ export function applyReasoningPatch(baseGraph: ReasoningGraph, patch: ReasoningG
       operationCount: validatedPatch.operations.length,
     },
   ]
-  validateReasoningGraph(graph, { requireAnsweredQuestions: true, fileName: fileName ? `${fileName} applied` : undefined })
+  validateReasoningGraph(graph, { fileName: fileName ? `${fileName} applied` : undefined })
   return graph
 }
 
@@ -707,7 +719,7 @@ function validateTreeLeaves(root: string, treeNodes: ForestNode[], treeEdges: Ar
 }
 
 export function buildReasoningForest(graph: ReasoningGraph): ReasoningForest {
-  const { nodes, edges, roots } = validateReasoningGraph(graph, { requireAnsweredQuestions: true })
+  const { nodes, edges, roots } = validateReasoningGraph(graph)
   const childrenByParent = new Map<string, Array<{ child: string; relation: ReasoningRelation }>>()
   for (const edge of edges) {
     const { child, parent, relation } = projectedChildParent(edge)

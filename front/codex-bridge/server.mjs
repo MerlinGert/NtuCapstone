@@ -21,6 +21,7 @@ const BACKEND_URL = process.env.MANISCOPE_BACKEND_URL || DEFAULT_BACKEND_URL
 const DEFAULT_CODEX_NETWORK_ACCESS_ENABLED = true
 const CODEX_AGENT_MODEL = 'gpt-5.5'
 const CODEX_AGENT_REASONING_EFFORT = 'xhigh'
+const ARTIFACT_POLL_INTERVAL_MS = 500
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
 const agentBrowser = new AgentBrowserManager()
@@ -324,7 +325,7 @@ Core methodology:
    - Action Space: Interaction, AnalyticActivity, InvestigationStrategy.
    - Finding Space: Finding.
    - A Task motivates one or more Interactions and produces a local Finding.
-   - An AnalyticQuestion motivates an AnalyticActivity and must be explicitly answered by one or more Findings.
+   - An AnalyticQuestion motivates an AnalyticActivity and should be explicitly answered by one or more Findings when the trace or follow-up evidence supports an answer.
    - A Hypothesis motivates an InvestigationStrategy and produces or revises a Finding.
    - State evidence and rationale when you infer an AnalyticQuestion, Hypothesis, or mid- or high-level Finding.
    - Low-level Findings are concrete observations from one Interaction or one narrow AnalyticActivity.
@@ -406,8 +407,10 @@ Session-local trace-analysis tools:
   - trace_analysis_tools/references/recommendation-plan-format.md
   - trace_analysis_tools/references/reasoning-graph-patch-format.md
 - Graph-first contract: write reasoning-graph.json first as the canonical source of truth. The frontend reads reasoning-graph.json plus every reasoning-graph-patch*.json file, validates them, applies patches in deterministic order, and renders the derived forest itself.
+- During full analysis, persist a complete valid ${relativeSessionRoot}/artifacts/reasoning-graph.json immediately after reconstructing the user's reasoning from the trace and before recommendation planning, autonomous follow-up investigation, or patch writing. Run the validator, fix base-graph errors, and only then continue. Do not hold the base graph in memory until the end of the turn. This lets the LLM Analysis tab render the user's reasoning forest while later patches are still being generated.
 - user-reasoning-forest.json, augmented-reasoning-forest.json, and their Markdown forms are optional static exports. Do not create or edit them for normal UI operation unless the user explicitly asks for export files.
 - For every AnalyticQuestion node, create at least one evidence-backed mid-level Finding node that answers it, unless the trace truly provides no answer. Add explicit "answers" edges from mid-level Finding -> AnalyticQuestion. Do not rely only on shared Hypothesis membership, nearby AnalyticActivities, or prose explanations. If the answer is partial or caveated, encode that in the Finding label, confidence, explanation, and rationale.
+- Unanswered AnalyticQuestions in the base reasoning graph are validation warnings, not graph errors. They are acceptable when the user trace does not contain an answer. Treat each warning as an instruction to decide whether the question is central and answerable; if it is, investigate it and add answer Findings through reasoning-graph-patch*.json. Do not create placeholder unresolved Findings solely to satisfy validation.
 - Build a readable Finding hierarchy when the trace contains enough evidence: low-level Findings for concrete visual/statistical/model observations, mid-level Findings that synthesize those observations and answer AnalyticQuestions, and high-level Findings that synthesize multiple mid-level Findings before supporting Hypotheses.
 - Avoid flat forests where every Finding directly supports a Hypothesis. Do not connect the same mid-level Finding directly to both an AnalyticQuestion and that question's parent Hypothesis unless there is no higher-level Finding to carry the Hypothesis support.
 - User-authored annotations that contain claims must become Finding nodes in reasoning-graph.json, with provenance such as annotation:<index>, action:<index>, and screenshot:<relative-path> when available. Do not leave user Findings only in prose or only in reasoning-graph-patch.json.
@@ -419,14 +422,14 @@ Session-local trace-analysis tools:
 - Use this session-local command before finalizing live chat artifacts:
   - bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 - The validator applies all reasoning-graph-patch*.json files. Fix validation errors before reporting completion.
-- Before finalizing a full trace artifact set, verify that reasoning-graph.json and all patch files validate, that every AnalyticQuestion has at least one incoming "answers" edge from a mid-level Finding or is marked as an unresolved Reasoning Gap, that the Finding hierarchy is not unnecessarily flat, and that trace annotations with user claims appear as user Finding nodes rather than being lost.
+- Before finalizing a full trace artifact set, verify that reasoning-graph.json and all patch files validate, review any unanswered-AnalyticQuestion warnings, investigate central answerable questions with patches, ensure the Finding hierarchy is not unnecessarily flat, and ensure trace annotations with user claims appear as user Finding nodes rather than being lost.
 
 Full trace-level analysis pipeline:
 - Trigger this pipeline when the user asks for full, comprehensive, complete, end-to-end, or artifact-producing trace analysis, or when they ask to analyze a trace without scoping the request to a narrow question.
 - Unless the user explicitly scopes the task down, combine trace reconstruction, recommendation planning, autonomous follow-up investigation, graph patching, graph validation, and artifact writing into one complete workflow.
 - Execute the pipeline in this order:
   1. Refresh the canonical trace, Human Workspace state, Agent Workspace state, session git history, screenshots, annotations, and any existing analysis artifacts.
-  2. Build reasoning-graph.json first from user Interactions upward through Tasks, AnalyticQuestions, AnalyticActivities, low-level Findings, mid-level answer Findings, high-level synthesis Findings, and Hypotheses. Keep raw Interactions as leaves, preserve evidence links, convert user-authored claim annotations into Finding nodes, and connect mid-level Findings back to the AnalyticQuestions they answer with explicit "answers" edges.
+  2. Build and write ${relativeSessionRoot}/artifacts/reasoning-graph.json first from user Interactions upward through Tasks, AnalyticQuestions, AnalyticActivities, low-level Findings, mid-level answer Findings, high-level synthesis Findings, and Hypotheses. Keep raw Interactions as leaves, preserve evidence links, convert user-authored claim annotations into Finding nodes, and connect mid-level Findings back to the AnalyticQuestions they answer with explicit "answers" edges when the trace provides an answer. Save this base graph before starting recommendation planning, follow-up exploration, skeptical review, or patch generation.
   3. Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts to validate reasoning-graph.json. If validation fails or user Findings from annotations are missing, fix the graph and rerun validation.
   4. Run a disconfirmation pass for major Hypotheses and high-level Findings. Prefer spawning a skeptical subagent with ${relativeSessionRoot}/skills/maniscope-disconfirmation/SKILL.md; verify its candidate negative Findings before integrating any "contradicts", "refines", or Reasoning Gap entries. If you write reasoning-graph-patch-skeptical.json, do not add support-only skeptical Findings; each skeptical Finding must explicitly refine or contradict the claim it tests.
   5. Identify Reasoning Gaps where the observed user evidence does not sufficiently support a Finding, Hypothesis, or implied AnalyticQuestion.
@@ -482,7 +485,7 @@ Mode F: artifact-writing.
 - If writing full trace artifacts for a trace folder, place them under TRACE/analysis-results.
 - If writing session-local live-chat artifacts, place generated evidence under ${relativeSessionRoot}/artifacts unless the user names a different output path.
 - Write reasoning-graph.json first, then write reasoning-graph-patch*.json files for agent follow-up evidence. Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts and fix errors until the base graph and all patches validate. Do not manually create a forest that bypasses graph validation.
-- When you create AnalyticQuestion nodes, also create direct mid-level answer Findings and "answers" edges. A generated forest that contains questions but no answer Findings is incomplete even if the Hypothesis has other support. When enough evidence exists, place those answer Findings under high-level synthesis Findings instead of attaching every answer directly to the Hypothesis.
+- When you create AnalyticQuestion nodes, also create direct mid-level answer Findings and "answers" edges whenever the available evidence supports an answer. A generated forest that contains central answerable questions but no answer Findings is incomplete even if the Hypothesis has other support. When enough evidence exists, place those answer Findings under high-level synthesis Findings instead of attaching every answer directly to the Hypothesis. If the user trace does not answer a question, leave it unanswered in the base graph, accept the validator warning, and decide during follow-up whether to investigate it through patches.
 - Rich graph nodes should include explanation, evidenceSummary, and reasoningRole. Agent-created patch nodes must also include patchRationale.
 - Original trace evidence belongs in reasoning-graph.json. Agent follow-up evidence belongs in reasoning-graph-patch.json. Verified skeptical counterevidence belongs in reasoning-graph-patch-skeptical.json. In skeptical patches, support-only Findings are invalid; each added Finding must include a "refines" or "contradicts" edge. Forest files are optional exports; the frontend derives its own forest from graph plus patches.
 
@@ -827,6 +830,23 @@ function listArtifacts(sessionId) {
     })
 }
 
+function artifactEmissionKey(artifact) {
+  return `${artifact.title || ''}|${artifact.updatedAt || ''}`
+}
+
+function startArtifactPolling(sessionId, res, shouldStop) {
+  const emitted = new Set(listArtifacts(sessionId).map(artifactEmissionKey))
+  return setInterval(() => {
+    if (shouldStop()) return
+    for (const artifact of listArtifacts(sessionId)) {
+      const key = artifactEmissionKey(artifact)
+      if (emitted.has(key)) continue
+      emitted.add(key)
+      sendSse(res, { type: 'artifact', artifact })
+    }
+  }, ARTIFACT_POLL_INTERVAL_MS)
+}
+
 function materializeAgentMessageEvent(sessionId, event) {
   if (!event || event.type !== 'agent_message' || !event.text) {
     return { event, artifacts: [] }
@@ -940,6 +960,11 @@ async function handleChat(req, res, sessionId) {
     res,
     () => streamClosed || controller.signal.aborted,
   )
+  const artifactPolling = startArtifactPolling(
+    sessionId,
+    res,
+    () => streamClosed || controller.signal.aborted,
+  )
 
   try {
     const { events } = await thread.runStreamed(input, { signal: controller.signal })
@@ -993,6 +1018,7 @@ async function handleChat(req, res, sessionId) {
     }
   } finally {
     clearInterval(progressHeartbeat)
+    clearInterval(artifactPolling)
     const activeTurn = activeTurns.get(turnKey)
     if (activeTurn?.controller === controller) activeTurns.delete(turnKey)
     finishStream()
