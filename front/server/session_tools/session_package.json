@@ -1,0 +1,8 @@
+{
+  "name": "__MANISCOPE_SESSION_PACKAGE_NAME__",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Session-local JavaScript and TypeScript workspace for ManiScope analysis scripts.",
+  "scripts": {}
+}

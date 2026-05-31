@@ -2,8 +2,12 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-05-28.2"
+TOOL_VERSION = "2026-05-31.1"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
+BASELINE_VIEW_TOOL_NAME = "maniscope_baseline_views.py"
+SESSION_PYPROJECT_NAME = "pyproject.toml"
+SESSION_PACKAGE_JSON_NAME = "package.json"
+SESSION_GITIGNORE_NAME = ".gitignore"
 TRACE_ANALYSIS_TOOLS_DIR_NAME = "trace_analysis_tools"
 REASONING_GRAPH_TS_DIR_NAME = "reasoning_graph"
 SESSION_SKILLS_DIR_NAME = "skills"
@@ -11,6 +15,10 @@ DISCONFIRMATION_SKILL_NAME = "maniscope-disconfirmation"
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
 TEMPLATE_PATH = BASE_DIR / "session_tools" / VISUALIZATION_TOOL_NAME
+BASELINE_TEMPLATE_PATH = BASE_DIR / "session_tools" / BASELINE_VIEW_TOOL_NAME
+PYPROJECT_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_pyproject.toml"
+PACKAGE_JSON_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_package.json"
+GITIGNORE_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_gitignore"
 TRACE_ANALYSIS_SKILL_DIR = PROJECT_ROOT / "skills" / "user-trace-analysis"
 REASONING_GRAPH_TS_SOURCE_DIR = PROJECT_ROOT / "front" / "src" / "reasoning-graph"
 DISCONFIRMATION_SKILL_DIR = PROJECT_ROOT / "skills" / DISCONFIRMATION_SKILL_NAME
@@ -24,22 +32,51 @@ TRACE_ANALYSIS_TOOL_FILES = [
     Path("references/follow-up-investigation-execution.md"),
 ]
 GIT_EXCLUDE_MARKER = "# ManiScope runtime session tools"
+SESSION_SCAFFOLD_EXCLUDE_ENTRIES = [
+    f"/{SESSION_PYPROJECT_NAME}",
+    f"/{SESSION_PACKAGE_JSON_NAME}",
+    f"/{SESSION_GITIGNORE_NAME}",
+    "/uv.lock",
+    "/bun.lock",
+    "/bun.lockb",
+    "/package-lock.json",
+    "/pnpm-lock.yaml",
+    "/yarn.lock",
+    "/.venv/",
+    "/node_modules/",
+]
 GIT_EXCLUDE_ENTRIES = [
     f"/{VISUALIZATION_TOOL_NAME}",
     f"/{TRACE_ANALYSIS_TOOLS_DIR_NAME}/",
     f"/{SESSION_SKILLS_DIR_NAME}/{DISCONFIRMATION_SKILL_NAME}/",
+    *SESSION_SCAFFOLD_EXCLUDE_ENTRIES,
+]
+BASELINE_GIT_EXCLUDE_ENTRIES = [
+    f"/{BASELINE_VIEW_TOOL_NAME}",
+    *SESSION_SCAFFOLD_EXCLUDE_ENTRIES,
 ]
 
 
 def ensure_session_tools(session_dir: Path, session_id: str) -> None:
     session_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_session_project_scaffold(session_dir, session_id, session_mode="specialized")
     target_path = session_dir / VISUALIZATION_TOOL_NAME
     content = _render_tool(session_id)
-    if _visualization_tool_needs_update(target_path, session_id):
+    if _managed_tool_needs_update(target_path, session_id):
         target_path.write_text(content, encoding="utf-8")
     _ensure_trace_analysis_tools(session_dir)
     _ensure_session_skills(session_dir)
-    _ensure_git_exclude(session_dir)
+    _ensure_git_exclude(session_dir, GIT_EXCLUDE_ENTRIES)
+
+
+def ensure_baseline_session_tools(session_dir: Path, session_id: str) -> None:
+    session_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_session_project_scaffold(session_dir, session_id, session_mode="baseline")
+    target_path = session_dir / BASELINE_VIEW_TOOL_NAME
+    content = _render_baseline_tool(session_id)
+    if _managed_tool_needs_update(target_path, session_id):
+        target_path.write_text(content, encoding="utf-8")
+    _ensure_git_exclude(session_dir, BASELINE_GIT_EXCLUDE_ENTRIES)
 
 
 def _render_tool(session_id: str) -> str:
@@ -50,7 +87,44 @@ def _render_tool(session_id: str) -> str:
     )
 
 
-def _visualization_tool_needs_update(target_path: Path, session_id: str) -> bool:
+def _render_baseline_tool(session_id: str) -> str:
+    template = BASELINE_TEMPLATE_PATH.read_text(encoding="utf-8")
+    return (
+        template.replace("__MANISCOPE_TOOL_VERSION__", TOOL_VERSION)
+        .replace("__MANISCOPE_SESSION_ID__", session_id)
+    )
+
+
+def _ensure_session_project_scaffold(session_dir: Path, session_id: str, session_mode: str) -> None:
+    package_name = f"maniscope-{session_mode}-session-{session_id}"
+    _write_template_if_missing(
+        session_dir / SESSION_PYPROJECT_NAME,
+        PYPROJECT_TEMPLATE_PATH,
+        package_name=package_name,
+    )
+    _write_template_if_missing(
+        session_dir / SESSION_PACKAGE_JSON_NAME,
+        PACKAGE_JSON_TEMPLATE_PATH,
+        package_name=package_name,
+    )
+    _write_template_if_missing(session_dir / SESSION_GITIGNORE_NAME, GITIGNORE_TEMPLATE_PATH)
+
+
+def _write_template_if_missing(
+    target_path: Path,
+    template_path: Path,
+    *,
+    package_name: str | None = None,
+) -> None:
+    if target_path.exists():
+        return
+    content = template_path.read_text(encoding="utf-8")
+    if package_name is not None:
+        content = content.replace("__MANISCOPE_SESSION_PACKAGE_NAME__", package_name)
+    target_path.write_text(content, encoding="utf-8")
+
+
+def _managed_tool_needs_update(target_path: Path, session_id: str) -> bool:
     if not target_path.exists():
         return True
     try:
@@ -128,14 +202,14 @@ def _session_skill_needs_update(version_path: Path) -> bool:
     return existing != TOOL_VERSION
 
 
-def _ensure_git_exclude(session_dir: Path) -> None:
+def _ensure_git_exclude(session_dir: Path, entries: list[str]) -> None:
     git_dir = session_dir / ".git"
     if not git_dir.exists():
         return
     exclude_path = git_dir / "info" / "exclude"
     exclude_path.parent.mkdir(parents=True, exist_ok=True)
     existing = exclude_path.read_text(encoding="utf-8") if exclude_path.exists() else ""
-    missing_entries = [entry for entry in GIT_EXCLUDE_ENTRIES if entry not in existing.splitlines()]
+    missing_entries = [entry for entry in entries if entry not in existing.splitlines()]
     if not missing_entries:
         return
     lines = []

@@ -113,6 +113,7 @@ test('leaves external and existing artifact URLs unchanged', () => {
   const text = [
     '![external](https://example.com/a.png)',
     '![artifact](/api/sessions/abcde/artifacts/already.png)',
+    '![baseline](/api/base/sessions/abcde/artifacts/already.png)',
     '[external link](http://example.com/b.webp)',
   ].join('\n')
 
@@ -120,6 +121,19 @@ test('leaves external and existing artifact URLs unchanged', () => {
 
   assert.equal(result.text, text)
   assert.equal(result.artifacts.length, 0)
+})
+
+test('can rewrite local references with a baseline artifact URL prefix', () => {
+  const fixture = makeFixture()
+  const reportPath = writeFile(path.join(fixture.repoRoot, 'baseline-report.md'), '# Report\n')
+
+  const result = materialize(`[report](${reportPath})`, fixture, {
+    artifactUrlPrefix: '/api/base/sessions/abcde/artifacts',
+  })
+
+  assert.match(result.text, /\[report\]\(\/api\/base\/sessions\/abcde\/artifacts\/baseline-report-[a-f0-9]{16}\.md\)/)
+  assert.equal(result.artifacts.length, 1)
+  assert.equal(result.artifacts[0].kind, 'markdown')
 })
 
 test('skips inline code and fenced code blocks', () => {

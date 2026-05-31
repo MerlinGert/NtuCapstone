@@ -11,13 +11,15 @@ import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from session_tool_service import ensure_session_tools
+from session_tool_service import ensure_baseline_session_tools, ensure_session_tools
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+baseline_router = APIRouter(prefix="/api/base/chat", tags=["base-chat"])
 
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
 THREAD_KEY_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 WORKSPACE_ROLES = {"human", "agent"}
+SESSION_MODES = {"specialized", "baseline"}
 ARTIFACT_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 ARTIFACT_KIND_BY_SUFFIX = {
     ".json": "json",
@@ -34,6 +36,7 @@ CODEX_BRIDGE_URL = os.getenv("CODEX_BRIDGE_URL", DEFAULT_CODEX_BRIDGE_URL)
 BASE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = BASE_DIR.parent.parent
 SESSIONS_DIR = REPO_ROOT / ".maniscope-chat" / "sessions"
+BASELINE_SESSIONS_DIR = REPO_ROOT / ".maniscope-chat" / "baseline-sessions"
 
 
 def _validate_session_id(session_id: str) -> None:
@@ -52,17 +55,44 @@ def _validate_workspace_role(role: str) -> str:
     return role
 
 
+def _validate_session_mode(session_mode: str) -> str:
+    if session_mode not in SESSION_MODES:
+        raise HTTPException(status_code=400, detail="sessionMode must be 'specialized' or 'baseline'")
+    return session_mode
+
+
+def _sessions_dir(session_mode: str = "specialized") -> Path:
+    _validate_session_mode(session_mode)
+    return BASELINE_SESSIONS_DIR if session_mode == "baseline" else SESSIONS_DIR
+
+
+def _session_api_prefix(session_mode: str = "specialized") -> str:
+    return "/api/base/sessions" if session_mode == "baseline" else "/api/sessions"
+
+
+def _validate_mode_workspace_role(role: str, session_mode: str = "specialized") -> str:
+    session_mode = _validate_session_mode(session_mode)
+    if session_mode == "baseline":
+        if role != "human":
+            raise HTTPException(status_code=400, detail="Baseline chat only supports the human workspace")
+        return role
+    return _validate_workspace_role(role)
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _session_dir(session_id: str) -> Path:
+def _session_dir(session_id: str, session_mode: str = "specialized") -> Path:
     _validate_session_id(session_id)
-    session_dir = SESSIONS_DIR / session_id
+    session_dir = _sessions_dir(session_mode) / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
     (session_dir / "images").mkdir(exist_ok=True)
     (session_dir / "artifacts").mkdir(exist_ok=True)
-    ensure_session_tools(session_dir, session_id)
+    if session_mode == "baseline":
+        ensure_baseline_session_tools(session_dir, session_id)
+    else:
+        ensure_session_tools(session_dir, session_id)
     return session_dir
 
 
@@ -82,8 +112,8 @@ def _read_json(path: Path, fallback: dict[str, Any] | None = None) -> dict[str, 
         raise HTTPException(status_code=500, detail=f"Invalid JSON in {path.name}")
 
 
-def _artifact_url(session_id: str, artifact_name: str) -> str:
-    return f"/api/sessions/{session_id}/artifacts/{artifact_name}"
+def _artifact_url(session_id: str, artifact_name: str, session_mode: str = "specialized") -> str:
+    return f"{_session_api_prefix(session_mode)}/{session_id}/artifacts/{artifact_name}"
 
 
 def _artifact_kind(path: Path) -> str:
@@ -116,13 +146,23 @@ def _parse_markdown_destination(raw_destination: str) -> tuple[str, str] | None:
     return raw, ""
 
 
-def _artifact_from_destination(session_id: str, session_dir: Path, destination: str) -> tuple[dict[str, Any], str] | None:
+def _artifact_from_destination(
+    session_id: str,
+    session_dir: Path,
+    destination: str,
+    session_mode: str,
+) -> tuple[dict[str, Any], str] | None:
     if not destination:
         return None
 
-    artifact_prefix = f"/api/sessions/{session_id}/artifacts/"
-    if destination.startswith(artifact_prefix):
-        artifact_name = unquote(destination.split(artifact_prefix, 1)[1].split("?", 1)[0].split("#", 1)[0])
+    artifact_prefixes = [
+        f"{_session_api_prefix(session_mode)}/{session_id}/artifacts/",
+        f"/api/sessions/{session_id}/artifacts/",
+        f"/api/base/sessions/{session_id}/artifacts/",
+    ]
+    matching_prefix = next((prefix for prefix in artifact_prefixes if destination.startswith(prefix)), None)
+    if matching_prefix:
+        artifact_name = unquote(destination.split(matching_prefix, 1)[1].split("?", 1)[0].split("#", 1)[0])
         candidates = [session_dir / "artifacts" / artifact_name]
     else:
         parsed = urlparse(destination)
@@ -148,7 +188,7 @@ def _artifact_from_destination(session_id: str, session_dir: Path, destination: 
         if not resolved.exists() or not resolved.is_file():
             continue
         artifact = _artifact_object(resolved)
-        return artifact, _artifact_url(session_id, artifact["title"])
+        return artifact, _artifact_url(session_id, artifact["title"], session_mode=session_mode)
     return None
 
 
@@ -165,7 +205,12 @@ def _split_markdown_protected_segments(content: str) -> list[tuple[bool, str]]:
     return segments
 
 
-def _normalize_history_message_artifacts(session_id: str, session_dir: Path, message: dict[str, Any]) -> dict[str, Any]:
+def _normalize_history_message_artifacts(
+    session_id: str,
+    session_dir: Path,
+    message: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
     normalized = dict(message)
     content = str(normalized.get("content") or "")
     artifacts_by_id = {
@@ -180,7 +225,7 @@ def _normalize_history_message_artifacts(session_id: str, session_dir: Path, mes
             if not parsed:
                 return match.group(0)
             destination, suffix = parsed
-            materialized = _artifact_from_destination(session_id, session_dir, destination)
+            materialized = _artifact_from_destination(session_id, session_dir, destination, session_mode)
             if not materialized:
                 return match.group(0)
             artifact, url = materialized
@@ -199,13 +244,13 @@ def _normalize_history_message_artifacts(session_id: str, session_dir: Path, mes
     return normalized
 
 
-def _history_path(session_id: str, thread_key: str) -> Path:
+def _history_path(session_id: str, thread_key: str, session_mode: str = "specialized") -> Path:
     _validate_thread_key(thread_key)
-    return _session_dir(session_id) / f"chat-history-{thread_key}.json"
+    return _session_dir(session_id, session_mode=session_mode) / f"chat-history-{thread_key}.json"
 
 
-def _thread_cache_path(session_id: str) -> Path:
-    return _session_dir(session_id) / "codex-threads.json"
+def _thread_cache_path(session_id: str, session_mode: str = "specialized") -> Path:
+    return _session_dir(session_id, session_mode=session_mode) / "codex-threads.json"
 
 
 def _sse_event(payload: dict[str, Any]) -> str:
@@ -242,10 +287,10 @@ def _stream_codex_response(session_id: str, payload: dict[str, Any]) -> Iterator
         yield _sse_event({"type": "error", "error": f"Codex bridge request failed: {exc}"})
 
 
-def _stop_codex_turn(session_id: str, thread_key: str) -> dict[str, Any]:
+def _stop_codex_turn(session_id: str, thread_key: str, session_mode: str = "specialized") -> dict[str, Any]:
     url = f"{CODEX_BRIDGE_URL.rstrip('/')}/chat/{session_id}/threads/{thread_key}/stop"
     try:
-        response = requests.post(url, json={}, timeout=5)
+        response = requests.post(url, json={"sessionMode": session_mode}, timeout=5)
     except requests.ConnectionError:
         raise HTTPException(
             status_code=503,
@@ -262,9 +307,9 @@ def _stop_codex_turn(session_id: str, thread_key: str) -> dict[str, Any]:
     return response.json()
 
 
-@router.post("/{session_id}/message")
-def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingResponse:
+def _send_chat_message(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> StreamingResponse:
     _validate_session_id(session_id)
+    session_mode = _validate_session_mode(session_mode)
 
     message = str(body.get("message") or "").strip()
     attachments = body.get("attachments") if isinstance(body.get("attachments"), list) else []
@@ -273,7 +318,7 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
 
     thread_key = str(body.get("threadKey") or "trace-analysis")
     _validate_thread_key(thread_key)
-    workspace_role = _validate_workspace_role(str(body.get("workspaceRole") or "human"))
+    workspace_role = _validate_mode_workspace_role(str(body.get("workspaceRole") or "human"), session_mode=session_mode)
 
     payload = {
         "message": message,
@@ -282,6 +327,7 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
         "includeCurrentTrace": body.get("includeCurrentTrace", True),
         "includeCurrentViews": body.get("includeCurrentViews", True),
         "workspaceRole": workspace_role,
+        "sessionMode": session_mode,
     }
     return StreamingResponse(
         _stream_codex_response(session_id, payload),
@@ -290,26 +336,25 @@ def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingRespons
     )
 
 
-@router.get("/{session_id}/history")
-def get_chat_history(session_id: str, threadKey: str = "trace-analysis") -> dict[str, Any]:
-    session_dir = _session_dir(session_id)
-    history = _read_json(_history_path(session_id, threadKey), {"messages": []})
+def _get_chat_history(session_id: str, threadKey: str = "trace-analysis", session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir = _session_dir(session_id, session_mode=session_mode)
+    history = _read_json(_history_path(session_id, threadKey, session_mode=session_mode), {"messages": []})
     messages = [
-        _normalize_history_message_artifacts(session_id, session_dir, message)
+        _normalize_history_message_artifacts(session_id, session_dir, message, session_mode=session_mode)
         if isinstance(message, dict)
         else message
         for message in history.get("messages", [])
     ]
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "threadKey": threadKey,
         "messages": messages,
         "lastUpdatedAt": history.get("lastUpdatedAt"),
     }
 
 
-@router.put("/{session_id}/history")
-def save_chat_history(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+def _save_chat_history(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> dict[str, Any]:
     thread_key = str(body.get("threadKey") or "trace-analysis")
     messages = body.get("messages")
     if not isinstance(messages, list):
@@ -318,22 +363,22 @@ def save_chat_history(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     now = _now_iso()
     payload = {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "threadKey": thread_key,
         "lastUpdatedAt": now,
         "messages": messages,
     }
-    _atomic_write_json(_history_path(session_id, thread_key), payload)
-    return {"sessionId": session_id, "threadKey": thread_key, "lastUpdatedAt": now}
+    _atomic_write_json(_history_path(session_id, thread_key, session_mode=session_mode), payload)
+    return {"sessionId": session_id, "sessionMode": session_mode, "threadKey": thread_key, "lastUpdatedAt": now}
 
 
-@router.delete("/{session_id}/threads/{thread_key}")
-def clear_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+def _clear_chat_thread(session_id: str, thread_key: str, session_mode: str = "specialized") -> dict[str, Any]:
     _validate_thread_key(thread_key)
-    history_path = _history_path(session_id, thread_key)
+    history_path = _history_path(session_id, thread_key, session_mode=session_mode)
     if history_path.exists():
         history_path.unlink()
 
-    thread_cache_path = _thread_cache_path(session_id)
+    thread_cache_path = _thread_cache_path(session_id, session_mode=session_mode)
     thread_cache = _read_json(thread_cache_path, {})
     removed_thread = thread_cache.pop(thread_key, None)
     if thread_cache:
@@ -343,16 +388,66 @@ def clear_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
 
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "threadKey": thread_key,
         "removedThread": bool(removed_thread),
     }
 
 
-@router.post("/{session_id}/threads/{thread_key}/stop")
-def stop_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+def _stop_chat_thread(session_id: str, thread_key: str, session_mode: str = "specialized") -> dict[str, Any]:
     _validate_session_id(session_id)
     _validate_thread_key(thread_key)
-    return _stop_codex_turn(session_id, thread_key)
+    return _stop_codex_turn(session_id, thread_key, session_mode=session_mode)
+
+
+@router.post("/{session_id}/message")
+def send_chat_message(session_id: str, body: dict[str, Any]) -> StreamingResponse:
+    return _send_chat_message(session_id, body, session_mode="specialized")
+
+
+@baseline_router.post("/{session_id}/message")
+def send_baseline_chat_message(session_id: str, body: dict[str, Any]) -> StreamingResponse:
+    return _send_chat_message(session_id, body, session_mode="baseline")
+
+
+@router.get("/{session_id}/history")
+def get_chat_history(session_id: str, threadKey: str = "trace-analysis") -> dict[str, Any]:
+    return _get_chat_history(session_id, threadKey=threadKey, session_mode="specialized")
+
+
+@baseline_router.get("/{session_id}/history")
+def get_baseline_chat_history(session_id: str, threadKey: str = "trace-analysis") -> dict[str, Any]:
+    return _get_chat_history(session_id, threadKey=threadKey, session_mode="baseline")
+
+
+@router.put("/{session_id}/history")
+def save_chat_history(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _save_chat_history(session_id, body, session_mode="specialized")
+
+
+@baseline_router.put("/{session_id}/history")
+def save_baseline_chat_history(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _save_chat_history(session_id, body, session_mode="baseline")
+
+
+@router.delete("/{session_id}/threads/{thread_key}")
+def clear_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+    return _clear_chat_thread(session_id, thread_key, session_mode="specialized")
+
+
+@baseline_router.delete("/{session_id}/threads/{thread_key}")
+def clear_baseline_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+    return _clear_chat_thread(session_id, thread_key, session_mode="baseline")
+
+
+@router.post("/{session_id}/threads/{thread_key}/stop")
+def stop_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+    return _stop_chat_thread(session_id, thread_key, session_mode="specialized")
+
+
+@baseline_router.post("/{session_id}/threads/{thread_key}/stop")
+def stop_baseline_chat_thread(session_id: str, thread_key: str) -> dict[str, Any]:
+    return _stop_chat_thread(session_id, thread_key, session_mode="baseline")
 
 
 @router.get("/health")
@@ -366,3 +461,8 @@ def chat_health() -> dict[str, Any]:
         "bridgeUrl": CODEX_BRIDGE_URL,
         "statusCode": response.status_code,
     }
+
+
+@baseline_router.get("/health")
+def baseline_chat_health() -> dict[str, Any]:
+    return chat_health()

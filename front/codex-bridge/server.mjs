@@ -9,11 +9,13 @@ import { materializeLocalArtifactReferences } from './local-image-artifacts.mjs'
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
 const WORKSPACE_ROLE_RE = /^(human|agent)$/
+const SESSION_MODE_RE = /^(specialized|baseline)$/
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FRONT_DIR = path.resolve(__dirname, '..')
 const REPO_ROOT = process.env.MANISCOPE_REPO_ROOT || path.resolve(FRONT_DIR, '..')
 const CHAT_ROOT = path.join(REPO_ROOT, '.maniscope-chat')
 const SESSIONS_DIR = path.join(CHAT_ROOT, 'sessions')
+const BASELINE_SESSIONS_DIR = path.join(CHAT_ROOT, 'baseline-sessions')
 const DEFAULT_CODEX_BRIDGE_PORT = 8787
 const PORT = Number(process.env.CODEX_BRIDGE_PORT || DEFAULT_CODEX_BRIDGE_PORT)
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8099'
@@ -26,17 +28,27 @@ const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
 const agentBrowser = new AgentBrowserManager()
 
-function sessionDir(sessionId) {
+function validateSessionMode(sessionMode) {
+  if (!SESSION_MODE_RE.test(sessionMode)) {
+    const error = new Error('sessionMode must be specialized or baseline')
+    error.statusCode = 400
+    throw error
+  }
+  return sessionMode
+}
+
+function sessionDir(sessionId, sessionMode = 'specialized') {
   if (!SESSION_ID_RE.test(sessionId)) {
     const error = new Error('Session ID must be 5 lowercase hex characters')
     error.statusCode = 400
     throw error
   }
-  return path.join(SESSIONS_DIR, sessionId)
+  const root = validateSessionMode(sessionMode) === 'baseline' ? BASELINE_SESSIONS_DIR : SESSIONS_DIR
+  return path.join(root, sessionId)
 }
 
-function existingSessionDir(sessionId) {
-  const dir = sessionDir(sessionId)
+function existingSessionDir(sessionId, sessionMode = 'specialized') {
+  const dir = sessionDir(sessionId, sessionMode)
   if (!fs.existsSync(dir)) {
     const error = new Error('session not found')
     error.statusCode = 404
@@ -54,17 +66,22 @@ function validateThreadKey(threadKey) {
   return threadKey
 }
 
-function validateWorkspaceRole(workspaceRole) {
+function validateWorkspaceRole(workspaceRole, sessionMode = 'specialized') {
   if (!WORKSPACE_ROLE_RE.test(workspaceRole)) {
     const error = new Error('workspaceRole must be human or agent')
+    error.statusCode = 400
+    throw error
+  }
+  if (sessionMode === 'baseline' && workspaceRole !== 'human') {
+    const error = new Error('baseline chat only supports the human workspace')
     error.statusCode = 400
     throw error
   }
   return workspaceRole
 }
 
-function activeTurnKey(sessionId, threadKey) {
-  return `${sessionId}:${threadKey}`
+function activeTurnKey(sessionMode, sessionId, threadKey) {
+  return `${sessionMode}:${sessionId}:${threadKey}`
 }
 
 function readJson(filePath, fallback) {
@@ -121,25 +138,45 @@ function sendSse(res, event) {
   res.write(`data: ${JSON.stringify(event)}\n\n`)
 }
 
-function startProgressHeartbeat(res, shouldStop) {
-  const notes = [
-    {
-      title: 'Inspecting trace context',
-      detail: 'Reading the live trace, current state, and available screenshots.',
-    },
-    {
-      title: 'Mapping evidence',
-      detail: 'Relating observed Interactions to intentions, Findings, and possible Hypotheses.',
-    },
-    {
-      title: 'Planning investigation',
-      detail: 'Checking which visual or statistical Analytic Activities are useful next.',
-    },
-    {
-      title: 'Waiting for Codex output',
-      detail: 'The agent is still working and will stream the next event when available.',
-    },
-  ]
+function startProgressHeartbeat(res, shouldStop, sessionMode = 'specialized') {
+  const notes =
+    sessionMode === 'baseline'
+      ? [
+          {
+            title: 'Inspecting session context',
+            detail: 'Reading the current trace, screenshots, and available data files.',
+          },
+          {
+            title: 'Checking evidence',
+            detail: 'Comparing trace evidence, screenshots, and raw data where useful.',
+          },
+          {
+            title: 'Preparing response',
+            detail: 'Organizing observations and next checks for the user.',
+          },
+          {
+            title: 'Waiting for Codex output',
+            detail: 'The agent is still working and will stream the next event when available.',
+          },
+        ]
+      : [
+          {
+            title: 'Inspecting trace context',
+            detail: 'Reading the live trace, current state, and available screenshots.',
+          },
+          {
+            title: 'Mapping evidence',
+            detail: 'Relating observed Interactions to intentions, Findings, and possible Hypotheses.',
+          },
+          {
+            title: 'Planning investigation',
+            detail: 'Checking which visual or statistical Analytic Activities are useful next.',
+          },
+          {
+            title: 'Waiting for Codex output',
+            detail: 'The agent is still working and will stream the next event when available.',
+          },
+        ]
   let index = 0
   return setInterval(() => {
     if (shouldStop()) return
@@ -174,10 +211,10 @@ function extensionForImageType(type, fallbackName) {
   return '.png'
 }
 
-function saveChatAttachments(sessionId, attachments) {
+function saveChatAttachments(sessionId, attachments, sessionMode = 'specialized') {
   if (!Array.isArray(attachments) || attachments.length === 0) return []
 
-  const uploadDir = path.join(sessionDir(sessionId), 'chat-uploads')
+  const uploadDir = path.join(sessionDir(sessionId, sessionMode), 'chat-uploads')
   fs.mkdirSync(uploadDir, { recursive: true })
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
 
@@ -196,9 +233,9 @@ function saveChatAttachments(sessionId, attachments) {
     .filter(Boolean)
 }
 
-function resolveSessionFile(sessionId, relativePath) {
+function resolveSessionFile(sessionId, relativePath, sessionMode = 'specialized') {
   if (!relativePath || path.isAbsolute(relativePath)) return null
-  const dir = sessionDir(sessionId)
+  const dir = sessionDir(sessionId, sessionMode)
   const filePath = path.resolve(dir, relativePath)
   const relative = path.relative(dir, filePath)
   if (relative.startsWith('..') || path.isAbsolute(relative)) return null
@@ -206,19 +243,20 @@ function resolveSessionFile(sessionId, relativePath) {
   return filePath
 }
 
-function workspaceCurrentStatePath(sessionId, workspaceRole) {
-  const dir = sessionDir(sessionId)
+function workspaceCurrentStatePath(sessionId, workspaceRole, sessionMode = 'specialized') {
+  const dir = sessionDir(sessionId, sessionMode)
   if (workspaceRole === 'human') return path.join(dir, 'current-state.json')
+  if (sessionMode === 'baseline') return path.join(dir, 'current-state.json')
   return path.join(dir, 'workspaces', workspaceRole, 'current-state.json')
 }
 
-function currentViewImagePaths(sessionId, workspaceRole = 'human') {
-  const currentState = readJson(workspaceCurrentStatePath(sessionId, workspaceRole), {})
+function currentViewImagePaths(sessionId, workspaceRole = 'human', sessionMode = 'specialized') {
+  const currentState = readJson(workspaceCurrentStatePath(sessionId, workspaceRole, sessionMode), {})
   const screenshots = currentState.majorViewScreenshots
   if (!screenshots || typeof screenshots !== 'object') return []
 
   return Object.values(screenshots)
-    .map((relativePath) => resolveSessionFile(sessionId, relativePath))
+    .map((relativePath) => resolveSessionFile(sessionId, relativePath, sessionMode))
     .filter(Boolean)
 }
 
@@ -226,17 +264,17 @@ function uniquePaths(paths) {
   return Array.from(new Set(paths))
 }
 
-function threadCachePath(sessionId) {
-  return path.join(sessionDir(sessionId), 'codex-threads.json')
+function threadCachePath(sessionId, sessionMode = 'specialized') {
+  return path.join(sessionDir(sessionId, sessionMode), 'codex-threads.json')
 }
 
-function getThreadEntry(sessionId, threadKey) {
-  const cache = readJson(threadCachePath(sessionId), {})
+function getThreadEntry(sessionId, threadKey, sessionMode = 'specialized') {
+  const cache = readJson(threadCachePath(sessionId, sessionMode), {})
   return cache[threadKey] || null
 }
 
-function setThreadEntry(sessionId, threadKey, threadId) {
-  const cachePath = threadCachePath(sessionId)
+function setThreadEntry(sessionId, threadKey, threadId, sessionMode = 'specialized') {
+  const cachePath = threadCachePath(sessionId, sessionMode)
   const cache = readJson(cachePath, {})
   const now = new Date().toISOString()
   cache[threadKey] = {
@@ -284,6 +322,12 @@ a report generator by default.
 
 Active chat workspace role: ${workspaceRole}
 ${workspaceContext}
+
+Session-local scripting workspace:
+- The active session root contains pyproject.toml and package.json templates.
+- Run Python scripts from ${relativeSessionRoot} with uv, for example uv run python script.py. Add Python packages with uv add when needed.
+- Run JavaScript or TypeScript scripts from ${relativeSessionRoot} with bun, for example bun script.ts. Add JS or TS packages with bun add when needed.
+- Keep generated evidence and durable outputs under ${relativeSessionRoot}/artifacts unless the user names another path.
 
 Start every trace-dependent turn by refreshing context. Read these files first:
 - docs/reports/user-manual.en.md
@@ -503,13 +547,65 @@ User message:
 ${userMessage}`
 }
 
-function buildInput(sessionId, threadKey, userMessage, isNewThread, attachmentPaths, workspaceRole = 'human') {
+function buildBaselinePrompt(sessionId, userMessage) {
+  const relativeSessionRoot = `.maniscope-chat/baseline-sessions/${sessionId}`
+  return `You are a Codex agent helping a user analyze possible token price manipulation in ManiScope.
+
+The user is interacting with a visual analytics app for token-market investigation. Answer as a practical collaborator: inspect the evidence, explain what you find, state uncertainty, and suggest useful next checks when appropriate.
+
+Active baseline session root:
+- ${relativeSessionRoot}
+
+Start trace-dependent answers by reading the current session files when they exist:
+- ${relativeSessionRoot}/live-session.json
+- ${relativeSessionRoot}/current-state.json
+
+Useful session folders:
+- ${relativeSessionRoot}/images contains synced screenshots from the user's actions, annotations, and current views.
+- ${relativeSessionRoot}/artifacts is where you may save files, scripts, summaries, or copied images that are useful for this chat.
+
+Session-local scripting workspace:
+- ${relativeSessionRoot} contains pyproject.toml and package.json templates.
+- Run Python scripts from ${relativeSessionRoot} with uv, for example uv run python script.py. Add Python packages with uv add when needed.
+- Run JavaScript or TypeScript scripts from ${relativeSessionRoot} with bun, for example bun script.ts. Add JS or TS packages with bun add when needed.
+
+Available evidence in the project may include:
+- OHLC/K-line price data for token price movement over time.
+- Holder snapshots and holder distribution data.
+- Trades, transfers, wallet behavior sequences, and balances.
+- Detector outputs from existing backend services, including entity, link, and manipulation-related outputs.
+- The user's recorded trace, annotations, screenshots, imported trace data, and current view state.
+
+You may inspect raw JSON/CSV files and write small scripts or files when useful. Use exact data for counts, amounts, timestamps, overlaps, and other quantitative claims. Use screenshots and current-view images for visual claims about clusters, charts, card timing, behavior timelines, or visible labels.
+
+If you need local image files for the current visible views, the session may contain ${relativeSessionRoot}/maniscope_baseline_views.py. It can only copy the user's latest synced Token Distribution, K-Line, and Behavior Details screenshots into artifacts; it cannot change visualization settings or render alternative configurations.
+
+Keep responses conversational by default. Produce durable files only when they help answer the user or when the user asks for them. Do not assume previous chat memory is current; refresh the trace files when the user asks about the current session.
+
+---
+
+User message:
+${userMessage}`
+}
+
+function buildInput(
+  sessionId,
+  threadKey,
+  userMessage,
+  isNewThread,
+  attachmentPaths,
+  workspaceRole = 'human',
+  sessionMode = 'specialized',
+) {
   const text =
     userMessage ||
     'Please inspect the attached image input in the context of the current ManiScope session.'
 
   if (isNewThread && threadKey === 'trace-analysis') {
-    const promptText = buildTraceAnalysisPrompt(sessionId, text, workspaceRole)
+    const promptText =
+      sessionMode === 'baseline'
+        ? buildBaselinePrompt(sessionId, text)
+        : buildTraceAnalysisPrompt(sessionId, text, workspaceRole)
     if (attachmentPaths.length === 0) return promptText
     return [
       { type: 'text', text: promptText },
@@ -801,8 +897,8 @@ function describeFunctionCall(item) {
   return name
 }
 
-function listArtifacts(sessionId) {
-  const artifactsDir = path.join(sessionDir(sessionId), 'artifacts')
+function listArtifacts(sessionId, sessionMode = 'specialized') {
+  const artifactsDir = path.join(sessionDir(sessionId, sessionMode), 'artifacts')
   if (!fs.existsSync(artifactsDir)) return []
   const artifactKinds = new Map([
     ['.md', 'markdown'],
@@ -834,11 +930,11 @@ function artifactEmissionKey(artifact) {
   return `${artifact.title || ''}|${artifact.updatedAt || ''}`
 }
 
-function startArtifactPolling(sessionId, res, shouldStop) {
-  const emitted = new Set(listArtifacts(sessionId).map(artifactEmissionKey))
+function startArtifactPolling(sessionId, sessionMode, res, shouldStop) {
+  const emitted = new Set(listArtifacts(sessionId, sessionMode).map(artifactEmissionKey))
   return setInterval(() => {
     if (shouldStop()) return
-    for (const artifact of listArtifacts(sessionId)) {
+    for (const artifact of listArtifacts(sessionId, sessionMode)) {
       const key = artifactEmissionKey(artifact)
       if (emitted.has(key)) continue
       emitted.add(key)
@@ -847,16 +943,20 @@ function startArtifactPolling(sessionId, res, shouldStop) {
   }, ARTIFACT_POLL_INTERVAL_MS)
 }
 
-function materializeAgentMessageEvent(sessionId, event) {
+function materializeAgentMessageEvent(sessionId, sessionMode, event) {
   if (!event || event.type !== 'agent_message' || !event.text) {
     return { event, artifacts: [] }
   }
   try {
     const result = materializeLocalArtifactReferences(event.text, {
       sessionId,
-      sessionDir: sessionDir(sessionId),
+      sessionDir: sessionDir(sessionId, sessionMode),
       repoRoot: REPO_ROOT,
       env: process.env,
+      artifactUrlPrefix:
+        sessionMode === 'baseline'
+          ? `/api/base/sessions/${sessionId}/artifacts`
+          : `/api/sessions/${sessionId}/artifacts`,
     })
     return {
       event: { ...event, text: result.text },
@@ -870,9 +970,10 @@ function materializeAgentMessageEvent(sessionId, event) {
 
 async function handleChat(req, res, sessionId) {
   const body = await readBody(req)
+  const sessionMode = validateSessionMode(String(body.sessionMode || 'specialized'))
   const message = String(body.message || '').trim()
   const threadKey = validateThreadKey(String(body.threadKey || 'trace-analysis'))
-  const workspaceRole = validateWorkspaceRole(String(body.workspaceRole || 'human'))
+  const workspaceRole = validateWorkspaceRole(String(body.workspaceRole || 'human'), sessionMode)
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
   const includeCurrentViews = body.includeCurrentViews !== false
   if (!message && attachments.length === 0) {
@@ -880,26 +981,26 @@ async function handleChat(req, res, sessionId) {
     return
   }
 
-  const dir = sessionDir(sessionId)
+  const dir = sessionDir(sessionId, sessionMode)
   if (!fs.existsSync(dir)) {
     sendJson(res, 404, { error: 'session not found' })
     return
   }
 
   const codex = new Codex()
-  const existing = getThreadEntry(sessionId, threadKey)
+  const existing = getThreadEntry(sessionId, threadKey, sessionMode)
   const options = buildThreadOptions()
   const isNewThread = !existing?.threadId
   const thread = isNewThread
     ? codex.startThread(options)
     : codex.resumeThread(existing.threadId, options)
-  const attachmentPaths = saveChatAttachments(sessionId, attachments)
+  const attachmentPaths = saveChatAttachments(sessionId, attachments, sessionMode)
   if (!message && attachments.length > 0 && attachmentPaths.length === 0) {
     sendJson(res, 400, { error: 'No supported image attachments were provided.' })
     return
   }
   const inputImagePaths = uniquePaths([
-    ...(includeCurrentViews ? currentViewImagePaths(sessionId, workspaceRole) : []),
+    ...(includeCurrentViews ? currentViewImagePaths(sessionId, workspaceRole, sessionMode) : []),
     ...attachmentPaths,
   ])
   const input = buildInput(
@@ -909,8 +1010,9 @@ async function handleChat(req, res, sessionId) {
     isNewThread,
     inputImagePaths,
     workspaceRole,
+    sessionMode,
   )
-  const turnKey = activeTurnKey(sessionId, threadKey)
+  const turnKey = activeTurnKey(sessionMode, sessionId, threadKey)
   if (activeTurns.has(turnKey)) {
     sendJson(res, 409, { error: 'A Codex turn is already running for this thread.' })
     return
@@ -919,6 +1021,7 @@ async function handleChat(req, res, sessionId) {
   const controller = new AbortController()
   activeTurns.set(turnKey, {
     controller,
+    sessionMode,
     sessionId,
     threadKey,
     startedAt: new Date().toISOString(),
@@ -952,16 +1055,20 @@ async function handleChat(req, res, sessionId) {
     category: 'session',
     title: 'Preparing Codex context',
     detail:
-      workspaceRole === 'agent'
-        ? 'Syncing shared trace files and attaching agent workspace screenshots.'
-        : 'Syncing shared trace files and attaching human workspace screenshots.',
+      sessionMode === 'baseline'
+        ? 'Syncing baseline trace files and attaching current human view screenshots.'
+        : workspaceRole === 'agent'
+          ? 'Syncing shared trace files and attaching agent workspace screenshots.'
+          : 'Syncing shared trace files and attaching human workspace screenshots.',
   })
   const progressHeartbeat = startProgressHeartbeat(
     res,
     () => streamClosed || controller.signal.aborted,
+    sessionMode,
   )
   const artifactPolling = startArtifactPolling(
     sessionId,
+    sessionMode,
     res,
     () => streamClosed || controller.signal.aborted,
   )
@@ -972,7 +1079,7 @@ async function handleChat(req, res, sessionId) {
       if (controller.signal.aborted) break
       const normalized = normalizeEvent(event)
       if (normalized) {
-        const materialized = materializeAgentMessageEvent(sessionId, normalized)
+        const materialized = materializeAgentMessageEvent(sessionId, sessionMode, normalized)
         sendSse(res, materialized.event)
         for (const artifact of materialized.artifacts) {
           sendSse(res, { type: 'artifact', artifact })
@@ -982,9 +1089,9 @@ async function handleChat(req, res, sessionId) {
 
     const threadId = thread.id || existing?.threadId || ''
     if (threadId) {
-      setThreadEntry(sessionId, threadKey, threadId)
+      setThreadEntry(sessionId, threadKey, threadId, sessionMode)
     }
-    for (const artifact of listArtifacts(sessionId)) {
+    for (const artifact of listArtifacts(sessionId, sessionMode)) {
       sendSse(res, { type: 'artifact', artifact })
     }
     if (controller.signal.aborted) {
@@ -1027,10 +1134,11 @@ async function handleChat(req, res, sessionId) {
 
 async function handleStop(req, res, sessionId, threadKey) {
   validateThreadKey(threadKey)
-  sessionDir(sessionId)
-  await readBody(req).catch(() => ({}))
+  const body = await readBody(req).catch(() => ({}))
+  const sessionMode = validateSessionMode(String(body.sessionMode || 'specialized'))
+  sessionDir(sessionId, sessionMode)
 
-  const turnKey = activeTurnKey(sessionId, threadKey)
+  const turnKey = activeTurnKey(sessionMode, sessionId, threadKey)
   const activeTurn = activeTurns.get(turnKey)
   if (!activeTurn) {
     sendJson(res, 200, { sessionId, threadKey, stopped: false })

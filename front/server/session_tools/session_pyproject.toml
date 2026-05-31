@@ -1,0 +1,10 @@
+[project]
+name = "__MANISCOPE_SESSION_PACKAGE_NAME__"
+version = "0.1.0"
+description = "Session-local Python workspace for ManiScope analysis scripts."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false
+

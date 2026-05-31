@@ -13,18 +13,22 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from session_git_service import SessionGitError, commit_trace_state, list_trace_versions
-from session_tool_service import ensure_session_tools
+from session_tool_service import ensure_baseline_session_tools, ensure_session_tools
 
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
+baseline_router = APIRouter(prefix="/api/base/sessions", tags=["base-sessions"])
 
 BASE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = BASE_DIR.parent.parent
 CHAT_ROOT = REPO_ROOT / ".maniscope-chat"
 SESSIONS_DIR = CHAT_ROOT / "sessions"
+BASELINE_SESSIONS_DIR = CHAT_ROOT / "baseline-sessions"
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
+SESSION_MODES = {"specialized", "baseline"}
 EXPORT_VERSION = "1.0"
 WORKSPACE_ROLES = {"human", "agent"}
+BASELINE_WORKSPACE_ROLES = {"human"}
 ANALYSIS_EXPORT_SUFFIXES = {".json", ".md"}
 REASONING_GRAPH_NAME = "reasoning-graph.json"
 REASONING_GRAPH_PATCH_RE = re.compile(r"^reasoning-graph-patch(?:-.+)?\.json$")
@@ -41,28 +45,49 @@ def _validate_session_id(session_id: str) -> None:
         raise HTTPException(status_code=400, detail="Session ID must be 5 lowercase hex characters")
 
 
-def _session_dir(session_id: str) -> Path:
+def _validate_session_mode(session_mode: str) -> str:
+    if session_mode not in SESSION_MODES:
+        raise HTTPException(status_code=400, detail="Session mode must be 'specialized' or 'baseline'")
+    return session_mode
+
+
+def _sessions_dir(session_mode: str = "specialized") -> Path:
+    _validate_session_mode(session_mode)
+    return BASELINE_SESSIONS_DIR if session_mode == "baseline" else SESSIONS_DIR
+
+
+def _api_session_prefix(session_mode: str = "specialized") -> str:
+    return "/api/base/sessions" if session_mode == "baseline" else "/api/sessions"
+
+
+def _session_dir(session_id: str, session_mode: str = "specialized") -> Path:
     _validate_session_id(session_id)
-    return SESSIONS_DIR / session_id
+    return _sessions_dir(session_mode) / session_id
 
 
-def _validate_workspace_role(role: str) -> None:
-    if role not in WORKSPACE_ROLES:
+def _workspace_roles(session_mode: str = "specialized") -> set[str]:
+    return BASELINE_WORKSPACE_ROLES if session_mode == "baseline" else WORKSPACE_ROLES
+
+
+def _validate_workspace_role(role: str, session_mode: str = "specialized") -> None:
+    if role not in _workspace_roles(session_mode):
+        if session_mode == "baseline":
+            raise HTTPException(status_code=400, detail="Baseline sessions only support the human workspace")
         raise HTTPException(status_code=400, detail="Workspace role must be 'human' or 'agent'")
 
 
-def _workspace_dir(session_dir: Path, role: str) -> Path:
-    _validate_workspace_role(role)
+def _workspace_dir(session_dir: Path, role: str, session_mode: str = "specialized") -> Path:
+    _validate_workspace_role(role, session_mode=session_mode)
     return session_dir / "workspaces" / role
 
 
-def _workspace_state_path(session_dir: Path, role: str) -> Path:
-    return _workspace_dir(session_dir, role) / "current-state.json"
+def _workspace_state_path(session_dir: Path, role: str, session_mode: str = "specialized") -> Path:
+    return _workspace_dir(session_dir, role, session_mode=session_mode) / "current-state.json"
 
 
-def _ensure_workspace_dirs(session_dir: Path) -> None:
-    for role in WORKSPACE_ROLES:
-        _workspace_dir(session_dir, role).mkdir(parents=True, exist_ok=True)
+def _ensure_workspace_dirs(session_dir: Path, session_mode: str = "specialized") -> None:
+    for role in _workspace_roles(session_mode):
+        _workspace_dir(session_dir, role, session_mode=session_mode).mkdir(parents=True, exist_ok=True)
 
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -81,14 +106,21 @@ def _read_json(path: Path) -> dict[str, Any] | None:
         raise HTTPException(status_code=500, detail=f"Invalid JSON in {path.name}")
 
 
-def _analysis_artifact_info(session_id: str, path: Path, role: str, label: str, priority: int) -> dict[str, Any]:
+def _analysis_artifact_info(
+    session_id: str,
+    path: Path,
+    role: str,
+    label: str,
+    priority: int,
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
     stat = path.stat()
     return {
         "role": role,
         "label": label,
         "name": path.name,
         "path": f"artifacts/{path.name}",
-        "url": f"/api/sessions/{session_id}/artifacts/{path.name}",
+        "url": f"{_api_session_prefix(session_mode)}/{session_id}/artifacts/{path.name}",
         "size": stat.st_size,
         "modifiedAt": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat().replace("+00:00", "Z"),
         "mtime": stat.st_mtime,
@@ -175,7 +207,7 @@ def _current_artifact(items: list[dict[str, Any]]) -> dict[str, Any] | None:
     return sorted(items, key=lambda item: (item["priority"], -item["mtime"], item["name"]))[0]
 
 
-def _analysis_artifact_manifest(session_id: str, session_dir: Path) -> dict[str, Any]:
+def _analysis_artifact_manifest(session_id: str, session_dir: Path, session_mode: str = "specialized") -> dict[str, Any]:
     artifacts_dir = session_dir / "artifacts"
     artifacts: list[dict[str, Any]] = []
     exports: list[dict[str, Any]] = []
@@ -189,6 +221,7 @@ def _analysis_artifact_manifest(session_id: str, session_dir: Path) -> dict[str,
             "reasoningGraph",
             "Reasoning Graph",
             0,
+            session_mode,
         )
         artifacts.append(reasoning_graph)
 
@@ -202,6 +235,7 @@ def _analysis_artifact_manifest(session_id: str, session_dir: Path) -> dict[str,
             "reasoningGraphPatch",
             "Reasoning Graph Patch",
             _patch_sort_key(path.name)[0],
+            session_mode,
         )
         run_id = _json_run_id(path)
         if run_id:
@@ -216,7 +250,7 @@ def _analysis_artifact_manifest(session_id: str, session_dir: Path) -> dict[str,
             continue
         if path.name in source_names or REASONING_GRAPH_PATCH_RE.fullmatch(path.name):
             continue
-        item = _analysis_artifact_info(session_id, path, "analysisExport", "Analysis Export", 0)
+        item = _analysis_artifact_info(session_id, path, "analysisExport", "Analysis Export", 0, session_mode)
         exports.append(item)
         artifacts.append(item)
 
@@ -225,6 +259,7 @@ def _analysis_artifact_manifest(session_id: str, session_dir: Path) -> dict[str,
     latest = _latest_artifact(artifacts)
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "artifactRoot": "artifacts",
         "current": {
             "reasoningGraph": reasoning_graph,
@@ -261,10 +296,16 @@ def _empty_live_session(session_id: str, coin: str | None = None) -> dict[str, A
     }
 
 
-def _create_meta(session_id: str, coin: str | None = None, restored: bool = False) -> dict[str, Any]:
+def _create_meta(
+    session_id: str,
+    coin: str | None = None,
+    restored: bool = False,
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
     now = _now_iso()
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "coin": coin,
         "createdAt": now,
         "lastUpdatedAt": now,
@@ -272,18 +313,30 @@ def _create_meta(session_id: str, coin: str | None = None, restored: bool = Fals
     }
 
 
-def _ensure_session(session_id: str, coin: str | None = None) -> tuple[Path, dict[str, Any], bool]:
-    session_dir = _session_dir(session_id)
+def _effective_session_mode(meta: dict[str, Any] | None) -> str:
+    if not meta:
+        return "specialized"
+    value = meta.get("sessionMode")
+    return value if value in SESSION_MODES else "specialized"
+
+
+def _ensure_session(
+    session_id: str,
+    coin: str | None = None,
+    session_mode: str = "specialized",
+) -> tuple[Path, dict[str, Any], bool]:
+    session_mode = _validate_session_mode(session_mode)
+    session_dir = _session_dir(session_id, session_mode=session_mode)
     existed = session_dir.exists()
     session_dir.mkdir(parents=True, exist_ok=True)
     (session_dir / "images").mkdir(exist_ok=True)
     (session_dir / "artifacts").mkdir(exist_ok=True)
-    _ensure_workspace_dirs(session_dir)
+    _ensure_workspace_dirs(session_dir, session_mode=session_mode)
 
     meta_path = session_dir / "session-meta.json"
     meta = _read_json(meta_path)
     if meta is None:
-        meta = _create_meta(session_id, coin=coin, restored=existed)
+        meta = _create_meta(session_id, coin=coin, restored=existed, session_mode=session_mode)
         _atomic_write_json(meta_path, meta)
         _commit_trace_history(
             session_dir=session_dir,
@@ -294,7 +347,14 @@ def _ensure_session(session_id: str, coin: str | None = None) -> tuple[Path, dic
             image_count=0,
             updated_at=meta["createdAt"],
         )
-    ensure_session_tools(session_dir, session_id)
+    elif _effective_session_mode(meta) != session_mode:
+        raise HTTPException(status_code=409, detail="Session mode does not match requested API scope")
+
+    meta.setdefault("sessionMode", session_mode)
+    if session_mode == "baseline":
+        ensure_baseline_session_tools(session_dir, session_id)
+    else:
+        ensure_session_tools(session_dir, session_id)
     return session_dir, meta, existed
 
 
@@ -559,8 +619,12 @@ def _write_trace_state(
     }
 
 
-def _event_session_state(session_id: str, body: dict[str, Any]) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any]]:
-    session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"))
+def _event_session_state(
+    session_id: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"), session_mode=session_mode)
     live_session = _load_live_session(session_dir, session_id, coin=body.get("coin"))
     current_state = _read_json(session_dir / "current-state.json") or {}
     _apply_trace_context(live_session, current_state, _event_context_from_body(body))
@@ -614,16 +678,17 @@ def _annotation_detail(annotation: dict[str, Any] | None, annotation_id: int | N
     return {key: value for key, value in detail.items() if value is not None}
 
 
-def _workspace_payload(session_id: str, role: str) -> dict[str, Any]:
-    _validate_workspace_role(role)
-    session_dir, meta, existed = _ensure_session(session_id)
+def _workspace_payload(session_id: str, role: str, session_mode: str = "specialized") -> dict[str, Any]:
+    _validate_workspace_role(role, session_mode=session_mode)
+    session_dir, meta, existed = _ensure_session(session_id, session_mode=session_mode)
     live_session = _load_live_session(session_dir, session_id, coin=meta.get("coin"))
     current_state = _read_json(session_dir / "current-state.json")
-    workspace_state = _read_json(_workspace_state_path(session_dir, role))
+    workspace_state = _read_json(_workspace_state_path(session_dir, role, session_mode=session_mode))
     if workspace_state is None and role == "human":
         workspace_state = current_state
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "workspaceRole": role,
         "meta": {**meta, "restoredFromExisting": existed},
         "liveSession": _hydrate_live_session_for_frontend(session_dir, live_session),
@@ -641,22 +706,22 @@ def _workspace_state_from_body(body: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(state)
 
 
-@router.post("")
-def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
+def _create_session(body: dict[str, Any] | None = None, session_mode: str = "specialized") -> dict[str, Any]:
     coin = (body or {}).get("coin")
-    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    sessions_dir = _sessions_dir(session_mode)
+    sessions_dir.mkdir(parents=True, exist_ok=True)
 
     for _ in range(20):
         session_id = secrets.token_hex(3)[:5]
-        session_dir = SESSIONS_DIR / session_id
+        session_dir = sessions_dir / session_id
         try:
             session_dir.mkdir(parents=True)
         except FileExistsError:
             continue
         (session_dir / "images").mkdir()
         (session_dir / "artifacts").mkdir()
-        _ensure_workspace_dirs(session_dir)
-        meta = _create_meta(session_id, coin=coin, restored=False)
+        _ensure_workspace_dirs(session_dir, session_mode=session_mode)
+        meta = _create_meta(session_id, coin=coin, restored=False, session_mode=session_mode)
         _atomic_write_json(session_dir / "session-meta.json", meta)
         git_result = _commit_trace_history(
             session_dir=session_dir,
@@ -667,34 +732,40 @@ def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
             image_count=0,
             updated_at=meta["createdAt"],
         )
-        ensure_session_tools(session_dir, session_id)
-        return {"sessionId": session_id, "meta": meta, "git": git_result}
+        if session_mode == "baseline":
+            ensure_baseline_session_tools(session_dir, session_id)
+        else:
+            ensure_session_tools(session_dir, session_id)
+        return {"sessionId": session_id, "sessionMode": session_mode, "meta": meta, "git": git_result}
 
     raise HTTPException(status_code=503, detail="Unable to allocate a unique session ID")
 
 
-@router.get("/{session_id}")
-def get_session(session_id: str) -> dict[str, Any]:
-    session_dir, meta, existed = _ensure_session(session_id)
+def _get_session(session_id: str, session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir, meta, existed = _ensure_session(session_id, session_mode=session_mode)
     live_session = _read_json(session_dir / "live-session.json")
     current_state = _read_json(session_dir / "current-state.json")
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "meta": {**meta, "restoredFromExisting": existed},
         "liveSession": _hydrate_live_session_for_frontend(session_dir, live_session) if live_session else None,
         "currentState": current_state,
     }
 
 
-@router.get("/{session_id}/workspaces/{role}")
-def get_session_workspace(session_id: str, role: str) -> dict[str, Any]:
-    return _workspace_payload(session_id, role)
+def _get_session_workspace(session_id: str, role: str, session_mode: str = "specialized") -> dict[str, Any]:
+    return _workspace_payload(session_id, role, session_mode=session_mode)
 
 
-@router.put("/{session_id}/workspaces/{role}/state")
-def put_session_workspace_state(session_id: str, role: str, body: dict[str, Any]) -> dict[str, Any]:
-    _validate_workspace_role(role)
-    session_dir, _, _ = _ensure_session(session_id)
+def _put_session_workspace_state(
+    session_id: str,
+    role: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
+    _validate_workspace_role(role, session_mode=session_mode)
+    session_dir, _, _ = _ensure_session(session_id, session_mode=session_mode)
     state = _workspace_state_from_body(body)
     now = _now_iso()
     _process_current_state_images(session_dir, state, prefix=f"{role}-current")
@@ -705,17 +776,17 @@ def put_session_workspace_state(session_id: str, role: str, body: dict[str, Any]
             "lastUpdatedAt": now,
         }
     )
-    _atomic_write_json(_workspace_state_path(session_dir, role), state)
+    _atomic_write_json(_workspace_state_path(session_dir, role, session_mode=session_mode), state)
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "workspaceRole": role,
         "lastUpdatedAt": now,
     }
 
 
-@router.get("/{session_id}/artifacts/{artifact_path:path}")
-def get_session_artifact(session_id: str, artifact_path: str) -> FileResponse:
-    session_dir = _session_dir(session_id)
+def _get_session_artifact(session_id: str, artifact_path: str, session_mode: str = "specialized") -> FileResponse:
+    session_dir = _session_dir(session_id, session_mode=session_mode)
     return _session_scoped_file_response(
         session_dir,
         "artifacts",
@@ -727,9 +798,8 @@ def get_session_artifact(session_id: str, artifact_path: str) -> FileResponse:
     )
 
 
-@router.get("/{session_id}/images/{image_path:path}")
-def get_session_image(session_id: str, image_path: str) -> FileResponse:
-    session_dir = _session_dir(session_id)
+def _get_session_image(session_id: str, image_path: str, session_mode: str = "specialized") -> FileResponse:
+    session_dir = _session_dir(session_id, session_mode=session_mode)
     return _session_scoped_file_response(
         session_dir,
         "images",
@@ -741,15 +811,13 @@ def get_session_image(session_id: str, image_path: str) -> FileResponse:
     )
 
 
-@router.get("/{session_id}/analysis-artifacts")
-def get_analysis_artifact_manifest(session_id: str) -> dict[str, Any]:
-    session_dir, _meta, _existed = _ensure_session(session_id)
-    return _analysis_artifact_manifest(session_id, session_dir)
+def _get_analysis_artifact_manifest(session_id: str, session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    return _analysis_artifact_manifest(session_id, session_dir, session_mode=session_mode)
 
 
-@router.get("/{session_id}/versions")
-def get_session_versions(session_id: str, limit: int = 50) -> dict[str, Any]:
-    session_dir = _session_dir(session_id)
+def _get_session_versions(session_id: str, limit: int = 50, session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir = _session_dir(session_id, session_mode=session_mode)
     if not session_dir.exists():
         raise HTTPException(status_code=404, detail="Session not found")
     try:
@@ -758,17 +826,17 @@ def get_session_versions(session_id: str, limit: int = 50) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(error))
     return {
         "sessionId": session_id,
+        "sessionMode": session_mode,
         "versions": versions,
     }
 
 
-@router.post("/{session_id}/events/user-actions")
-def append_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+def _append_user_action_event(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> dict[str, Any]:
     action = copy.deepcopy(body.get("action"))
     if not isinstance(action, dict):
         raise HTTPException(status_code=400, detail="action must be an object")
 
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     actions, _ = _normalize_trace_lists(live_session)
     actions.append(action)
     return _write_trace_state(
@@ -782,15 +850,19 @@ def append_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str,
     )
 
 
-@router.put("/{session_id}/events/user-actions/{action_index}")
-def upsert_user_action_event(session_id: str, action_index: int, body: dict[str, Any]) -> dict[str, Any]:
+def _upsert_user_action_event(
+    session_id: str,
+    action_index: int,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
     if action_index < 0:
         raise HTTPException(status_code=400, detail="action_index must be non-negative")
     action = copy.deepcopy(body.get("action"))
     if not isinstance(action, dict):
         raise HTTPException(status_code=400, detail="action must be an object")
 
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     actions, _ = _normalize_trace_lists(live_session)
     if action_index < len(actions):
         actions[action_index] = action
@@ -809,13 +881,17 @@ def upsert_user_action_event(session_id: str, action_index: int, body: dict[str,
     )
 
 
-@router.delete("/{session_id}/events/user-actions/{action_index}")
-def delete_user_action_event(session_id: str, action_index: int, body: dict[str, Any] | None = None) -> dict[str, Any]:
+def _delete_user_action_event(
+    session_id: str,
+    action_index: int,
+    body: dict[str, Any] | None = None,
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
     if action_index < 0:
         raise HTTPException(status_code=400, detail="action_index must be non-negative")
 
     body = body or {}
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     actions, _ = _normalize_trace_lists(live_session)
     if action_index >= len(actions):
         raise HTTPException(status_code=404, detail="action not found")
@@ -831,13 +907,12 @@ def delete_user_action_event(session_id: str, action_index: int, body: dict[str,
     )
 
 
-@router.post("/{session_id}/events/annotations")
-def append_annotation_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+def _append_annotation_event(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> dict[str, Any]:
     annotation = copy.deepcopy(body.get("annotation"))
     if not isinstance(annotation, dict):
         raise HTTPException(status_code=400, detail="annotation must be an object")
 
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     _, annotations = _normalize_trace_lists(live_session)
     annotations.append(annotation)
     return _write_trace_state(
@@ -851,13 +926,17 @@ def append_annotation_event(session_id: str, body: dict[str, Any]) -> dict[str, 
     )
 
 
-@router.put("/{session_id}/events/annotations/{annotation_id}")
-def upsert_annotation_event(session_id: str, annotation_id: int, body: dict[str, Any]) -> dict[str, Any]:
+def _upsert_annotation_event(
+    session_id: str,
+    annotation_id: int,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
     annotation = copy.deepcopy(body.get("annotation"))
     if not isinstance(annotation, dict):
         raise HTTPException(status_code=400, detail="annotation must be an object")
 
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     _, annotations = _normalize_trace_lists(live_session)
     existing_index = next(
         (index for index, item in enumerate(annotations) if isinstance(item, dict) and item.get("id") == annotation_id),
@@ -878,10 +957,14 @@ def upsert_annotation_event(session_id: str, annotation_id: int, body: dict[str,
     )
 
 
-@router.delete("/{session_id}/events/annotations/{annotation_id}")
-def delete_annotation_event(session_id: str, annotation_id: int, body: dict[str, Any] | None = None) -> dict[str, Any]:
+def _delete_annotation_event(
+    session_id: str,
+    annotation_id: int,
+    body: dict[str, Any] | None = None,
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
     body = body or {}
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     _, annotations = _normalize_trace_lists(live_session)
     existing_index = next(
         (index for index, item in enumerate(annotations) if isinstance(item, dict) and item.get("id") == annotation_id),
@@ -901,8 +984,7 @@ def delete_annotation_event(session_id: str, annotation_id: int, body: dict[str,
     )
 
 
-@router.post("/{session_id}/events/reorder")
-def reorder_trace_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+def _reorder_trace_event(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> dict[str, Any]:
     actions = copy.deepcopy(body.get("userActionSequence"))
     annotations = copy.deepcopy(body.get("annotationRecords"))
     if not isinstance(actions, list):
@@ -910,7 +992,7 @@ def reorder_trace_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]
     if not isinstance(annotations, list):
         raise HTTPException(status_code=400, detail="annotationRecords must be an array")
 
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     live_session["userActionSequence"] = actions
     live_session["annotationRecords"] = annotations
     return _write_trace_state(
@@ -923,9 +1005,8 @@ def reorder_trace_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]
     )
 
 
-@router.post("/{session_id}/events/settings")
-def update_session_settings_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
-    session_dir, meta, live_session, current_state = _event_session_state(session_id, body)
+def _update_session_settings_event(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir, meta, live_session, current_state = _event_session_state(session_id, body, session_mode=session_mode)
     return _write_trace_state(
         session_id,
         session_dir,
@@ -937,9 +1018,8 @@ def update_session_settings_event(session_id: str, body: dict[str, Any]) -> dict
     )
 
 
-@router.post("/{session_id}/sync")
-def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
-    session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"))
+def _sync_session(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"), session_mode=session_mode)
 
     actions = copy.deepcopy(body.get("userActionSequence") or [])
     annotations = copy.deepcopy(body.get("annotationRecords") or [])
@@ -979,3 +1059,181 @@ def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
         "full_sync",
         {"coin": body.get("coin")},
     )
+
+
+@router.post("")
+def create_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _create_session(body, session_mode="specialized")
+
+
+@baseline_router.post("")
+def create_baseline_session(body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _create_session(body, session_mode="baseline")
+
+
+@router.get("/{session_id}")
+def get_session(session_id: str) -> dict[str, Any]:
+    return _get_session(session_id, session_mode="specialized")
+
+
+@baseline_router.get("/{session_id}")
+def get_baseline_session(session_id: str) -> dict[str, Any]:
+    return _get_session(session_id, session_mode="baseline")
+
+
+@router.get("/{session_id}/workspaces/{role}")
+def get_session_workspace(session_id: str, role: str) -> dict[str, Any]:
+    return _get_session_workspace(session_id, role, session_mode="specialized")
+
+
+@baseline_router.get("/{session_id}/workspaces/{role}")
+def get_baseline_session_workspace(session_id: str, role: str) -> dict[str, Any]:
+    return _get_session_workspace(session_id, role, session_mode="baseline")
+
+
+@router.put("/{session_id}/workspaces/{role}/state")
+def put_session_workspace_state(session_id: str, role: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _put_session_workspace_state(session_id, role, body, session_mode="specialized")
+
+
+@baseline_router.put("/{session_id}/workspaces/{role}/state")
+def put_baseline_session_workspace_state(session_id: str, role: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _put_session_workspace_state(session_id, role, body, session_mode="baseline")
+
+
+@router.get("/{session_id}/artifacts/{artifact_path:path}")
+def get_session_artifact(session_id: str, artifact_path: str) -> FileResponse:
+    return _get_session_artifact(session_id, artifact_path, session_mode="specialized")
+
+
+@baseline_router.get("/{session_id}/artifacts/{artifact_path:path}")
+def get_baseline_session_artifact(session_id: str, artifact_path: str) -> FileResponse:
+    return _get_session_artifact(session_id, artifact_path, session_mode="baseline")
+
+
+@router.get("/{session_id}/images/{image_path:path}")
+def get_session_image(session_id: str, image_path: str) -> FileResponse:
+    return _get_session_image(session_id, image_path, session_mode="specialized")
+
+
+@baseline_router.get("/{session_id}/images/{image_path:path}")
+def get_baseline_session_image(session_id: str, image_path: str) -> FileResponse:
+    return _get_session_image(session_id, image_path, session_mode="baseline")
+
+
+@router.get("/{session_id}/analysis-artifacts")
+def get_analysis_artifact_manifest(session_id: str) -> dict[str, Any]:
+    return _get_analysis_artifact_manifest(session_id, session_mode="specialized")
+
+
+@baseline_router.get("/{session_id}/analysis-artifacts")
+def get_baseline_analysis_artifact_manifest(session_id: str) -> dict[str, Any]:
+    return _get_analysis_artifact_manifest(session_id, session_mode="baseline")
+
+
+@router.get("/{session_id}/versions")
+def get_session_versions(session_id: str, limit: int = 50) -> dict[str, Any]:
+    return _get_session_versions(session_id, limit=limit, session_mode="specialized")
+
+
+@baseline_router.get("/{session_id}/versions")
+def get_baseline_session_versions(session_id: str, limit: int = 50) -> dict[str, Any]:
+    return _get_session_versions(session_id, limit=limit, session_mode="baseline")
+
+
+@router.post("/{session_id}/events/user-actions")
+def append_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _append_user_action_event(session_id, body, session_mode="specialized")
+
+
+@baseline_router.post("/{session_id}/events/user-actions")
+def append_baseline_user_action_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _append_user_action_event(session_id, body, session_mode="baseline")
+
+
+@router.put("/{session_id}/events/user-actions/{action_index}")
+def upsert_user_action_event(session_id: str, action_index: int, body: dict[str, Any]) -> dict[str, Any]:
+    return _upsert_user_action_event(session_id, action_index, body, session_mode="specialized")
+
+
+@baseline_router.put("/{session_id}/events/user-actions/{action_index}")
+def upsert_baseline_user_action_event(session_id: str, action_index: int, body: dict[str, Any]) -> dict[str, Any]:
+    return _upsert_user_action_event(session_id, action_index, body, session_mode="baseline")
+
+
+@router.delete("/{session_id}/events/user-actions/{action_index}")
+def delete_user_action_event(session_id: str, action_index: int, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _delete_user_action_event(session_id, action_index, body, session_mode="specialized")
+
+
+@baseline_router.delete("/{session_id}/events/user-actions/{action_index}")
+def delete_baseline_user_action_event(
+    session_id: str,
+    action_index: int,
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return _delete_user_action_event(session_id, action_index, body, session_mode="baseline")
+
+
+@router.post("/{session_id}/events/annotations")
+def append_annotation_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _append_annotation_event(session_id, body, session_mode="specialized")
+
+
+@baseline_router.post("/{session_id}/events/annotations")
+def append_baseline_annotation_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _append_annotation_event(session_id, body, session_mode="baseline")
+
+
+@router.put("/{session_id}/events/annotations/{annotation_id}")
+def upsert_annotation_event(session_id: str, annotation_id: int, body: dict[str, Any]) -> dict[str, Any]:
+    return _upsert_annotation_event(session_id, annotation_id, body, session_mode="specialized")
+
+
+@baseline_router.put("/{session_id}/events/annotations/{annotation_id}")
+def upsert_baseline_annotation_event(session_id: str, annotation_id: int, body: dict[str, Any]) -> dict[str, Any]:
+    return _upsert_annotation_event(session_id, annotation_id, body, session_mode="baseline")
+
+
+@router.delete("/{session_id}/events/annotations/{annotation_id}")
+def delete_annotation_event(session_id: str, annotation_id: int, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _delete_annotation_event(session_id, annotation_id, body, session_mode="specialized")
+
+
+@baseline_router.delete("/{session_id}/events/annotations/{annotation_id}")
+def delete_baseline_annotation_event(
+    session_id: str,
+    annotation_id: int,
+    body: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return _delete_annotation_event(session_id, annotation_id, body, session_mode="baseline")
+
+
+@router.post("/{session_id}/events/reorder")
+def reorder_trace_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _reorder_trace_event(session_id, body, session_mode="specialized")
+
+
+@baseline_router.post("/{session_id}/events/reorder")
+def reorder_baseline_trace_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _reorder_trace_event(session_id, body, session_mode="baseline")
+
+
+@router.post("/{session_id}/events/settings")
+def update_session_settings_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _update_session_settings_event(session_id, body, session_mode="specialized")
+
+
+@baseline_router.post("/{session_id}/events/settings")
+def update_baseline_session_settings_event(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _update_session_settings_event(session_id, body, session_mode="baseline")
+
+
+@router.post("/{session_id}/sync")
+def sync_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _sync_session(session_id, body, session_mode="specialized")
+
+
+@baseline_router.post("/{session_id}/sync")
+def sync_baseline_session(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _sync_session(session_id, body, session_mode="baseline")
