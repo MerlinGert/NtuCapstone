@@ -165,6 +165,11 @@ export default {
       type: String,
       default: '',
     },
+    sessionMode: {
+      type: String,
+      default: 'specialized',
+      validator: (value) => ['specialized', 'baseline'].includes(value),
+    },
     active: {
       type: Boolean,
       default: true,
@@ -193,6 +198,9 @@ export default {
   computed: {
     isImportedMode() {
       return Boolean(this.analysisPayload)
+    },
+    sessionApiBase() {
+      return this.sessionMode === 'baseline' ? '/api/base/sessions' : '/api/sessions'
     },
     hasAnalysis() {
       return this.forestTrees.length > 0
@@ -343,7 +351,7 @@ export default {
   },
   methods: {
     manifestUrl() {
-      return `/api/sessions/${this.sessionId}/analysis-artifacts`
+      return `${this.sessionApiBase}/${this.sessionId}/analysis-artifacts`
     },
     encodeRelativePath(path) {
       return String(path)
@@ -353,7 +361,7 @@ export default {
         .join('/')
     },
     artifactUrl(name) {
-      return `/api/sessions/${this.sessionId}/artifacts/${this.encodeRelativePath(name)}`
+      return `${this.sessionApiBase}/${this.sessionId}/artifacts/${this.encodeRelativePath(name)}`
     },
     cacheBustedUrl(url, token) {
       if (!token) return url
@@ -361,7 +369,7 @@ export default {
       return `${url}${separator}v=${encodeURIComponent(token)}`
     },
     imageUrl(name) {
-      return `/api/sessions/${this.sessionId}/images/${this.encodeRelativePath(name)}`
+      return `${this.sessionApiBase}/${this.sessionId}/images/${this.encodeRelativePath(name)}`
     },
     async fetchManifest() {
       const response = await fetch(this.manifestUrl(), { cache: 'no-store' })
@@ -604,6 +612,7 @@ export default {
       if (this.isImportedMode) return
       const detail = event?.detail || {}
       if (detail.sessionId && detail.sessionId !== this.sessionId) return
+      if (detail.sessionMode && detail.sessionMode !== this.sessionMode) return
       const name = detail.artifact?.title || detail.artifact?.name || ''
       if (!this.isAnalysisArtifactName(name)) return
       if (this.active) this.loadAnalysis({ force: true, silent: true })
@@ -887,7 +896,7 @@ export default {
       if (/^(https?:|data:|blob:)/i.test(path)) {
         return { url: path, label: this.basename(path) }
       }
-      if (path.startsWith('/api/sessions/')) {
+      if (path.startsWith('/api/sessions/') || path.startsWith('/api/base/sessions/')) {
         return { url: path, label: this.basename(path) }
       }
       if (/^(file:|[a-z]+:)/i.test(path)) return null

@@ -28,7 +28,7 @@
 
     <div ref="messagesEl" class="codex-chat-messages" @paste="handlePaste">
       <div v-if="messages.length === 0" class="codex-chat-empty">
-        Ask Codex to inspect the current trace, explain an interaction path, or draft a trace analysis.
+        {{ emptyStateText }}
       </div>
 
       <div
@@ -143,6 +143,7 @@
 
     <div class="codex-chat-input-area">
       <button
+        v-if="sessionMode !== 'baseline'"
         class="codex-chat-preset-btn"
         type="button"
         title="Run full trace analysis with counter-evidence search"
@@ -245,6 +246,11 @@ export default {
       type: String,
       default: '',
     },
+    sessionMode: {
+      type: String,
+      default: 'specialized',
+      validator: (value) => ['specialized', 'baseline'].includes(value),
+    },
     workspaceRole: {
       type: String,
       default: 'human',
@@ -292,7 +298,20 @@ export default {
       return 'Live trace will sync before each message'
     },
     workspaceLabel() {
+      if (this.sessionMode === 'baseline') return 'Baseline'
       return this.workspaceRole === 'agent' ? 'Agent Workspace' : 'Human Workspace'
+    },
+    chatApiBase() {
+      return this.sessionMode === 'baseline' ? '/api/base/chat' : '/api/chat'
+    },
+    sessionApiBase() {
+      return this.sessionMode === 'baseline' ? '/api/base/sessions' : '/api/sessions'
+    },
+    emptyStateText() {
+      if (this.sessionMode === 'baseline') {
+        return 'Ask Codex to inspect the current trace, screenshots, or raw market data.'
+      }
+      return 'Ask Codex to inspect the current trace, explain an interaction path, or draft a trace analysis.'
     },
     panelStyle() {
       if (!this.panelPositioned) return null
@@ -326,6 +345,10 @@ export default {
           this.historyLoadedForSession = ''
         }
       },
+    },
+    sessionMode() {
+      this.historyLoadedForSession = ''
+      if (this.sessionId) this.loadChatHistory(this.sessionId)
     },
   },
   methods: {
@@ -531,9 +554,10 @@ export default {
       }))
     },
     async loadChatHistory(sessionId = this.sessionId) {
-      if (!sessionId || this.historyLoadedForSession === sessionId) return
+      const historyKey = `${this.sessionMode}:${sessionId}`
+      if (!sessionId || this.historyLoadedForSession === historyKey) return
       try {
-        const response = await fetch(`/api/chat/${sessionId}/history?threadKey=trace-analysis`)
+        const response = await fetch(`${this.chatApiBase}/${sessionId}/history?threadKey=trace-analysis`)
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const payload = await response.json()
         const messages = Array.isArray(payload.messages) ? payload.messages : []
@@ -547,10 +571,10 @@ export default {
             )
             return Math.max(maxId, activityMax)
           }, 0) + 1
-        this.historyLoadedForSession = sessionId
+        this.historyLoadedForSession = historyKey
         this.scrollToBottom()
       } catch (error) {
-        this.historyLoadedForSession = sessionId
+        this.historyLoadedForSession = historyKey
         this.messages = [
           {
             id: this.nextMessageId++,
@@ -564,7 +588,7 @@ export default {
     },
     async persistChatHistory() {
       if (!this.sessionId) return
-      await fetch(`/api/chat/${this.sessionId}/history`, {
+      await fetch(`${this.chatApiBase}/${this.sessionId}/history`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -632,12 +656,13 @@ export default {
     },
     artifactHref(artifact) {
       if (!this.sessionId || !artifact?.title) return '#'
-      return `/api/sessions/${this.sessionId}/artifacts/${encodeURIComponent(artifact.title)}`
+      return `${this.sessionApiBase}/${this.sessionId}/artifacts/${encodeURIComponent(artifact.title)}`
     },
     notifySessionArtifactUpdated(artifact) {
       window.dispatchEvent(new CustomEvent('maniscope-session-artifact-updated', {
         detail: {
           sessionId: this.sessionId,
+          sessionMode: this.sessionMode,
           artifact,
         },
       }))
@@ -818,7 +843,7 @@ export default {
         throw new Error('No ManiScope session is active yet.')
       }
 
-      const response = await fetch(`/api/chat/${this.sessionId}/message`, {
+      const response = await fetch(`${this.chatApiBase}/${this.sessionId}/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -830,6 +855,7 @@ export default {
           includeCurrentTrace: true,
           includeCurrentViews: true,
           workspaceRole: this.workspaceRole,
+          sessionMode: this.sessionMode,
         }),
       })
 
@@ -862,8 +888,10 @@ export default {
       }
 
       try {
-        const response = await fetch(`/api/chat/${this.sessionId}/threads/trace-analysis/stop`, {
+        const response = await fetch(`${this.chatApiBase}/${this.sessionId}/threads/trace-analysis/stop`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionMode: this.sessionMode }),
         })
         if (!response.ok) {
           const errorText = await response.text()

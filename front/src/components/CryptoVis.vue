@@ -12,7 +12,7 @@
           >
             Session {{ maniscopeSessionId }}
           </button>
-          <span class="workspace-badge" :class="`workspace-${workspaceRole}`">
+          <span class="workspace-badge" :class="workspaceBadgeClass">
             {{ workspaceLabel }}
           </span>
           <button
@@ -178,6 +178,7 @@
     <div style="flex: 4; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
         <NotesPanel 
             :session-id="maniscopeSessionId"
+            :session-mode="sessionMode"
             :actions="userActionSequence"
             :annotations="annotationRecords"
             :read-only="isAgentWorkspace"
@@ -201,6 +202,7 @@
 <CodexChatSidebar
   :open="chatBoxOpen"
   :session-id="maniscopeSessionId"
+  :session-mode="sessionMode"
   :workspace-role="workspaceRole"
   :sync-in-flight="liveTraceSyncInFlight"
   :last-sync-at="lastLiveTraceSyncAt"
@@ -314,6 +316,11 @@ export default {
     sessionId: {
       type: String,
       default: null,
+    },
+    sessionMode: {
+      type: String,
+      default: 'specialized',
+      validator: (value) => ['specialized', 'baseline'].includes(value),
     },
     workspaceRole: {
       type: String,
@@ -525,14 +532,24 @@ export default {
     }
   },
   computed: {
+    isBaselineSession() {
+      return this.sessionMode === 'baseline'
+    },
+    sessionApiBase() {
+      return this.isBaselineSession ? '/api/base/sessions' : '/api/sessions'
+    },
     isHumanWorkspace() {
-      return this.workspaceRole !== 'agent'
+      return this.isBaselineSession || this.workspaceRole !== 'agent'
     },
     isAgentWorkspace() {
-      return this.workspaceRole === 'agent'
+      return !this.isBaselineSession && this.workspaceRole === 'agent'
     },
     workspaceLabel() {
+      if (this.isBaselineSession) return 'Baseline'
       return this.isAgentWorkspace ? 'Agent Workspace' : 'Human Workspace'
+    },
+    workspaceBadgeClass() {
+      return this.isBaselineSession ? 'workspace-baseline' : `workspace-${this.workspaceRole}`
     },
   },
   watch: {
@@ -554,7 +571,7 @@ export default {
       }
       try {
         const response = await fetch(
-          `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
+          `${this.sessionApiBase}/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
         )
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const payload = await response.json()
@@ -686,7 +703,7 @@ export default {
         : null
       const currentState = this.buildCurrentState(majorViewScreenshots)
       const response = await fetch(
-        `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}/state`,
+        `${this.sessionApiBase}/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}/state`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -732,7 +749,7 @@ export default {
         return Promise.resolve(null)
       }
       return this.queueSessionEvent(async () => {
-        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}/events/${endpoint}`, {
+        const response = await fetch(`${this.sessionApiBase}/${this.maniscopeSessionId}/events/${endpoint}`, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.buildSessionEventBody(body)),
@@ -811,7 +828,7 @@ export default {
         const majorViewScreenshots = includeCurrentViews
           ? await this.captureCurrentMajorViewsForSession()
           : null
-        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}/sync`, {
+        const response = await fetch(`${this.sessionApiBase}/${this.maniscopeSessionId}/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -852,7 +869,7 @@ export default {
       if (!this.isAgentWorkspace || !this.maniscopeSessionId) return null
       try {
         const response = await fetch(
-          `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
+          `${this.sessionApiBase}/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
         )
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const payload = await response.json()
@@ -894,7 +911,10 @@ export default {
       }, delay)
     },
     copySessionLink() {
-      const url = `${window.location.origin}/${this.maniscopeSessionId}/${this.workspaceRole}`
+      const path = this.isBaselineSession
+        ? `/base/${this.maniscopeSessionId}`
+        : `/${this.maniscopeSessionId}/${this.workspaceRole}`
+      const url = `${window.location.origin}${path}`
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(url).catch(() => {})
       }
@@ -2660,6 +2680,12 @@ a {
   background: #f0fff4;
   color: #276749;
   border-color: #9ae6b4;
+}
+
+.workspace-baseline {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
 }
 
 .workspace-link-tag {

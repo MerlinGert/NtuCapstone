@@ -33,6 +33,7 @@
           :style="activeTab === 'tree' ? 'color:#059669; border-bottom-color:#059669;' : ''"
         >Action Tree</button>
         <button
+          v-if="showLlmAnalysis"
           class="tab-btn"
           :class="{ active: activeTab === 'llm_analysis' }"
           @click="activeTab = 'llm_analysis'"
@@ -78,9 +79,10 @@
       />
     </div>
 
-    <div v-show="activeTab === 'llm_analysis'" style="flex:1; padding:10px; overflow:hidden;">
+    <div v-if="showLlmAnalysis" v-show="activeTab === 'llm_analysis'" style="flex:1; padding:10px; overflow:hidden;">
       <LlmAnalysisView
         :session-id="sessionId"
+        :session-mode="sessionMode"
         :active="activeTab === 'llm_analysis'"
         :analysis-payload="analysisPayload"
       />
@@ -108,6 +110,11 @@ export default {
     sessionId: {
       type: String,
       default: ''
+    },
+    sessionMode: {
+      type: String,
+      default: 'specialized',
+      validator: (value) => ['specialized', 'baseline'].includes(value),
     },
     actions: {
       type: Array,
@@ -144,15 +151,34 @@ export default {
   },
   data() {
     return {
-      activeTab: this.analysisOnly ? 'llm_analysis' : this.initialTab
+      activeTab: this.analysisOnly
+        ? 'llm_analysis'
+        : (this.sessionMode === 'baseline' && this.initialTab === 'llm_analysis' ? 'tree' : this.initialTab)
+    }
+  },
+  computed: {
+    showLlmAnalysis() {
+      return this.analysisOnly || this.sessionMode !== 'baseline'
     }
   },
   watch: {
     initialTab(nextTab) {
-      if (!this.analysisOnly && nextTab) this.activeTab = nextTab
+      if (!this.analysisOnly && nextTab) {
+        this.activeTab = this.resolveActiveTab(nextTab)
+      }
     },
     analysisOnly(enabled) {
       if (enabled) this.activeTab = 'llm_analysis'
+      else this.activeTab = this.resolveActiveTab(this.activeTab)
+    },
+    sessionMode() {
+      this.activeTab = this.resolveActiveTab(this.activeTab)
+    }
+  },
+  methods: {
+    resolveActiveTab(tab) {
+      if (tab === 'llm_analysis' && !this.showLlmAnalysis) return 'tree'
+      return tab || 'tree'
     }
   }
 }
