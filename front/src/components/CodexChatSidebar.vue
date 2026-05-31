@@ -777,9 +777,6 @@ export default {
           title: event.title || 'Codex error',
           detail: event.error || '',
         })
-        assistantMessage.content = assistantMessage.content
-          ? `${assistantMessage.content}\n\nError: ${event.error}`
-          : `Error: ${event.error}`
       } else if (event.type === 'thread') {
         assistantMessage.threadId = event.threadId
         this.addActivity(assistantMessage, event)
@@ -997,9 +994,6 @@ export default {
       } catch (error) {
         const errorText = error && error.message ? error.message : String(error)
         if (assistantMessage) {
-          assistantMessage.content = assistantMessage.content
-            ? `${assistantMessage.content}\n\nError: ${errorText}`
-            : `Error: ${errorText}`
           this.addActivity(assistantMessage, {
             level: 'error',
             category: 'session',
