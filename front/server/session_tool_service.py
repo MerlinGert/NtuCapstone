@@ -174,6 +174,8 @@ references replace repo-root documentation reads:
 
 Trace-analysis schema references remain under `trace_analysis_tools/references/`.
 The skeptical-review skill remains under `skills/maniscope-disconfirmation/`.
+The uv cache at `~/.cache/uv` is available to package tooling only; do not use it
+for analysis outputs.
 """
 
 
@@ -189,6 +191,8 @@ visualization rendering helpers.
 Raw market data is available through the Codex sandbox as read-only-by-policy
 additional directories. The chat prompt gives their absolute ACT and PNUT
 paths for the current run.
+
+The uv cache at `~/.cache/uv` is available to package tooling only.
 
 Do not edit raw data files. Write scripts, derived data, summaries, and copied
 images inside this session directory, preferably under `artifacts/`.

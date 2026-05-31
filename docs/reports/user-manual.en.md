@@ -175,7 +175,7 @@ In baseline sessions, Codex Chat uses `/api/base/chat/...` and stores files unde
 
 Each chat session root contains project templates for ad hoc scripting: `pyproject.toml` for Python work with `uv`, and `package.json` for JavaScript or TypeScript work with `bun`. Agents can add dependencies inside that session when useful, while generated evidence and reports should be placed in `artifacts/`.
 
-Codex Chat agents run from the active session directory instead of the repository root. They can write only inside that session workspace, preferably in `artifacts/`, and receive ACT and PNUT raw-data folders as additional read-only-by-policy inputs. Network access is enabled so agents can reach local ManiScope services and external references when an investigation needs them.
+Codex Chat agents run from the active session directory instead of the repository root. They can write only inside that session workspace, preferably in `artifacts/`, and receive ACT and PNUT raw-data folders as additional read-only-by-policy inputs. The uv package cache at `~/.cache/uv` is also available so Python dependencies can be installed without writing outside the allowed cache. Network access is enabled so agents can reach local ManiScope services and external references when an investigation needs them. When the bridge starts, it checks that `uv`, `codex`, and either `bun` or `npm` are installed.
 
 The Codex Chat panel is floating. Drag its header to move it, or drag the lower corners to resize it. The panel keeps its local position and size in the browser.
 

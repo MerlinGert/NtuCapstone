@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import os from 'node:os'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export const FRONT_DIR = path.resolve(__dirname, '..')
@@ -7,11 +8,19 @@ export const REPO_ROOT = process.env.MANISCOPE_REPO_ROOT || path.resolve(FRONT_D
 export const CODEX_AGENT_MODEL = 'gpt-5.5'
 export const CODEX_AGENT_REASONING_EFFORT = 'xhigh'
 
+export function uvCacheDirectory(homeDir = os.homedir()) {
+  return path.join(homeDir, '.cache', 'uv')
+}
+
 export function rawDataDirectories(frontDir = FRONT_DIR) {
   return [
     path.join(frontDir, 'public', 'data'),
     path.join(frontDir, 'public', 'data2'),
   ]
+}
+
+export function agentAdditionalDirectories() {
+  return [...rawDataDirectories(), uvCacheDirectory()]
 }
 
 export function buildThreadOptions(sessionDirectory) {
@@ -27,6 +36,6 @@ export function buildThreadOptions(sessionDirectory) {
     modelReasoningEffort: CODEX_AGENT_REASONING_EFFORT,
     networkAccessEnabled: true,
     webSearchMode: process.env.CODEX_WEB_SEARCH || 'disabled',
-    additionalDirectories: rawDataDirectories(),
+    additionalDirectories: agentAdditionalDirectories(),
   }
 }

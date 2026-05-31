@@ -175,7 +175,7 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 每个聊天会话根目录都包含用于临时脚本的项目模板：`pyproject.toml` 用于通过 `uv` 运行 Python，`package.json` 用于通过 `bun` 运行 JavaScript 或 TypeScript。智能体可以在该会话内添加依赖；生成的证据、报告和导出文件应放在 `artifacts/`。
 
-Codex Chat 智能体会从当前会话目录运行，而不是从仓库根目录运行。它只能在该会话工作区内写入文件，优先写入 `artifacts/`；ACT 和 PNUT 原始数据目录会作为额外的只读策略输入提供。网络访问保持开启，因此智能体可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。
+Codex Chat 智能体会从当前会话目录运行，而不是从仓库根目录运行。它只能在该会话工作区内写入文件，优先写入 `artifacts/`；ACT 和 PNUT 原始数据目录会作为额外的只读策略输入提供。`~/.cache/uv` 也会开放给 uv 作为包缓存目录，因此安装 Python 依赖时不需要写入其他位置。网络访问保持开启，因此智能体可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。bridge 启动时会检查本机是否已经安装 `uv`、`codex`，以及 `bun` 或 `npm` 中的一个。
 
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
 

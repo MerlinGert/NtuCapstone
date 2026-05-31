@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import test from 'node:test'
-import { buildThreadOptions, rawDataDirectories } from './thread-options.mjs'
+import { buildThreadOptions, rawDataDirectories, uvCacheDirectory } from './thread-options.mjs'
 
 test('builds specialized thread options with session directory as workspace', () => {
   const sessionDir = '/tmp/maniscope/.maniscope-chat/sessions/abcde'
@@ -24,7 +24,7 @@ test('builds baseline thread options with baseline session directory as workspac
   assert.equal(options.networkAccessEnabled, true)
 })
 
-test('only adds ACT and PNUT raw data directories', () => {
+test('adds ACT, PNUT, and uv cache directories', () => {
   const frontDir = '/tmp/maniscope/front'
   const dirs = rawDataDirectories(frontDir)
 
@@ -32,7 +32,10 @@ test('only adds ACT and PNUT raw data directories', () => {
     path.join(frontDir, 'public', 'data'),
     path.join(frontDir, 'public', 'data2'),
   ])
-  assert.deepEqual(buildThreadOptions('/tmp/session').additionalDirectories, rawDataDirectories())
+  assert.deepEqual(buildThreadOptions('/tmp/session').additionalDirectories, [
+    ...rawDataDirectories(),
+    uvCacheDirectory(),
+  ])
 })
 
 test('does not allow caller to omit the session directory', () => {

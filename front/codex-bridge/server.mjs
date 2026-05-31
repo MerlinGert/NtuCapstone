@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { AgentBrowserManager } from './agent-browser.mjs'
 import { materializeLocalArtifactReferences } from './local-image-artifacts.mjs'
+import { runStartupPreflight } from './preflight.mjs'
 import { buildThreadOptions, rawDataDirectories, FRONT_DIR, REPO_ROOT } from './thread-options.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
@@ -302,6 +303,7 @@ Filesystem access:
   - ACT raw data: ${actRawDataDir}
   - PNUT raw data: ${pnutRawDataDir}
 - Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
+- The uv package cache at ~/.cache/uv is also accessible so uv can install and reuse packages. Treat it only as tool cache; do not write outputs there.
 
 Session-local scripting workspace:
 - The active session root contains pyproject.toml and package.json templates.
@@ -547,6 +549,7 @@ Filesystem access:
   - ACT raw data: ${actRawDataDir}
   - PNUT raw data: ${pnutRawDataDir}
 - Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
+- The uv package cache at ~/.cache/uv is also accessible so uv can install and reuse packages. Treat it only as tool cache; do not write outputs there.
 
 Start trace-dependent answers by reading the current session files when they exist:
 - ${relativeSessionRoot}/live-session.json
@@ -1273,9 +1276,16 @@ const server = http.createServer((req, res) => {
   sendJson(res, 404, { error: 'not found' })
 })
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Codex bridge listening on http://127.0.0.1:${PORT}`)
-})
+try {
+  const preflight = runStartupPreflight()
+  console.log(`Codex bridge preflight passed. uv cache: ${preflight.uvCacheDir}`)
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`Codex bridge listening on http://127.0.0.1:${PORT}`)
+  })
+} catch (error) {
+  console.error(error?.message || String(error))
+  process.exit(1)
+}
 
 async function shutdown() {
   await agentBrowser.close()
