@@ -6,7 +6,7 @@ import {
   formatPreflightError,
   runStartupPreflight,
 } from './preflight.mjs'
-import { uvCacheDirectory } from './thread-options.mjs'
+import { sharedUvCacheDirectory } from './thread-options.mjs'
 
 function fakeRunner(availableCommands) {
   return (command) => ({
@@ -56,8 +56,8 @@ test('startup preflight creates uv cache directory and returns cache path', () =
     },
   })
 
-  assert.equal(result.uvCacheDir, uvCacheDirectory())
-  assert.deepEqual(mkdirCalls, [{ dir: uvCacheDirectory(), options: { recursive: true } }])
+  assert.equal(result.uvCacheDir, sharedUvCacheDirectory())
+  assert.deepEqual(mkdirCalls, [{ dir: sharedUvCacheDirectory(), options: { recursive: true } }])
 })
 
 test('startup preflight throws a clear error when required tools are missing', () => {

@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { uvCacheDirectory } from './thread-options.mjs'
+import { sharedUvCacheDirectory } from './thread-options.mjs'
 
 const INSTALLATION_HINTS = {
   uv: 'Install uv: https://docs.astral.sh/uv/getting-started/installation/',
@@ -58,7 +58,7 @@ export function formatPreflightError({ missing, env = process.env }) {
 }
 
 export function ensureUvCacheDirectory({ mkdirSync = fs.mkdirSync } = {}) {
-  const cacheDir = uvCacheDirectory()
+  const cacheDir = sharedUvCacheDirectory()
   mkdirSync(cacheDir, { recursive: true })
   return cacheDir
 }

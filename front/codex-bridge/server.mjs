@@ -5,7 +5,13 @@ import path from 'node:path'
 import { AgentBrowserManager } from './agent-browser.mjs'
 import { materializeLocalArtifactReferences } from './local-image-artifacts.mjs'
 import { runStartupPreflight } from './preflight.mjs'
-import { buildThreadOptions, rawDataDirectories, FRONT_DIR, REPO_ROOT } from './thread-options.mjs'
+import {
+  buildCodexClientOptions,
+  buildThreadOptions,
+  rawDataDirectories,
+  FRONT_DIR,
+  REPO_ROOT,
+} from './thread-options.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
@@ -303,7 +309,7 @@ Filesystem access:
   - ACT raw data: ${actRawDataDir}
   - PNUT raw data: ${pnutRawDataDir}
 - Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
-- The uv package cache at ~/.cache/uv is also accessible so uv can install and reuse packages. Treat it only as tool cache; do not write outputs there.
+- The bridge sets UV_CACHE_DIR to the repo-local shared uv cache. Use plain uv commands and do not override UV_CACHE_DIR.
 
 Session-local scripting workspace:
 - The active session root contains pyproject.toml and package.json templates.
@@ -549,7 +555,7 @@ Filesystem access:
   - ACT raw data: ${actRawDataDir}
   - PNUT raw data: ${pnutRawDataDir}
 - Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
-- The uv package cache at ~/.cache/uv is also accessible so uv can install and reuse packages. Treat it only as tool cache; do not write outputs there.
+- The bridge sets UV_CACHE_DIR to the repo-local shared uv cache. Use plain uv commands and do not override UV_CACHE_DIR.
 
 Start trace-dependent answers by reading the current session files when they exist:
 - ${relativeSessionRoot}/live-session.json
@@ -984,7 +990,7 @@ async function handleChat(req, res, sessionId) {
     return
   }
 
-  const codex = new Codex()
+  const codex = new Codex(buildCodexClientOptions())
   const existing = getThreadEntry(sessionId, threadKey, sessionMode)
   const options = buildThreadOptions(dir)
   const isNewThread = !existing?.threadId
