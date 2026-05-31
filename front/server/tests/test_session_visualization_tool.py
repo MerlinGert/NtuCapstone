@@ -137,6 +137,10 @@ class SessionVisualizationToolTests(unittest.TestCase):
             self.assertIn('name = "maniscope-specialized-session-abcde"', pyproject.read_text(encoding="utf-8"))
             self.assertIn('"name": "maniscope-specialized-session-abcde"', package_json.read_text(encoding="utf-8"))
             self.assertIn("node_modules/", gitignore.read_text(encoding="utf-8"))
+            references_dir = session_dir / "session-references"
+            self.assertEqual((references_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
+            self.assertTrue((references_dir / "user-manual.en.md").exists())
+            self.assertTrue((references_dir / "major-view-render-api.md").exists())
 
             tool_path = session_dir / "maniscope_visualization.py"
             self.assertTrue(tool_path.exists())
@@ -146,6 +150,7 @@ class SessionVisualizationToolTests(unittest.TestCase):
 
             exclude = (session_dir / ".git" / "info" / "exclude").read_text(encoding="utf-8")
             self.assertIn("/maniscope_visualization.py", exclude)
+            self.assertIn("/session-references/", exclude)
             self.assertIn("/trace_analysis_tools/", exclude)
             self.assertIn("/skills/maniscope-disconfirmation/", exclude)
             self.assertIn("/pyproject.toml", exclude)
@@ -212,6 +217,11 @@ class SessionVisualizationToolTests(unittest.TestCase):
             package_json = session_dir / "package.json"
             self.assertIn('name = "maniscope-baseline-session-abcde"', pyproject.read_text(encoding="utf-8"))
             self.assertIn('"name": "maniscope-baseline-session-abcde"', package_json.read_text(encoding="utf-8"))
+            references_dir = session_dir / "session-references"
+            self.assertEqual((references_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
+            self.assertTrue((references_dir / "README.md").exists())
+            self.assertFalse((references_dir / "user-manual.en.md").exists())
+            self.assertFalse((references_dir / "major-view-render-api.md").exists())
             content = tool_path.read_text(encoding="utf-8")
             self.assertIn('SESSION_ID = "abcde"', content)
             self.assertIn(f'TOOL_VERSION = "{service.TOOL_VERSION}"', content)
@@ -221,6 +231,7 @@ class SessionVisualizationToolTests(unittest.TestCase):
 
             exclude = (session_dir / ".git" / "info" / "exclude").read_text(encoding="utf-8")
             self.assertIn("/maniscope_baseline_views.py", exclude)
+            self.assertIn("/session-references/", exclude)
             self.assertIn("/pyproject.toml", exclude)
             self.assertIn("/package.json", exclude)
             self.assertNotIn("/maniscope_visualization.py", exclude)

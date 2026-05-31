@@ -2,17 +2,14 @@ import { Codex } from '@openai/codex-sdk'
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { AgentBrowserManager } from './agent-browser.mjs'
 import { materializeLocalArtifactReferences } from './local-image-artifacts.mjs'
+import { buildThreadOptions, rawDataDirectories, FRONT_DIR, REPO_ROOT } from './thread-options.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
 const WORKSPACE_ROLE_RE = /^(human|agent)$/
 const SESSION_MODE_RE = /^(specialized|baseline)$/
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const FRONT_DIR = path.resolve(__dirname, '..')
-const REPO_ROOT = process.env.MANISCOPE_REPO_ROOT || path.resolve(FRONT_DIR, '..')
 const CHAT_ROOT = path.join(REPO_ROOT, '.maniscope-chat')
 const SESSIONS_DIR = path.join(CHAT_ROOT, 'sessions')
 const BASELINE_SESSIONS_DIR = path.join(CHAT_ROOT, 'baseline-sessions')
@@ -20,9 +17,7 @@ const DEFAULT_CODEX_BRIDGE_PORT = 8787
 const PORT = Number(process.env.CODEX_BRIDGE_PORT || DEFAULT_CODEX_BRIDGE_PORT)
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8099'
 const BACKEND_URL = process.env.MANISCOPE_BACKEND_URL || DEFAULT_BACKEND_URL
-const DEFAULT_CODEX_NETWORK_ACCESS_ENABLED = true
-const CODEX_AGENT_MODEL = 'gpt-5.5'
-const CODEX_AGENT_REASONING_EFFORT = 'xhigh'
+const RAW_DATA_DIRS = rawDataDirectories(FRONT_DIR)
 const ARTIFACT_POLL_INTERVAL_MS = 500
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
@@ -97,15 +92,6 @@ function writeJson(filePath, payload) {
   const tmpPath = `${filePath}.tmp`
   fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), 'utf8')
   fs.renameSync(tmpPath, filePath)
-}
-
-function booleanEnv(name, defaultValue) {
-  const value = process.env[name]
-  if (value === undefined || value === '') return defaultValue
-  const normalized = value.trim().toLowerCase()
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
-  if (['0', 'false', 'no', 'off'].includes(normalized)) return false
-  return defaultValue
 }
 
 function readBody(req) {
@@ -286,25 +272,11 @@ function setThreadEntry(sessionId, threadKey, threadId, sessionMode = 'specializ
   writeJson(cachePath, cache)
 }
 
-function buildThreadOptions() {
-  const options = {
-    workingDirectory: REPO_ROOT,
-    skipGitRepoCheck: false,
-    sandboxMode: process.env.CODEX_SANDBOX_MODE || 'workspace-write',
-    approvalPolicy: process.env.CODEX_APPROVAL_POLICY || 'never',
-    model: CODEX_AGENT_MODEL,
-    modelReasoningEffort: CODEX_AGENT_REASONING_EFFORT,
-    networkAccessEnabled: booleanEnv(
-      'CODEX_NETWORK_ACCESS',
-      DEFAULT_CODEX_NETWORK_ACCESS_ENABLED,
-    ),
-    webSearchMode: process.env.CODEX_WEB_SEARCH || 'disabled',
-  }
-  return options
-}
-
 function buildTraceAnalysisPrompt(sessionId, userMessage, workspaceRole = 'human') {
-  const relativeSessionRoot = `.maniscope-chat/sessions/${sessionId}`
+  const relativeSessionRoot = '.'
+  const sessionRoot = sessionDir(sessionId, 'specialized')
+  const actRawDataDir = RAW_DATA_DIRS[0]
+  const pnutRawDataDir = RAW_DATA_DIRS[1]
   const activeWorkspaceState =
     workspaceRole === 'agent'
       ? `${relativeSessionRoot}/workspaces/agent/current-state.json`
@@ -323,6 +295,14 @@ a report generator by default.
 Active chat workspace role: ${workspaceRole}
 ${workspaceContext}
 
+Filesystem access:
+- Your writable working directory is this active session directory: ${sessionRoot}
+- Keep scripts, temporary files, generated evidence, reports, and outputs inside this session directory, preferably under ${relativeSessionRoot}/artifacts.
+- Raw market data is available as additional read-only-by-policy directories:
+  - ACT raw data: ${actRawDataDir}
+  - PNUT raw data: ${pnutRawDataDir}
+- Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
+
 Session-local scripting workspace:
 - The active session root contains pyproject.toml and package.json templates.
 - Run Python scripts from ${relativeSessionRoot} with uv, for example uv run python script.py. Add Python packages with uv add when needed.
@@ -330,8 +310,8 @@ Session-local scripting workspace:
 - Keep generated evidence and durable outputs under ${relativeSessionRoot}/artifacts unless the user names another path.
 
 Start every trace-dependent turn by refreshing context. Read these files first:
-- docs/reports/user-manual.en.md
-- docs/ui-analysis/major-view-render-api.md
+- session-references/user-manual.en.md
+- session-references/major-view-render-api.md
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
 - ${activeWorkspaceState}
@@ -462,7 +442,8 @@ Session-local trace-analysis tools:
 - For every executed Hypothesis Expansion branch, explicitly resolve the proposed adjacent Hypothesis in the follow-up evidence. If follow-up Findings support it, create a new agent-authored Hypothesis node in a Reasoning Graph Patch, connect supporting agent Findings to it, and include an add_root operation so the frontend renders the adjacent Hypothesis as a separate tree. If evidence does not support it, mark it rejected, deferred, or unsupported in the follow-up report and add a contradicts or refines Finding when evidence warrants it. Do not silently fold Hypothesis Expansion evidence into the original user Hypothesis only.
 - For major Hypotheses and high-level Findings, include a disconfirmation pass. When functions.spawn_agent is available, spawn a skeptical subagent and tell it to read ${relativeSessionRoot}/skills/maniscope-disconfirmation/SKILL.md first. Give it the claim IDs, current graph or forest files, relevant evidence artifacts, and a bounded task to find false positives, benign alternatives, robustness failures, counterexamples, or missing support. The skeptical subagent should report candidate negative Findings only; you must verify them before adding "contradicts", "refines", or Reasoning Gap entries to graph artifacts. If no spawn tool is available, perform a smaller skeptical pass yourself and say so.
 - In reasoning-graph-patch-skeptical.json, every added Finding must have at least one outgoing "refines" or "contradicts" edge to the relevant Intention node. Use "refines" for evidence that narrows, qualifies, or caveats a claim; use "contradicts" for evidence that weakens or falsifies it. Do not encode a skeptical Finding with only "supports" edges. "supports" is allowed only as an additional placement or synthesis edge to a related Finding.
-- For live chat session artifacts, write JSON and Markdown under ${relativeSessionRoot}/artifacts unless the user names a different path. For exported trace-folder analyses, write under TRACE/analysis-results.
+- For live chat session artifacts, write JSON and Markdown under ${relativeSessionRoot}/artifacts unless the user names a different session-local path.
+- If the user asks you to analyze or export to a trace folder outside this session sandbox, explain that this chat agent can only write inside the active session directory. Ask the user to import or copy the trace into the session, or write a session-local artifact that the user can move later.
 - Use this session-local command before finalizing live chat artifacts:
   - bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 - The validator applies all reasoning-graph-patch*.json files. Fix validation errors before reporting completion.
@@ -483,7 +464,7 @@ Full trace-level analysis pipeline:
   9. Record follow-up evidence as Reasoning Graph Patches, including explanation, evidenceSummary, reasoningRole, and patchRationale for agent-created patch nodes.
   10. For each executed Hypothesis Expansion branch, decide whether the proposed adjacent Hypothesis is supported, rejected, deferred, or unsupported. Supported adjacent Hypotheses must become new agent-authored Hypothesis nodes with supporting Finding edges and add_root operations. Rejected, deferred, or unsupported branches must be stated explicitly in the follow-up report, not hidden inside evidence for the original Hypothesis.
   11. Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts again so reasoning-graph.json plus all reasoning-graph-patch*.json files validate together.
-  12. Save durable artifacts under TRACE/analysis-results for trace-folder analyses or ${relativeSessionRoot}/artifacts for live-chat session analyses, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
+  12. Save durable artifacts under ${relativeSessionRoot}/artifacts, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
 - If time, tool access, missing data, or rendering failures prevent a complete pipeline, say which stages were completed, which were blocked, and what exact evidence or tool would unblock the remaining stages.
 
 Response and execution modes:
@@ -526,8 +507,8 @@ Mode E: autonomous investigation.
 
 Mode F: artifact-writing.
 - Use chat-first output unless the user asks for files or durable analysis artifacts.
-- If writing full trace artifacts for a trace folder, place them under TRACE/analysis-results.
-- If writing session-local live-chat artifacts, place generated evidence under ${relativeSessionRoot}/artifacts unless the user names a different output path.
+- Place generated evidence and durable analysis artifacts under ${relativeSessionRoot}/artifacts unless the user names a different session-local output path.
+- If the requested output path is outside the active session directory or raw-data read-only directories, do not attempt to write there. Explain the sandbox boundary and write a session-local artifact instead if useful.
 - Write reasoning-graph.json first, then write reasoning-graph-patch*.json files for agent follow-up evidence. Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts and fix errors until the base graph and all patches validate. Do not manually create a forest that bypasses graph validation.
 - When you create AnalyticQuestion nodes, also create direct mid-level answer Findings and "answers" edges whenever the available evidence supports an answer. A generated forest that contains central answerable questions but no answer Findings is incomplete even if the Hypothesis has other support. When enough evidence exists, place those answer Findings under high-level synthesis Findings instead of attaching every answer directly to the Hypothesis. If the user trace does not answer a question, leave it unanswered in the base graph, accept the validator warning, and decide during follow-up whether to investigate it through patches.
 - Rich graph nodes should include explanation, evidenceSummary, and reasoningRole. Agent-created patch nodes must also include patchRationale.
@@ -548,17 +529,29 @@ ${userMessage}`
 }
 
 function buildBaselinePrompt(sessionId, userMessage) {
-  const relativeSessionRoot = `.maniscope-chat/baseline-sessions/${sessionId}`
+  const relativeSessionRoot = '.'
+  const sessionRoot = sessionDir(sessionId, 'baseline')
+  const actRawDataDir = RAW_DATA_DIRS[0]
+  const pnutRawDataDir = RAW_DATA_DIRS[1]
   return `You are a Codex agent helping a user analyze possible token price manipulation in ManiScope.
 
 The user is interacting with a visual analytics app for token-market investigation. Answer as a practical collaborator: inspect the evidence, explain what you find, state uncertainty, and suggest useful next checks when appropriate.
 
 Active baseline session root:
-- ${relativeSessionRoot}
+- ${sessionRoot}
+
+Filesystem access:
+- Your writable working directory is the active baseline session directory: ${sessionRoot}
+- Keep scripts, temporary files, copied images, summaries, and generated outputs inside this session directory, preferably under ${relativeSessionRoot}/artifacts.
+- Raw market data is available as additional read-only-by-policy directories:
+  - ACT raw data: ${actRawDataDir}
+  - PNUT raw data: ${pnutRawDataDir}
+- Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
 
 Start trace-dependent answers by reading the current session files when they exist:
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
+- session-references/README.md
 
 Useful session folders:
 - ${relativeSessionRoot}/images contains synced screenshots from the user's actions, annotations, and current views.
@@ -951,8 +944,9 @@ function materializeAgentMessageEvent(sessionId, sessionMode, event) {
     const result = materializeLocalArtifactReferences(event.text, {
       sessionId,
       sessionDir: sessionDir(sessionId, sessionMode),
-      repoRoot: REPO_ROOT,
+      repoRoot: sessionDir(sessionId, sessionMode),
       env: process.env,
+      extraRoots: RAW_DATA_DIRS,
       artifactUrlPrefix:
         sessionMode === 'baseline'
           ? `/api/base/sessions/${sessionId}/artifacts`
@@ -989,7 +983,7 @@ async function handleChat(req, res, sessionId) {
 
   const codex = new Codex()
   const existing = getThreadEntry(sessionId, threadKey, sessionMode)
-  const options = buildThreadOptions()
+  const options = buildThreadOptions(dir)
   const isNewThread = !existing?.threadId
   const thread = isNewThread
     ? codex.startThread(options)

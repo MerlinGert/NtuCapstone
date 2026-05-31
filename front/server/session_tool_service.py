@@ -2,12 +2,13 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-05-31.1"
+TOOL_VERSION = "2026-05-31.2"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
 BASELINE_VIEW_TOOL_NAME = "maniscope_baseline_views.py"
 SESSION_PYPROJECT_NAME = "pyproject.toml"
 SESSION_PACKAGE_JSON_NAME = "package.json"
 SESSION_GITIGNORE_NAME = ".gitignore"
+SESSION_REFERENCES_DIR_NAME = "session-references"
 TRACE_ANALYSIS_TOOLS_DIR_NAME = "trace_analysis_tools"
 REASONING_GRAPH_TS_DIR_NAME = "reasoning_graph"
 SESSION_SKILLS_DIR_NAME = "skills"
@@ -19,6 +20,8 @@ BASELINE_TEMPLATE_PATH = BASE_DIR / "session_tools" / BASELINE_VIEW_TOOL_NAME
 PYPROJECT_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_pyproject.toml"
 PACKAGE_JSON_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_package.json"
 GITIGNORE_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_gitignore"
+USER_MANUAL_EN_PATH = PROJECT_ROOT / "docs" / "reports" / "user-manual.en.md"
+MAJOR_VIEW_RENDER_API_PATH = PROJECT_ROOT / "docs" / "ui-analysis" / "major-view-render-api.md"
 TRACE_ANALYSIS_SKILL_DIR = PROJECT_ROOT / "skills" / "user-trace-analysis"
 REASONING_GRAPH_TS_SOURCE_DIR = PROJECT_ROOT / "front" / "src" / "reasoning-graph"
 DISCONFIRMATION_SKILL_DIR = PROJECT_ROOT / "skills" / DISCONFIRMATION_SKILL_NAME
@@ -47,12 +50,14 @@ SESSION_SCAFFOLD_EXCLUDE_ENTRIES = [
 ]
 GIT_EXCLUDE_ENTRIES = [
     f"/{VISUALIZATION_TOOL_NAME}",
+    f"/{SESSION_REFERENCES_DIR_NAME}/",
     f"/{TRACE_ANALYSIS_TOOLS_DIR_NAME}/",
     f"/{SESSION_SKILLS_DIR_NAME}/{DISCONFIRMATION_SKILL_NAME}/",
     *SESSION_SCAFFOLD_EXCLUDE_ENTRIES,
 ]
 BASELINE_GIT_EXCLUDE_ENTRIES = [
     f"/{BASELINE_VIEW_TOOL_NAME}",
+    f"/{SESSION_REFERENCES_DIR_NAME}/",
     *SESSION_SCAFFOLD_EXCLUDE_ENTRIES,
 ]
 
@@ -60,6 +65,7 @@ BASELINE_GIT_EXCLUDE_ENTRIES = [
 def ensure_session_tools(session_dir: Path, session_id: str) -> None:
     session_dir.mkdir(parents=True, exist_ok=True)
     _ensure_session_project_scaffold(session_dir, session_id, session_mode="specialized")
+    _ensure_session_references(session_dir, session_mode="specialized")
     target_path = session_dir / VISUALIZATION_TOOL_NAME
     content = _render_tool(session_id)
     if _managed_tool_needs_update(target_path, session_id):
@@ -72,6 +78,7 @@ def ensure_session_tools(session_dir: Path, session_id: str) -> None:
 def ensure_baseline_session_tools(session_dir: Path, session_id: str) -> None:
     session_dir.mkdir(parents=True, exist_ok=True)
     _ensure_session_project_scaffold(session_dir, session_id, session_mode="baseline")
+    _ensure_session_references(session_dir, session_mode="baseline")
     target_path = session_dir / BASELINE_VIEW_TOOL_NAME
     content = _render_baseline_tool(session_id)
     if _managed_tool_needs_update(target_path, session_id):
@@ -122,6 +129,70 @@ def _write_template_if_missing(
     if package_name is not None:
         content = content.replace("__MANISCOPE_SESSION_PACKAGE_NAME__", package_name)
     target_path.write_text(content, encoding="utf-8")
+
+
+def _ensure_session_references(session_dir: Path, session_mode: str) -> None:
+    references_dir = session_dir / SESSION_REFERENCES_DIR_NAME
+    version_path = references_dir / "TOOL_VERSION"
+    if not _session_references_need_update(version_path):
+        return
+
+    if references_dir.exists():
+        shutil.rmtree(references_dir)
+    references_dir.mkdir(parents=True, exist_ok=True)
+
+    if session_mode == "specialized":
+        shutil.copy2(USER_MANUAL_EN_PATH, references_dir / "user-manual.en.md")
+        shutil.copy2(MAJOR_VIEW_RENDER_API_PATH, references_dir / "major-view-render-api.md")
+        (references_dir / "README.md").write_text(_specialized_references_readme(), encoding="utf-8")
+    else:
+        (references_dir / "README.md").write_text(_baseline_references_readme(), encoding="utf-8")
+
+    version_path.write_text(f"{TOOL_VERSION}\n", encoding="utf-8")
+
+
+def _session_references_need_update(version_path: Path) -> bool:
+    if not version_path.exists():
+        return True
+    try:
+        existing = version_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return True
+    return existing != TOOL_VERSION
+
+
+def _specialized_references_readme() -> str:
+    return """# ManiScope Session References
+
+Managed by ManiScope. Do not edit this session-local copy by hand.
+
+The Codex chat sandbox is rooted at the active session directory. These copied
+references replace repo-root documentation reads:
+
+- `user-manual.en.md`: user-facing ManiScope workflow and UI semantics.
+- `major-view-render-api.md`: visual rendering API and evidence-generation notes.
+
+Trace-analysis schema references remain under `trace_analysis_tools/references/`.
+The skeptical-review skill remains under `skills/maniscope-disconfirmation/`.
+"""
+
+
+def _baseline_references_readme() -> str:
+    return """# ManiScope Baseline Session
+
+Managed by ManiScope. Do not edit this session-local copy by hand.
+
+This baseline session is intentionally generic. It does not include specialized
+trace-analysis methodology, graph tooling, disconfirmation skills, or arbitrary
+visualization rendering helpers.
+
+Raw market data is available through the Codex sandbox as read-only-by-policy
+additional directories. The chat prompt gives their absolute ACT and PNUT
+paths for the current run.
+
+Do not edit raw data files. Write scripts, derived data, summaries, and copied
+images inside this session directory, preferably under `artifacts/`.
+"""
 
 
 def _managed_tool_needs_update(target_path: Path, session_id: str) -> bool:
