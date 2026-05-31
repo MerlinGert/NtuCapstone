@@ -175,7 +175,7 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 每个聊天会话根目录都包含用于临时脚本的项目模板：`pyproject.toml` 用于通过 `uv` 运行 Python，`package.json` 用于通过 `bun` 运行 JavaScript 或 TypeScript。智能体可以在该会话内添加依赖；生成的证据、报告和导出文件应放在 `artifacts/`。
 
-Codex Chat 智能体会从当前会话目录运行，而不是从仓库根目录运行。它只能在该会话工作区内写入文件，优先写入 `artifacts/`；ACT 和 PNUT 原始数据目录会作为额外的只读策略输入提供。`~/.cache/uv` 也会开放给 uv 作为包缓存目录，因此安装 Python 依赖时不需要写入其他位置。网络访问保持开启，因此智能体可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。bridge 启动时会检查本机是否已经安装 `uv`、`codex`，以及 `bun` 或 `npm` 中的一个。
+Codex Chat 智能体会从当前会话目录运行，而不是从仓库根目录运行。它只能在该会话工作区内写入文件，优先写入 `artifacts/`；ACT 和 PNUT 原始数据目录会作为额外的只读策略输入提供。Python 依赖会使用仓库本地的 uv 缓存 `.maniscope-chat/shared-uv-cache`，bridge 会通过 Codex writable roots 授权该缓存目录，因此智能体可以直接使用 `uv`，不需要手动设置 `UV_CACHE_DIR`。网络访问保持开启，因此智能体可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。bridge 启动时会检查本机是否已经安装 `uv`、`codex`，以及 `bun` 或 `npm` 中的一个。
 
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
 
@@ -185,7 +185,7 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 助手回复可以包含 Markdown 文本、生成的 artifact、JSON 文件、Markdown 报告和图片预览。当智能体在回复中提到本地图片、Markdown 或 JSON 路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的 artifact 根目录下，ManiScope 会通过会话 artifact 接口生成链接。有效图片会被复制到会话的 `artifacts/` 文件夹用于预览；Markdown 和 JSON 输出会显示为可下载的 artifact 链接。聊天中生成的文件通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析 artifact 则应保存到对应 trace 的 `analysis-results/` 文件夹。
 
-对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
+对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。bridge 会先等待 Agent Workspace 的可视化数据完成加载，再提取当前渲染参数。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
 
 对于完整的 trace 分析，每个会话还会包含一个托管的 skeptical-review skill。可用时，智能体可以派生一个聚焦的子智能体，专门寻找削弱主要假设的负面证据、误报、良性解释或模型参数不稳定性。主智能体需要先验证这些候选负面发现，然后才会把它们作为 `contradicts`、`refines` 或 Reasoning Gap 条目加入分析 artifact。
 

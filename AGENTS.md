@@ -30,7 +30,7 @@ The frontend dev server is configured in `front/vite.config.js` to bind `127.0.0
 
 The backend direct-run default in `front/server/main.py` is `127.0.0.1:8099`, overridable with `MANISCOPE_BACKEND_HOST` and `MANISCOPE_BACKEND_PORT`.
 
-The Codex bridge default in `front/codex-bridge/server.mjs` is `8787`, overridable with `CODEX_BRIDGE_PORT`. ManiScope chat agents run with model `gpt-5.5` and reasoning effort `xhigh` as code defaults in the bridge. The bridge launches each chat agent with `workspace-write` sandboxing, working directory set to that session root, network access enabled, ACT and PNUT raw-data directories as additional directories, and `~/.cache/uv` as a package-tool cache directory. Raw data is read-only by policy in the prompt; agent scripts, temp files, and outputs should stay inside the session root, preferably `artifacts/`. The bridge checks for `uv`, `codex`, and one of `bun` or `npm` before listening. The backend chat service defaults to `http://127.0.0.1:8787`, overridable with `CODEX_BRIDGE_URL`.
+The Codex bridge default in `front/codex-bridge/server.mjs` is `8787`, overridable with `CODEX_BRIDGE_PORT`. ManiScope chat agents run with model `gpt-5.5` and reasoning effort `xhigh` as code defaults in the bridge. The bridge launches each chat agent with `workspace-write` sandboxing, working directory set to that session root, network access enabled, ACT and PNUT raw-data directories as additional directories, and a repo-local uv cache at `.maniscope-chat/shared-uv-cache` granted through `sandbox_workspace_write.writable_roots`. Raw data is read-only by policy in the prompt; agent scripts, temp files, and outputs should stay inside the session root, preferably `artifacts/`. Agents can use plain `uv` and should not set `UV_CACHE_DIR` manually. The bridge checks for `uv`, `codex`, and one of `bun` or `npm` before listening. The backend chat service defaults to `http://127.0.0.1:8787`, overridable with `CODEX_BRIDGE_URL`.
 
 ## Baseline Agent Mode
 
@@ -55,7 +55,7 @@ Run Python scripts from the session root with `uv run python script.py`. Run Jav
 
 Every ManiScope chat session contains a managed helper file at `.maniscope-chat/sessions/{sessionId}/maniscope_visualization.py`. Use it when an agent needs to render visual evidence from Python. It exposes view-specific functions for Token Distribution, K-Line, and Behavior Details, including `get_token_distribution_args`, `render_token_distribution`, `get_kline_args`, `render_kline_chart`, `fetch_behavior_sequences`, `get_behavior_details_args`, and `render_behavior_details`.
 
-The helper calls the Codex bridge on `http://127.0.0.1:8787`. The bridge opens an isolated Agent Workspace browser page at `http://127.0.0.1:3099/{sessionId}/agent`, invokes the frontend render API there, and saves generated PNGs to the session `artifacts/` folder. Prefer these helper functions over manual browser attachment or ad hoc JavaScript evaluation.
+The helper calls the Codex bridge on `http://127.0.0.1:8787`. The bridge opens an isolated Agent Workspace browser page at `http://127.0.0.1:3099/{sessionId}/agent`, waits for the Agent Workspace visualization data to hydrate, invokes the frontend render API there, and saves generated PNGs to the session `artifacts/` folder. Prefer these helper functions over manual browser attachment or ad hoc JavaScript evaluation.
 
 Agent rendering uses Playwright Chromium from the `front/` package. If the bridge reports a missing browser runtime, run `bunx playwright install chromium` from `front/`.
 
