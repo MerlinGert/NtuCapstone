@@ -40,6 +40,20 @@ Both workspaces read the shared canonical trace stored in the session. The human
 
 The backward-compatible `current-state.json` is the human current state. The human and agent workspaces also keep separate `workspaces/human/current-state.json` and `workspaces/agent/current-state.json` files. This means the agent can run different detector settings, inspect a different snapshot, select different users, or render evidence images without overwriting the human's visible analysis.
 
+## Baseline Sessions
+
+Baseline sessions are available for evaluating a general Codex assistant against the specialized ManiScope agent.
+
+- Visiting `/base` creates a fresh 5-character baseline session and redirects to `/base/{sessionId}`.
+- `/base/{sessionId}` restores that baseline session.
+- `/base/{sessionId}/agent` is not a separate workspace and redirects back to `/base/{sessionId}`.
+
+Baseline sessions use a separate storage root: `.maniscope-chat/baseline-sessions/{sessionId}`. They still record user actions, annotations, imports, screenshots, current state, chat history, and artifacts, but the chat prompt is intentionally general. The baseline agent can inspect raw data, trace files, screenshots, and current state, but it is not given the specialized reasoning-graph methodology, trace-analysis tools, skeptical-review skill, Agent Workspace, or arbitrary visualization-rendering helper.
+
+If the baseline agent needs current-view image files, the session includes `maniscope_baseline_views.py`. That helper only copies the latest synced screenshots for Token Distribution, K-line, and Behavior Details into `artifacts/`; it cannot change detector parameters, selected users, time windows, scale, granularity, or any other visualization state.
+
+Both specialized and baseline chat sessions are seeded with `pyproject.toml`, `package.json`, and `.gitignore` in the session root. These files let the agent run session-local Python, JavaScript, or TypeScript scripts with `uv` and `bun`, and add temporary analysis dependencies when needed. Durable outputs should still be saved under the session `artifacts/` folder.
+
 ## Control Panel
 
 The Control Panel drives the computation shown in the other views. It is vertically scrollable and currently contains four groups in this order: Snapshot Configuration, Entity Detection, Manipulation Detection, and Link Configuration.
@@ -157,6 +171,10 @@ The floating Codex Chat sidebar lets you ask the agent to inspect the current se
 
 Chat history and generated artifacts are shared at the session level. The agent prompt distinguishes three kinds of context: the shared canonical trace, the human current state, and the agent's private exploratory state. Agent visual exploration should use the Agent Workspace and should not append to the human action trace unless you explicitly ask for durable artifacts or reasoning patches.
 
+In baseline sessions, Codex Chat uses `/api/base/chat/...` and stores files under `.maniscope-chat/baseline-sessions/{sessionId}`. The chat is labeled `Baseline`, the Agent Workspace shortcut, full-analysis shortcut, and right-panel LLM Analysis tab are hidden, and the prompt describes the price-manipulation task and available raw data without specialized trace-analysis instructions.
+
+Each chat session root contains project templates for ad hoc scripting: `pyproject.toml` for Python work with `uv`, and `package.json` for JavaScript or TypeScript work with `bun`. Agents can add dependencies inside that session when useful, while generated evidence and reports should be placed in `artifacts/`.
+
 Codex SDK network access is enabled by default for the chat agent so it can reach the local ManiScope services and fetch external references when an investigation needs them. For restricted offline runs, start the bridge with `CODEX_NETWORK_ACCESS=false`.
 
 The Codex Chat panel is floating. Drag its header to move it, or drag the lower corners to resize it. The panel keeps its local position and size in the browser.
@@ -173,7 +191,7 @@ For comprehensive trace analysis, sessions also include a managed skeptical-revi
 
 ## User Actions, Annotations, Action Tree, And LLM Analysis
 
-The bottom panel in the middle column is now part of the investigation workflow. It has four tabs: User Actions, Annotations, Action Tree, and LLM Analysis. The default active tab is Action Tree.
+The bottom panel in the middle column is now part of the investigation workflow. In specialized sessions, it has four tabs: User Actions, Annotations, Action Tree, and LLM Analysis. In baseline sessions, the LLM Analysis tab is hidden. The default active tab is Action Tree.
 
 ### User Actions
 

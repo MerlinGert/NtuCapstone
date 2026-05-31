@@ -32,6 +32,25 @@ The backend direct-run default in `front/server/main.py` is `127.0.0.1:8099`, ov
 
 The Codex bridge default in `front/codex-bridge/server.mjs` is `8787`, overridable with `CODEX_BRIDGE_PORT`. ManiScope chat agents run with model `gpt-5.5` and reasoning effort `xhigh` as code defaults in the bridge. Codex SDK network access is enabled by default for ManiScope chat agents; set `CODEX_NETWORK_ACCESS=false` before `bun run codex-bridge` only when a restricted offline run is required. The backend chat service defaults to `http://127.0.0.1:8787`, overridable with `CODEX_BRIDGE_URL`.
 
+## Baseline Agent Mode
+
+Specialized sessions use `.maniscope-chat/sessions/{sessionId}` and routes such as `/{sessionId}/human` and `/{sessionId}/agent`. Baseline evaluation sessions use `.maniscope-chat/baseline-sessions/{sessionId}` and routes under `/base`.
+
+- `/base` creates a new baseline session and redirects to `/base/{sessionId}`.
+- `/base/{sessionId}` restores the baseline Human Workspace.
+- `/base/{sessionId}/agent` is invalid and should redirect to `/base/{sessionId}`.
+- Baseline APIs use `/api/base/sessions/...` and `/api/base/chat/...`.
+
+Baseline sessions record user actions, annotations, screenshots, current state, chat history, and artifacts normally, but they intentionally remove specialized agent guidance. The baseline Codex prompt should describe the price-manipulation task and available raw data only. Do not include User Reasoning Forest, graph-first contracts, patches, trace-analysis skills, disconfirmation skills, subagents, Agent Workspace guidance, or specialized visualization-rendering methodology in the baseline prompt.
+
+Baseline UI should not expose the specialized right-panel LLM Analysis tab. Keep User Actions, Annotations, and Action Tree visible for baseline trace review.
+
+## Session-Local Analysis Workspace
+
+Every specialized and baseline ManiScope chat session is also seeded with `pyproject.toml`, `package.json`, and `.gitignore` in the session root. These files are templates for agent scratch work and are written only when missing, so agents may add Python packages with `uv add` or JavaScript/TypeScript packages with `bun add` without the backend overwriting their choices.
+
+Run Python scripts from the session root with `uv run python script.py`. Run JavaScript or TypeScript scripts from the session root with `bun script.ts` or `bun script.js`. Keep durable evidence, reports, copied screenshots, and analysis outputs under the session `artifacts/` directory unless the user explicitly names another path.
+
 ## Agent Visualization Helper
 
 Every ManiScope chat session contains a managed helper file at `.maniscope-chat/sessions/{sessionId}/maniscope_visualization.py`. Use it when an agent needs to render visual evidence from Python. It exposes view-specific functions for Token Distribution, K-Line, and Behavior Details, including `get_token_distribution_args`, `render_token_distribution`, `get_kline_args`, `render_kline_chart`, `fetch_behavior_sequences`, `get_behavior_details_args`, and `render_behavior_details`.
@@ -39,6 +58,9 @@ Every ManiScope chat session contains a managed helper file at `.maniscope-chat/
 The helper calls the Codex bridge on `http://127.0.0.1:8787`. The bridge opens an isolated Agent Workspace browser page at `http://127.0.0.1:3099/{sessionId}/agent`, invokes the frontend render API there, and saves generated PNGs to the session `artifacts/` folder. Prefer these helper functions over manual browser attachment or ad hoc JavaScript evaluation.
 
 Agent rendering uses Playwright Chromium from the `front/` package. If the bridge reports a missing browser runtime, run `bunx playwright install chromium` from `front/`.
+
+Baseline sessions do not receive `maniscope_visualization.py`. They receive `.maniscope-chat/baseline-sessions/{sessionId}/maniscope_baseline_views.py`, which is capture-only. It exposes `capture_current_token_distribution()`, `capture_current_kline_chart()`, `capture_current_behavior_details()`, `capture_current_views()`, and `artifact_path(name)`. These functions only copy latest synced Human Workspace screenshots from `current-state.json.majorViewScreenshots` into `artifacts/`; they must not accept or simulate parameters that change detector configs, selected users, time windows, scale, granularity, model outputs, or any other visualization state.
+
 
 ## Agent Trace Analysis Tools
 

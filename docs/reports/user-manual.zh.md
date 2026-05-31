@@ -40,6 +40,20 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 
 为了保持向后兼容，`current-state.json` 仍表示人的当前状态。同时，human 和 agent 会分别维护 `workspaces/human/current-state.json` 和 `workspaces/agent/current-state.json`。这意味着智能体可以运行不同的检测参数、查看不同快照、选择不同用户或渲染证据图片，而不会覆盖人的可见分析状态。
 
+## Baseline 会话
+
+Baseline 会话用于评估通用 Codex 助手与专门的 ManiScope 智能体之间的差异。
+
+- 访问 `/base` 会创建一个新的 5 字符 baseline 会话，并跳转到 `/base/{sessionId}`。
+- `/base/{sessionId}` 会恢复对应的 baseline 会话。
+- `/base/{sessionId}/agent` 不提供独立工作区，会跳回 `/base/{sessionId}`。
+
+Baseline 会话使用独立的存储根目录：`.maniscope-chat/baseline-sessions/{sessionId}`。它仍然会记录用户动作、标注、导入内容、截图、当前状态、聊天历史和 artifacts，但聊天提示词会刻意保持通用。Baseline 智能体可以查看原始数据、trace 文件、截图和当前状态，但不会获得专门的 reasoning-graph 方法、trace-analysis 工具、skeptical-review skill、Agent Workspace 或可任意重渲染可视化的 helper。
+
+如果 baseline 智能体需要当前视图图片，会话中包含 `maniscope_baseline_views.py`。这个 helper 只能把最近同步的 Token Distribution、K-line 和 Behavior Details 截图复制到 `artifacts/`；它不能改变检测参数、选中用户、时间窗口、缩放比例、粒度或任何其他可视化状态。
+
+specialized 和 baseline 聊天会话都会在会话根目录生成 `pyproject.toml`、`package.json` 和 `.gitignore`。这些文件用于会话本地脚本环境，智能体可以用 `uv` 运行 Python 脚本，也可以用 `bun` 运行 JavaScript 或 TypeScript 脚本，并在需要时添加临时分析依赖。持久证据和报告仍应保存到会话的 `artifacts/` 文件夹。
+
 ## Control Panel
 
 Control Panel 驱动其他视图中的计算结果。它可以垂直滚动，当前按顺序包含四组配置：Snapshot Configuration、Entity Detection、Manipulation Detection 和 Link Configuration。
@@ -157,6 +171,10 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 聊天历史和生成的 artifacts 在会话层级共享。智能体提示词会区分三类上下文：共享的 canonical trace、人的当前状态，以及智能体私有的探索状态。智能体的可视探索应使用 Agent Workspace，并且不应追加到人的动作 trace，除非你明确要求生成持久 artifacts 或 reasoning patches。
 
+在 baseline 会话中，Codex Chat 使用 `/api/base/chat/...`，文件存储在 `.maniscope-chat/baseline-sessions/{sessionId}`。聊天面板会标记为 `Baseline`，Agent Workspace 入口、完整分析快捷按钮和右侧面板的 LLM Analysis 标签页都会隐藏，提示词只描述价格操纵分析任务和可用原始数据，不包含专门的 trace-analysis 指令。
+
+每个聊天会话根目录都包含用于临时脚本的项目模板：`pyproject.toml` 用于通过 `uv` 运行 Python，`package.json` 用于通过 `bun` 运行 JavaScript 或 TypeScript。智能体可以在该会话内添加依赖；生成的证据、报告和导出文件应放在 `artifacts/`。
+
 Codex SDK 的网络访问默认对聊天智能体开启，因此它可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。对于受限的离线运行，可以用 `CODEX_NETWORK_ACCESS=false` 启动 bridge。
 
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
@@ -173,7 +191,7 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 ## User Actions、Annotations、Action Tree 和 LLM Analysis
 
-中列下方的面板现在是调查工作流的一部分。它包含四个标签页：User Actions、Annotations、Action Tree 和 LLM Analysis。默认激活的标签页是 Action Tree。
+中列下方的面板现在是调查工作流的一部分。在 specialized 会话中，它包含四个标签页：User Actions、Annotations、Action Tree 和 LLM Analysis。在 baseline 会话中，LLM Analysis 标签页会隐藏。默认激活的标签页是 Action Tree。
 
 ### User Actions
 
