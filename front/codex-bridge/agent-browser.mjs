@@ -167,6 +167,9 @@ export class AgentBrowserManager {
         async ({ viewName, options: renderOptions }) => {
           const api = window.maniScopeMajorViewApi
           if (!api) throw new Error('ManiScope major view API is not ready')
+          if (typeof api.ensureReady === 'function') {
+            await api.ensureReady(viewName, renderOptions || {})
+          }
           return api.getRenderArgs(viewName, renderOptions || {})
         },
         { viewName: config.viewName, options },
@@ -189,9 +192,12 @@ export class AgentBrowserManager {
     return this.runQueued(sessionId, async () => {
       const page = await this.ensurePage(sessionId)
       const renderResult = await page.evaluate(
-        async ({ renderFunction, args: renderArgs, options: renderOptions }) => {
+        async ({ viewName, renderFunction, args: renderArgs, options: renderOptions }) => {
           const api = window.maniScopeMajorViewApi
           if (!api) throw new Error('ManiScope major view API is not ready')
+          if (typeof api.ensureReady === 'function') {
+            await api.ensureReady(viewName, renderOptions || {})
+          }
           const render = api[renderFunction]
           if (typeof render !== 'function') {
             throw new Error(`Render function ${renderFunction} is not available`)
@@ -199,6 +205,7 @@ export class AgentBrowserManager {
           return render(renderArgs, renderOptions || {})
         },
         {
+          viewName: config.viewName,
           renderFunction: config.renderFunction,
           args,
           options,

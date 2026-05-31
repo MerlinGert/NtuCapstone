@@ -364,6 +364,9 @@ export default {
       _workspaceStateTimer: null,
       _sessionEventQueue: null,
       _workspaceRestoreState: null,
+      _initialWorkspaceReadyPromise: null,
+      _initialWorkspaceReadySettled: false,
+      _initialWorkspaceReadyError: null,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -941,6 +944,122 @@ export default {
     },
     getMajorViewDataDependencies(viewName, options = {}) {
       return getMajorViewDataDependencies(this, viewName, options)
+    },
+    normalizeMajorViewNameForReadiness(viewName) {
+      if (!viewName) return null
+      return getMajorViewDataDependencies(this, viewName).viewName
+    },
+    hasSnapshotRenderData() {
+      const balances = this.snapshot_data?.balances
+      return !!(
+        balances &&
+        typeof balances === 'object' &&
+        (Object.keys(balances.users || {}).length > 0 ||
+          Object.keys(balances.related_users || {}).length > 0)
+      )
+    },
+    hasObjectRenderData(value) {
+      return !!(value && typeof value === 'object' && Object.keys(value).length > 0)
+    },
+    hasArrayRenderData(value) {
+      return Array.isArray(value) && value.length > 0
+    },
+    getMajorViewReadiness(viewName = null) {
+      const viewNames = viewName
+        ? [this.normalizeMajorViewNameForReadiness(viewName)]
+        : ['token_distribution', 'candlestick_chart', 'behavior_details']
+      const views = {}
+
+      viewNames.forEach((name) => {
+        const missing = []
+        if (name === 'token_distribution') {
+          if (!this.hasSnapshotRenderData()) missing.push('snapshotData')
+          if (!this.hasArrayRenderData(this.entity_detection_results)) missing.push('entityDetectionResults')
+          if (!this.hasObjectRenderData(this.link_generation_results)) missing.push('linkDetectionResults')
+          if (!this.hasArrayRenderData(this.manipulation_detection_results)) {
+            missing.push('manipulationDetectionResults')
+          }
+        } else if (name === 'candlestick_chart') {
+          const klineRef = this.$refs?.candlestickChart
+          if (!this.hasArrayRenderData(klineRef?.ohlc)) missing.push('ohlcData')
+          if (!this.hasArrayRenderData(this.manipulation_detection_results)) {
+            missing.push('manipulationResults')
+          }
+        } else if (name === 'behavior_details') {
+          const selectedUsers = this.selectedUser
+            ? [this.selectedUser]
+            : Array.isArray(this.selectedCardUsers)
+              ? this.selectedCardUsers
+              : []
+          if (selectedUsers.length > 0) {
+            const behaviorData = this.behaviorDetailData || {}
+            const missingUsers = selectedUsers.filter(
+              (user) => !Array.isArray(behaviorData[user]) || behaviorData[user].length === 0,
+            )
+            if (missingUsers.length > 0) missing.push('behaviorData')
+          }
+          if (!this.hasArrayRenderData(this.manipulation_detection_results)) {
+            missing.push('manipulationResults')
+          }
+        }
+
+        views[name] = {
+          ready: missing.length === 0,
+          missing,
+        }
+      })
+
+      return {
+        ready: Object.values(views).every((entry) => entry.ready),
+        initializing: !!this._initialWorkspaceReadyPromise && !this._initialWorkspaceReadySettled,
+        loading: !!(this.loading || this.detecting || this.detectingLinks || this.detectingManipulation),
+        error: this._initialWorkspaceReadyError
+          ? this._initialWorkspaceReadyError.message || String(this._initialWorkspaceReadyError)
+          : null,
+        views,
+      }
+    },
+    async ensureMajorViewReady(viewName, options = {}) {
+      const normalizedViewName = this.normalizeMajorViewNameForReadiness(viewName)
+      const timeoutMs = Number(options.readinessTimeoutMs || options.timeoutMs || 60000)
+      const pollMs = Number(options.readinessPollMs || 200)
+      const startedAt = Date.now()
+      let refreshed = false
+
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+      while (Date.now() - startedAt <= timeoutMs) {
+        if (this._initialWorkspaceReadyPromise && !this._initialWorkspaceReadySettled) {
+          await this._initialWorkspaceReadyPromise.catch(() => {})
+        }
+        if (this._targetReadyPromise) {
+          await this._targetReadyPromise.catch(() => {})
+        }
+        await this._awaitViewsSettled()
+
+        const readiness = this.getMajorViewReadiness(normalizedViewName)
+        if (readiness.ready) return readiness
+
+        if (!refreshed && options.refreshIfMissing !== false) {
+          refreshed = true
+          const work = this.initializeForCurrentCoin({
+            preserveSnapshotTime: true,
+          }).catch((error) => {
+            console.error('CryptoVis: readiness refresh failed:', error)
+          })
+          this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
+          await work
+          continue
+        }
+
+        await wait(pollMs)
+      }
+
+      const readiness = this.getMajorViewReadiness(normalizedViewName)
+      const missing = readiness.views[normalizedViewName]?.missing || []
+      throw new Error(
+        `ManiScope ${normalizedViewName} is not ready after ${timeoutMs}ms; missing: ${missing.join(', ') || 'unknown'}`,
+      )
     },
     getMajorViewRenderArgs(viewName, options = {}) {
       return getMajorViewRenderArgsFromState(this, viewName, options)
@@ -2584,22 +2703,30 @@ export default {
       }
     };
     document.addEventListener('keydown', this._onKeyDown);
-	    this.installMajorViewApi()
+    this.installMajorViewApi()
 
-	    try {
-	      await this.initializeManiScopeSession()
-	      const restoreState = this._workspaceRestoreState
-	      await this.initializeForCurrentCoin({ preserveSnapshotTime: !!restoreState?.snapshotTime })
-	      if (restoreState) {
-	        this.applyCurrentState(restoreState)
-	      }
-	      if (this.isAgentWorkspace) {
-	        this.startAgentTraceRefresh()
-	      }
-	      this.scheduleLiveTraceSync(0)
-	    } catch (error) {
-	      console.error('CryptoVis: Error during initial load:', error)
-	    }
+    const initialWorkspaceReady = (async () => {
+      await this.initializeManiScopeSession()
+      const restoreState = this._workspaceRestoreState
+      await this.initializeForCurrentCoin({ preserveSnapshotTime: !!restoreState?.snapshotTime })
+      if (restoreState) {
+        this.applyCurrentState(restoreState)
+      }
+      if (this.isAgentWorkspace) {
+        this.startAgentTraceRefresh()
+      }
+      this.scheduleLiveTraceSync(0)
+    })()
+    this._initialWorkspaceReadyPromise = initialWorkspaceReady
+
+    try {
+      await initialWorkspaceReady
+    } catch (error) {
+      this._initialWorkspaceReadyError = error
+      console.error('CryptoVis: Error during initial load:', error)
+    } finally {
+      this._initialWorkspaceReadySettled = true
+    }
   },
   // ezio: cleanup snapshot shortcut listeners
 	  beforeUnmount() {
