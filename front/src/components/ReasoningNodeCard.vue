@@ -49,6 +49,7 @@
         v-for="child in node.children"
         :key="child.instanceId || child.id"
         :node="child"
+        :nesting-level="nestingLevel + 1"
         :hide-patch-label="childHidePatchLabel"
         @select-node="$emit('select-node', $event)"
       />
@@ -64,6 +65,10 @@ export default {
       type: Object,
       required: true,
     },
+    nestingLevel: {
+      type: Number,
+      default: 0,
+    },
     hidePatchLabel: {
       type: Boolean,
       default: false,
@@ -73,6 +78,13 @@ export default {
     return {
       collapsed: this.shouldCollapseByDefault(),
     }
+  },
+  watch: {
+    node: {
+      handler() {
+        this.collapsed = this.shouldCollapseByDefault()
+      },
+    },
   },
   computed: {
     hasChildren() {
@@ -173,6 +185,9 @@ export default {
     shouldCollapseByDefault() {
       if (this.node.type === 'AnalyticActivity') return true
       const children = Array.isArray(this.node.children) ? this.node.children : []
+      if (this.node.type === 'Finding' && this.nestingLevel === 1 && children.length > 0) {
+        return true
+      }
       return children.length > 0 && children.every((child) => child.type === 'Interaction')
     },
     normalizedRelation(relation) {
