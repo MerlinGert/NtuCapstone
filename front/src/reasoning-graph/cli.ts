@@ -76,12 +76,13 @@ function validateArtifacts(artifactsDir: string): {
 } {
   const { graph, orderedPatches } = loadArtifacts(artifactsDir)
   const base = validateReasoningGraph(graph, {
-    requireAnsweredQuestions: true,
     fileName: 'reasoning-graph.json',
   })
   const augmentedGraph = applyReasoningPatches(graph, orderedPatches)
+  const augmented = validateReasoningGraph(augmentedGraph, { fileName: 'augmented reasoning graph' })
   const forest = buildReasoningForest(augmentedGraph)
   const displayTrees = projectGraphToDisplayForest(augmentedGraph)
+  const warnings = Array.from(new Set([...base.warnings, ...augmented.warnings]))
 
   console.log('Reasoning artifacts validated.')
   console.log(`Base graph: ${base.nodes.size} nodes, ${base.edges.length} edges, ${base.roots.length} roots`)
@@ -90,6 +91,10 @@ function validateArtifacts(artifactsDir: string): {
   console.log(`Projected forest: ${forest.trees.length} trees; UI display trees: ${displayTrees.length}`)
   if (checkpointRecommended(orderedPatches)) {
     console.log(`Checkpoint recommended: active patch count ${orderedPatches.length} >= ${CHECKPOINT_PATCH_THRESHOLD}`)
+  }
+  if (warnings.length) {
+    console.warn('Warnings:')
+    for (const warning of warnings) console.warn(`- ${warning}`)
   }
   return { graph, orderedPatches, augmentedGraph }
 }
@@ -100,7 +105,6 @@ function materializeArtifacts(artifactsDir: string): ReasoningGraph {
   const outputPath = join(artifactsDir, CURRENT_REASONING_GRAPH_NAME)
   writeJson(outputPath, materialized)
   validateReasoningGraph(materialized, {
-    requireAnsweredQuestions: true,
     fileName: CURRENT_REASONING_GRAPH_NAME,
   })
   console.log(`Materialized graph written: ${outputPath}`)
@@ -144,7 +148,6 @@ function checkpointArtifacts(artifactsDir: string): void {
   }
 
   validateReasoningGraph(materialized, {
-    requireAnsweredQuestions: true,
     fileName: 'checkpoint materialized graph',
   })
 

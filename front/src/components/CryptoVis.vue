@@ -12,9 +12,18 @@
           >
             Session {{ maniscopeSessionId }}
           </button>
-          <span class="workspace-badge" :class="`workspace-${workspaceRole}`">
+          <span class="workspace-badge" :class="workspaceBadgeClass">
             {{ workspaceLabel }}
           </span>
+          <button
+            v-if="isHumanWorkspace"
+            class="workspace-link-tag"
+            type="button"
+            title="Open imported LLM analysis page"
+            @click="openImportedAnalysisPage"
+          >
+            Analysis Import
+          </button>
           <button
             class="ai-chat-btn"
             @click="chatBoxOpen = !chatBoxOpen"
@@ -169,6 +178,7 @@
     <div style="flex: 4; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
         <NotesPanel 
             :session-id="maniscopeSessionId"
+            :session-mode="sessionMode"
             :actions="userActionSequence"
             :annotations="annotationRecords"
             :read-only="isAgentWorkspace"
@@ -192,6 +202,7 @@
 <CodexChatSidebar
   :open="chatBoxOpen"
   :session-id="maniscopeSessionId"
+  :session-mode="sessionMode"
   :workspace-role="workspaceRole"
   :sync-in-flight="liveTraceSyncInFlight"
   :last-sync-at="lastLiveTraceSyncAt"
@@ -306,6 +317,11 @@ export default {
       type: String,
       default: null,
     },
+    sessionMode: {
+      type: String,
+      default: 'specialized',
+      validator: (value) => ['specialized', 'baseline'].includes(value),
+    },
     workspaceRole: {
       type: String,
       default: 'human',
@@ -348,6 +364,9 @@ export default {
       _workspaceStateTimer: null,
       _sessionEventQueue: null,
       _workspaceRestoreState: null,
+      _initialWorkspaceReadyPromise: null,
+      _initialWorkspaceReadySettled: false,
+      _initialWorkspaceReadyError: null,
       //new params
       //snapshot configuration
       snapshot_configuration: {
@@ -516,14 +535,24 @@ export default {
     }
   },
   computed: {
+    isBaselineSession() {
+      return this.sessionMode === 'baseline'
+    },
+    sessionApiBase() {
+      return this.isBaselineSession ? '/api/base/sessions' : '/api/sessions'
+    },
     isHumanWorkspace() {
-      return this.workspaceRole !== 'agent'
+      return this.isBaselineSession || this.workspaceRole !== 'agent'
     },
     isAgentWorkspace() {
-      return this.workspaceRole === 'agent'
+      return !this.isBaselineSession && this.workspaceRole === 'agent'
     },
     workspaceLabel() {
+      if (this.isBaselineSession) return 'Baseline'
       return this.isAgentWorkspace ? 'Agent Workspace' : 'Human Workspace'
+    },
+    workspaceBadgeClass() {
+      return this.isBaselineSession ? 'workspace-baseline' : `workspace-${this.workspaceRole}`
     },
   },
   watch: {
@@ -545,7 +574,7 @@ export default {
       }
       try {
         const response = await fetch(
-          `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
+          `${this.sessionApiBase}/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
         )
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const payload = await response.json()
@@ -677,7 +706,7 @@ export default {
         : null
       const currentState = this.buildCurrentState(majorViewScreenshots)
       const response = await fetch(
-        `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}/state`,
+        `${this.sessionApiBase}/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}/state`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -723,7 +752,7 @@ export default {
         return Promise.resolve(null)
       }
       return this.queueSessionEvent(async () => {
-        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}/events/${endpoint}`, {
+        const response = await fetch(`${this.sessionApiBase}/${this.maniscopeSessionId}/events/${endpoint}`, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.buildSessionEventBody(body)),
@@ -802,7 +831,7 @@ export default {
         const majorViewScreenshots = includeCurrentViews
           ? await this.captureCurrentMajorViewsForSession()
           : null
-        const response = await fetch(`/api/sessions/${this.maniscopeSessionId}/sync`, {
+        const response = await fetch(`${this.sessionApiBase}/${this.maniscopeSessionId}/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -843,7 +872,7 @@ export default {
       if (!this.isAgentWorkspace || !this.maniscopeSessionId) return null
       try {
         const response = await fetch(
-          `/api/sessions/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
+          `${this.sessionApiBase}/${this.maniscopeSessionId}/workspaces/${this.workspaceRole}`,
         )
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const payload = await response.json()
@@ -885,10 +914,16 @@ export default {
       }, delay)
     },
     copySessionLink() {
-      const url = `${window.location.origin}/${this.maniscopeSessionId}/${this.workspaceRole}`
+      const path = this.isBaselineSession
+        ? `/base/${this.maniscopeSessionId}`
+        : `/${this.maniscopeSessionId}/${this.workspaceRole}`
+      const url = `${window.location.origin}${path}`
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(url).catch(() => {})
       }
+    },
+    openImportedAnalysisPage() {
+      window.open(`${window.location.origin}/analysis-import`, '_blank', 'noopener')
     },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
@@ -909,6 +944,122 @@ export default {
     },
     getMajorViewDataDependencies(viewName, options = {}) {
       return getMajorViewDataDependencies(this, viewName, options)
+    },
+    normalizeMajorViewNameForReadiness(viewName) {
+      if (!viewName) return null
+      return getMajorViewDataDependencies(this, viewName).viewName
+    },
+    hasSnapshotRenderData() {
+      const balances = this.snapshot_data?.balances
+      return !!(
+        balances &&
+        typeof balances === 'object' &&
+        (Object.keys(balances.users || {}).length > 0 ||
+          Object.keys(balances.related_users || {}).length > 0)
+      )
+    },
+    hasObjectRenderData(value) {
+      return !!(value && typeof value === 'object' && Object.keys(value).length > 0)
+    },
+    hasArrayRenderData(value) {
+      return Array.isArray(value) && value.length > 0
+    },
+    getMajorViewReadiness(viewName = null) {
+      const viewNames = viewName
+        ? [this.normalizeMajorViewNameForReadiness(viewName)]
+        : ['token_distribution', 'candlestick_chart', 'behavior_details']
+      const views = {}
+
+      viewNames.forEach((name) => {
+        const missing = []
+        if (name === 'token_distribution') {
+          if (!this.hasSnapshotRenderData()) missing.push('snapshotData')
+          if (!this.hasArrayRenderData(this.entity_detection_results)) missing.push('entityDetectionResults')
+          if (!this.hasObjectRenderData(this.link_generation_results)) missing.push('linkDetectionResults')
+          if (!this.hasArrayRenderData(this.manipulation_detection_results)) {
+            missing.push('manipulationDetectionResults')
+          }
+        } else if (name === 'candlestick_chart') {
+          const klineRef = this.$refs?.candlestickChart
+          if (!this.hasArrayRenderData(klineRef?.ohlc)) missing.push('ohlcData')
+          if (!this.hasArrayRenderData(this.manipulation_detection_results)) {
+            missing.push('manipulationResults')
+          }
+        } else if (name === 'behavior_details') {
+          const selectedUsers = this.selectedUser
+            ? [this.selectedUser]
+            : Array.isArray(this.selectedCardUsers)
+              ? this.selectedCardUsers
+              : []
+          if (selectedUsers.length > 0) {
+            const behaviorData = this.behaviorDetailData || {}
+            const missingUsers = selectedUsers.filter(
+              (user) => !Array.isArray(behaviorData[user]) || behaviorData[user].length === 0,
+            )
+            if (missingUsers.length > 0) missing.push('behaviorData')
+          }
+          if (!this.hasArrayRenderData(this.manipulation_detection_results)) {
+            missing.push('manipulationResults')
+          }
+        }
+
+        views[name] = {
+          ready: missing.length === 0,
+          missing,
+        }
+      })
+
+      return {
+        ready: Object.values(views).every((entry) => entry.ready),
+        initializing: !!this._initialWorkspaceReadyPromise && !this._initialWorkspaceReadySettled,
+        loading: !!(this.loading || this.detecting || this.detectingLinks || this.detectingManipulation),
+        error: this._initialWorkspaceReadyError
+          ? this._initialWorkspaceReadyError.message || String(this._initialWorkspaceReadyError)
+          : null,
+        views,
+      }
+    },
+    async ensureMajorViewReady(viewName, options = {}) {
+      const normalizedViewName = this.normalizeMajorViewNameForReadiness(viewName)
+      const timeoutMs = Number(options.readinessTimeoutMs || options.timeoutMs || 60000)
+      const pollMs = Number(options.readinessPollMs || 200)
+      const startedAt = Date.now()
+      let refreshed = false
+
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+      while (Date.now() - startedAt <= timeoutMs) {
+        if (this._initialWorkspaceReadyPromise && !this._initialWorkspaceReadySettled) {
+          await this._initialWorkspaceReadyPromise.catch(() => {})
+        }
+        if (this._targetReadyPromise) {
+          await this._targetReadyPromise.catch(() => {})
+        }
+        await this._awaitViewsSettled()
+
+        const readiness = this.getMajorViewReadiness(normalizedViewName)
+        if (readiness.ready) return readiness
+
+        if (!refreshed && options.refreshIfMissing !== false) {
+          refreshed = true
+          const work = this.initializeForCurrentCoin({
+            preserveSnapshotTime: true,
+          }).catch((error) => {
+            console.error('CryptoVis: readiness refresh failed:', error)
+          })
+          this._targetReadyPromise = work.then(() => this._awaitViewsSettled())
+          await work
+          continue
+        }
+
+        await wait(pollMs)
+      }
+
+      const readiness = this.getMajorViewReadiness(normalizedViewName)
+      const missing = readiness.views[normalizedViewName]?.missing || []
+      throw new Error(
+        `ManiScope ${normalizedViewName} is not ready after ${timeoutMs}ms; missing: ${missing.join(', ') || 'unknown'}`,
+      )
     },
     getMajorViewRenderArgs(viewName, options = {}) {
       return getMajorViewRenderArgsFromState(this, viewName, options)
@@ -2552,22 +2703,30 @@ export default {
       }
     };
     document.addEventListener('keydown', this._onKeyDown);
-	    this.installMajorViewApi()
+    this.installMajorViewApi()
 
-	    try {
-	      await this.initializeManiScopeSession()
-	      const restoreState = this._workspaceRestoreState
-	      await this.initializeForCurrentCoin({ preserveSnapshotTime: !!restoreState?.snapshotTime })
-	      if (restoreState) {
-	        this.applyCurrentState(restoreState)
-	      }
-	      if (this.isAgentWorkspace) {
-	        this.startAgentTraceRefresh()
-	      }
-	      this.scheduleLiveTraceSync(0)
-	    } catch (error) {
-	      console.error('CryptoVis: Error during initial load:', error)
-	    }
+    const initialWorkspaceReady = (async () => {
+      await this.initializeManiScopeSession()
+      const restoreState = this._workspaceRestoreState
+      await this.initializeForCurrentCoin({ preserveSnapshotTime: !!restoreState?.snapshotTime })
+      if (restoreState) {
+        this.applyCurrentState(restoreState)
+      }
+      if (this.isAgentWorkspace) {
+        this.startAgentTraceRefresh()
+      }
+      this.scheduleLiveTraceSync(0)
+    })()
+    this._initialWorkspaceReadyPromise = initialWorkspaceReady
+
+    try {
+      await initialWorkspaceReady
+    } catch (error) {
+      this._initialWorkspaceReadyError = error
+      console.error('CryptoVis: Error during initial load:', error)
+    } finally {
+      this._initialWorkspaceReadySettled = true
+    }
   },
   // ezio: cleanup snapshot shortcut listeners
 	  beforeUnmount() {
@@ -2648,6 +2807,31 @@ a {
   background: #f0fff4;
   color: #276749;
   border-color: #9ae6b4;
+}
+
+.workspace-baseline {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.workspace-link-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.workspace-link-tag:hover {
+  background: #ede9fe;
+  border-color: #c4b5fd;
 }
 
 .ai-chat-btn {

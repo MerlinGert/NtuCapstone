@@ -10,6 +10,10 @@ The temporary render host is fixed behind the page with pointer events disabled,
 
 Codex agents should normally use the session-local Python wrapper instead of calling `window.maniScopeMajorViewApi` directly. Each session contains `.maniscope-chat/sessions/{sessionId}/maniscope_visualization.py`. That wrapper calls the Codex bridge, which owns an isolated Agent Workspace browser page at `http://127.0.0.1:3099/{sessionId}/agent`, renders through the browser API, and saves PNG artifacts under `.maniscope-chat/sessions/{sessionId}/artifacts/`.
 
+Before extracting current arguments or rendering through the bridge, the Agent Workspace calls `ensureReady(viewName)`. Readiness waits for session restore, snapshot processing, detector outputs, manipulation results, child view redraws, and any pending target-view work. If required data is still missing, the bridge returns a clear readiness error instead of silently returning empty render args.
+
+Baseline evaluation sessions are intentionally different. A baseline session under `.maniscope-chat/baseline-sessions/{sessionId}` does not receive `maniscope_visualization.py` and does not expose argument-driven rendering to the baseline agent. Its `maniscope_baseline_views.py` helper can only copy the latest synced Human Workspace screenshots from `current-state.json.majorViewScreenshots` into `artifacts/`, using functions such as `capture_current_token_distribution()`, `capture_current_kline_chart()`, and `capture_current_behavior_details()`.
+
 ## Views
 
 - `token_distribution`: token holder distribution network.
@@ -90,6 +94,10 @@ api.optionalArguments
 //   candlestick_chart: ['visibleTimeWindow', 'cardAlignment', 'cardFocusTime'],
 //   behavior_details: ['visibleTimeWindow', 'maxEventsPerUser']
 // }
+
+await api.ensureReady('token_distribution')
+api.getReadiness('token_distribution')
+// { ready: true, views: { token_distribution: { ready: true, missing: [] } }, ... }
 
 const tokenArgs = api.getRenderArgs('token_distribution', {
   width: 1000,

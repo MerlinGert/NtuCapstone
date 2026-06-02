@@ -49,6 +49,7 @@
         v-for="child in node.children"
         :key="child.instanceId || child.id"
         :node="child"
+        :nesting-level="nestingLevel + 1"
         :hide-patch-label="childHidePatchLabel"
         @select-node="$emit('select-node', $event)"
       />
@@ -64,6 +65,10 @@ export default {
       type: Object,
       required: true,
     },
+    nestingLevel: {
+      type: Number,
+      default: 0,
+    },
     hidePatchLabel: {
       type: Boolean,
       default: false,
@@ -73,6 +78,13 @@ export default {
     return {
       collapsed: this.shouldCollapseByDefault(),
     }
+  },
+  watch: {
+    node: {
+      handler() {
+        this.collapsed = this.shouldCollapseByDefault()
+      },
+    },
   },
   computed: {
     hasChildren() {
@@ -124,13 +136,18 @@ export default {
         'source-user': this.node.source !== 'patch',
         'source-patch': this.node.source === 'patch',
         'type-hypothesis': this.node.type === 'Hypothesis',
+        'derived-hypothesis': this.isDerivedHypothesis,
         'root-hypothesis': this.node.type === 'Hypothesis' && !this.node.parentInstanceId,
         'type-question': this.node.type === 'AnalyticQuestion',
         'type-finding': this.node.type === 'Finding',
         [`relation-${this.relationName}`]: Boolean(this.relationName),
       }
     },
+    isDerivedHypothesis() {
+      return this.node.type === 'Hypothesis' && this.node.source === 'patch'
+    },
     nodeTypeLabel() {
+      if (this.isDerivedHypothesis) return 'Derived Hypothesis'
       if (this.node.type === 'Finding') {
         return this.node.source === 'patch' ? 'Agent Finding' : 'User Finding'
       }
@@ -138,6 +155,7 @@ export default {
     },
     nodeTypeClass() {
       return {
+        'node-type-derived-hypothesis': this.isDerivedHypothesis,
         'node-type-user-finding': this.node.type === 'Finding' && this.node.source !== 'patch',
         'node-type-agent-finding': this.node.type === 'Finding' && this.node.source === 'patch',
       }
@@ -167,6 +185,9 @@ export default {
     shouldCollapseByDefault() {
       if (this.node.type === 'AnalyticActivity') return true
       const children = Array.isArray(this.node.children) ? this.node.children : []
+      if (this.node.type === 'Finding' && this.nestingLevel === 1 && children.length > 0) {
+        return true
+      }
       return children.length > 0 && children.every((child) => child.type === 'Interaction')
     },
     normalizedRelation(relation) {
@@ -213,6 +234,21 @@ export default {
   border-color: #aabce8;
 }
 
+.derived-hypothesis {
+  background: #fff0f7;
+  border-color: #f3b4d0;
+}
+
+.source-user.type-finding {
+  background: #edf4ff;
+  border-color: #b8cdf8;
+}
+
+.source-patch.type-finding {
+  background: #fff0f7;
+  border-color: #f3b4d0;
+}
+
 .source-user.type-question {
   background: #ffffff;
   border-color: #cbd5e1;
@@ -252,15 +288,21 @@ export default {
 }
 
 .node-type-user-finding {
-  color: #166534;
-  background: #ecfdf3;
-  border-color: #86efac;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.node-type-derived-hypothesis {
+  color: #be185d;
+  background: #fce7f3;
+  border-color: #f9a8d4;
 }
 
 .node-type-agent-finding {
-  color: #92400e;
-  background: #fffbeb;
-  border-color: #fbbf24;
+  color: #be185d;
+  background: #fce7f3;
+  border-color: #f9a8d4;
 }
 
 .relation-pill {

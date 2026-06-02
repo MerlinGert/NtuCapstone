@@ -24,7 +24,7 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 +------------------+------------------------------+------------------------------+
 ```
 
-标题栏包含产品名、会话标记、工作区标记、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。
+标题栏包含产品名、会话标记、工作区标记、`Analysis Import` 标签、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。
 
 左列是 Control Panel。中列上方是 Token Distribution 视图，下方是带标签页的调查面板。右列上方是 K 线和操纵卡片视图，下方是 Behavior Details。
 
@@ -39,6 +39,20 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 两个工作区都会读取会话中共享的 canonical trace。当你在人的页面交互、标注、导入、重排或同步会话时，Human Workspace 会写入 canonical trace。Agent Workspace 会在后台刷新这份 canonical trace，因此它可以看到人已经做过什么，但智能体侧的选择、检测器设置、缩放窗口、选中用户和渲染证据会单独保存。在 Agent Workspace 中，Action Tree 是只读的。
 
 为了保持向后兼容，`current-state.json` 仍表示人的当前状态。同时，human 和 agent 会分别维护 `workspaces/human/current-state.json` 和 `workspaces/agent/current-state.json`。这意味着智能体可以运行不同的检测参数、查看不同快照、选择不同用户或渲染证据图片，而不会覆盖人的可见分析状态。
+
+## Baseline 会话
+
+Baseline 会话用于评估通用 Codex 助手与专门的 ManiScope 智能体之间的差异。
+
+- 访问 `/base` 会创建一个新的 5 字符 baseline 会话，并跳转到 `/base/{sessionId}`。
+- `/base/{sessionId}` 会恢复对应的 baseline 会话。
+- `/base/{sessionId}/agent` 不提供独立工作区，会跳回 `/base/{sessionId}`。
+
+Baseline 会话使用独立的存储根目录：`.maniscope-chat/baseline-sessions/{sessionId}`。它仍然会记录用户动作、标注、导入内容、截图、当前状态、聊天历史和 artifacts，但聊天提示词会刻意保持通用。Baseline 智能体可以查看原始数据、trace 文件、截图和当前状态，但不会获得专门的 reasoning-graph 方法、trace-analysis 工具、skeptical-review skill、Agent Workspace 或可任意重渲染可视化的 helper。
+
+如果 baseline 智能体需要当前视图图片，会话中包含 `maniscope_baseline_views.py`。这个 helper 只能把最近同步的 Token Distribution、K-line 和 Behavior Details 截图复制到 `artifacts/`；它不能改变检测参数、选中用户、时间窗口、缩放比例、粒度或任何其他可视化状态。
+
+specialized 和 baseline 聊天会话都会在会话根目录生成 `pyproject.toml`、`package.json` 和 `.gitignore`。这些文件用于会话本地脚本环境，智能体可以用 `uv` 运行 Python 脚本，也可以用 `bun` 运行 JavaScript 或 TypeScript 脚本，并在需要时添加临时分析依赖。持久证据和报告仍应保存到会话的 `artifacts/` 文件夹。
 
 ## Control Panel
 
@@ -157,7 +171,11 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 聊天历史和生成的 artifacts 在会话层级共享。智能体提示词会区分三类上下文：共享的 canonical trace、人的当前状态，以及智能体私有的探索状态。智能体的可视探索应使用 Agent Workspace，并且不应追加到人的动作 trace，除非你明确要求生成持久 artifacts 或 reasoning patches。
 
-Codex SDK 的网络访问默认对聊天智能体开启，因此它可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。对于受限的离线运行，可以用 `CODEX_NETWORK_ACCESS=false` 启动 bridge。
+在 baseline 会话中，Codex Chat 使用 `/api/base/chat/...`，文件存储在 `.maniscope-chat/baseline-sessions/{sessionId}`。聊天面板会标记为 `Baseline`，Agent Workspace 入口、完整分析快捷按钮和右侧面板的 LLM Analysis 标签页都会隐藏，提示词只描述价格操纵分析任务和可用原始数据，不包含专门的 trace-analysis 指令。
+
+每个聊天会话根目录都包含用于临时脚本的项目模板：`pyproject.toml` 用于通过 `uv` 运行 Python，`package.json` 用于通过 `bun` 运行 JavaScript 或 TypeScript。智能体可以在该会话内添加依赖；生成的证据、报告和导出文件应放在 `artifacts/`。
+
+Codex Chat 智能体会从当前会话目录运行，而不是从仓库根目录运行。它只能在该会话工作区内写入文件，优先写入 `artifacts/`；ACT 和 PNUT 原始数据目录会作为额外的只读策略输入提供。Python 依赖会使用仓库本地的 uv 缓存 `.maniscope-chat/shared-uv-cache`，bridge 会通过 Codex writable roots 授权该缓存目录，因此智能体可以直接使用 `uv`，不需要手动设置 `UV_CACHE_DIR`。网络访问保持开启，因此智能体可以访问本地 ManiScope 服务，并在调查需要时获取外部参考。bridge 启动时会检查本机是否已经安装 `uv`、`codex`，以及 `bun` 或 `npm` 中的一个。
 
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
 
@@ -167,7 +185,7 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 助手回复可以包含 Markdown 文本、生成的 artifact、JSON 文件、Markdown 报告和图片预览。当智能体在回复中提到本地图片、Markdown 或 JSON 路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的 artifact 根目录下，ManiScope 会通过会话 artifact 接口生成链接。有效图片会被复制到会话的 `artifacts/` 文件夹用于预览；Markdown 和 JSON 输出会显示为可下载的 artifact 链接。聊天中生成的文件通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析 artifact 则应保存到对应 trace 的 `analysis-results/` 文件夹。
 
-对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
+对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。bridge 会先等待 Agent Workspace 的可视化数据完成加载，再提取当前渲染参数。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
 
 对于完整的 trace 分析，每个会话还会包含一个托管的 skeptical-review skill。可用时，智能体可以派生一个聚焦的子智能体，专门寻找削弱主要假设的负面证据、误报、良性解释或模型参数不稳定性。主智能体需要先验证这些候选负面发现，然后才会把它们作为 `contradicts`、`refines` 或 Reasoning Gap 条目加入分析 artifact。
 
@@ -175,7 +193,7 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 ## User Actions、Annotations、Action Tree 和 LLM Analysis
 
-中列下方的面板现在是调查工作流的一部分。它包含四个标签页：User Actions、Annotations、Action Tree 和 LLM Analysis。默认激活的标签页是 Action Tree。
+中列下方的面板现在是调查工作流的一部分。在 specialized 会话中，它包含四个标签页：User Actions、Annotations、Action Tree 和 LLM Analysis。在 baseline 会话中，LLM Analysis 标签页会隐藏。默认激活的标签页是 Action Tree。
 
 ### User Actions
 
@@ -203,11 +221,11 @@ Action Tree 标签页把动作和标注显示为一棵可视化树。图例区�
 
 ### LLM Analysis
 
-LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载 `reasoning-graph.json` 和所有可用的 `reasoning-graph-patch*.json` 文件。该标签页会在浏览器中验证 graph 和 patch，按确定顺序应用 patch，并派生出用于显示的 forest。生成的 forest JSON 或 Markdown 文件只作为可选导出，不再作为 UI 的数据源。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 graph 中用于追溯。回答隐藏 Analytic Question 的中层 Finding 仍会显示在 Finding 层级中；如果同一个 canonical Finding 因为隐藏节点投影而重复出现，界面会把它折叠为一个卡片，避免同一个答案在一个 Hypothesis 下重复显示。Finding 的来源会显示在节点标记中：用户 Finding 使用绿色 `User Finding` 标记，智能体生成的补丁 Finding 使用琥珀色 `Agent Finding` 标记。关系标记会区分支持性证据、直接回答、细化结论和反驳关系。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括它与父节点的关系、可用的 evidence summary、patch rationale 和较大的证据图片。
+LLM Analysis 标签页会显示 Codex 生成的 trace 分析 artifact。它会先向后端请求当前 analysis artifact manifest，然后从会话的 `artifacts` 文件夹加载 `reasoning-graph.json` 和所有可用的 `reasoning-graph-patch*.json` 文件。该标签页会在浏览器中验证 graph 和 patch，按确定顺序应用 patch，并派生出用于显示的 forest。生成的 forest JSON 或 Markdown 文件只作为可选导出，不再作为 UI 的数据源。未回答的 Analytic Question 会显示为非阻塞的 graph warning，因为用户 trace 可能尚未包含答案；重要且可回答的 warning 应由智能体继续调查，并通过 patch Finding 解决。该标签页渲染一个更紧凑的发现层级：顶层 Hypothesis 包含用户 Finding 和智能体生成的补丁 Finding，而内部的 Task、Analytic Question、Analytic Activity 和 Interaction 不会显示在卡片视图里。这些隐藏节点仍保留在源 graph 中用于追溯。回答隐藏 Analytic Question 的中层 Finding 仍会显示在 Finding 层级中；如果同一个 canonical Finding 因为隐藏节点投影而重复出现，界面会把它折叠为一个卡片，避免同一个答案在一个 Hypothesis 下重复显示。Finding 的来源会显示在节点标记中：用户 Finding 使用蓝色 `User Finding` 标记，智能体生成的补丁 Finding 使用粉色 `Agent Finding` 标记，来自补丁的 Hypothesis 会显示为粉色 `Derived Hypothesis`。关系标记会区分支持性证据、直接回答、细化结论和反驳关系。带有截图或渲染图 provenance 的卡片在展开时会显示小缩略图。点击卡片会打开细节，包括它与父节点的关系、可用的 evidence summary、patch rationale 和较大的证据图片。工具栏还提供 **Export JSON** 按钮，可下载当前分析包，其中包含已加载的 reasoning graph、按顺序应用的 patch 列表、augmented graph，以及当前界面展示的 forest，便于后续离线分析和复查。Human Workspace 标记旁边的 `Analysis Import` 标签会在新页面打开导入界面；选择刚导出的 JSON 后，会按当前右侧 LLM Analysis 的方式恢复卡片层级和详情视图，便于单独查看与复盘。
 
 `current-reasoning-graph.json` 是给智能体和调试使用的派生阅读辅助。LLM Analysis 标签页仍然以 `reasoning-graph.json` 加 patch 文件作为数据源。
 
-该标签页会在打开时、点击 Refresh 时、Codex 宣布新的相关 artifact 时刷新；当标签页处于激活状态时，也会进行轻量级周期检查。后端不会启动长期文件监听器，而是在请求时扫描会话 artifacts 并返回最新识别到的文件。
+该标签页会在打开时、点击 Refresh 时、Codex 宣布新的相关 artifact 时刷新；当标签页处于激活状态时，也会进行轻量级周期检查。在 Codex Chat 回合进行中，bridge 会大约每秒两次扫描会话 artifacts 并宣布新写入或更新的 artifact，所以有效的 `reasoning-graph.json` 可以在后续 patch 文件完成前先显示为卡片。后端不会启动长期文件监听器，而是在请求时扫描会话 artifacts 并返回最新识别到的文件。
 
 ## 快照标注工作流
 

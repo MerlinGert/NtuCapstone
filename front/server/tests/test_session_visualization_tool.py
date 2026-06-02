@@ -8,6 +8,7 @@ SERVER_DIR = Path(__file__).resolve().parents[1]
 TEMPLATE_PATH = (
     SERVER_DIR / "session_tools" / "maniscope_visualization.py"
 )
+BASELINE_TEMPLATE_PATH = SERVER_DIR / "session_tools" / "maniscope_baseline_views.py"
 SESSION_TOOL_SERVICE_PATH = SERVER_DIR / "session_tool_service.py"
 
 
@@ -21,6 +22,14 @@ def load_tool_module():
 
 def load_session_tool_service():
     spec = importlib.util.spec_from_file_location("session_tool_service_template", SESSION_TOOL_SERVICE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_baseline_tool_module():
+    spec = importlib.util.spec_from_file_location("maniscope_baseline_views_template", BASELINE_TEMPLATE_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
@@ -119,6 +128,20 @@ class SessionVisualizationToolTests(unittest.TestCase):
 
             service.ensure_session_tools(session_dir, "abcde")
 
+            pyproject = session_dir / "pyproject.toml"
+            package_json = session_dir / "package.json"
+            gitignore = session_dir / ".gitignore"
+            self.assertTrue(pyproject.exists())
+            self.assertTrue(package_json.exists())
+            self.assertTrue(gitignore.exists())
+            self.assertIn('name = "maniscope-specialized-session-abcde"', pyproject.read_text(encoding="utf-8"))
+            self.assertIn('"name": "maniscope-specialized-session-abcde"', package_json.read_text(encoding="utf-8"))
+            self.assertIn("node_modules/", gitignore.read_text(encoding="utf-8"))
+            references_dir = session_dir / "session-references"
+            self.assertEqual((references_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
+            self.assertTrue((references_dir / "user-manual.en.md").exists())
+            self.assertTrue((references_dir / "major-view-render-api.md").exists())
+
             tool_path = session_dir / "maniscope_visualization.py"
             self.assertTrue(tool_path.exists())
             content = tool_path.read_text(encoding="utf-8")
@@ -127,8 +150,27 @@ class SessionVisualizationToolTests(unittest.TestCase):
 
             exclude = (session_dir / ".git" / "info" / "exclude").read_text(encoding="utf-8")
             self.assertIn("/maniscope_visualization.py", exclude)
+            self.assertIn("/session-references/", exclude)
             self.assertIn("/trace_analysis_tools/", exclude)
             self.assertIn("/skills/maniscope-disconfirmation/", exclude)
+            self.assertIn("/pyproject.toml", exclude)
+            self.assertIn("/package.json", exclude)
+            self.assertIn("/.gitignore", exclude)
+            self.assertIn("/node_modules/", exclude)
+
+    def test_session_project_scaffold_does_not_overwrite_existing_files(self):
+        service = load_session_tool_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            session_dir = Path(tmp_dir)
+            (session_dir / "pyproject.toml").write_text("[project]\nname = \"custom\"\n", encoding="utf-8")
+            (session_dir / "package.json").write_text('{"name":"custom"}\n', encoding="utf-8")
+            (session_dir / ".gitignore").write_text("custom-cache/\n", encoding="utf-8")
+
+            service.ensure_session_tools(session_dir, "abcde")
+
+            self.assertEqual((session_dir / "pyproject.toml").read_text(encoding="utf-8"), "[project]\nname = \"custom\"\n")
+            self.assertEqual((session_dir / "package.json").read_text(encoding="utf-8"), '{"name":"custom"}\n')
+            self.assertEqual((session_dir / ".gitignore").read_text(encoding="utf-8"), "custom-cache/\n")
 
     def test_ensure_session_tools_writes_trace_analysis_bundle(self):
         service = load_session_tool_service()
@@ -160,6 +202,64 @@ class SessionVisualizationToolTests(unittest.TestCase):
             self.assertEqual((skill_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
             skill_content = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("ManiScope Disconfirmation Review", skill_content)
+
+    def test_ensure_baseline_session_tools_writes_only_capture_helper(self):
+        service = load_session_tool_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            session_dir = Path(tmp_dir)
+            (session_dir / ".git" / "info").mkdir(parents=True)
+
+            service.ensure_baseline_session_tools(session_dir, "abcde")
+
+            tool_path = session_dir / "maniscope_baseline_views.py"
+            self.assertTrue(tool_path.exists())
+            pyproject = session_dir / "pyproject.toml"
+            package_json = session_dir / "package.json"
+            self.assertIn('name = "maniscope-baseline-session-abcde"', pyproject.read_text(encoding="utf-8"))
+            self.assertIn('"name": "maniscope-baseline-session-abcde"', package_json.read_text(encoding="utf-8"))
+            references_dir = session_dir / "session-references"
+            self.assertEqual((references_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
+            self.assertTrue((references_dir / "README.md").exists())
+            self.assertFalse((references_dir / "user-manual.en.md").exists())
+            self.assertFalse((references_dir / "major-view-render-api.md").exists())
+            content = tool_path.read_text(encoding="utf-8")
+            self.assertIn('SESSION_ID = "abcde"', content)
+            self.assertIn(f'TOOL_VERSION = "{service.TOOL_VERSION}"', content)
+            self.assertFalse((session_dir / "maniscope_visualization.py").exists())
+            self.assertFalse((session_dir / "trace_analysis_tools").exists())
+            self.assertFalse((session_dir / "skills" / "maniscope-disconfirmation").exists())
+
+            exclude = (session_dir / ".git" / "info" / "exclude").read_text(encoding="utf-8")
+            self.assertIn("/maniscope_baseline_views.py", exclude)
+            self.assertIn("/session-references/", exclude)
+            self.assertIn("/pyproject.toml", exclude)
+            self.assertIn("/package.json", exclude)
+            self.assertNotIn("/maniscope_visualization.py", exclude)
+
+    def test_baseline_helper_copies_only_synced_current_screenshots(self):
+        module = load_baseline_tool_module()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            session_dir = Path(tmp_dir)
+            images_dir = session_dir / "images"
+            images_dir.mkdir()
+            source = images_dir / "current-token-distribution.png"
+            source.write_bytes(b"\x89PNG\r\n\x1a\n")
+            (session_dir / "current-state.json").write_text(
+                '{"majorViewScreenshots":{"token_distribution":"images/current-token-distribution.png"}}',
+                encoding="utf-8",
+            )
+            module.SESSION_DIR = session_dir
+            module.ARTIFACTS_DIR = session_dir / "artifacts"
+            module.SESSION_ID = "abcde"
+
+            result = module.capture_current_token_distribution()
+
+            artifact_path = Path(result["artifact_path"])
+            self.assertTrue(artifact_path.exists())
+            self.assertEqual(artifact_path.read_bytes(), source.read_bytes())
+            self.assertEqual(result["artifact_url"], f"/api/base/sessions/abcde/artifacts/{artifact_path.name}")
+            with self.assertRaises(ValueError):
+                module.artifact_path("../escape.png")
 
 
 if __name__ == "__main__":

@@ -186,7 +186,7 @@ Shared canonical nodes are duplicated mechanically. Each tree node instance must
 
 The forest must preserve raw Interaction leaves by default. If a compact Step view is also useful, keep it in `trace-step-map.md`, not as a replacement for Interaction leaves in the User Reasoning Forest.
 
-Every `AnalyticQuestion` should have at least one incoming `answers` edge from a mid-level `Finding`. If the trace only yields a partial or uncertain answer, encode that caveat in the Finding's label, confidence, `explanation`, and `reasoningRole`. If the trace does not answer the question at all, create a clearly unresolved mid-level Finding and mark the missing evidence as a Reasoning Gap in the Recommendation Plan.
+Every answerable `AnalyticQuestion` should have at least one incoming `answers` edge from a mid-level `Finding`. If the trace only yields a partial or uncertain answer, encode that caveat in the Finding's label, confidence, `explanation`, and `reasoningRole`. If the user trace does not answer the question at all, leave the question unanswered in the base reasoning graph. The validator reports this as a warning, not an error. Treat the warning as a follow-up instruction: if the question is central and answerable, investigate it and add answer Findings through a patch.
 
 Use a real Finding hierarchy when the trace contains enough evidence:
 
@@ -235,7 +235,7 @@ The script should fail if:
 - an edge is a self-edge,
 - a relation is unknown,
 - a relation points in the wrong direction for its type,
-- an Analytic Question has no incoming `answers` edge from a mid-level Finding,
+- an Analytic Question has no incoming `answers` edge from a mid-level Finding (warning unless strict error mode is requested),
 - an `answers` edge uses a non-mid-level Finding as its source,
 - an edge lacks a non-empty `rationale`,
 - an Interaction lacks `salience`,

@@ -890,6 +890,14 @@ export function createMajorViewApi(vm) {
     ),
     optionalArgumentDefaults: { ...OPTIONAL_RENDER_ARG_DEFAULTS },
     createKlineZoomTransform,
+    getReadiness: (viewName = null, options = {}) =>
+      typeof vm.getMajorViewReadiness === 'function'
+        ? vm.getMajorViewReadiness(viewName, options)
+        : { ready: true, views: {} },
+    ensureReady: (viewName, options = {}) =>
+      typeof vm.ensureMajorViewReady === 'function'
+        ? vm.ensureMajorViewReady(viewName, options)
+        : Promise.resolve({ ready: true, views: {} }),
     getRenderArgs: (viewName, options = {}) => getMajorViewRenderArgs(vm, viewName, options),
     getDataDependencies: (viewName, options = {}) =>
       getMajorViewDataDependencies(vm, viewName, options),

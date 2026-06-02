@@ -2,38 +2,55 @@ import { Codex } from '@openai/codex-sdk'
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { AgentBrowserManager } from './agent-browser.mjs'
 import { materializeLocalArtifactReferences } from './local-image-artifacts.mjs'
+import { runStartupPreflight } from './preflight.mjs'
+import {
+  buildCodexClientOptions,
+  buildThreadOptions,
+  rawDataDirectories,
+  FRONT_DIR,
+  REPO_ROOT,
+} from './thread-options.mjs'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const THREAD_KEY_RE = /^[a-zA-Z0-9_-]{1,64}$/
 const WORKSPACE_ROLE_RE = /^(human|agent)$/
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const FRONT_DIR = path.resolve(__dirname, '..')
-const REPO_ROOT = process.env.MANISCOPE_REPO_ROOT || path.resolve(FRONT_DIR, '..')
+const SESSION_MODE_RE = /^(specialized|baseline)$/
 const CHAT_ROOT = path.join(REPO_ROOT, '.maniscope-chat')
 const SESSIONS_DIR = path.join(CHAT_ROOT, 'sessions')
+const BASELINE_SESSIONS_DIR = path.join(CHAT_ROOT, 'baseline-sessions')
 const DEFAULT_CODEX_BRIDGE_PORT = 8787
 const PORT = Number(process.env.CODEX_BRIDGE_PORT || DEFAULT_CODEX_BRIDGE_PORT)
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8099'
 const BACKEND_URL = process.env.MANISCOPE_BACKEND_URL || DEFAULT_BACKEND_URL
-const DEFAULT_CODEX_NETWORK_ACCESS_ENABLED = true
+const RAW_DATA_DIRS = rawDataDirectories(FRONT_DIR)
+const ARTIFACT_POLL_INTERVAL_MS = 500
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
 const agentBrowser = new AgentBrowserManager()
 
-function sessionDir(sessionId) {
+function validateSessionMode(sessionMode) {
+  if (!SESSION_MODE_RE.test(sessionMode)) {
+    const error = new Error('sessionMode must be specialized or baseline')
+    error.statusCode = 400
+    throw error
+  }
+  return sessionMode
+}
+
+function sessionDir(sessionId, sessionMode = 'specialized') {
   if (!SESSION_ID_RE.test(sessionId)) {
     const error = new Error('Session ID must be 5 lowercase hex characters')
     error.statusCode = 400
     throw error
   }
-  return path.join(SESSIONS_DIR, sessionId)
+  const root = validateSessionMode(sessionMode) === 'baseline' ? BASELINE_SESSIONS_DIR : SESSIONS_DIR
+  return path.join(root, sessionId)
 }
 
-function existingSessionDir(sessionId) {
-  const dir = sessionDir(sessionId)
+function existingSessionDir(sessionId, sessionMode = 'specialized') {
+  const dir = sessionDir(sessionId, sessionMode)
   if (!fs.existsSync(dir)) {
     const error = new Error('session not found')
     error.statusCode = 404
@@ -51,17 +68,22 @@ function validateThreadKey(threadKey) {
   return threadKey
 }
 
-function validateWorkspaceRole(workspaceRole) {
+function validateWorkspaceRole(workspaceRole, sessionMode = 'specialized') {
   if (!WORKSPACE_ROLE_RE.test(workspaceRole)) {
     const error = new Error('workspaceRole must be human or agent')
+    error.statusCode = 400
+    throw error
+  }
+  if (sessionMode === 'baseline' && workspaceRole !== 'human') {
+    const error = new Error('baseline chat only supports the human workspace')
     error.statusCode = 400
     throw error
   }
   return workspaceRole
 }
 
-function activeTurnKey(sessionId, threadKey) {
-  return `${sessionId}:${threadKey}`
+function activeTurnKey(sessionMode, sessionId, threadKey) {
+  return `${sessionMode}:${sessionId}:${threadKey}`
 }
 
 function readJson(filePath, fallback) {
@@ -77,15 +99,6 @@ function writeJson(filePath, payload) {
   const tmpPath = `${filePath}.tmp`
   fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), 'utf8')
   fs.renameSync(tmpPath, filePath)
-}
-
-function booleanEnv(name, defaultValue) {
-  const value = process.env[name]
-  if (value === undefined || value === '') return defaultValue
-  const normalized = value.trim().toLowerCase()
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true
-  if (['0', 'false', 'no', 'off'].includes(normalized)) return false
-  return defaultValue
 }
 
 function readBody(req) {
@@ -118,25 +131,45 @@ function sendSse(res, event) {
   res.write(`data: ${JSON.stringify(event)}\n\n`)
 }
 
-function startProgressHeartbeat(res, shouldStop) {
-  const notes = [
-    {
-      title: 'Inspecting trace context',
-      detail: 'Reading the live trace, current state, and available screenshots.',
-    },
-    {
-      title: 'Mapping evidence',
-      detail: 'Relating observed Interactions to intentions, Findings, and possible Hypotheses.',
-    },
-    {
-      title: 'Planning investigation',
-      detail: 'Checking which visual or statistical Analytic Activities are useful next.',
-    },
-    {
-      title: 'Waiting for Codex output',
-      detail: 'The agent is still working and will stream the next event when available.',
-    },
-  ]
+function startProgressHeartbeat(res, shouldStop, sessionMode = 'specialized') {
+  const notes =
+    sessionMode === 'baseline'
+      ? [
+          {
+            title: 'Inspecting session context',
+            detail: 'Reading the current trace, screenshots, and available data files.',
+          },
+          {
+            title: 'Checking evidence',
+            detail: 'Comparing trace evidence, screenshots, and raw data where useful.',
+          },
+          {
+            title: 'Preparing response',
+            detail: 'Organizing observations and next checks for the user.',
+          },
+          {
+            title: 'Waiting for Codex output',
+            detail: 'The agent is still working and will stream the next event when available.',
+          },
+        ]
+      : [
+          {
+            title: 'Inspecting trace context',
+            detail: 'Reading the live trace, current state, and available screenshots.',
+          },
+          {
+            title: 'Mapping evidence',
+            detail: 'Relating observed Interactions to intentions, Findings, and possible Hypotheses.',
+          },
+          {
+            title: 'Planning investigation',
+            detail: 'Checking which visual or statistical Analytic Activities are useful next.',
+          },
+          {
+            title: 'Waiting for Codex output',
+            detail: 'The agent is still working and will stream the next event when available.',
+          },
+        ]
   let index = 0
   return setInterval(() => {
     if (shouldStop()) return
@@ -171,10 +204,10 @@ function extensionForImageType(type, fallbackName) {
   return '.png'
 }
 
-function saveChatAttachments(sessionId, attachments) {
+function saveChatAttachments(sessionId, attachments, sessionMode = 'specialized') {
   if (!Array.isArray(attachments) || attachments.length === 0) return []
 
-  const uploadDir = path.join(sessionDir(sessionId), 'chat-uploads')
+  const uploadDir = path.join(sessionDir(sessionId, sessionMode), 'chat-uploads')
   fs.mkdirSync(uploadDir, { recursive: true })
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
 
@@ -193,9 +226,9 @@ function saveChatAttachments(sessionId, attachments) {
     .filter(Boolean)
 }
 
-function resolveSessionFile(sessionId, relativePath) {
+function resolveSessionFile(sessionId, relativePath, sessionMode = 'specialized') {
   if (!relativePath || path.isAbsolute(relativePath)) return null
-  const dir = sessionDir(sessionId)
+  const dir = sessionDir(sessionId, sessionMode)
   const filePath = path.resolve(dir, relativePath)
   const relative = path.relative(dir, filePath)
   if (relative.startsWith('..') || path.isAbsolute(relative)) return null
@@ -203,19 +236,20 @@ function resolveSessionFile(sessionId, relativePath) {
   return filePath
 }
 
-function workspaceCurrentStatePath(sessionId, workspaceRole) {
-  const dir = sessionDir(sessionId)
+function workspaceCurrentStatePath(sessionId, workspaceRole, sessionMode = 'specialized') {
+  const dir = sessionDir(sessionId, sessionMode)
   if (workspaceRole === 'human') return path.join(dir, 'current-state.json')
+  if (sessionMode === 'baseline') return path.join(dir, 'current-state.json')
   return path.join(dir, 'workspaces', workspaceRole, 'current-state.json')
 }
 
-function currentViewImagePaths(sessionId, workspaceRole = 'human') {
-  const currentState = readJson(workspaceCurrentStatePath(sessionId, workspaceRole), {})
+function currentViewImagePaths(sessionId, workspaceRole = 'human', sessionMode = 'specialized') {
+  const currentState = readJson(workspaceCurrentStatePath(sessionId, workspaceRole, sessionMode), {})
   const screenshots = currentState.majorViewScreenshots
   if (!screenshots || typeof screenshots !== 'object') return []
 
   return Object.values(screenshots)
-    .map((relativePath) => resolveSessionFile(sessionId, relativePath))
+    .map((relativePath) => resolveSessionFile(sessionId, relativePath, sessionMode))
     .filter(Boolean)
 }
 
@@ -223,17 +257,17 @@ function uniquePaths(paths) {
   return Array.from(new Set(paths))
 }
 
-function threadCachePath(sessionId) {
-  return path.join(sessionDir(sessionId), 'codex-threads.json')
+function threadCachePath(sessionId, sessionMode = 'specialized') {
+  return path.join(sessionDir(sessionId, sessionMode), 'codex-threads.json')
 }
 
-function getThreadEntry(sessionId, threadKey) {
-  const cache = readJson(threadCachePath(sessionId), {})
+function getThreadEntry(sessionId, threadKey, sessionMode = 'specialized') {
+  const cache = readJson(threadCachePath(sessionId, sessionMode), {})
   return cache[threadKey] || null
 }
 
-function setThreadEntry(sessionId, threadKey, threadId) {
-  const cachePath = threadCachePath(sessionId)
+function setThreadEntry(sessionId, threadKey, threadId, sessionMode = 'specialized') {
+  const cachePath = threadCachePath(sessionId, sessionMode)
   const cache = readJson(cachePath, {})
   const now = new Date().toISOString()
   cache[threadKey] = {
@@ -245,27 +279,11 @@ function setThreadEntry(sessionId, threadKey, threadId) {
   writeJson(cachePath, cache)
 }
 
-function buildThreadOptions() {
-  const options = {
-    workingDirectory: REPO_ROOT,
-    skipGitRepoCheck: false,
-    sandboxMode: process.env.CODEX_SANDBOX_MODE || 'workspace-write',
-    approvalPolicy: process.env.CODEX_APPROVAL_POLICY || 'never',
-    modelReasoningEffort: process.env.CODEX_REASONING_EFFORT || 'high',
-    networkAccessEnabled: booleanEnv(
-      'CODEX_NETWORK_ACCESS',
-      DEFAULT_CODEX_NETWORK_ACCESS_ENABLED,
-    ),
-    webSearchMode: process.env.CODEX_WEB_SEARCH || 'disabled',
-  }
-  if (process.env.CODEX_MODEL) {
-    options.model = process.env.CODEX_MODEL
-  }
-  return options
-}
-
 function buildTraceAnalysisPrompt(sessionId, userMessage, workspaceRole = 'human') {
-  const relativeSessionRoot = `.maniscope-chat/sessions/${sessionId}`
+  const relativeSessionRoot = '.'
+  const sessionRoot = sessionDir(sessionId, 'specialized')
+  const actRawDataDir = RAW_DATA_DIRS[0]
+  const pnutRawDataDir = RAW_DATA_DIRS[1]
   const activeWorkspaceState =
     workspaceRole === 'agent'
       ? `${relativeSessionRoot}/workspaces/agent/current-state.json`
@@ -284,9 +302,24 @@ a report generator by default.
 Active chat workspace role: ${workspaceRole}
 ${workspaceContext}
 
+Filesystem access:
+- Your writable working directory is this active session directory: ${sessionRoot}
+- Keep scripts, temporary files, generated evidence, reports, and outputs inside this session directory, preferably under ${relativeSessionRoot}/artifacts.
+- Raw market data is available as additional read-only-by-policy directories:
+  - ACT raw data: ${actRawDataDir}
+  - PNUT raw data: ${pnutRawDataDir}
+- Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
+- The bridge sets UV_CACHE_DIR to the repo-local shared uv cache. Use plain uv commands and do not override UV_CACHE_DIR.
+
+Session-local scripting workspace:
+- The active session root contains pyproject.toml and package.json templates.
+- Run Python scripts from ${relativeSessionRoot} with uv, for example uv run python script.py. Add Python packages with uv add when needed.
+- Run JavaScript or TypeScript scripts from ${relativeSessionRoot} with bun, for example bun script.ts. Add JS or TS packages with bun add when needed.
+- Keep generated evidence and durable outputs under ${relativeSessionRoot}/artifacts unless the user names another path.
+
 Start every trace-dependent turn by refreshing context. Read these files first:
-- docs/reports/user-manual.en.md
-- docs/ui-analysis/major-view-render-api.md
+- session-references/user-manual.en.md
+- session-references/major-view-render-api.md
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
 - ${activeWorkspaceState}
@@ -324,7 +357,7 @@ Core methodology:
    - Action Space: Interaction, AnalyticActivity, InvestigationStrategy.
    - Finding Space: Finding.
    - A Task motivates one or more Interactions and produces a local Finding.
-   - An AnalyticQuestion motivates an AnalyticActivity and must be explicitly answered by one or more Findings.
+   - An AnalyticQuestion motivates an AnalyticActivity and should be explicitly answered by one or more Findings when the trace or follow-up evidence supports an answer.
    - A Hypothesis motivates an InvestigationStrategy and produces or revises a Finding.
    - State evidence and rationale when you infer an AnalyticQuestion, Hypothesis, or mid- or high-level Finding.
    - Low-level Findings are concrete observations from one Interaction or one narrow AnalyticActivity.
@@ -407,8 +440,10 @@ Session-local trace-analysis tools:
   - trace_analysis_tools/references/reasoning-graph-patch-format.md
 - Graph-first contract: write reasoning-graph.json first as the canonical source of truth. The frontend reads reasoning-graph.json plus every reasoning-graph-patch*.json file, validates them, applies patches in deterministic order, and renders the derived forest itself.
 - Reasoning graphs should include analysisAnchor metadata for the live trace snapshot they cover. Incremental patches must include baseAnchor and targetAnchor metadata, plus patchType="incremental". Use reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json for incremental user-trace deltas.
+- During full analysis, persist a complete valid ${relativeSessionRoot}/artifacts/reasoning-graph.json immediately after reconstructing the user's reasoning from the trace and before recommendation planning, autonomous follow-up investigation, or patch writing. Run the validator, fix base-graph errors, and only then continue. Do not hold the base graph in memory until the end of the turn. This lets the LLM Analysis tab render the user's reasoning forest while later patches are still being generated.
 - user-reasoning-forest.json, augmented-reasoning-forest.json, and their Markdown forms are optional static exports. Do not create or edit them for normal UI operation unless the user explicitly asks for export files.
 - For every AnalyticQuestion node, create at least one evidence-backed mid-level Finding node that answers it, unless the trace truly provides no answer. Add explicit "answers" edges from mid-level Finding -> AnalyticQuestion. Do not rely only on shared Hypothesis membership, nearby AnalyticActivities, or prose explanations. If the answer is partial or caveated, encode that in the Finding label, confidence, explanation, and rationale.
+- Unanswered AnalyticQuestions in the base reasoning graph are validation warnings, not graph errors. They are acceptable when the user trace does not contain an answer. Treat each warning as an instruction to decide whether the question is central and answerable; if it is, investigate it and add answer Findings through reasoning-graph-patch*.json. Do not create placeholder unresolved Findings solely to satisfy validation.
 - Build a readable Finding hierarchy when the trace contains enough evidence: low-level Findings for concrete visual/statistical/model observations, mid-level Findings that synthesize those observations and answer AnalyticQuestions, and high-level Findings that synthesize multiple mid-level Findings before supporting Hypotheses.
 - Avoid flat forests where every Finding directly supports a Hypothesis. Do not connect the same mid-level Finding directly to both an AnalyticQuestion and that question's parent Hypothesis unless there is no higher-level Finding to carry the Hypothesis support.
 - User-authored annotations that contain claims must become Finding nodes in reasoning-graph.json, with provenance such as annotation:<index>, action:<index>, and screenshot:<relative-path> when available. Do not leave user Findings only in prose or only in reasoning-graph-patch.json.
@@ -416,20 +451,21 @@ Session-local trace-analysis tools:
 - For every executed Hypothesis Expansion branch, explicitly resolve the proposed adjacent Hypothesis in the follow-up evidence. If follow-up Findings support it, create a new agent-authored Hypothesis node in a Reasoning Graph Patch, connect supporting agent Findings to it, and include an add_root operation so the frontend renders the adjacent Hypothesis as a separate tree. If evidence does not support it, mark it rejected, deferred, or unsupported in the follow-up report and add a contradicts or refines Finding when evidence warrants it. Do not silently fold Hypothesis Expansion evidence into the original user Hypothesis only.
 - For major Hypotheses and high-level Findings, include a disconfirmation pass. When functions.spawn_agent is available, spawn a skeptical subagent and tell it to read ${relativeSessionRoot}/skills/maniscope-disconfirmation/SKILL.md first. Give it the claim IDs, current graph or forest files, relevant evidence artifacts, and a bounded task to find false positives, benign alternatives, robustness failures, counterexamples, or missing support. The skeptical subagent should report candidate negative Findings only; you must verify them before adding "contradicts", "refines", or Reasoning Gap entries to graph artifacts. If no spawn tool is available, perform a smaller skeptical pass yourself and say so.
 - In reasoning-graph-patch-skeptical.json, every added Finding must have at least one outgoing "refines" or "contradicts" edge to the relevant Intention node. Use "refines" for evidence that narrows, qualifies, or caveats a claim; use "contradicts" for evidence that weakens or falsifies it. Do not encode a skeptical Finding with only "supports" edges. "supports" is allowed only as an additional placement or synthesis edge to a related Finding.
-- For live chat session artifacts, write JSON and Markdown under ${relativeSessionRoot}/artifacts unless the user names a different path. For exported trace-folder analyses, write under TRACE/analysis-results.
+- For live chat session artifacts, write JSON and Markdown under ${relativeSessionRoot}/artifacts unless the user names a different session-local path.
+- If the user asks you to analyze or export to a trace folder outside this session sandbox, explain that this chat agent can only write inside the active session directory. Ask the user to import or copy the trace into the session, or write a session-local artifact that the user can move later.
 - Use this session-local command before finalizing live chat artifacts:
   - bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
 - Use bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts when reasoning-graph-patch*.json files already exist and you need a complete current graph for global context. Read current-reasoning-graph.json as a derived aid only; keep writing new evidence as patch files.
 - Use bun trace_analysis_tools/reasoning_graph/cli.ts checkpoint artifacts when the active deduplicated patch count reaches 8 or the validator reports "Checkpoint recommended", unless the user explicitly asks to preserve the unsquashed patch stack. Checkpointing archives the old base graph and active patches, then replaces reasoning-graph.json with the materialized graph.
 - The validator applies all reasoning-graph-patch*.json files. Fix validation errors before reporting completion.
-- Before finalizing a full trace artifact set, verify that reasoning-graph.json and all patch files validate, that every AnalyticQuestion has at least one incoming "answers" edge from a mid-level Finding or is marked as an unresolved Reasoning Gap, that the Finding hierarchy is not unnecessarily flat, and that trace annotations with user claims appear as user Finding nodes rather than being lost.
+- Before finalizing a full trace artifact set, verify that reasoning-graph.json and all patch files validate, review any unanswered-AnalyticQuestion warnings, investigate central answerable questions with patches, ensure the Finding hierarchy is not unnecessarily flat, and ensure trace annotations with user claims appear as user Finding nodes rather than being lost.
 
 Full trace-level analysis pipeline:
 - Trigger this pipeline when the user asks for full, comprehensive, complete, end-to-end, or artifact-producing trace analysis, or when they ask to analyze a trace without scoping the request to a narrow question.
 - Unless the user explicitly scopes the task down, combine trace reconstruction, recommendation planning, autonomous follow-up investigation, graph patching, graph validation, and artifact writing into one complete workflow.
 - Execute the pipeline in this order:
   1. Refresh the canonical trace, Human Workspace state, Agent Workspace state, session git history, screenshots, annotations, and any existing analysis artifacts.
-  2. Build reasoning-graph.json first from user Interactions upward through Tasks, AnalyticQuestions, AnalyticActivities, low-level Findings, mid-level answer Findings, high-level synthesis Findings, and Hypotheses. Keep raw Interactions as leaves, preserve evidence links, convert user-authored claim annotations into Finding nodes, and connect mid-level Findings back to the AnalyticQuestions they answer with explicit "answers" edges.
+  2. Build and write ${relativeSessionRoot}/artifacts/reasoning-graph.json first from user Interactions upward through Tasks, AnalyticQuestions, AnalyticActivities, low-level Findings, mid-level answer Findings, high-level synthesis Findings, and Hypotheses. Keep raw Interactions as leaves, preserve evidence links, convert user-authored claim annotations into Finding nodes, and connect mid-level Findings back to the AnalyticQuestions they answer with explicit "answers" edges when the trace provides an answer. Save this base graph before starting recommendation planning, follow-up exploration, skeptical review, or patch generation.
   3. Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts to validate reasoning-graph.json. If validation fails or user Findings from annotations are missing, fix the graph and rerun validation.
   4. Run a disconfirmation pass for major Hypotheses and high-level Findings. Prefer spawning a skeptical subagent with ${relativeSessionRoot}/skills/maniscope-disconfirmation/SKILL.md; verify its candidate negative Findings before integrating any "contradicts", "refines", or Reasoning Gap entries. If you write reasoning-graph-patch-skeptical.json, do not add support-only skeptical Findings; each skeptical Finding must explicitly refine or contradict the claim it tests.
   5. Identify Reasoning Gaps where the observed user evidence does not sufficiently support a Finding, Hypothesis, or implied AnalyticQuestion.
@@ -439,7 +475,7 @@ Full trace-level analysis pipeline:
   9. Record follow-up evidence as Reasoning Graph Patches, including explanation, evidenceSummary, reasoningRole, and patchRationale for agent-created patch nodes.
   10. For each executed Hypothesis Expansion branch, decide whether the proposed adjacent Hypothesis is supported, rejected, deferred, or unsupported. Supported adjacent Hypotheses must become new agent-authored Hypothesis nodes with supporting Finding edges and add_root operations. Rejected, deferred, or unsupported branches must be stated explicitly in the follow-up report, not hidden inside evidence for the original Hypothesis.
   11. Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts again so reasoning-graph.json plus all reasoning-graph-patch*.json files validate together.
-  12. Save durable artifacts under TRACE/analysis-results for trace-folder analyses or ${relativeSessionRoot}/artifacts for live-chat session analyses, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
+  12. Save durable artifacts under ${relativeSessionRoot}/artifacts, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
 - If time, tool access, missing data, or rendering failures prevent a complete pipeline, say which stages were completed, which were blocked, and what exact evidence or tool would unblock the remaining stages.
 
 Incremental trace analysis pipeline:
@@ -493,10 +529,10 @@ Mode E: autonomous investigation.
 
 Mode F: artifact-writing.
 - Use chat-first output unless the user asks for files or durable analysis artifacts.
-- If writing full trace artifacts for a trace folder, place them under TRACE/analysis-results.
-- If writing session-local live-chat artifacts, place generated evidence under ${relativeSessionRoot}/artifacts unless the user names a different output path.
+- Place generated evidence and durable analysis artifacts under ${relativeSessionRoot}/artifacts unless the user names a different session-local output path.
+- If the requested output path is outside the active session directory or raw-data read-only directories, do not attempt to write there. Explain the sandbox boundary and write a session-local artifact instead if useful.
 - Write reasoning-graph.json first, then write reasoning-graph-patch*.json files for agent follow-up evidence. Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts and fix errors until the base graph and all patches validate. Do not manually create a forest that bypasses graph validation.
-- When you create AnalyticQuestion nodes, also create direct mid-level answer Findings and "answers" edges. A generated forest that contains questions but no answer Findings is incomplete even if the Hypothesis has other support. When enough evidence exists, place those answer Findings under high-level synthesis Findings instead of attaching every answer directly to the Hypothesis.
+- When you create AnalyticQuestion nodes, also create direct mid-level answer Findings and "answers" edges whenever the available evidence supports an answer. A generated forest that contains central answerable questions but no answer Findings is incomplete even if the Hypothesis has other support. When enough evidence exists, place those answer Findings under high-level synthesis Findings instead of attaching every answer directly to the Hypothesis. If the user trace does not answer a question, leave it unanswered in the base graph, accept the validator warning, and decide during follow-up whether to investigate it through patches.
 - Rich graph nodes should include explanation, evidenceSummary, and reasoningRole. Agent-created patch nodes must also include patchRationale.
 - Original trace evidence belongs in reasoning-graph.json. Agent follow-up evidence belongs in reasoning-graph-patch.json. Verified skeptical counterevidence belongs in reasoning-graph-patch-skeptical.json. In skeptical patches, support-only Findings are invalid; each added Finding must include a "refines" or "contradicts" edge. Forest files are optional exports; the frontend derives its own forest from graph plus patches.
 
@@ -514,13 +550,78 @@ User message:
 ${userMessage}`
 }
 
-function buildInput(sessionId, threadKey, userMessage, isNewThread, attachmentPaths, workspaceRole = 'human') {
+function buildBaselinePrompt(sessionId, userMessage) {
+  const relativeSessionRoot = '.'
+  const sessionRoot = sessionDir(sessionId, 'baseline')
+  const actRawDataDir = RAW_DATA_DIRS[0]
+  const pnutRawDataDir = RAW_DATA_DIRS[1]
+  return `You are a Codex agent helping a user analyze possible token price manipulation in ManiScope.
+
+The user is interacting with a visual analytics app for token-market investigation. Answer as a practical collaborator: inspect the evidence, explain what you find, state uncertainty, and suggest useful next checks when appropriate.
+
+Active baseline session root:
+- ${sessionRoot}
+
+Filesystem access:
+- Your writable working directory is the active baseline session directory: ${sessionRoot}
+- Keep scripts, temporary files, copied images, summaries, and generated outputs inside this session directory, preferably under ${relativeSessionRoot}/artifacts.
+- Raw market data is available as additional read-only-by-policy directories:
+  - ACT raw data: ${actRawDataDir}
+  - PNUT raw data: ${pnutRawDataDir}
+- Do not edit, delete, reformat, or create files in the raw data directories. If you need derived data, write it under ${relativeSessionRoot}/artifacts or another file inside the session directory.
+- The bridge sets UV_CACHE_DIR to the repo-local shared uv cache. Use plain uv commands and do not override UV_CACHE_DIR.
+
+Start trace-dependent answers by reading the current session files when they exist:
+- ${relativeSessionRoot}/live-session.json
+- ${relativeSessionRoot}/current-state.json
+- session-references/README.md
+
+Useful session folders:
+- ${relativeSessionRoot}/images contains synced screenshots from the user's actions, annotations, and current views.
+- ${relativeSessionRoot}/artifacts is where you may save files, scripts, summaries, or copied images that are useful for this chat.
+
+Session-local scripting workspace:
+- ${relativeSessionRoot} contains pyproject.toml and package.json templates.
+- Run Python scripts from ${relativeSessionRoot} with uv, for example uv run python script.py. Add Python packages with uv add when needed.
+- Run JavaScript or TypeScript scripts from ${relativeSessionRoot} with bun, for example bun script.ts. Add JS or TS packages with bun add when needed.
+
+Available evidence in the project may include:
+- OHLC/K-line price data for token price movement over time.
+- Holder snapshots and holder distribution data.
+- Trades, transfers, wallet behavior sequences, and balances.
+- Detector outputs from existing backend services, including entity, link, and manipulation-related outputs.
+- The user's recorded trace, annotations, screenshots, imported trace data, and current view state.
+
+You may inspect raw JSON/CSV files and write small scripts or files when useful. Use exact data for counts, amounts, timestamps, overlaps, and other quantitative claims. Use screenshots and current-view images for visual claims about clusters, charts, card timing, behavior timelines, or visible labels.
+
+If you need local image files for the current visible views, the session may contain ${relativeSessionRoot}/maniscope_baseline_views.py. It can only copy the user's latest synced Token Distribution, K-Line, and Behavior Details screenshots into artifacts; it cannot change visualization settings or render alternative configurations.
+
+Keep responses conversational by default. Produce durable files only when they help answer the user or when the user asks for them. Do not assume previous chat memory is current; refresh the trace files when the user asks about the current session.
+
+---
+
+User message:
+${userMessage}`
+}
+
+function buildInput(
+  sessionId,
+  threadKey,
+  userMessage,
+  isNewThread,
+  attachmentPaths,
+  workspaceRole = 'human',
+  sessionMode = 'specialized',
+) {
   const text =
     userMessage ||
     'Please inspect the attached image input in the context of the current ManiScope session.'
 
   if (isNewThread && threadKey === 'trace-analysis') {
-    const promptText = buildTraceAnalysisPrompt(sessionId, text, workspaceRole)
+    const promptText =
+      sessionMode === 'baseline'
+        ? buildBaselinePrompt(sessionId, text)
+        : buildTraceAnalysisPrompt(sessionId, text, workspaceRole)
     if (attachmentPaths.length === 0) return promptText
     return [
       { type: 'text', text: promptText },
@@ -812,8 +913,8 @@ function describeFunctionCall(item) {
   return name
 }
 
-function listArtifacts(sessionId) {
-  const artifactsDir = path.join(sessionDir(sessionId), 'artifacts')
+function listArtifacts(sessionId, sessionMode = 'specialized') {
+  const artifactsDir = path.join(sessionDir(sessionId, sessionMode), 'artifacts')
   if (!fs.existsSync(artifactsDir)) return []
   const artifactKinds = new Map([
     ['.md', 'markdown'],
@@ -841,16 +942,38 @@ function listArtifacts(sessionId) {
     })
 }
 
-function materializeAgentMessageEvent(sessionId, event) {
+function artifactEmissionKey(artifact) {
+  return `${artifact.title || ''}|${artifact.updatedAt || ''}`
+}
+
+function startArtifactPolling(sessionId, sessionMode, res, shouldStop) {
+  const emitted = new Set(listArtifacts(sessionId, sessionMode).map(artifactEmissionKey))
+  return setInterval(() => {
+    if (shouldStop()) return
+    for (const artifact of listArtifacts(sessionId, sessionMode)) {
+      const key = artifactEmissionKey(artifact)
+      if (emitted.has(key)) continue
+      emitted.add(key)
+      sendSse(res, { type: 'artifact', artifact })
+    }
+  }, ARTIFACT_POLL_INTERVAL_MS)
+}
+
+function materializeAgentMessageEvent(sessionId, sessionMode, event) {
   if (!event || event.type !== 'agent_message' || !event.text) {
     return { event, artifacts: [] }
   }
   try {
     const result = materializeLocalArtifactReferences(event.text, {
       sessionId,
-      sessionDir: sessionDir(sessionId),
-      repoRoot: REPO_ROOT,
+      sessionDir: sessionDir(sessionId, sessionMode),
+      repoRoot: sessionDir(sessionId, sessionMode),
       env: process.env,
+      extraRoots: RAW_DATA_DIRS,
+      artifactUrlPrefix:
+        sessionMode === 'baseline'
+          ? `/api/base/sessions/${sessionId}/artifacts`
+          : `/api/sessions/${sessionId}/artifacts`,
     })
     return {
       event: { ...event, text: result.text },
@@ -864,9 +987,10 @@ function materializeAgentMessageEvent(sessionId, event) {
 
 async function handleChat(req, res, sessionId) {
   const body = await readBody(req)
+  const sessionMode = validateSessionMode(String(body.sessionMode || 'specialized'))
   const message = String(body.message || '').trim()
   const threadKey = validateThreadKey(String(body.threadKey || 'trace-analysis'))
-  const workspaceRole = validateWorkspaceRole(String(body.workspaceRole || 'human'))
+  const workspaceRole = validateWorkspaceRole(String(body.workspaceRole || 'human'), sessionMode)
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
   const includeCurrentViews = body.includeCurrentViews !== false
   if (!message && attachments.length === 0) {
@@ -874,26 +998,26 @@ async function handleChat(req, res, sessionId) {
     return
   }
 
-  const dir = sessionDir(sessionId)
+  const dir = sessionDir(sessionId, sessionMode)
   if (!fs.existsSync(dir)) {
     sendJson(res, 404, { error: 'session not found' })
     return
   }
 
-  const codex = new Codex()
-  const existing = getThreadEntry(sessionId, threadKey)
-  const options = buildThreadOptions()
+  const codex = new Codex(buildCodexClientOptions())
+  const existing = getThreadEntry(sessionId, threadKey, sessionMode)
+  const options = buildThreadOptions(dir)
   const isNewThread = !existing?.threadId
   const thread = isNewThread
     ? codex.startThread(options)
     : codex.resumeThread(existing.threadId, options)
-  const attachmentPaths = saveChatAttachments(sessionId, attachments)
+  const attachmentPaths = saveChatAttachments(sessionId, attachments, sessionMode)
   if (!message && attachments.length > 0 && attachmentPaths.length === 0) {
     sendJson(res, 400, { error: 'No supported image attachments were provided.' })
     return
   }
   const inputImagePaths = uniquePaths([
-    ...(includeCurrentViews ? currentViewImagePaths(sessionId, workspaceRole) : []),
+    ...(includeCurrentViews ? currentViewImagePaths(sessionId, workspaceRole, sessionMode) : []),
     ...attachmentPaths,
   ])
   const input = buildInput(
@@ -903,8 +1027,9 @@ async function handleChat(req, res, sessionId) {
     isNewThread,
     inputImagePaths,
     workspaceRole,
+    sessionMode,
   )
-  const turnKey = activeTurnKey(sessionId, threadKey)
+  const turnKey = activeTurnKey(sessionMode, sessionId, threadKey)
   if (activeTurns.has(turnKey)) {
     sendJson(res, 409, { error: 'A Codex turn is already running for this thread.' })
     return
@@ -913,6 +1038,7 @@ async function handleChat(req, res, sessionId) {
   const controller = new AbortController()
   activeTurns.set(turnKey, {
     controller,
+    sessionMode,
     sessionId,
     threadKey,
     startedAt: new Date().toISOString(),
@@ -946,11 +1072,20 @@ async function handleChat(req, res, sessionId) {
     category: 'session',
     title: 'Preparing Codex context',
     detail:
-      workspaceRole === 'agent'
-        ? 'Syncing shared trace files and attaching agent workspace screenshots.'
-        : 'Syncing shared trace files and attaching human workspace screenshots.',
+      sessionMode === 'baseline'
+        ? 'Syncing baseline trace files and attaching current human view screenshots.'
+        : workspaceRole === 'agent'
+          ? 'Syncing shared trace files and attaching agent workspace screenshots.'
+          : 'Syncing shared trace files and attaching human workspace screenshots.',
   })
   const progressHeartbeat = startProgressHeartbeat(
+    res,
+    () => streamClosed || controller.signal.aborted,
+    sessionMode,
+  )
+  const artifactPolling = startArtifactPolling(
+    sessionId,
+    sessionMode,
     res,
     () => streamClosed || controller.signal.aborted,
   )
@@ -961,7 +1096,7 @@ async function handleChat(req, res, sessionId) {
       if (controller.signal.aborted) break
       const normalized = normalizeEvent(event)
       if (normalized) {
-        const materialized = materializeAgentMessageEvent(sessionId, normalized)
+        const materialized = materializeAgentMessageEvent(sessionId, sessionMode, normalized)
         sendSse(res, materialized.event)
         for (const artifact of materialized.artifacts) {
           sendSse(res, { type: 'artifact', artifact })
@@ -971,9 +1106,9 @@ async function handleChat(req, res, sessionId) {
 
     const threadId = thread.id || existing?.threadId || ''
     if (threadId) {
-      setThreadEntry(sessionId, threadKey, threadId)
+      setThreadEntry(sessionId, threadKey, threadId, sessionMode)
     }
-    for (const artifact of listArtifacts(sessionId)) {
+    for (const artifact of listArtifacts(sessionId, sessionMode)) {
       sendSse(res, { type: 'artifact', artifact })
     }
     if (controller.signal.aborted) {
@@ -1007,6 +1142,7 @@ async function handleChat(req, res, sessionId) {
     }
   } finally {
     clearInterval(progressHeartbeat)
+    clearInterval(artifactPolling)
     const activeTurn = activeTurns.get(turnKey)
     if (activeTurn?.controller === controller) activeTurns.delete(turnKey)
     finishStream()
@@ -1015,10 +1151,11 @@ async function handleChat(req, res, sessionId) {
 
 async function handleStop(req, res, sessionId, threadKey) {
   validateThreadKey(threadKey)
-  sessionDir(sessionId)
-  await readBody(req).catch(() => ({}))
+  const body = await readBody(req).catch(() => ({}))
+  const sessionMode = validateSessionMode(String(body.sessionMode || 'specialized'))
+  sessionDir(sessionId, sessionMode)
 
-  const turnKey = activeTurnKey(sessionId, threadKey)
+  const turnKey = activeTurnKey(sessionMode, sessionId, threadKey)
   const activeTurn = activeTurns.get(turnKey)
   if (!activeTurn) {
     sendJson(res, 200, { sessionId, threadKey, stopped: false })
@@ -1159,9 +1296,16 @@ const server = http.createServer((req, res) => {
   sendJson(res, 404, { error: 'not found' })
 })
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Codex bridge listening on http://127.0.0.1:${PORT}`)
-})
+try {
+  const preflight = runStartupPreflight()
+  console.log(`Codex bridge preflight passed. uv cache: ${preflight.uvCacheDir}`)
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`Codex bridge listening on http://127.0.0.1:${PORT}`)
+  })
+} catch (error) {
+  console.error(error?.message || String(error))
+  process.exit(1)
+}
 
 async function shutdown() {
   await agentBrowser.close()

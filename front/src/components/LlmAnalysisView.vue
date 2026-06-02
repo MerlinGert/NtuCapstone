@@ -7,19 +7,35 @@
           Findings hierarchy under top-level hypotheses, with agent patch findings overlaid.
         </div>
       </div>
-      <button class="refresh-btn" :disabled="loading || !sessionId" @click="refreshAnalysis">
-        {{ loading ? 'Loading...' : 'Refresh' }}
-      </button>
+      <div class="toolbar-actions">
+        <button class="export-btn" :disabled="loading || !canExportAnalysis" @click="exportAnalysis">
+          Export JSON
+        </button>
+        <button
+          v-if="!isImportedMode"
+          class="refresh-btn"
+          :disabled="loading || !sessionId"
+          @click="refreshAnalysis"
+        >
+          {{ loading ? 'Loading...' : 'Refresh' }}
+        </button>
+        <span v-else class="imported-mode-badge">Imported JSON</span>
+      </div>
     </div>
     <div v-if="artifactSummary" class="artifact-summary">{{ artifactSummary }}</div>
+    <div v-if="validationWarnings.length" class="validation-warnings">
+      <div class="validation-warning-title">Graph warnings</div>
+      <ul>
+        <li v-for="warning in validationWarnings" :key="warning">{{ warning }}</li>
+      </ul>
+    </div>
 
     <div class="legend-block">
-      <div class="legend-row">
+      <div class="legend-row legend-row-single">
         <span class="legend-item legend-hypothesis">Hypothesis</span>
+        <span class="legend-item legend-derived-hypothesis">Derived Hypothesis</span>
         <span class="legend-item legend-user">User Finding</span>
         <span class="legend-item legend-patch">Agent Finding</span>
-      </div>
-      <div class="legend-row">
         <span class="legend-item relation-legend relation-supports">Supports</span>
         <span class="legend-item relation-legend relation-answers">Answers</span>
         <span class="legend-item relation-legend relation-refines">Refines</span>
@@ -80,7 +96,7 @@
                     v-for="finding in selectedNodeInternalFindings"
                     :key="finding.key"
                     class="detail-finding-card"
-                    :class="finding.relationClass"
+                    :class="[finding.sourceClass, finding.relationClass]"
                   >
                     <div class="detail-finding-header">
                       <span
@@ -149,9 +165,18 @@ export default {
       type: String,
       default: '',
     },
+    sessionMode: {
+      type: String,
+      default: 'specialized',
+      validator: (value) => ['specialized', 'baseline'].includes(value),
+    },
     active: {
       type: Boolean,
       default: true,
+    },
+    analysisPayload: {
+      type: Object,
+      default: null,
     },
   },
   data() {
@@ -160,7 +185,9 @@ export default {
       error: '',
       manifest: null,
       reasoningGraph: null,
+      augmentedReasoningGraph: null,
       graphPatches: [],
+      validationWarnings: [],
       displayTrees: [],
       selectedNode: null,
       loadStarted: false,
@@ -169,13 +196,23 @@ export default {
     }
   },
   computed: {
+    isImportedMode() {
+      return Boolean(this.analysisPayload)
+    },
+    sessionApiBase() {
+      return this.sessionMode === 'baseline' ? '/api/base/sessions' : '/api/sessions'
+    },
     hasAnalysis() {
       return this.forestTrees.length > 0
+    },
+    canExportAnalysis() {
+      return this.hasAnalysis || Boolean(this.reasoningGraph) || Boolean(this.augmentedReasoningGraph)
     },
     forestTrees() {
       return this.displayTrees
     },
     artifactSummary() {
+      if (this.analysisPayload?.artifactSummary) return this.analysisPayload.artifactSummary
       const current = this.manifest?.current || {}
       const graphName = current.reasoningGraph?.name || this.manifest?.reasoningGraph?.name
       const patches = Array.isArray(current.patches)
@@ -222,13 +259,20 @@ export default {
     },
     selectedNodeTypeLabel() {
       if (!this.selectedNode) return ''
+      if (this.selectedNode.type === 'Hypothesis' && this.selectedNode.source === 'patch') {
+        return 'Derived Hypothesis'
+      }
       if (this.selectedNode.type === 'Finding') {
         return this.selectedNode.source === 'patch' ? 'Agent Finding' : 'User Finding'
       }
       return this.selectedNode.type || 'Node'
     },
     selectedNodeTypeClass() {
-      if (!this.selectedNode || this.selectedNode.type !== 'Finding') return ''
+      if (!this.selectedNode) return ''
+      if (this.selectedNode.type === 'Hypothesis' && this.selectedNode.source === 'patch') {
+        return 'detail-type-derived-hypothesis'
+      }
+      if (this.selectedNode.type !== 'Finding') return ''
       return this.selectedNode.source === 'patch' ? 'detail-type-agent-finding' : 'detail-type-user-finding'
     },
     selectedNodeRelationLabel() {
@@ -257,13 +301,25 @@ export default {
     },
   },
   watch: {
+    analysisPayload: {
+      immediate: true,
+      handler(payload) {
+        if (payload) {
+          this.stopPolling()
+          this.applyImportedAnalysis(payload)
+        }
+      },
+    },
     sessionId: {
       immediate: true,
       handler() {
+        if (this.isImportedMode) return
         this.loadStarted = false
         this.manifest = null
         this.reasoningGraph = null
+        this.augmentedReasoningGraph = null
         this.graphPatches = []
+        this.validationWarnings = []
         this.displayTrees = []
         this.selectedNode = null
         this.lastManifestSignature = ''
@@ -273,6 +329,7 @@ export default {
     active: {
       immediate: true,
       handler(isActive) {
+        if (this.isImportedMode) return
         if (isActive) {
           this.startPolling()
           this.loadAnalysis({ force: true, silent: this.loadStarted })
@@ -285,7 +342,7 @@ export default {
   mounted() {
     window.addEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
     window.addEventListener('keydown', this.handleKeydown)
-    if (this.active) this.startPolling()
+    if (this.active && !this.isImportedMode) this.startPolling()
   },
   beforeUnmount() {
     this.stopPolling()
@@ -294,7 +351,7 @@ export default {
   },
   methods: {
     manifestUrl() {
-      return `/api/sessions/${this.sessionId}/analysis-artifacts`
+      return `${this.sessionApiBase}/${this.sessionId}/analysis-artifacts`
     },
     encodeRelativePath(path) {
       return String(path)
@@ -304,7 +361,7 @@ export default {
         .join('/')
     },
     artifactUrl(name) {
-      return `/api/sessions/${this.sessionId}/artifacts/${this.encodeRelativePath(name)}`
+      return `${this.sessionApiBase}/${this.sessionId}/artifacts/${this.encodeRelativePath(name)}`
     },
     cacheBustedUrl(url, token) {
       if (!token) return url
@@ -312,7 +369,7 @@ export default {
       return `${url}${separator}v=${encodeURIComponent(token)}`
     },
     imageUrl(name) {
-      return `/api/sessions/${this.sessionId}/images/${this.encodeRelativePath(name)}`
+      return `${this.sessionApiBase}/${this.sessionId}/images/${this.encodeRelativePath(name)}`
     },
     async fetchManifest() {
       const response = await fetch(this.manifestUrl(), { cache: 'no-store' })
@@ -347,9 +404,119 @@ export default {
       ].join('|')
     },
     async refreshAnalysis() {
+      if (this.isImportedMode) {
+        this.applyImportedAnalysis(this.analysisPayload)
+        return
+      }
       await this.loadAnalysis({ force: true })
     },
+    cloneJson(value) {
+      if (value == null) return value
+      try {
+        return JSON.parse(JSON.stringify(value))
+      } catch (error) {
+        return value
+      }
+    },
+    applyImportedAnalysis(payload) {
+      const snapshot = this.cloneJson(payload) || {}
+      const displayForest = Array.isArray(snapshot.displayForest)
+        ? snapshot.displayForest
+          .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
+          .filter(Boolean)
+        : []
+      const patchLayers = Array.isArray(snapshot.graphPatches)
+        ? snapshot.graphPatches
+          .map((layer) => {
+            if (!layer) return null
+            const name = layer.name || 'reasoning-graph-patch.json'
+            const patch = layer.patch || layer
+            if (!patch || typeof patch !== 'object') return null
+            return { name, patch }
+          })
+          .filter(Boolean)
+        : []
+      const currentArtifacts = snapshot.currentArtifacts || {}
+      this.loading = false
+      this.error = displayForest.length || snapshot.reasoningGraph || snapshot.augmentedReasoningGraph
+        ? ''
+        : 'Imported analysis JSON does not contain a displayable reasoning forest.'
+      this.manifest = {
+        current: currentArtifacts,
+        reasoningGraph: currentArtifacts.reasoningGraph || null,
+        patches: Array.isArray(currentArtifacts.patches) ? currentArtifacts.patches : [],
+      }
+      this.reasoningGraph = snapshot.reasoningGraph || null
+      this.augmentedReasoningGraph = snapshot.augmentedReasoningGraph || snapshot.reasoningGraph || null
+      this.graphPatches = patchLayers
+      this.validationWarnings = []
+      this.displayTrees = displayForest
+      this.selectedNode = null
+      this.lastManifestSignature = ''
+      this.loadStarted = true
+    },
+    exportAnalysis() {
+      if (!this.canExportAnalysis) return
+      const payload = {
+        exportVersion: 1,
+        exportFormat: 'maniscope-llm-analysis-json',
+        exportedAt: new Date().toISOString(),
+        sessionId: this.sessionId || this.analysisPayload?.sessionId || null,
+        artifactSummary: this.artifactSummary || null,
+        currentArtifacts: this.currentAnalysisArtifacts(),
+        reasoningGraph: this.reasoningGraph,
+        graphPatches: this.graphPatches.map((layer) => ({
+          name: layer.name,
+          patch: layer.patch,
+        })),
+        augmentedReasoningGraph: this.augmentedReasoningGraph,
+        displayForest: this.displayTrees,
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = this.buildAnalysisExportFileName()
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    },
+    currentAnalysisArtifacts() {
+      if (this.analysisPayload?.currentArtifacts) {
+        return this.cloneJson(this.analysisPayload.currentArtifacts)
+      }
+      const current = this.manifest?.current || {}
+      const graphInfo = current.reasoningGraph || this.manifest?.reasoningGraph || null
+      const patchInfos = Array.isArray(current.patches)
+        ? current.patches
+        : Array.isArray(this.manifest?.patches)
+          ? this.manifest.patches
+          : []
+      return {
+        reasoningGraph: graphInfo,
+        patches: patchInfos,
+      }
+    },
+    buildAnalysisExportFileName() {
+      const date = new Date()
+      const stamp = [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+      ].join('') + '-'
+        + [
+          String(date.getHours()).padStart(2, '0'),
+          String(date.getMinutes()).padStart(2, '0'),
+          String(date.getSeconds()).padStart(2, '0'),
+        ].join('')
+      const sessionPart = String(this.sessionId || this.analysisPayload?.sessionId || 'session')
+        .replace(/[^a-z0-9_-]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+      return `maniscope-llm-analysis-${sessionPart || 'session'}-${stamp}.json`
+    },
     async loadAnalysis(options = {}) {
+      if (this.isImportedMode) return
       if (!this.sessionId) {
         this.error = 'No active ManiScope session.'
         return
@@ -361,10 +528,12 @@ export default {
         this.error = ''
       }
       this.loadStarted = true
+      let previousSignature = this.lastManifestSignature
       try {
         const manifest = await this.fetchManifest()
         const signature = this.manifestSignature(manifest)
         if (!force && signature && signature === this.lastManifestSignature && this.reasoningGraph) return
+        previousSignature = this.lastManifestSignature
         this.manifest = manifest
         this.lastManifestSignature = signature
         const current = manifest?.current || {}
@@ -380,12 +549,14 @@ export default {
         ])
         if (!reasoningGraph) {
           this.reasoningGraph = null
+          this.augmentedReasoningGraph = null
           this.graphPatches = []
+          this.validationWarnings = []
           this.displayTrees = []
           return
         }
-        validateReasoningGraph(reasoningGraph, {
-          requireAnsweredQuestions: true,
+        const baseValidation = validateReasoningGraph(reasoningGraph, {
+          answeredQuestions: 'warn',
           fileName: graphInfo?.path || graphInfo?.name || 'reasoning-graph.json',
         })
         const patchLayers = orderPatchLayers(
@@ -397,22 +568,36 @@ export default {
             .filter(Boolean),
         )
         const augmentedGraph = applyReasoningPatches(reasoningGraph, patchLayers)
+        const augmentedValidation = validateReasoningGraph(augmentedGraph, {
+          answeredQuestions: 'warn',
+          fileName: 'augmented reasoning graph',
+        })
         this.reasoningGraph = reasoningGraph
+        this.augmentedReasoningGraph = augmentedGraph
         this.graphPatches = patchLayers
+        this.validationWarnings = Array.from(new Set([
+          ...baseValidation.warnings,
+          ...augmentedValidation.warnings,
+        ]))
         this.displayTrees = projectGraphToDisplayForest(augmentedGraph)
           .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
           .filter(Boolean)
       } catch (error) {
-        const message = error && error.message ? error.message : String(error)
-        this.displayTrees = []
-        if (!silent) this.error = message
-        else this.error = message
+        console.error('Failed to load LLM analysis artifacts:', error)
+        if (this.hasAnalysis) {
+          this.lastManifestSignature = previousSignature || this.lastManifestSignature
+        } else {
+          this.displayTrees = []
+          this.validationWarnings = []
+        }
+        this.error = ''
       } finally {
         if (!silent) this.loading = false
       }
     },
     startPolling() {
       this.stopPolling()
+      if (this.isImportedMode) return
       if (!this.sessionId) return
       this.pollTimer = window.setInterval(() => {
         this.loadAnalysis({ silent: true })
@@ -424,8 +609,10 @@ export default {
       this.pollTimer = null
     },
     handleArtifactUpdate(event) {
+      if (this.isImportedMode) return
       const detail = event?.detail || {}
       if (detail.sessionId && detail.sessionId !== this.sessionId) return
+      if (detail.sessionMode && detail.sessionMode !== this.sessionMode) return
       const name = detail.artifact?.title || detail.artifact?.name || ''
       if (!this.isAnalysisArtifactName(name)) return
       if (this.active) this.loadAnalysis({ force: true, silent: true })
@@ -520,6 +707,7 @@ export default {
                 key,
                 label: child.label,
                 relationLabel: this.relationLabel(child.displayRelation || child.relation),
+                sourceClass: child.source === 'patch' ? 'detail-finding-agent' : 'detail-finding-user',
                 relationClass: this.normalizedRelation(child.displayRelation || child.relation)
                   ? `relation-${this.normalizedRelation(child.displayRelation || child.relation)}`
                   : '',
@@ -708,7 +896,7 @@ export default {
       if (/^(https?:|data:|blob:)/i.test(path)) {
         return { url: path, label: this.basename(path) }
       }
-      if (path.startsWith('/api/sessions/')) {
+      if (path.startsWith('/api/sessions/') || path.startsWith('/api/base/sessions/')) {
         return { url: path, label: this.basename(path) }
       }
       if (/^(file:|[a-z]+:)/i.test(path)) return null
@@ -791,6 +979,26 @@ export default {
   margin-bottom: 8px;
 }
 
+.toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.imported-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  padding: 2px 8px;
+}
+
 .analysis-title {
   color: #334155;
   font-size: 13px;
@@ -810,7 +1018,29 @@ export default {
   margin: -2px 0 8px;
 }
 
+.validation-warnings {
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 10px;
+  line-height: 1.4;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+}
+
+.validation-warning-title {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.validation-warnings ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
 .refresh-btn,
+.export-btn,
 .detail-close {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
@@ -823,6 +1053,11 @@ export default {
 }
 
 .refresh-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.export-btn:disabled {
   cursor: default;
   opacity: 0.6;
 }
@@ -840,6 +1075,10 @@ export default {
   gap: 6px;
 }
 
+.legend-row-single {
+  align-items: center;
+}
+
 .legend-item {
   border-radius: 999px;
   border: 1px solid #d8e0ec;
@@ -854,16 +1093,22 @@ export default {
   color: #334155;
 }
 
+.legend-derived-hypothesis {
+  background: #fff0f7;
+  border-color: #f3b4d0;
+  color: #be185d;
+}
+
 .legend-user {
-  background: #ecfeef;
-  border-color: #9ae6b4;
-  color: #166534;
+  background: #edf4ff;
+  border-color: #b8cdf8;
+  color: #1d4ed8;
 }
 
 .legend-patch {
-  background: #fff7ed;
-  border-color: #fdba74;
-  color: #c2410c;
+  background: #fff0f7;
+  border-color: #f3b4d0;
+  color: #be185d;
 }
 
 .relation-legend {
@@ -978,20 +1223,27 @@ export default {
 }
 
 .detail-type {
-  background: #eef2ff;
-  color: #4338ca;
+  background: #d9e3ff;
+  color: #334155;
+  border: 1px solid #aabce8;
 }
 
 .detail-type-user-finding {
-  color: #166534;
-  background: #ecfdf3;
-  border: 1px solid #86efac;
+  color: #1d4ed8;
+  background: #edf4ff;
+  border: 1px solid #b8cdf8;
+}
+
+.detail-type-derived-hypothesis {
+  color: #be185d;
+  background: #fff0f7;
+  border: 1px solid #f3b4d0;
 }
 
 .detail-type-agent-finding {
-  color: #92400e;
-  background: #fffbeb;
-  border: 1px solid #fbbf24;
+  color: #be185d;
+  background: #fff0f7;
+  border: 1px solid #f3b4d0;
 }
 
 .detail-relation {
@@ -1081,14 +1333,14 @@ export default {
   background: #f8fafc;
 }
 
-.detail-finding-card.relation-contradicts {
-  background: #fff1f2;
-  border-color: #fb7185;
+.detail-finding-card.detail-finding-user {
+  background: #edf4ff;
+  border-color: #b8cdf8;
 }
 
-.detail-finding-card.relation-refines {
-  background: #fffbeb;
-  border-color: #fbbf24;
+.detail-finding-card.detail-finding-agent {
+  background: #fff0f7;
+  border-color: #f3b4d0;
 }
 
 .detail-finding-card.relation-answers {

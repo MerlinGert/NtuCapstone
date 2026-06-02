@@ -155,7 +155,8 @@ function isBrowserUrl(value) {
     normalized.startsWith('https://') ||
     normalized.startsWith('data:') ||
     normalized.startsWith('blob:') ||
-    normalized.startsWith('/api/sessions/')
+    normalized.startsWith('/api/sessions/') ||
+    normalized.startsWith('/api/base/sessions/')
   )
 }
 
@@ -237,7 +238,10 @@ function validJsonFile(filePath) {
   }
 }
 
-function artifactUrl(sessionId, artifactName) {
+function artifactUrl(sessionId, artifactName, artifactUrlPrefix = null) {
+  if (artifactUrlPrefix) {
+    return `${artifactUrlPrefix.replace(/\/+$/, '')}/${encodeURIComponent(artifactName)}`
+  }
   return `/api/sessions/${sessionId}/artifacts/${encodeURIComponent(artifactName)}`
 }
 
@@ -311,7 +315,7 @@ function makeMaterializer(options) {
       const artifact = artifactObject(sessionDir, artifactName)
       const result = {
         artifact,
-        url: artifactUrl(options.sessionId, artifactName),
+        url: artifactUrl(options.sessionId, artifactName, options.artifactUrlPrefix),
       }
       materializedByRealPath.set(realPath, result)
       artifactsByName.set(artifactName, artifact)

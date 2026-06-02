@@ -24,7 +24,7 @@ The dashboard fills the browser window. The current UI is arranged as three vert
 +------------------+------------------------------+------------------------------+
 ```
 
-The header contains the product name, the session chip, a workspace badge, the Codex Chat button, the ACT and PNUT radio buttons, and session import/export controls.
+The header contains the product name, the session chip, a workspace badge, the `Analysis Import` tag, the Codex Chat button, the ACT and PNUT radio buttons, and session import/export controls.
 
 The left column is the Control Panel. The middle column contains the Token Distribution view on top and a tabbed investigation panel on the bottom. The right column contains the K-line and manipulation-card view on top and Behavior Details on the bottom.
 
@@ -39,6 +39,20 @@ Each ManiScope browser page belongs to one workspace role.
 Both workspaces read the shared canonical trace stored in the session. The human page writes the canonical trace when you interact, annotate, import, reorder, or sync the session. The agent page refreshes that canonical trace in the background so it can see what the human has done, but agent-side selections, detector settings, zoom windows, selected users, and rendered evidence are saved separately. The Action Tree is read-only in the Agent Workspace.
 
 The backward-compatible `current-state.json` is the human current state. The human and agent workspaces also keep separate `workspaces/human/current-state.json` and `workspaces/agent/current-state.json` files. This means the agent can run different detector settings, inspect a different snapshot, select different users, or render evidence images without overwriting the human's visible analysis.
+
+## Baseline Sessions
+
+Baseline sessions are available for evaluating a general Codex assistant against the specialized ManiScope agent.
+
+- Visiting `/base` creates a fresh 5-character baseline session and redirects to `/base/{sessionId}`.
+- `/base/{sessionId}` restores that baseline session.
+- `/base/{sessionId}/agent` is not a separate workspace and redirects back to `/base/{sessionId}`.
+
+Baseline sessions use a separate storage root: `.maniscope-chat/baseline-sessions/{sessionId}`. They still record user actions, annotations, imports, screenshots, current state, chat history, and artifacts, but the chat prompt is intentionally general. The baseline agent can inspect raw data, trace files, screenshots, and current state, but it is not given the specialized reasoning-graph methodology, trace-analysis tools, skeptical-review skill, Agent Workspace, or arbitrary visualization-rendering helper.
+
+If the baseline agent needs current-view image files, the session includes `maniscope_baseline_views.py`. That helper only copies the latest synced screenshots for Token Distribution, K-line, and Behavior Details into `artifacts/`; it cannot change detector parameters, selected users, time windows, scale, granularity, or any other visualization state.
+
+Both specialized and baseline chat sessions are seeded with `pyproject.toml`, `package.json`, and `.gitignore` in the session root. These files let the agent run session-local Python, JavaScript, or TypeScript scripts with `uv` and `bun`, and add temporary analysis dependencies when needed. Durable outputs should still be saved under the session `artifacts/` folder.
 
 ## Control Panel
 
@@ -157,7 +171,11 @@ The floating Codex Chat sidebar lets you ask the agent to inspect the current se
 
 Chat history and generated artifacts are shared at the session level. The agent prompt distinguishes three kinds of context: the shared canonical trace, the human current state, and the agent's private exploratory state. Agent visual exploration should use the Agent Workspace and should not append to the human action trace unless you explicitly ask for durable artifacts or reasoning patches.
 
-Codex SDK network access is enabled by default for the chat agent so it can reach the local ManiScope services and fetch external references when an investigation needs them. For restricted offline runs, start the bridge with `CODEX_NETWORK_ACCESS=false`.
+In baseline sessions, Codex Chat uses `/api/base/chat/...` and stores files under `.maniscope-chat/baseline-sessions/{sessionId}`. The chat is labeled `Baseline`, the Agent Workspace shortcut, full-analysis shortcut, and right-panel LLM Analysis tab are hidden, and the prompt describes the price-manipulation task and available raw data without specialized trace-analysis instructions.
+
+Each chat session root contains project templates for ad hoc scripting: `pyproject.toml` for Python work with `uv`, and `package.json` for JavaScript or TypeScript work with `bun`. Agents can add dependencies inside that session when useful, while generated evidence and reports should be placed in `artifacts/`.
+
+Codex Chat agents run from the active session directory instead of the repository root. They can write only inside that session workspace, preferably in `artifacts/`, and receive ACT and PNUT raw-data folders as additional read-only-by-policy inputs. Python dependency work uses a repo-local uv package cache at `.maniscope-chat/shared-uv-cache`, which the bridge grants through Codex writable roots, so agents can use plain `uv` without setting `UV_CACHE_DIR` manually. Network access is enabled so agents can reach local ManiScope services and external references when an investigation needs them. When the bridge starts, it checks that `uv`, `codex`, and either `bun` or `npm` are installed.
 
 The Codex Chat panel is floating. Drag its header to move it, or drag the lower corners to resize it. The panel keeps its local position and size in the browser.
 
@@ -167,7 +185,7 @@ During an agent turn, Thinking and Agent Activity appear above the assistant res
 
 Assistant responses can include Markdown text, generated artifacts, JSON files, Markdown reports, and image previews. When the agent mentions a local image, Markdown, or JSON path in its response, ManiScope links it through the session artifact endpoint if the file is under the active session folder, the project folder, or another explicitly allowed artifact root. Valid images are copied into the session `artifacts/` folder for preview, while Markdown and JSON outputs are shown as downloadable artifact links. Generated files should normally be saved under the session `artifacts/` folder for chat evidence, or under a trace `analysis-results/` folder for durable trace-analysis artifacts.
 
-For visual follow-up work, each session also includes a managed Python helper named `maniscope_visualization.py`. The agent can import this file from the session folder to render Token Distribution, K-line, and Behavior Details images through an isolated Agent Workspace browser page. These renders save PNG evidence into the shared session `artifacts/` folder without changing the Human Workspace state.
+For visual follow-up work, each session also includes a managed Python helper named `maniscope_visualization.py`. The agent can import this file from the session folder to render Token Distribution, K-line, and Behavior Details images through an isolated Agent Workspace browser page. The bridge waits for the Agent Workspace visualization data to hydrate before extracting current render arguments, then saves PNG evidence into the shared session `artifacts/` folder without changing the Human Workspace state.
 
 For comprehensive trace analysis, sessions also include a managed skeptical-review skill. When available, the agent may spawn a focused subagent to look for negative evidence, false positives, benign alternatives, or model-parameter failures that weaken major hypotheses. The main agent verifies those candidate negative findings before adding `contradicts`, `refines`, or Reasoning Gap entries to analysis artifacts.
 
@@ -175,7 +193,7 @@ When an existing analysis is present and you continue using the interface, the a
 
 ## User Actions, Annotations, Action Tree, And LLM Analysis
 
-The bottom panel in the middle column is now part of the investigation workflow. It has four tabs: User Actions, Annotations, Action Tree, and LLM Analysis. The default active tab is Action Tree.
+The bottom panel in the middle column is now part of the investigation workflow. In specialized sessions, it has four tabs: User Actions, Annotations, Action Tree, and LLM Analysis. In baseline sessions, the LLM Analysis tab is hidden. The default active tab is Action Tree.
 
 ### User Actions
 
@@ -203,11 +221,11 @@ Clicking an annotation node opens its details. Clicking a high-level finding nod
 
 ### LLM Analysis
 
-The LLM Analysis tab displays trace-analysis artifacts generated by Codex. It asks the backend for the current analysis artifact manifest, then loads `reasoning-graph.json` and all available `reasoning-graph-patch*.json` files from the session `artifacts` folder. The tab validates the graph and patches, applies patches in deterministic order, and derives the displayed forest in the browser. Generated forest JSON or Markdown files are treated as optional exports rather than UI source data. The tab renders a compact findings hierarchy: top-level Hypotheses contain user Findings and agent-created patch Findings, while internal Tasks, Analytic Questions, Analytic Activities, and Interactions are hidden from the card view. Those hidden nodes remain in the source graph for traceability. Mid-level Findings that answer hidden Analytic Questions are still shown in the Finding hierarchy, and duplicated canonical Findings are collapsed so the same answer does not appear twice under one Hypothesis. Finding source is shown in the node badge: user Findings use a green `User Finding` badge, and agent-created patch Findings use an amber `Agent Finding` badge. Relation badges distinguish supporting evidence, direct answers, refinements, and contradictions. Cards with screenshot or render provenance show small thumbnails while expanded. Clicking a card opens its details, including the relation to its parent, evidence summaries, patch rationales, and larger evidence images when available.
+The LLM Analysis tab displays trace-analysis artifacts generated by Codex. It asks the backend for the current analysis artifact manifest, then loads `reasoning-graph.json` and all available `reasoning-graph-patch*.json` files from the session `artifacts` folder. The tab validates the graph and patches, applies patches in deterministic order, and derives the displayed forest in the browser. Generated forest JSON or Markdown files are treated as optional exports rather than UI source data. Unanswered Analytic Questions are shown as non-blocking graph warnings because the user trace may not contain an answer yet; central answerable warnings should be investigated by the agent and resolved through patch Findings. The tab renders a compact findings hierarchy: top-level Hypotheses contain user Findings and agent-created patch Findings, while internal Tasks, Analytic Questions, Analytic Activities, and Interactions are hidden from the card view. Those hidden nodes remain in the source graph for traceability. Mid-level Findings that answer hidden Analytic Questions are still shown in the Finding hierarchy, and duplicated canonical Findings are collapsed so the same answer does not appear twice under one Hypothesis. Finding source is shown in the node badge: user Findings use a blue `User Finding` badge, agent-created patch Findings use a pink `Agent Finding` badge, and patch-origin Hypotheses appear as pink `Derived Hypothesis` nodes. Relation badges distinguish supporting evidence, direct answers, refinements, and contradictions. Cards with screenshot or render provenance show small thumbnails while expanded. Clicking a card opens its details, including the relation to its parent, evidence summaries, patch rationales, and larger evidence images when available. The toolbar also includes an **Export JSON** button that downloads the current analysis package, including the loaded reasoning graph, ordered patch list, augmented graph, and the currently displayed forest for downstream review or offline analysis. The `Analysis Import` tag next to the Human Workspace badge opens a separate page where you can load one of those exported JSON files and restore the LLM Analysis view in the same right-panel style for standalone review.
 
 `current-reasoning-graph.json` is a derived reading aid for agents and debugging. The LLM Analysis tab still uses `reasoning-graph.json` plus patch files as its source of truth.
 
-The tab refreshes when it is opened, when you click Refresh, when Codex announces a new relevant artifact, and through a lightweight periodic check while the tab is active. The backend does not keep a long-running file watcher; it scans session artifacts on request and reports the latest recognized files. Manifest and artifact JSON requests bypass browser cache so regenerated analysis files appear without stale results.
+The tab refreshes when it is opened, when you click Refresh, when Codex announces a new relevant artifact, and through a lightweight periodic check while the tab is active. During an active Codex Chat turn, the bridge scans the session artifacts about twice per second and announces newly written or updated artifacts, so a valid `reasoning-graph.json` can appear as cards before later patch files are finished. The backend does not keep a long-running file watcher; it scans session artifacts on request and reports the latest recognized files. Manifest and artifact JSON requests bypass browser cache so regenerated analysis files appear without stale results.
 
 ## Snapshot Annotation Workflow
 

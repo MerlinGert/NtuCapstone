@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { saveRenderResult, viewConfigForKey } from './agent-browser.mjs'
+import { AgentBrowserManager, saveRenderResult, viewConfigForKey } from './agent-browser.mjs'
 
 const SESSION_ID = 'abcde'
 const PNG_DATA_URL = `data:image/png;base64,${Buffer.from([
@@ -14,6 +14,26 @@ function makeSessionDir() {
   const sessionDir = fs.mkdtempSync(path.join(os.tmpdir(), 'maniscope-agent-browser-'))
   fs.mkdirSync(path.join(sessionDir, 'artifacts'), { recursive: true })
   return sessionDir
+}
+
+class FakeAgentBrowserManager extends AgentBrowserManager {
+  constructor(api) {
+    super()
+    this.api = api
+  }
+
+  async ensurePage() {
+    return {
+      evaluate: async (fn, payload) => {
+        globalThis.window = { maniScopeMajorViewApi: this.api }
+        try {
+          return await fn(payload)
+        } finally {
+          delete globalThis.window
+        }
+      },
+    }
+  }
 }
 
 test('resolves known view endpoint keys', () => {
@@ -91,4 +111,25 @@ test('rejects non-png render outputs and artifact extensions', () => {
       }),
     /must use the .png extension/,
   )
+})
+
+test('waits for major view readiness before extracting current args', async () => {
+  const calls = []
+  const manager = new FakeAgentBrowserManager({
+    ensureReady: async (viewName, options) => {
+      calls.push({ type: 'ensureReady', viewName, options })
+    },
+    getRenderArgs: (viewName, options) => {
+      calls.push({ type: 'getRenderArgs', viewName, options })
+      return { currentCoin: 'ACT' }
+    },
+  })
+
+  const args = await manager.getCurrentArgs(SESSION_ID, 'kline', { width: 1200 })
+
+  assert.deepEqual(args, { currentCoin: 'ACT' })
+  assert.deepEqual(calls, [
+    { type: 'ensureReady', viewName: 'kline_chart', options: { width: 1200 } },
+    { type: 'getRenderArgs', viewName: 'kline_chart', options: { width: 1200 } },
+  ])
 })
