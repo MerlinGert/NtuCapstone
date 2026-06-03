@@ -171,7 +171,7 @@ The floating Codex Chat sidebar lets you ask the agent to inspect the current se
 
 Chat history and generated artifacts are shared at the session level. The agent prompt distinguishes three kinds of context: the shared canonical trace, the human current state, and the agent's private exploratory state. Agent visual exploration should use the Agent Workspace and should not append to the human action trace unless you explicitly ask for durable artifacts or reasoning patches.
 
-In baseline sessions, Codex Chat uses `/api/base/chat/...` and stores files under `.maniscope-chat/baseline-sessions/{sessionId}`. The chat is labeled `Baseline`, the Agent Workspace shortcut, full-analysis shortcut, and right-panel LLM Analysis tab are hidden, and the prompt describes the price-manipulation task and available raw data without specialized trace-analysis instructions.
+In baseline sessions, Codex Chat uses `/api/base/chat/...` and stores files under `.maniscope-chat/baseline-sessions/{sessionId}`. The chat is labeled `Baseline`, the Agent Workspace shortcut, analysis shortcut buttons, and right-panel LLM Analysis tab are hidden, and the prompt describes the price-manipulation task and available raw data without specialized trace-analysis instructions.
 
 Each chat session root contains project templates for ad hoc scripting: `pyproject.toml` for Python work with `uv`, and `package.json` for JavaScript or TypeScript work with `bun`. Agents can add dependencies inside that session when useful, while generated evidence and reports should be placed in `artifacts/`.
 
@@ -180,6 +180,8 @@ Codex Chat agents run from the active session directory instead of the repositor
 The Codex Chat panel is floating. Drag its header to move it, or drag the lower corners to resize it. The panel keeps its local position and size in the browser.
 
 The **Run Full Analysis** button above the message box sends a preset request: `please run a pass of full trace analysis with a subagent for finding counter-evidence.` This is a shortcut for starting a comprehensive trace-analysis pass without manually typing the prompt.
+
+The **Update Analysis** button appears next to **Run Full Analysis** after `reasoning-graph.json` is available in LLM Analysis. It sends the incremental-analysis prompt, asking Codex to compare the latest graph or patch anchor with the current live trace, analyze only new interactions and annotations, write a `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json` file when new evidence exists, validate the graph plus patches, and report both a technical audit and a plain-English summary.
 
 During an agent turn, Thinking and Agent Activity appear above the assistant response. Agent Activity starts collapsed by default, with the latest activity visible as a compact status card. You can expand it to inspect the full activity stream. When the turn completes, these sections collapse again.
 

@@ -171,7 +171,7 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 聊天历史和生成的 artifacts 在会话层级共享。智能体提示词会区分三类上下文：共享的 canonical trace、人的当前状态，以及智能体私有的探索状态。智能体的可视探索应使用 Agent Workspace，并且不应追加到人的动作 trace，除非你明确要求生成持久 artifacts 或 reasoning patches。
 
-在 baseline 会话中，Codex Chat 使用 `/api/base/chat/...`，文件存储在 `.maniscope-chat/baseline-sessions/{sessionId}`。聊天面板会标记为 `Baseline`，Agent Workspace 入口、完整分析快捷按钮和右侧面板的 LLM Analysis 标签页都会隐藏，提示词只描述价格操纵分析任务和可用原始数据，不包含专门的 trace-analysis 指令。
+在 baseline 会话中，Codex Chat 使用 `/api/base/chat/...`，文件存储在 `.maniscope-chat/baseline-sessions/{sessionId}`。聊天面板会标记为 `Baseline`，Agent Workspace 入口、分析快捷按钮和右侧面板的 LLM Analysis 标签页都会隐藏，提示词只描述价格操纵分析任务和可用原始数据，不包含专门的 trace-analysis 指令。
 
 每个聊天会话根目录都包含用于临时脚本的项目模板：`pyproject.toml` 用于通过 `uv` 运行 Python，`package.json` 用于通过 `bun` 运行 JavaScript 或 TypeScript。智能体可以在该会话内添加依赖；生成的证据、报告和导出文件应放在 `artifacts/`。
 
@@ -180,6 +180,8 @@ Codex Chat 智能体会从当前会话目录运行，而不是从仓库根目录
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
 
 消息输入框上方的 **Run Full Analysis** 按钮会发送一个预设请求：`please run a pass of full trace analysis with a subagent for finding counter-evidence.` 这是启动完整 trace 分析流程的快捷方式，不需要手动输入这段 prompt。
+
+当 LLM Analysis 中已经有 `reasoning-graph.json` 后，**Update Analysis** 按钮会显示在 **Run Full Analysis** 右侧。它会发送增量分析 prompt，要求 Codex 对比最新 graph 或 patch anchor 与当前 live trace，只分析新增的交互和标注，在有新证据时写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`，验证 graph 与 patch，并同时给出技术审计和面向人的英文解释摘要。
 
 在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。Agent Activity 默认折叠，只保留最新一条活动作为紧凑状态卡可见；你可以展开查看完整活动流。回合完成后，这些区域会再次折叠。
 

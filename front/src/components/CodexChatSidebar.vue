@@ -142,16 +142,26 @@
     <div v-if="dragging" class="codex-chat-drop-hint">Drop images to attach</div>
 
     <div class="codex-chat-input-area">
-      <button
-        v-if="sessionMode !== 'baseline'"
-        class="codex-chat-preset-btn"
-        type="button"
-        title="Run full trace analysis with counter-evidence search"
-        :disabled="sending"
-        @click="sendFullAnalysisPrompt"
-      >
-        Run Full Analysis
-      </button>
+      <div v-if="sessionMode !== 'baseline'" class="codex-chat-preset-row">
+        <button
+          class="codex-chat-preset-btn"
+          type="button"
+          title="Run full trace analysis with counter-evidence search"
+          :disabled="sending"
+          @click="sendFullAnalysisPrompt"
+        >
+          Run Full Analysis
+        </button>
+        <button
+          class="codex-chat-preset-btn codex-chat-update-btn"
+          type="button"
+          :title="analysisGraphAvailable ? 'Run incremental analysis against the current graph' : 'Available after reasoning-graph.json is present in LLM Analysis'"
+          :disabled="sending || !analysisGraphAvailable"
+          @click="sendUpdateAnalysisPrompt"
+        >
+          Update Analysis
+        </button>
+      </div>
       <textarea
         ref="inputEl"
         v-model="draft"
@@ -228,6 +238,62 @@ import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 
 const FULL_ANALYSIS_PROMPT = 'please run a pass of full trace analysis with a subagent for finding counter-evidence.'
+const UPDATE_ANALYSIS_PROMPT = `Please run an incremental trace analysis pass for the current session.
+
+Do not redo the full trace analysis unless incremental analysis is unsafe. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest. Compare the latest graph or patch trace anchor against the current live trace anchor.
+
+If reasoning-graph-patch*.json files already exist, first run:
+
+bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts
+
+Read current-reasoning-graph.json as the complete patched context, but do not treat it as the source of truth.
+
+Analyze only the new user Interactions and annotations after the latest applied anchor. Use the existing materialized graph as context. Do not rewrite reasoning-graph.json unless checkpointing is required.
+
+Write any new evidence as:
+
+reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json
+
+The patch must include patchType: "incremental", baseAnchor, targetAnchor, and precise provenance for the new trace range. Add new Findings, Hypotheses, Interactions, and edges only when they are supported by the new trace delta or by follow-up checks triggered by that delta.
+
+Use update_node only to refine metadata on existing nodes. Use add_node/add_edge for new evidence and relationships. Agent-created nodes must include explanation, evidenceSummary, reasoningRole, and patchRationale.
+
+If the new trace delta adds no material evidence, report that no patch was produced and explain exactly what delta you checked.
+
+After writing the patch, run:
+
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
+
+Fix validation errors before reporting completion. If the validator recommends checkpointing because active patch count reaches 8, run checkpoint unless I explicitly ask to preserve the patch stack.
+
+Final response format:
+
+# Technical Audit
+
+Report the operational details here:
+- previous anchor,
+- new trace anchor,
+- analyzed action and annotation range,
+- patch file written,
+- supporting evidence files,
+- validation result,
+- checkpoint status,
+- unresolved warnings.
+
+Keep this section concise and factual.
+
+# Plain-English Summary
+
+Explain the analytical meaning for the human analyst:
+- what new user behavior was analyzed,
+- what the user seemed to be checking,
+- what new evidence was found,
+- which Hypotheses were strengthened, weakened, or refined,
+- whether a new Hypothesis was created or not,
+- what caveats matter,
+- what the analyst should pay attention to next.
+
+Do not lead this section with revision numbers, digests, patch filenames, node IDs, or validation counts. Use human-readable names for Hypotheses and Findings.`
 const markdown = new MarkdownIt({
   breaks: true,
   linkify: true,
@@ -289,6 +355,7 @@ export default {
       panelHeight: 640,
       panelDragState: null,
       panelResizeState: null,
+      analysisGraphAvailable: false,
     }
   },
   computed: {
@@ -328,11 +395,14 @@ export default {
   mounted() {
     this.restorePanelLayout()
     window.addEventListener('resize', this.clampPanelToViewport)
+    window.addEventListener('maniscope-session-artifact-updated', this.handleSessionArtifactUpdated)
+    this.refreshAnalysisAvailability()
   },
   beforeUnmount() {
     this.attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
     this.detachPanelPointerListeners()
     window.removeEventListener('resize', this.clampPanelToViewport)
+    window.removeEventListener('maniscope-session-artifact-updated', this.handleSessionArtifactUpdated)
   },
   watch: {
     sessionId: {
@@ -343,12 +413,18 @@ export default {
         } else {
           this.messages = []
           this.historyLoadedForSession = ''
+          this.analysisGraphAvailable = false
         }
+        this.refreshAnalysisAvailability()
       },
     },
     sessionMode() {
       this.historyLoadedForSession = ''
       if (this.sessionId) this.loadChatHistory(this.sessionId)
+      this.refreshAnalysisAvailability()
+    },
+    open(isOpen) {
+      if (isOpen) this.refreshAnalysisAvailability()
     },
   },
   methods: {
@@ -658,6 +734,36 @@ export default {
       if (!this.sessionId || !artifact?.title) return '#'
       return `${this.sessionApiBase}/${this.sessionId}/artifacts/${encodeURIComponent(artifact.title)}`
     },
+    hasReasoningGraphArtifact(manifest) {
+      const current = manifest?.current || {}
+      return Boolean(current.reasoningGraph || manifest?.reasoningGraph)
+    },
+    async refreshAnalysisAvailability() {
+      if (!this.sessionId || this.sessionMode === 'baseline') {
+        this.analysisGraphAvailable = false
+        return
+      }
+      try {
+        const response = await fetch(`${this.sessionApiBase}/${this.sessionId}/analysis-artifacts`)
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const manifest = await response.json()
+        this.analysisGraphAvailable = this.hasReasoningGraphArtifact(manifest)
+      } catch (error) {
+        console.warn('CodexChatSidebar: failed to refresh analysis availability', error)
+        this.analysisGraphAvailable = false
+      }
+    },
+    handleSessionArtifactUpdated(event) {
+      const detail = event?.detail || {}
+      if (detail.sessionId && detail.sessionId !== this.sessionId) return
+      if (detail.sessionMode && detail.sessionMode !== this.sessionMode) return
+      const artifactName = detail.artifact?.title || detail.artifact?.name || ''
+      if (artifactName === 'reasoning-graph.json') {
+        this.analysisGraphAvailable = true
+      } else if (/^reasoning-graph-patch(?:-.+)?\.json$/.test(artifactName)) {
+        this.refreshAnalysisAvailability()
+      }
+    },
     notifySessionArtifactUpdated(artifact) {
       window.dispatchEvent(new CustomEvent('maniscope-session-artifact-updated', {
         detail: {
@@ -921,6 +1027,14 @@ export default {
     async sendFullAnalysisPrompt() {
       await this.sendMessage({
         contentOverride: FULL_ANALYSIS_PROMPT,
+        includeAttachments: false,
+        clearDraft: false,
+      })
+    },
+    async sendUpdateAnalysisPrompt() {
+      if (!this.analysisGraphAvailable) return
+      await this.sendMessage({
+        contentOverride: UPDATE_ANALYSIS_PROMPT,
         includeAttachments: false,
         clearDraft: false,
       })
@@ -1541,11 +1655,17 @@ export default {
   flex-shrink: 0;
 }
 
+.codex-chat-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .codex-chat-preset-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
   border: 1px solid #bfdbfe;
   border-radius: 6px;
   background: #eff6ff;
@@ -1557,8 +1677,18 @@ export default {
   padding: 5px 10px;
 }
 
+.codex-chat-update-btn {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
 .codex-chat-preset-btn:hover {
   background: #dbeafe;
+}
+
+.codex-chat-update-btn:hover {
+  background: #ede9fe;
 }
 
 .codex-chat-preset-btn:disabled {
