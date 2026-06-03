@@ -40,7 +40,7 @@ test('adds only raw data directories as additional directories', () => {
   assert.deepEqual(buildThreadOptions('/tmp/session').additionalDirectories, rawDataDirectories())
 })
 
-test('builds Codex client options with repo-local uv cache writable root', () => {
+test('builds Codex client options with fast service tier and repo-local uv cache writable root', () => {
   const repoRoot = '/tmp/maniscope'
   const options = buildCodexClientOptions({
     env: { PATH: '/bin', UV_CACHE_DIR: '/old/cache' },
@@ -50,6 +50,7 @@ test('builds Codex client options with repo-local uv cache writable root', () =>
 
   assert.equal(options.env.PATH, '/bin')
   assert.equal(options.env.UV_CACHE_DIR, uvCacheDir)
+  assert.equal(options.config.service_tier, 'fast')
   assert.deepEqual(options.config.sandbox_workspace_write.writable_roots, [uvCacheDir])
   assert.equal(options.config.sandbox_workspace_write.network_access, true)
 })
