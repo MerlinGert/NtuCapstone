@@ -12,7 +12,7 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 
 ```
 +---------------------------------------------------------------------------------------------+
-| ManiScope | Session | Human Workspace | Codex Chat | Coin: ACT PNUT | Export Import |
+| ManiScope | Session | Human Workspace | Analysis Import | Codex Chat | Coin: ACT PNUT | Study Info Export Import |
 +------------------+------------------------------+------------------------------+
 | Control Panel    | Token Distribution           | ACT or PNUT K-Line           |
 |                  |                              | round-trip cards             |
@@ -24,7 +24,7 @@ ManiScope 更适合作为调查员的分析工作台，而不是实时监控系�
 +------------------+------------------------------+------------------------------+
 ```
 
-标题栏包含产品名、会话标记、工作区标记、`Analysis Import` 标签、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及会话导入导出控件。
+标题栏包含产品名、会话标记、工作区标记、`Analysis Import` 标签、Codex Chat 按钮、ACT 和 PNUT 单选按钮，以及 `Study Info` / `Export` / `Import` 控件。
 
 左列是 Control Panel。中列上方是 Token Distribution 视图，下方是带标签页的调查面板。右列上方是 K 线和操纵卡片视图，下方是 Behavior Details。
 
@@ -250,12 +250,21 @@ Token 快照可以选择持有者节点并显示选中节点细节。Behavior �
 
 ## 导出会话
 
-标题栏中的 Export 按钮会打开 Export Session 对话框。对话框显示当前动作数量和标注数量，并提供 **Include snapshot images (PNG)** 复选框。
+标题栏中的 `Study Info` 按钮会打开实验元数据对话框，可填写 `Participant ID`、`Session Order` 和附加说明；condition 会根据当前工作区自动显示为 `baseline` 或 `full ManiScope`，dataset 会跟随当前 ACT / PNUT 选择。
 
-- 启用该复选框时，导出的 zip 会把动作缩略图和标注草图保存为 `images/` 目录下的 PNG 文件。JSON 中会保存类似 `images/action-0001-target-kline-chart-01.png` 的路径，而不是内联图片字符串。
-- 禁用该复选框时，导出的 zip 仍然包含 JSON 文件，但会移除截图和草图图片内容。
+标题栏中的 Export 按钮会打开 `Export Study Package` 对话框。对话框显示当前动作数量、标注数量和 chat turn 数量，并提供 **Include snapshot images (PNG)** 复选框。
 
-点击 **Download ZIP** 会保存一个类似 `maniscope-session-ACT-YYYYMMDD-HHMMSS.zip` 的文件。压缩包内的 `session.json` 包含动作和标注元数据；当启用图片导出时，`images/` 目录包含导出的 PNG 文件。当前 Import 按钮处于禁用状态，因此导出文件主要用于外部审阅或后续开发工作流。
+- 启用该复选框时，导出的 zip 会尽可能保存完整实验材料，包括动作缩略图、标注草图、导出时的当前三大视图截图、聊天附图，以及可访问的聊天响应图片 artifact。JSON 中会保存类似 `images/action-0001-target-kline-chart-01.png` 的路径，而不是内联图片字符串。
+- 对于 specialized 会话，导出的 zip 还会包含一份 `llmAnalysis` 快照：其中有原始 reasoning graph、patch graph、最后用于展示的 hypothesis / findings 层级，以及这些分析节点引用到的图片证据。
+- zip 还会记录 `llmAnalysisTrace`：包括 user reasoning graph 首次返回 / 更新的时间，以及后续 findings patch 回来的时间；这些事件也会进入 `derivedTables.llmAnalysisTrace`，便于做 reasoning trace 分析。
+- 禁用该复选框时，导出的 zip 仍然包含完整的结构化实验日志与元数据，但会移除嵌入图片内容。
+- `session.json` 现在除了原始 `userActionSequence` 与 `annotationRecords` 外，还会包含 `studyInfo`、`analysisMilestones`、`chatbotLogs`、`llmAnalysisTrace`、导出时 `currentState`，以及便于后续统计分析的 `derivedTables.interactionTrace`、`derivedTables.userNotes`、`derivedTables.chatbotLogs`、`derivedTables.llmAnalysisTrace`。
+
+点击 **Download ZIP** 会保存一个类似 `maniscope-session-ACT-YYYYMMDD-HHMMSS.zip` 的文件。压缩包内的 `session.json` 适合直接做用户实验后续分析，`images/` 目录则保存与之对应的证据图片。
+
+标题栏中的 **Study Import** 会打开一个独立的新页面，用于导入 study-package zip 并只读恢复完整查看界面。这个页面不会覆盖你当前正在分析的 live session。导入后既可以查看恢复后的主工作区，也可以查看导出元数据、当前视图截图、analysis milestones、chat logs，以及 zip 中保存的 LLM Analysis 内容。
+
+导入页中的 **Trace Timeline** 标签会把用户交互事件、LLM 请求到响应的时间窗口、assistant activity / reasoning 事件，以及 LLM Analysis 中 reasoning graph / findings patch 的返回时间并置到同一条时间轴上，方便观察 traces 的时序模式。如果归档里没有 activity 的原始时间戳，页面会在该轮请求-响应窗口内估算它们的位置，并明确标注为 estimated。
 
 ## Coin Selector
 

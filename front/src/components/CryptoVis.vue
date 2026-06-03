@@ -5,18 +5,30 @@
         <div style="display:flex; align-items:center; gap:10px; padding-left:20px;">
           <span>ManiScope</span>
           <button
-            v-if="maniscopeSessionId"
+            v-if="maniscopeSessionId && !isImportedWorkspace"
             class="session-chip"
             @click="copySessionLink"
             :title="`Copy session link ${maniscopeSessionId}`"
           >
             Session {{ maniscopeSessionId }}
           </button>
+          <span v-else-if="importedSessionId" class="session-chip imported-session-chip">
+            Imported {{ importedSessionId }}
+          </span>
           <span class="workspace-badge" :class="workspaceBadgeClass">
             {{ workspaceLabel }}
           </span>
           <button
-            v-if="isHumanWorkspace"
+            v-if="isHumanWorkspace && !isImportedWorkspace"
+            class="workspace-link-tag"
+            type="button"
+            title="Open imported study package page"
+            @click="openImportedStudyPage"
+          >
+            Study Import
+          </button>
+          <button
+            v-if="isHumanWorkspace && !isImportedWorkspace"
             class="workspace-link-tag"
             type="button"
             title="Open imported LLM analysis page"
@@ -25,8 +37,9 @@
             Analysis Import
           </button>
           <button
+            v-if="!isImportedWorkspace"
             class="ai-chat-btn"
-            @click="chatBoxOpen = !chatBoxOpen"
+            @click="toggleChatBox"
             :class="{ active: chatBoxOpen }"
             title="AI Assistant"
           >🤖</button>
@@ -35,14 +48,17 @@
           <span style="color: #4a5568;">Coin:</span>
           <div style="display: flex; gap: 5px;">
             <label style="cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <input type="radio" v-model="currentCoin" value="ACT" @change="handleCoinChange" /> ACT
+              <input type="radio" v-model="currentCoin" value="ACT" :disabled="isImportedWorkspace" @change="handleCoinChange" /> ACT
             </label>
             <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 10px;">
-              <input type="radio" v-model="currentCoin" value="PNUT" @change="handleCoinChange" /> PNUT
+              <input type="radio" v-model="currentCoin" value="PNUT" :disabled="isImportedWorkspace" @change="handleCoinChange" /> PNUT
             </label>
           </div>
           <!-- ezio: export/import session buttons -->
-          <div v-if="isHumanWorkspace" style="display: flex; gap: 6px; margin-left: 16px; border-left: 1px solid #e2e8f0; padding-left: 16px;">
+          <div v-if="isHumanWorkspace && !isImportedWorkspace" style="display: flex; gap: 6px; margin-left: 16px; border-left: 1px solid #e2e8f0; padding-left: 16px;">
+            <button class="session-io-btn" @click="showStudyInfoDialog = true" title="Edit participant and study metadata">
+              Study Info
+            </button>
             <button class="session-io-btn" @click="onClickExport" title="Export Actions & Annotations as JSON">
               Export
             </button>
@@ -177,13 +193,15 @@
     
     <div style="flex: 4; min-width:0; display: flex; flex-direction: column; height: 100%; overflow: hidden; margin-left: 5px;">
         <NotesPanel 
+            ref="notesPanel"
             :session-id="maniscopeSessionId"
             :session-mode="sessionMode"
             :actions="userActionSequence"
             :annotations="annotationRecords"
-            :read-only="isAgentWorkspace"
+            :read-only="isAgentWorkspace || isImportedWorkspace"
             :snapshot-categories="snapshotCategories"
             :snapshot-quality="snapshotQuality"
+            :analysis-payload="importedLlmAnalysis"
             @add-finding-annotation="handleAddFindingAnnotation"
             @delete-annotation="handleDeleteAnnotation"
             @delete-action="handleDeleteAction"
@@ -192,6 +210,9 @@
             @reorder-action="handleReorderAction"
             @toggle-category="onSnapshotCategoryToggle"
             @change-quality="onSnapshotQualityChange"
+            @tab-change="handleNotesPanelTabChange"
+            @log-action="handleNotesPanelLogAction"
+            @analysis-trace="handleLlmAnalysisTrace"
         />
     </div>
       <!-- </n-layout> -->
@@ -200,6 +221,7 @@
 </n-layout-content>
 
 <CodexChatSidebar
+  v-if="!isImportedWorkspace"
   :open="chatBoxOpen"
   :session-id="maniscopeSessionId"
   :session-mode="sessionMode"
@@ -207,20 +229,24 @@
   :sync-in-flight="liveTraceSyncInFlight"
   :last-sync-at="lastLiveTraceSyncAt"
   :before-send="syncTraceForChat"
-  @close="chatBoxOpen = false"
+  @send="handleChatSend"
+  @assistant-finished="handleAssistantFinished"
+  @assistant-interaction="handleAssistantInteraction"
+  @close="handleChatClose"
 />
 
 <!-- ezio: export dialog -->
 <div v-if="showExportDialog" class="session-io-overlay" @click.self="showExportDialog = false">
   <div class="session-io-dialog">
     <div class="session-io-dialog-header">
-      <h3>Export Session</h3>
+      <h3>Export Study Package</h3>
       <button class="session-io-close" @click="showExportDialog = false">×</button>
     </div>
     <div class="session-io-dialog-body">
       <div class="session-io-stats">
         <div><strong>{{ userActionSequence.length }}</strong> actions</div>
         <div><strong>{{ annotationRecords.length }}</strong> annotations</div>
+        <div><strong>{{ chatbotLogs.length }}</strong> chat turns</div>
       </div>
       <label class="session-io-checkbox">
         <input type="checkbox" v-model="exportIncludeSnapshots" />
@@ -228,13 +254,55 @@
       </label>
       <div class="session-io-hint">
         {{ exportIncludeSnapshots
-          ? 'Zip will include all screenshot / sketch images as PNG files.'
-          : 'Zip will contain metadata only. Sketches and view snapshots will be stripped.' }}
+          ? 'Zip will include screenshots, note images, current view captures, chat attachments, and linked response artifacts when available.'
+          : 'Zip will contain structured experiment logs and metadata only. Embedded images will be stripped.' }}
       </div>
     </div>
     <div class="session-io-dialog-footer">
       <button class="session-io-btn ghost" @click="showExportDialog = false">Cancel</button>
       <button class="session-io-btn primary" @click="confirmExport">Download ZIP</button>
+    </div>
+  </div>
+</div>
+
+<div v-if="showStudyInfoDialog" class="session-io-overlay" @click.self="showStudyInfoDialog = false">
+  <div class="session-io-dialog">
+    <div class="session-io-dialog-header">
+      <h3>Study Info</h3>
+      <button class="session-io-close" @click="showStudyInfoDialog = false">×</button>
+    </div>
+    <div class="session-io-dialog-body">
+      <div class="session-io-form-grid">
+        <label class="session-io-field">
+          <span>Participant ID</span>
+          <input v-model="studyInfo.participantId" class="session-io-input" placeholder="e.g. P07" />
+        </label>
+        <label class="session-io-field">
+          <span>Session Order</span>
+          <input v-model="studyInfo.sessionOrder" class="session-io-input" placeholder="e.g. 1" />
+        </label>
+        <label class="session-io-field">
+          <span>Condition</span>
+          <input :value="studyConditionLabel" class="session-io-input" disabled />
+        </label>
+        <label class="session-io-field">
+          <span>Dataset</span>
+          <input :value="currentCoin" class="session-io-input" disabled />
+        </label>
+      </div>
+      <label class="session-io-field" style="margin-top: 12px;">
+        <span>Study Notes</span>
+        <textarea
+          v-model="studyInfo.studyNotes"
+          class="session-io-input session-io-textarea"
+          rows="3"
+          placeholder="Optional experiment notes or condition annotations..."
+        ></textarea>
+      </label>
+    </div>
+    <div class="session-io-dialog-footer">
+      <button class="session-io-btn ghost" @click="showStudyInfoDialog = false">Close</button>
+      <button class="session-io-btn primary" @click="saveStudyInfo">Save</button>
     </div>
   </div>
 </div>
@@ -326,6 +394,14 @@ export default {
       type: String,
       default: 'human',
       validator: (value) => ['human', 'agent'].includes(value),
+    },
+    importedPayload: {
+      type: Object,
+      default: null,
+    },
+    importedMeta: {
+      type: Object,
+      default: null,
     },
   },
   components: {
@@ -530,11 +606,27 @@ export default {
       showExportDialog: false,
       exportIncludeSnapshots: true,
       showImportConflictDialog: false,
+      showStudyInfoDialog: false,
       pendingImportPayload: null,
+      studyInfo: {
+        participantId: '',
+        sessionOrder: '',
+        studyNotes: '',
+      },
+      analysisMilestones: [],
+      chatbotLogs: [],
+      llmAnalysisTrace: [],
+      importedLlmAnalysis: null,
       majorViewApi: null,
     }
   },
   computed: {
+    isImportedWorkspace() {
+      return !!this.importedPayload
+    },
+    importedSessionId() {
+      return this.importedMeta?.sessionId || null
+    },
     isBaselineSession() {
       return this.sessionMode === 'baseline'
     },
@@ -548,11 +640,16 @@ export default {
       return !this.isBaselineSession && this.workspaceRole === 'agent'
     },
     workspaceLabel() {
+      if (this.isImportedWorkspace) return 'Imported Study'
       if (this.isBaselineSession) return 'Baseline'
       return this.isAgentWorkspace ? 'Agent Workspace' : 'Human Workspace'
     },
     workspaceBadgeClass() {
+      if (this.isImportedWorkspace) return 'workspace-imported'
       return this.isBaselineSession ? 'workspace-baseline' : `workspace-${this.workspaceRole}`
+    },
+    studyConditionLabel() {
+      return this.isBaselineSession ? 'baseline' : 'full ManiScope'
     },
   },
   watch: {
@@ -568,6 +665,13 @@ export default {
   },
   methods: {
     async initializeManiScopeSession() {
+      if (this.isImportedWorkspace) {
+        this.applyImportedPayload(this.importedPayload)
+        this.latestHumanCurrentState = this.importedPayload?.currentState || null
+        this._workspaceRestoreState = this.importedPayload?.currentState || null
+        this.sessionRestoreStatus = 'imported'
+        return
+      }
       if (!this.maniscopeSessionId) {
         this.sessionRestoreStatus = 'missing'
         return
@@ -623,6 +727,20 @@ export default {
     applyLiveSession(liveSession) {
       if (!liveSession || typeof liveSession !== 'object') return
       this.applyTraceRecordsFromLiveSession(liveSession, { applyWorkspaceDefaults: true })
+      this.studyInfo = {
+        participantId: String(liveSession.studyInfo?.participantId || ''),
+        sessionOrder: String(liveSession.studyInfo?.sessionOrder || ''),
+        studyNotes: String(liveSession.studyInfo?.studyNotes || ''),
+      }
+      this.analysisMilestones = Array.isArray(liveSession.analysisMilestones)
+        ? liveSession.analysisMilestones
+        : []
+      this.chatbotLogs = Array.isArray(liveSession.chatbotLogs)
+        ? liveSession.chatbotLogs
+        : []
+      this.llmAnalysisTrace = Array.isArray(liveSession.llmAnalysisTrace)
+        ? liveSession.llmAnalysisTrace
+        : []
       if (Array.isArray(liveSession.config?.snapshotCategories)) {
         this.snapshotCategories = liveSession.config.snapshotCategories
       }
@@ -684,6 +802,7 @@ export default {
         klineTimeWindow: this.klineTimeWindow,
         behaviorTimeWindow: this.behaviorTimeWindow,
         activeBottomTab: this.activeBottomTab,
+        chatOpen: this.chatBoxOpen,
         hasEntityResults: !!(this.entity_detection_results && this.entity_detection_results.length > 0),
         hasManipulationResults: !!(this.manipulation_detection_results && this.manipulation_detection_results.length > 0),
         majorViewScreenshots,
@@ -696,7 +815,21 @@ export default {
         snapshotCategories: this.snapshotCategories,
         snapshotQuality: this.snapshotQuality,
         currentState: this.buildCurrentState(null),
+        studyInfo: this.clonePlain(this.studyInfo),
+        analysisMilestones: this.clonePlain(this.analysisMilestones),
+        chatbotLogs: this.clonePlain(this.chatbotLogs),
+        llmAnalysisTrace: this.clonePlain(this.llmAnalysisTrace),
         ...extra,
+      }
+    },
+    async collectLlmAnalysisForExport() {
+      if (this.isBaselineSession) return null
+      try {
+        if (!this.$refs?.notesPanel?.getAnalysisExportPayload) return null
+        return await this.$refs.notesPanel.getAnalysisExportPayload()
+      } catch (error) {
+        console.warn('CryptoVis: failed to collect LLM analysis export payload', error)
+        return null
       }
     },
     async putWorkspaceState({ includeCurrentViews = false } = {}) {
@@ -842,6 +975,9 @@ export default {
             userActionSequence: this.userActionSequence,
             annotationRecords: this.annotationRecords,
             currentState: this.buildCurrentState(majorViewScreenshots),
+            studyInfo: this.clonePlain(this.studyInfo),
+            analysisMilestones: this.clonePlain(this.analysisMilestones),
+            chatbotLogs: this.clonePlain(this.chatbotLogs),
           }),
         })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -914,6 +1050,7 @@ export default {
       }, delay)
     },
     copySessionLink() {
+      if (this.isImportedWorkspace) return
       const path = this.isBaselineSession
         ? `/base/${this.maniscopeSessionId}`
         : `/${this.maniscopeSessionId}/${this.workspaceRole}`
@@ -924,6 +1061,9 @@ export default {
     },
     openImportedAnalysisPage() {
       window.open(`${window.location.origin}/analysis-import`, '_blank', 'noopener')
+    },
+    openImportedStudyPage() {
+      window.open(`${window.location.origin}/study-import`, '_blank', 'noopener')
     },
     // ezio: open snapshot for the view under the mouse cursor (triggered by Alt+S)
     openSnapshotByMouse() {
@@ -1087,6 +1227,255 @@ export default {
       }
       this.majorViewApi = null
     },
+    normalizeStudyCondition() {
+      return this.isBaselineSession ? 'baseline' : 'full ManiScope'
+    },
+    normalizeStudyView(viewName) {
+      const labels = {
+        token_distribution: 'Token Distribution',
+        kline_chart: 'Manipulation View',
+        behavior_details: 'Behavior Detail',
+        control_panel: 'Control Panel',
+        llm_analysis: 'LLM Analysis',
+        chat: 'Chat',
+        annotations: 'Annotations',
+        actions: 'User Actions',
+        tree: 'Action Tree',
+        all_views: 'All Views',
+        system: 'System',
+      }
+      return labels[viewName] || viewName || 'System'
+    },
+    buildStudySystemState() {
+      return {
+        selectedSnapshot: this.snapshot_configuration.time || null,
+        topHolderThreshold: this.snapshot_configuration.top_holder_threshold,
+        relatedHolderThreshold: this.snapshot_configuration.related_user_threshold,
+        snapshotConfig: this.clonePlain(this.snapshot_configuration),
+        entitySettings: this.clonePlain(this.entity_detection_configuration),
+        linkSettings: this.clonePlain(this.link_detection_configuration),
+        suspiciousPatternSettings: this.clonePlain(this.manipulation_detection_configuration),
+        selectedHolderId: this.selectedUser || null,
+        selectedCardUsers: this.clonePlain(this.selectedCardUsers || []),
+        klineTimeWindow: this.klineTimeWindow,
+        behaviorTimeWindow: this.behaviorTimeWindow,
+        activeBottomTab: this.activeBottomTab,
+        chatOpen: this.chatBoxOpen,
+        behaviorSequentialTime: this.behaviorSequentialTime,
+      }
+    },
+    buildTargetObject(actionType, actionInfo = {}) {
+      const info = actionInfo && typeof actionInfo === 'object' ? actionInfo : {}
+      return {
+        holderId: info.targetUserId || info.userId || this.selectedUser || null,
+        cardId: info.cardId || null,
+        cardUsers: Array.isArray(info.cardUsers) ? info.cardUsers : null,
+        timeWindow: info.timeWindow || this.klineTimeWindow || this.behaviorTimeWindow || null,
+        parameterName: info.parameterName || null,
+        thresholdValue: info.thresholdValue ?? info.threshold ?? null,
+        selectedItems: Array.isArray(info.selectedItems) ? info.selectedItems : null,
+        raw: this.clonePlain(info),
+        actionType,
+      }
+    },
+    inferNoteKind(text, preferredKind = '') {
+      const value = String(text || '').trim().toLowerCase()
+      if (preferredKind) return preferredKind
+      if (!value) return 'finding'
+      if (/[?？]$/.test(value) || /^(why|how|whether|what|which)\b/.test(value)) return 'question'
+      if (/\b(maybe|possibly|probably|unclear|unsure|not sure|uncertain)\b/.test(value)) return 'uncertainty'
+      if (/\b(hypothesis|suspect|likely|assume|might be|could be|suggests)\b/.test(value)) return 'hypothesis'
+      if (/\b(conclusion|conclude|final|risk|manipulation|benign|malicious)\b/.test(value)) return 'conclusion'
+      return 'finding'
+    },
+    buildNoteContext(sourceView) {
+      return {
+        linkedView: this.normalizeStudyView(sourceView),
+        selectedObject: {
+          holderId: this.selectedUser || null,
+          cardUsers: this.clonePlain(this.selectedCardUsers || []),
+        },
+        timeWindow: this.klineTimeWindow || this.behaviorTimeWindow || null,
+      }
+    },
+    upsertMilestone(name, details = {}) {
+      if (!name) return
+      const existing = this.analysisMilestones.find((item) => item && item.name === name)
+      if (existing) return
+      this.analysisMilestones.push({
+        name,
+        timestamp: new Date().toISOString(),
+        condition: this.normalizeStudyCondition(),
+        dataset: this.currentCoin,
+        participantId: this.studyInfo.participantId || null,
+        sessionOrder: this.studyInfo.sessionOrder || null,
+        details: this.clonePlain(details),
+      })
+      this.scheduleLiveTraceSync(0)
+    },
+    markLatestAssistantResponseUsed(reason, details = {}) {
+      for (let index = this.chatbotLogs.length - 1; index >= 0; index -= 1) {
+        const entry = this.chatbotLogs[index]
+        if (!entry?.response || entry.response.used) continue
+        entry.response.used = true
+        entry.response.usedAt = new Date().toISOString()
+        entry.response.usedReason = reason || 'follow_up_action'
+        entry.response.usedDetails = this.clonePlain(details)
+        this.scheduleLiveTraceSync(0)
+        return entry
+      }
+      return null
+    },
+    maybeMarkMilestonesFromNote(record) {
+      if (!record) return
+      this.upsertMilestone('first_meaningful_evidence_found', {
+        noteId: record.id,
+        view: record.sourceView,
+      })
+      if (record.noteKind === 'hypothesis') {
+        this.upsertMilestone('first_hypothesis_formed', {
+          noteId: record.id,
+          text: record.text,
+        })
+      }
+      if (record.noteKind === 'conclusion') {
+        this.upsertMilestone('final_risk_assessment_submitted', {
+          noteId: record.id,
+          text: record.text,
+        })
+      }
+      if (this.markLatestAssistantResponseUsed('note_created', { noteId: record.id })) {
+        this.upsertMilestone('first_evidence_added_after_llm_assistance', {
+          noteId: record.id,
+          noteKind: record.noteKind,
+        })
+      }
+    },
+    inferChatResponseTypes(message) {
+      const text = String(message?.content || '').toLowerCase()
+      const types = []
+      if (/\bshould|consider|recommend|suggest\b/.test(text)) types.push('suggestion')
+      if (/\bhypothesis|likely|suspect|indicates\b/.test(text)) types.push('inferred hypothesis')
+      if (/\bchart|image|screenshot|visual\b/.test(text)) types.push('visual finding')
+      if (/\bstatistic|percentage|mean|median|count|volume|balance\b/.test(text)) types.push('statistical finding')
+      if (/\bhowever|but|contradict|counter|not consistent\b/.test(text)) types.push('contradictory evidence')
+      if (/\bsummary|overall|in short\b/.test(text)) types.push('data summary')
+      if (types.length === 0) types.push('explanation')
+      return types
+    },
+    saveStudyInfo() {
+      this.showStudyInfoDialog = false
+      this.scheduleLiveTraceSync(0)
+    },
+    toggleChatBox() {
+      this.chatBoxOpen = !this.chatBoxOpen
+      this.logUserAction('toggle_chat_panel', { open: this.chatBoxOpen })
+    },
+    handleChatClose() {
+      this.chatBoxOpen = false
+      this.logUserAction('toggle_chat_panel', { open: false, via: 'close_button' })
+    },
+    handleNotesPanelTabChange(tab) {
+      this.activeBottomTab = tab || 'tree'
+      this.logUserAction('switch_notes_panel_tab', {
+        tab,
+        view: tab === 'llm_analysis' ? 'llm_analysis' : tab,
+      })
+    },
+    handleNotesPanelLogAction(payload) {
+      if (!payload || typeof payload !== 'object') return
+      this.logUserAction(payload.actionType || 'notes_panel_action', payload.targetObject || payload)
+    },
+    handleChatSend(payload) {
+      const entry = {
+        id: payload?.messageId || `chat-${Date.now()}`,
+        timestamp: payload?.createdAt || new Date().toISOString(),
+        participantId: this.studyInfo.participantId || null,
+        condition: this.normalizeStudyCondition(),
+        dataset: this.currentCoin,
+        sessionOrder: this.studyInfo.sessionOrder || null,
+        triggerType: payload?.triggerType || 'manual',
+        prompt: payload?.content || '',
+        promptAttachments: this.clonePlain(payload?.promptAttachments || []),
+        promptContext: this.buildStudySystemState(),
+        response: null,
+      }
+      this.chatbotLogs.push(entry)
+      this.upsertMilestone('first_llm_chatbot_request', {
+        promptId: entry.id,
+        triggerType: entry.triggerType,
+      })
+      if (entry.triggerType === 'analyze_with_me') {
+        this.logUserAction('analyze_with_me_trigger', { promptId: entry.id })
+      } else {
+        this.logUserAction('chatbot_query', { promptId: entry.id, promptLength: entry.prompt.length })
+      }
+      this.scheduleLiveTraceSync(0)
+    },
+    handleAssistantFinished(payload) {
+      if (!payload?.requestMessageId || !payload.message) return
+      const entry = this.chatbotLogs.find((item) => item.id === payload.requestMessageId)
+      if (!entry) return
+      entry.response = {
+        assistantMessageId: payload.assistantMessageId || null,
+        timestamp: payload.message.createdAt || new Date().toISOString(),
+        text: payload.message.content || '',
+        activity: this.clonePlain(payload.message.activity || []),
+        artifacts: this.clonePlain(payload.message.artifacts || []),
+        responseTypes: this.inferChatResponseTypes(payload.message),
+        linkedEvidence: {
+          view: this.normalizeStudyView('chat'),
+          holderId: this.selectedUser || null,
+          cardUsers: this.clonePlain(this.selectedCardUsers || []),
+          timeWindow: this.klineTimeWindow || this.behaviorTimeWindow || null,
+          statistic: {
+            topHolderThreshold: this.snapshot_configuration.top_holder_threshold,
+            relatedHolderThreshold: this.snapshot_configuration.related_user_threshold,
+          },
+        },
+        clicked: false,
+        expanded: false,
+        accepted: null,
+        used: false,
+      }
+      this.scheduleLiveTraceSync(0)
+    },
+    handleAssistantInteraction(payload) {
+      if (!payload?.messageId) return
+      const entry = [...this.chatbotLogs].reverse().find(
+        (item) => item.response && item.response.assistantMessageId === payload.messageId,
+      )
+      if (!entry?.response) return
+      if (payload.type === 'toggle_response_details') {
+        entry.response.expanded = Boolean(payload.expanded)
+      } else if (payload.type === 'click_response_artifact') {
+        entry.response.clicked = true
+        entry.response.clickedArtifact = this.clonePlain(payload.artifact || null)
+      }
+      this.scheduleLiveTraceSync(0)
+    },
+    handleLlmAnalysisTrace(payload) {
+      if (this.isImportedWorkspace || this.isAgentWorkspace) return
+      if (!payload || typeof payload !== 'object') return
+      const traceKey = String(
+        payload.traceKey
+          || `${payload.eventType || 'llm_analysis'}:${payload.artifactName || ''}:${payload.artifactModifiedAt || ''}`,
+      )
+      const entry = {
+        ...this.clonePlain(payload),
+        traceKey,
+        timestamp: payload.timestamp || new Date().toISOString(),
+        sessionId: this.maniscopeSessionId || null,
+        condition: this.normalizeStudyCondition(),
+        dataset: this.currentCoin,
+        sessionOrder: this.studyInfo.sessionOrder || null,
+        currentSystemState: this.buildStudySystemState(),
+      }
+      const existingIndex = this.llmAnalysisTrace.findIndex((item) => item?.traceKey === traceKey)
+      if (existingIndex >= 0) this.llmAnalysisTrace.splice(existingIndex, 1, entry)
+      else this.llmAnalysisTrace.push(entry)
+      this.scheduleLiveTraceSync(0)
+    },
     // ezio: handle annotation submission from snapshot modals
     handleSnapshotAnnotation(sourceView, payload) {
       if (this.isAgentWorkspace) {
@@ -1100,12 +1489,14 @@ export default {
         text: payload.text || '',
         selectedItems: payload.selectedItems || payload.selectedIds || [],
         sketchDataUrl: payload.sketchDataUrl || null,
+        noteKind: this.inferNoteKind(payload.text),
+        ...this.buildNoteContext(sourceView),
       }
-	      this.annotationRecords.push(record)
-	      // ezio: auto-switch to annotations tab when a new annotation arrives
-	      this.activeBottomTab = 'annotations'
-	      this.upsertAnnotationEvent(record)
-	    },
+      this.annotationRecords.push(record)
+      this.activeBottomTab = 'annotations'
+      this.upsertAnnotationEvent(record)
+      this.maybeMarkMilestonesFromNote(record)
+    },
     // ezio: handle finding annotation added from UserActionTree
     handleAddFindingAnnotation(payload) {
       if (this.isAgentWorkspace) return
@@ -1116,11 +1507,14 @@ export default {
         text: payload.text || '',
         selectedItems: payload.selectedItems || [],
         sketchDataUrl: null,
-        isFinding: true
-	      }
-	      this.annotationRecords.push(record)
-	      this.upsertAnnotationEvent(record)
-	    },
+        isFinding: true,
+        noteKind: this.inferNoteKind(payload.text, 'finding'),
+        ...this.buildNoteContext(payload.sourceView),
+      }
+      this.annotationRecords.push(record)
+      this.upsertAnnotationEvent(record)
+      this.maybeMarkMilestonesFromNote(record)
+    },
 
     // ezio: delete annotation by id (from tree editor)
     handleDeleteAnnotation(id) {
@@ -1147,11 +1541,12 @@ export default {
       if (this.isAgentWorkspace) return
       const ann = this.annotationRecords.find(a => a.id === payload.id)
       if (!ann) return
-	      if (payload.text !== undefined) ann.text = payload.text
-	      if (payload.customColor !== undefined) ann.customColor = payload.customColor
-	      if (payload.sketchDataUrl !== undefined) ann.sketchDataUrl = payload.sketchDataUrl
-	      this.upsertAnnotationEvent(ann)
-	    },
+      if (payload.text !== undefined) ann.text = payload.text
+      if (payload.customColor !== undefined) ann.customColor = payload.customColor
+      if (payload.sketchDataUrl !== undefined) ann.sketchDataUrl = payload.sketchDataUrl
+      ann.noteKind = this.inferNoteKind(ann.text, ann.isFinding ? 'finding' : '')
+      this.upsertAnnotationEvent(ann)
+    },
 
     // ezio: add a custom annotation node (from tree editor)
     handleAddCustomAnnotation(payload) {
@@ -1178,10 +1573,13 @@ export default {
         selectedItems: [],
         sketchDataUrl: payload.sketchDataUrl || null,
         customColor: payload.customColor || null,
-	      }
-	      this.annotationRecords.push(record)
-	      this.upsertAnnotationEvent(record)
-	    },
+        noteKind: this.inferNoteKind(payload.text),
+        ...this.buildNoteContext(payload.sourceView || 'token_distribution'),
+      }
+      this.annotationRecords.push(record)
+      this.upsertAnnotationEvent(record)
+      this.maybeMarkMilestonesFromNote(record)
+    },
 
     // ezio: reorder actions/annotations by swapping timestamps
     handleReorderAction({ timestamp, direction }) {
@@ -1207,9 +1605,15 @@ export default {
       this.showExportDialog = true
     },
     // ezio: build zip payload + trigger download
-    confirmExport() {
+    async confirmExport() {
       if (this.isAgentWorkspace) return
-      const archive = buildExportArchive({
+      const majorViewScreenshots = this.exportIncludeSnapshots
+        ? await this.captureCurrentMajorViewsForSession()
+        : null
+      const llmAnalysis = await this.collectLlmAnalysisForExport()
+      const archive = await buildExportArchive({
+        sessionId: this.maniscopeSessionId,
+        sessionMode: this.sessionMode,
         coin: this.currentCoin,
         userActionSequence: this.userActionSequence,
         annotationRecords: this.annotationRecords,
@@ -1217,6 +1621,12 @@ export default {
         snapshotQuality: this.snapshotQuality,
         annotationSeqId: this._annotationSeqId,
         includeSnapshots: this.exportIncludeSnapshots,
+        currentState: this.buildCurrentState(majorViewScreenshots),
+        studyInfo: this.studyInfo,
+        analysisMilestones: this.analysisMilestones,
+        chatbotLogs: this.chatbotLogs,
+        llmAnalysisTrace: this.llmAnalysisTrace,
+        llmAnalysis,
       })
       downloadZipArchive(archive, this.currentCoin)
       this.showExportDialog = false
@@ -1289,13 +1699,24 @@ export default {
       this.activeBottomTab = 'tree'
       this.scheduleLiveTraceSync(0)
     },
-    // ezio: replace current session with imported payload
-    applyImport() {
-      if (this.isAgentWorkspace) return
-      const parsed = this.pendingImportPayload
-      if (!parsed) return
+    applyImportedPayload(parsed) {
+      if (!parsed || typeof parsed !== 'object') return
       this.userActionSequence = parsed.userActionSequence || []
       this.annotationRecords = parsed.annotationRecords || []
+      this.studyInfo = {
+        participantId: String(parsed.studyInfo?.participantId || ''),
+        sessionOrder: String(parsed.studyInfo?.sessionOrder || ''),
+        studyNotes: String(parsed.studyInfo?.studyNotes || ''),
+      }
+      this.analysisMilestones = Array.isArray(parsed.analysisMilestones) ? parsed.analysisMilestones : []
+      this.chatbotLogs = Array.isArray(parsed.chatbotLogs) ? parsed.chatbotLogs : []
+      this.llmAnalysisTrace = Array.isArray(parsed.llmAnalysisTrace) ? parsed.llmAnalysisTrace : []
+      this.importedLlmAnalysis = parsed.llmAnalysis && typeof parsed.llmAnalysis === 'object'
+        ? parsed.llmAnalysis
+        : null
+      if (parsed.currentState && typeof parsed.currentState === 'object') {
+        this.applyCurrentState(parsed.currentState)
+      }
       const maxId = this.annotationRecords.reduce(
         (m, a) => (Number.isFinite(a?.id) && a.id > m ? a.id : m),
         -1
@@ -1304,17 +1725,26 @@ export default {
         Number.isFinite(parsed.annotationSeqId) ? parsed.annotationSeqId : 0,
         maxId + 1
       )
+      this.activeBottomTab = 'tree'
+    },
+    // ezio: replace current session with imported payload
+    applyImport() {
+      if (this.isAgentWorkspace) return
+      const parsed = this.pendingImportPayload
+      if (!parsed) return
+      this.applyImportedPayload(parsed)
       this.showImportConflictDialog = false
       this.pendingImportPayload = null
-      this.activeBottomTab = 'tree'
-	      this.logUserAction('import_session', {
-	        actionCount: this.userActionSequence.length,
-	        annotationCount: this.annotationRecords.length,
-	      })
-	      this.scheduleLiveTraceSync(0)
-	    },
+      this.logUserAction('import_session', {
+        actionCount: this.userActionSequence.length,
+        annotationCount: this.annotationRecords.length,
+        chatLogCount: this.chatbotLogs.length,
+      })
+      this.scheduleLiveTraceSync(0)
+    },
 
     logUserAction(actionType, actionInfo = {}, userId = null) {
+      if (this.isImportedWorkspace) return
       if (this.isAgentWorkspace) {
         if (actionType === 'cancel_hover') return
         this.scheduleWorkspaceStateSync()
@@ -1458,16 +1888,7 @@ export default {
       }
       
       // Determine the current view state
-      const currentViewState = {
-        coin: this.currentCoin,
-        snapshotTime: this.snapshot_configuration.time,
-        selectedUser: this.selectedUser,
-        selectedCardUsers: this.selectedCardUsers,
-        klineTimeWindow: this.klineTimeWindow,
-        behaviorTimeWindow: this.behaviorTimeWindow,
-        hasEntityResults: !!(this.entity_detection_results && this.entity_detection_results.length > 0),
-        hasManipulationResults: !!(this.manipulation_detection_results && this.manipulation_detection_results.length > 0)
-      }
+      const currentViewState = this.buildStudySystemState()
 
       // Record the effect of the action
       // For cross-component interactions, check actionType or actionInfo for source and target
@@ -1493,27 +1914,56 @@ export default {
       } else if (actionType === 'sync_time_window') {
         sourceView = actionInfo.source;
         targetView = actionInfo.source === 'kline_chart' ? 'behavior_details' : 'kline_chart';
+      } else if (actionType === 'toggle_chat_panel' || actionType === 'chatbot_query' || actionType === 'analyze_with_me_trigger') {
+        sourceView = 'chat'
+        targetView = 'chat'
+      } else if (actionType === 'switch_notes_panel_tab') {
+        sourceView = actionInfo.view || 'tree'
+        targetView = actionInfo.view || 'tree'
+      } else if (actionType.includes('reasoning') || actionType.includes('llm_analysis')) {
+        sourceView = 'llm_analysis'
+        targetView = 'llm_analysis'
       }
+
+      const normalizedView = this.normalizeStudyView(sourceView === 'system' ? targetView : sourceView)
+      const targetObject = this.buildTargetObject(actionType, actionInfo)
 
       const actionRecord = {
         timestamp: currentTimestamp,
-        userId: userId || this.selectedUser || 'system',
+        userId: this.studyInfo.participantId || null,
+        selectedHolderId: userId || this.selectedUser || null,
+        condition: this.normalizeStudyCondition(),
+        dataset: this.currentCoin,
+        sessionOrder: this.studyInfo.sessionOrder || null,
+        view: normalizedView,
         actionType: actionType,
         sourceView: sourceView,
         targetView: targetView,
         actionInfo: actionInfo,
+        targetObject,
+        currentSystemState: currentViewState,
         relatedViewWithViewState: currentViewState,
         actionEffect: `Triggered ${actionType}`
       }
 
       this.userActionSequence.push(actionRecord)
       console.log('User Action Logged:', actionRecord)
+      if (sourceView !== targetView && sourceView !== 'system' && targetView !== 'all_views') {
+        this.upsertMilestone('first_cross_view_transition', {
+          actionType,
+          sourceView: this.normalizeStudyView(sourceView),
+          targetView: this.normalizeStudyView(targetView),
+        })
+      }
+      this.markLatestAssistantResponseUsed('interaction', {
+        actionType,
+        view: normalizedView,
+      })
 
-	      // ezio: auto-capture screenshots if this action's category is enabled
-	      this._maybeCaptureSnapshots(actionRecord)
-	      this.upsertUserActionEvent(actionRecord, this.userActionSequence.length - 1)
+      this._maybeCaptureSnapshots(actionRecord)
+      this.upsertUserActionEvent(actionRecord, this.userActionSequence.length - 1)
 
-	      // Optional: Send to backend
+      // Optional: Send to backend
       // fetch('/api/log_action', { method: 'POST', body: JSON.stringify(actionRecord) })
     },
 
@@ -2842,6 +3292,16 @@ a {
   border-color: #fed7aa;
 }
 
+.workspace-imported {
+  background: #eef2ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+.imported-session-chip {
+  cursor: default;
+}
+
 .workspace-link-tag {
   display: inline-flex;
   align-items: center;
@@ -2989,6 +3449,37 @@ a {
   gap: 18px;
   margin-bottom: 12px;
   color: #4a5568;
+}
+.session-io-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.session-io-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #4a5568;
+  font-size: 12px;
+  font-weight: 600;
+}
+.session-io-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid #d8e0ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2937;
+  font-size: 13px;
+}
+.session-io-input:disabled {
+  background: #f8fafc;
+  color: #64748b;
+}
+.session-io-textarea {
+  resize: vertical;
+  min-height: 84px;
 }
 .session-io-checkbox {
   display: flex;

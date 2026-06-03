@@ -15,7 +15,7 @@
         class="collapse-btn"
         type="button"
         :aria-label="collapsed ? 'Expand node' : 'Collapse node'"
-        @click.stop="collapsed = !collapsed"
+        @click.stop="toggleCollapsed"
       >
         {{ collapsed ? '+' : '-' }}
       </button>
@@ -52,6 +52,7 @@
         :nesting-level="nestingLevel + 1"
         :hide-patch-label="childHidePatchLabel"
         @select-node="$emit('select-node', $event)"
+        @toggle-node="$emit('toggle-node', $event)"
       />
     </div>
   </div>
@@ -208,6 +209,14 @@ export default {
       return text
         .replace(/[_-]+/g, ' ')
         .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    },
+    toggleCollapsed() {
+      this.collapsed = !this.collapsed
+      this.$emit('toggle-node', {
+        node: this.node,
+        collapsed: this.collapsed,
+        nestingLevel: this.nestingLevel,
+      })
     },
   },
 }

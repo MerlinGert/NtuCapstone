@@ -12,7 +12,7 @@
           v-if="!analysisOnly"
           class="tab-btn"
           :class="{ active: activeTab === 'actions' }"
-          @click="activeTab = 'actions'"
+          @click="setActiveTab('actions')"
           style="padding:4px 8px; border:none; background:none; cursor:pointer; font-size:14px; font-weight:600; color:#718096; border-bottom:2px solid transparent;"
           :style="activeTab === 'actions' ? 'color:#3182ce; border-bottom-color:#3182ce;' : ''"
         >User Actions</button>
@@ -20,7 +20,7 @@
           v-if="!analysisOnly"
           class="tab-btn"
           :class="{ active: activeTab === 'annotations' }"
-          @click="activeTab = 'annotations'"
+          @click="setActiveTab('annotations')"
           style="padding:4px 8px; border:none; background:none; cursor:pointer; font-size:14px; font-weight:600; color:#718096; border-bottom:2px solid transparent;"
           :style="activeTab === 'annotations' ? 'color:#d97706; border-bottom-color:#d97706;' : ''"
         >Annotations</button>
@@ -28,7 +28,7 @@
           v-if="!analysisOnly"
           class="tab-btn"
           :class="{ active: activeTab === 'tree' }"
-          @click="activeTab = 'tree'"
+          @click="setActiveTab('tree')"
           style="padding:4px 8px; border:none; background:none; cursor:pointer; font-size:14px; font-weight:600; color:#718096; border-bottom:2px solid transparent;"
           :style="activeTab === 'tree' ? 'color:#059669; border-bottom-color:#059669;' : ''"
         >Action Tree</button>
@@ -36,7 +36,7 @@
           v-if="showLlmAnalysis"
           class="tab-btn"
           :class="{ active: activeTab === 'llm_analysis' }"
-          @click="activeTab = 'llm_analysis'"
+          @click="setActiveTab('llm_analysis')"
           style="padding:4px 8px; border:none; background:none; cursor:pointer; font-size:14px; font-weight:600; color:#718096; border-bottom:2px solid transparent;"
           :style="activeTab === 'llm_analysis' ? 'color:#805ad5; border-bottom-color:#805ad5;' : ''"
         >LLM Analysis</button>
@@ -81,10 +81,13 @@
 
     <div v-if="showLlmAnalysis" v-show="activeTab === 'llm_analysis'" style="flex:1; padding:10px; overflow:hidden;">
       <LlmAnalysisView
+        ref="llmAnalysisView"
         :session-id="sessionId"
         :session-mode="sessionMode"
         :active="activeTab === 'llm_analysis'"
         :analysis-payload="analysisPayload"
+        @log-action="$emit('log-action', $event)"
+        @analysis-trace="$emit('analysis-trace', $event)"
       />
     </div>
   </n-card>
@@ -106,6 +109,7 @@ export default {
     AnnotationTimeline,
     LlmAnalysisView
   },
+  emits: ['tab-change', 'log-action', 'analysis-trace'],
   props: {
     sessionId: {
       type: String,
@@ -176,6 +180,20 @@ export default {
     }
   },
   methods: {
+    async getAnalysisExportPayload() {
+      if (!this.showLlmAnalysis) return null
+      if (!this.$refs.llmAnalysisView?.buildAnalysisExportPayload) return null
+      if (this.$refs.llmAnalysisView?.refreshAnalysis) {
+        await this.$refs.llmAnalysisView.refreshAnalysis()
+      }
+      return this.$refs.llmAnalysisView.buildAnalysisExportPayload()
+    },
+    setActiveTab(tab) {
+      const nextTab = this.resolveActiveTab(tab)
+      if (nextTab === this.activeTab) return
+      this.activeTab = nextTab
+      this.$emit('tab-change', nextTab)
+    },
     resolveActiveTab(tab) {
       if (tab === 'llm_analysis' && !this.showLlmAnalysis) return 'tree'
       return tab || 'tree'
