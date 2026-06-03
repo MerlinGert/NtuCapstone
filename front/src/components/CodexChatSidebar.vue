@@ -283,13 +283,7 @@ import {
   normalizeMessageParts,
 } from '../utils/chatTimeline.js'
 
-const FULL_ANALYSIS_PROMPT = `Please run a pass of full trace analysis for the current session.
-
-After reconstructing the user reasoning graph and validating reasoning-graph.json, form the recommendation and investigation plan. When useful, spawn evidence-only subagents for independent branches such as support-seeking for major user Hypotheses, answer-seeking for central AnalyticQuestions, adjacent-hypothesis investigation, and skeptical or counterevidence review.
-
-Use subagents only as full-context forks with fork_context: true and no extra config. Subagents may create uniquely named evidence files under ./artifacts, but the main agent must verify their outputs and must be the only writer of reasoning-graph.json and reasoning-graph-patch*.json files.
-
-Execute the highest-value follow-up checks, validate the graph plus patches, and end with the key findings in plain English.`
+const FULL_ANALYSIS_PROMPT = `Please run the full trace-analysis pipeline for the current session. Write and validate ./artifacts/reasoning-graph.json first, then plan and execute follow-up checks. Use 2-4 evidence-only subagents with fork_context: true when useful. The main agent alone writes reasoning-graph-patch*.json. Validate before reporting, and end with a plain-language summary or explanation in my language.`
 const UPDATE_ANALYSIS_PROMPT = `Please run an incremental trace analysis pass for the current session.
 
 Do not redo the full trace analysis unless incremental analysis is unsafe. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest. Compare the latest graph or patch trace anchor against the current live trace anchor.
@@ -334,9 +328,9 @@ Report the operational details here:
 
 Keep this section concise and factual.
 
-# Plain-English Summary
+# Plain-Language Summary
 
-Explain the analytical meaning for the human analyst:
+Explain the analytical meaning for the human analyst in my language:
 - what new user behavior was analyzed,
 - what the user seemed to be checking,
 - what new evidence was found,
