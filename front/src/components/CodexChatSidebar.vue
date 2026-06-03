@@ -38,9 +38,12 @@
         :class="message.role === 'user' ? 'user' : 'assistant'"
       >
         <div class="message-role">{{ message.role === 'user' ? 'You' : 'Codex' }}</div>
-        <div class="message-bubble">
+        <div
+          class="message-bubble"
+          :class="{ 'message-bubble-preset': message.role === 'user' && message.presetKind }"
+        >
           <div
-            v-if="message.role === 'assistant' && (message.loading || message.ephemeralReasoning || (message.activity && message.activity.length))"
+            v-if="message.role === 'assistant' && (message.loading || message.ephemeralReasoning)"
             class="message-status-stack"
           >
             <div v-if="message.loading" class="message-loading">
@@ -51,57 +54,84 @@
               <div class="reasoning-label">Thinking</div>
               <div class="reasoning-text">{{ message.ephemeralReasoning }}</div>
             </div>
-            <div
-              v-if="message.activity && message.activity.length"
-              class="message-activity"
-              :class="{ 'message-activity-after-thinking': hasVisibleThinking(message) }"
-            >
-              <div class="activity-header">
-                <span>Agent activity</span>
-              </div>
-              <div v-if="message.activityOpen && displayedActivities(message).length" class="activity-list">
-                <div
-                  v-for="activity in displayedActivities(message)"
-                  :key="activity.id"
-                  class="activity-item"
-                  :class="activityClass(activity)"
-                >
-                  <span class="activity-dot"></span>
-                  <span class="activity-body">
-                    <span class="activity-title">{{ activity.title || activity.text }}</span>
-                    <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
-                    <span v-if="activity.output && message.activityOpen" class="activity-output">
-                      {{ activity.output }}
-                    </span>
-                  </span>
-                </div>
-              </div>
-              <div v-else-if="collapsedActivities(message).length" class="activity-list activity-list-collapsed">
-                <div
-                  v-for="activity in collapsedActivities(message)"
-                  :key="activity.id"
-                  class="activity-item activity-item-latest"
-                  :class="activityClass(activity)"
-                >
-                  <span class="activity-dot"></span>
-                  <span class="activity-body">
-                    <span class="activity-title">{{ activity.title || activity.text }}</span>
-                    <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
-                  </span>
-                </div>
-              </div>
-              <div class="activity-footer">
-                <button type="button" class="activity-toggle" @click="message.activityOpen = !message.activityOpen">
-                  {{ activityToggleLabel(message) }}
-                </button>
-              </div>
-            </div>
           </div>
-          <div
-            v-if="message.content && message.role === 'assistant'"
-            class="message-markdown"
-            v-html="renderMarkdown(message.content)"
-          ></div>
+          <template v-if="message.role === 'assistant'">
+            <template v-for="part in message.parts || []" :key="part.id">
+              <div
+                v-if="part.type === TIMELINE_PART_TYPES.MARKDOWN"
+                class="message-markdown"
+                v-html="renderMarkdown(part.text)"
+              ></div>
+              <div
+                v-else-if="part.type === TIMELINE_PART_TYPES.ACTIVITY_SEQUENCE"
+                class="message-activity-sequence"
+              >
+                <div v-if="part.open && displayedSequenceActivities(part).length" class="activity-list">
+                  <div
+                    v-for="activity in displayedSequenceActivities(part)"
+                    :key="activity.id"
+                    class="activity-item"
+                    :class="activityClass(activity)"
+                  >
+                    <span class="activity-dot"></span>
+                    <span class="activity-body">
+                      <span class="activity-title">{{ activity.title || activity.text }}</span>
+                      <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
+                      <span v-if="activity.output && part.open" class="activity-output">
+                        {{ activity.output }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <div v-else-if="collapsedSequenceActivities(part).length" class="activity-list activity-list-collapsed">
+                  <div
+                    v-for="activity in collapsedSequenceActivities(part)"
+                    :key="activity.id"
+                    class="activity-item activity-item-latest"
+                    :class="activityClass(activity)"
+                  >
+                    <span class="activity-dot"></span>
+                    <span class="activity-body">
+                      <span class="activity-title">{{ activity.title || activity.text }}</span>
+                      <span v-if="activity.detail" class="activity-detail">{{ activity.detail }}</span>
+                    </span>
+                    <button type="button" class="activity-toggle activity-toggle-inline" @click="part.open = true">
+                      {{ activitySequenceToggleLabel(part) }}
+                    </button>
+                  </div>
+                </div>
+                <div v-if="part.open" class="activity-footer">
+                  <button type="button" class="activity-toggle" @click="part.open = !part.open">
+                    {{ activitySequenceToggleLabel(part) }}
+                  </button>
+                </div>
+              </div>
+              <div
+                v-else-if="part.type === TIMELINE_PART_TYPES.ARTIFACT"
+                class="message-artifacts message-artifacts-inline"
+              >
+                <a
+                  class="artifact-link"
+                  :href="artifactHref(part.artifact)"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <img
+                    v-if="part.artifact.kind === 'image'"
+                    class="artifact-thumb"
+                    :src="artifactHref(part.artifact)"
+                    :alt="part.artifact.title"
+                  />
+                  <span>{{ part.artifact.title }}</span>
+                </a>
+              </div>
+            </template>
+            <div
+              v-if="!(message.parts && message.parts.length) && message.content"
+              class="message-markdown"
+              v-html="renderMarkdown(message.content)"
+            ></div>
+          </template>
           <div
             v-else-if="message.content"
             class="message-text"
@@ -109,7 +139,7 @@
           >
             {{ message.content }}
           </div>
-          <div v-if="message.artifacts && message.artifacts.length" class="message-artifacts">
+          <div v-if="message.role !== 'assistant' && message.artifacts && message.artifacts.length" class="message-artifacts">
             <a
               v-for="artifact in message.artifacts"
               :key="artifact.id"
@@ -242,6 +272,16 @@
 <script>
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
+import {
+  TIMELINE_PART_TYPES,
+  appendActivityToTimeline,
+  appendArtifactPart,
+  appendMarkdownPart,
+  collectLegacyActivities,
+  collectLegacyArtifacts,
+  compactLegacyContent,
+  normalizeMessageParts,
+} from '../utils/chatTimeline.js'
 
 const FULL_ANALYSIS_PROMPT = `Please run a pass of full trace analysis for the current session.
 
@@ -350,6 +390,7 @@ export default {
   emits: ['close', 'send'],
   data() {
     return {
+      TIMELINE_PART_TYPES,
       draft: '',
       messages: [],
       attachments: [],
@@ -359,6 +400,7 @@ export default {
       nextMessageId: 1,
       nextAttachmentId: 1,
       nextActivityId: 1,
+      nextPartId: 1,
       historyLoadedForSession: '',
       panelPositioned: false,
       panelX: 0,
@@ -576,6 +618,9 @@ export default {
     renderMarkdown(content) {
       return DOMPurify.sanitize(markdown.render(content || ''))
     },
+    nextTimelinePartId(prefix = 'part') {
+      return `${prefix}-${this.nextPartId++}`
+    },
     normalizeActivity(activity, fallbackId) {
       if (typeof activity === 'string') {
         return {
@@ -611,15 +656,40 @@ export default {
       }
     },
     normalizeHistoryMessage(message, fallbackId) {
+      const content = String(message.content || '')
+      const activity = Array.isArray(message.activity)
+        ? message.activity.map((item, index) => this.normalizeActivity(item, `${fallbackId}-${index + 1}`))
+        : []
+      const artifacts = Array.isArray(message.artifacts) ? message.artifacts : []
+      const parts = normalizeMessageParts(
+        {
+          ...message,
+          content,
+          activity,
+          artifacts,
+          activityOpen: Boolean(message.activityOpen),
+        },
+        `${fallbackId}`,
+      ).map((part, partIndex) => {
+        if (part.type !== TIMELINE_PART_TYPES.ACTIVITY_SEQUENCE) return part
+        return {
+          ...part,
+          activities: part.activities.map((item, index) =>
+            this.normalizeActivity(item, `${fallbackId}-${partIndex + 1}-${index + 1}`),
+          ),
+          open: Boolean(part.open),
+        }
+      })
+      const timelineActivity = collectLegacyActivities(parts)
+      const timelineArtifacts = collectLegacyArtifacts(parts)
       return {
         id: Number(message.id) || fallbackId,
         role: message.role === 'user' ? 'user' : 'assistant',
-        content: String(message.content || ''),
+        content,
         attachments: Array.isArray(message.attachments) ? message.attachments : [],
-        activity: Array.isArray(message.activity)
-          ? message.activity.map((activity, index) => this.normalizeActivity(activity, `${fallbackId}-${index + 1}`))
-          : [],
-        artifacts: Array.isArray(message.artifacts) ? message.artifacts : [],
+        activity: activity.length ? activity : timelineActivity,
+        artifacts: artifacts.length ? artifacts : timelineArtifacts,
+        parts,
         presetKind: String(message.presetKind || ''),
         activityOpen: Boolean(message.activityOpen),
         threadId: message.threadId || '',
@@ -633,15 +703,35 @@ export default {
       return this.messages.map((message) => ({
         id: message.id,
         role: message.role,
-        content: message.content || '',
+        content: compactLegacyContent(message.parts) || message.content || '',
         attachments: message.attachments || [],
-        activity: (message.activity || []).filter((activity) => !activity.ephemeral),
-        artifacts: message.artifacts || [],
+        activity: this.serializedActivities(message),
+        artifacts: this.serializedArtifacts(message),
+        parts: message.role === 'assistant' ? this.serializedParts(message) : [],
         presetKind: message.presetKind || '',
         activityOpen: Boolean(message.activityOpen),
         threadId: message.threadId || '',
         createdAt: message.createdAt || '',
       }))
+    },
+    serializedActivities(message) {
+      const timelineActivities = collectLegacyActivities(message.parts)
+      return timelineActivities.length
+        ? timelineActivities
+        : (message.activity || []).filter((activity) => !activity.ephemeral)
+    },
+    serializedArtifacts(message) {
+      const timelineArtifacts = collectLegacyArtifacts(message.parts)
+      return timelineArtifacts.length ? timelineArtifacts : message.artifacts || []
+    },
+    serializedParts(message) {
+      return normalizeMessageParts(message, `${message.id}`).filter((part) => {
+        if (part.type === TIMELINE_PART_TYPES.ACTIVITY_SEQUENCE) {
+          part.activities = part.activities.filter((activity) => !activity.ephemeral)
+          return part.activities.length > 0
+        }
+        return true
+      })
     },
     async loadChatHistory(sessionId = this.sessionId) {
       const historyKey = `${this.sessionMode}:${sessionId}`
@@ -672,6 +762,13 @@ export default {
             content: `Error loading chat history: ${error && error.message ? error.message : String(error)}`,
             activity: [],
             artifacts: [],
+            parts: [
+              {
+                id: this.nextTimelinePartId('markdown'),
+                type: TIMELINE_PART_TYPES.MARKDOWN,
+                text: `Error loading chat history: ${error && error.message ? error.message : String(error)}`,
+              },
+            ],
           },
         ]
       }
@@ -787,23 +884,20 @@ export default {
         },
       }))
     },
-    hasVisibleThinking(message) {
-      return Boolean(message.ephemeralReasoning && message.thinkingOpen !== false)
-    },
-    displayedActivities(message) {
-      const activities = (message.activity || []).filter((activity) => !activity.ephemeral)
-      if (message.activityOpen) return activities
+    displayedSequenceActivities(part) {
+      const activities = (part.activities || []).filter((activity) => !activity.ephemeral)
+      if (part.open) return activities
       return []
     },
-    collapsedActivities(message) {
-      if (message.activityOpen) return []
-      const activities = (message.activity || []).filter((activity) => !activity.ephemeral)
+    collapsedSequenceActivities(part) {
+      if (part.open) return []
+      const activities = (part.activities || []).filter((activity) => !activity.ephemeral)
       const latest = activities[activities.length - 1]
       return latest ? [latest] : []
     },
-    activityToggleLabel(message) {
-      if (message.activityOpen) return 'Hide details'
-      const total = (message.activity || []).filter((activity) => !activity.ephemeral).length
+    activitySequenceToggleLabel(part) {
+      if (part.open) return 'Hide details'
+      const total = (part.activities || []).filter((activity) => !activity.ephemeral).length
       return `Show ${total}`
     },
     activityClass(activity) {
@@ -815,24 +909,52 @@ export default {
     addActivity(message, activity) {
       if (!activity || !message) return
       if (!Array.isArray(message.activity)) message.activity = []
+      if (!Array.isArray(message.parts)) message.parts = []
 
       const normalized = this.normalizeActivity(activity, this.nextActivityId++)
       if (normalized.ephemeral) return
 
+      let timelineActivity = normalized
       if (normalized.eventId) {
         const existingIndex = message.activity.findIndex(
           (item) => item.eventId === normalized.eventId && item.category === normalized.category,
         )
         if (existingIndex !== -1) {
-          message.activity.splice(existingIndex, 1, {
+          timelineActivity = {
             ...message.activity[existingIndex],
             ...normalized,
             id: message.activity[existingIndex].id,
-          })
+          }
+          message.activity.splice(existingIndex, 1, timelineActivity)
+          appendActivityToTimeline(message.parts, this.nextTimelinePartId('activity'), timelineActivity)
           return
         }
       }
       message.activity.push(normalized)
+      appendActivityToTimeline(message.parts, this.nextTimelinePartId('activity'), normalized)
+    },
+    appendAssistantMarkdown(message, text) {
+      if (!message || !text) return
+      if (!Array.isArray(message.parts)) message.parts = []
+      message.content = message.content ? `${message.content}\n\n${text}` : text
+      appendMarkdownPart(message.parts, this.nextTimelinePartId('markdown'), text)
+    },
+    appendAssistantArtifact(message, artifact) {
+      if (!message || !artifact) return
+      if (!Array.isArray(message.artifacts)) message.artifacts = []
+      if (!Array.isArray(message.parts)) message.parts = []
+      const existingIndex = message.artifacts.findIndex(
+        (item) => (item.id || item.path || item.title) === (artifact.id || artifact.path || artifact.title),
+      )
+      if (existingIndex !== -1) {
+        message.artifacts.splice(existingIndex, 1, {
+          ...message.artifacts[existingIndex],
+          ...artifact,
+        })
+      } else {
+        message.artifacts.push(artifact)
+      }
+      appendArtifactPart(message.parts, this.nextTimelinePartId('artifact'), artifact)
     },
     activeAssistantMessage() {
       for (let index = this.messages.length - 1; index >= 0; index -= 1) {
@@ -854,9 +976,7 @@ export default {
       if (event.type === 'agent_message') {
         if (event.text) {
           assistantMessage.ephemeralReasoning = ''
-          assistantMessage.content = assistantMessage.content
-            ? `${assistantMessage.content}\n\n${event.text}`
-            : event.text
+          this.appendAssistantMarkdown(assistantMessage, event.text)
         }
       } else if (event.type === 'reasoning') {
         assistantMessage.ephemeralReasoning = event.text || 'Working through the trace evidence...'
@@ -881,15 +1001,8 @@ export default {
         assistantMessage.ephemeralReasoning = event.detail || event.title || 'Calling a tool...'
         this.addActivity(assistantMessage, event)
       } else if (event.type === 'artifact' && event.artifact) {
-        const existing = assistantMessage.artifacts.some((artifact) => artifact.id === event.artifact.id)
-        if (!existing) assistantMessage.artifacts.push(event.artifact)
+        this.appendAssistantArtifact(assistantMessage, event.artifact)
         this.notifySessionArtifactUpdated(event.artifact)
-        this.addActivity(assistantMessage, {
-          level: 'highlight',
-          category: 'artifact',
-          title: 'Artifact ready',
-          detail: event.artifact.title,
-        })
       } else if (event.type === 'error') {
         this.addActivity(assistantMessage, {
           level: 'error',
@@ -913,7 +1026,7 @@ export default {
         assistantMessage.activityOpen = false
         assistantMessage.loading = false
         this.addActivity(assistantMessage, event)
-        if (!assistantMessage.content) assistantMessage.content = 'Stopped before completion.'
+        if (!assistantMessage.content) this.appendAssistantMarkdown(assistantMessage, 'Stopped before completion.')
       } else if (event.type === 'done') {
         assistantMessage.ephemeralReasoning = ''
         assistantMessage.thinkingOpen = false
@@ -955,7 +1068,7 @@ export default {
         if (done) break
       }
     },
-    async sendToCodex(content, codexAttachments, assistantMessage) {
+    async sendToCodex({ content, displayContent, presetKind, codexAttachments, attachmentMetadata, assistantMessage }) {
       if (!this.sessionId) {
         throw new Error('No ManiScope session is active yet.')
       }
@@ -968,7 +1081,10 @@ export default {
         body: JSON.stringify({
           threadKey: 'trace-analysis',
           message: content,
+          displayMessage: displayContent,
+          presetKind,
           attachments: codexAttachments,
+          attachmentMetadata,
           includeCurrentTrace: true,
           includeCurrentViews: true,
           workspaceRole: this.workspaceRole,
@@ -1113,6 +1229,7 @@ export default {
           loading: true,
           activity: [],
           artifacts: [],
+          parts: [],
           activityOpen: false,
           thinkingOpen: true,
           ephemeralReasoning: '',
@@ -1121,11 +1238,18 @@ export default {
         this.messages.push(nextAssistantMessage)
         assistantMessage = this.messages[this.messages.length - 1]
         this.scrollToBottom()
-        await this.sendToCodex(content, codexAttachments, assistantMessage)
+        await this.sendToCodex({
+          content,
+          displayContent,
+          presetKind,
+          codexAttachments,
+          attachmentMetadata: attachments,
+          assistantMessage,
+        })
         assistantMessage.loading = false
         assistantMessage.ephemeralReasoning = ''
         if (!assistantMessage.content && assistantMessage.artifacts.length > 0) {
-          assistantMessage.content = 'Generated artifacts are available below.'
+          assistantMessage.content = 'Generated artifacts are available in this response.'
         }
       } catch (error) {
         const errorText = error && error.message ? error.message : String(error)
@@ -1143,6 +1267,13 @@ export default {
             content: `Error: ${errorText}`,
             activity: [],
             artifacts: [],
+            parts: [
+              {
+                id: this.nextTimelinePartId('markdown'),
+                type: TIMELINE_PART_TYPES.MARKDOWN,
+                text: `Error: ${errorText}`,
+              },
+            ],
             createdAt: new Date().toISOString(),
           })
         }
@@ -1153,9 +1284,6 @@ export default {
           assistantMessage.thinkingOpen = false
           assistantMessage.activityOpen = false
         }
-        await this.persistChatHistory().catch((error) => {
-          console.error('CodexChatSidebar: failed to persist chat history', error)
-        })
         this.sending = false
         this.stopRequested = false
         this.scrollToBottom()
@@ -1328,6 +1456,12 @@ export default {
   border-color: #2b6cb0;
 }
 
+.codex-chat-message.user .message-bubble.message-bubble-preset {
+  background: #fff;
+  color: #243044;
+  border-color: #dbe3ec;
+}
+
 .message-text {
   white-space: pre-wrap;
 }
@@ -1337,9 +1471,7 @@ export default {
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  padding: 2px 8px;
+  padding: 0;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1362,6 +1494,17 @@ export default {
 
 .message-markdown {
   overflow-wrap: anywhere;
+}
+
+.message-markdown + .message-markdown,
+.message-markdown + .message-activity-sequence,
+.message-markdown + .message-artifacts-inline,
+.message-activity-sequence + .message-markdown,
+.message-activity-sequence + .message-artifacts-inline,
+.message-artifacts-inline + .message-markdown,
+.message-artifacts-inline + .message-activity-sequence,
+.message-artifacts-inline + .message-artifacts-inline {
+  margin-top: 8px;
 }
 
 .message-markdown :deep(p) {
@@ -1443,15 +1586,11 @@ export default {
   white-space: pre-wrap;
 }
 
-.message-activity {
-  padding-top: 0;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #edf2f7;
-}
-
-.message-activity-after-thinking {
-  border-top: 1px solid #edf2f7;
-  padding-top: 6px;
+.message-activity-sequence {
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 7px;
+  background: #fff;
 }
 
 .activity-header {
@@ -1506,9 +1645,19 @@ export default {
 }
 
 .activity-item-latest {
-  padding: 4px 6px;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 0;
   font-size: 10.5px;
-  background: #fff;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.activity-toggle-inline {
+  align-self: center;
+  margin-left: 10px;
+  white-space: nowrap;
 }
 
 .activity-dot {
@@ -1581,6 +1730,14 @@ export default {
   opacity: 0.75;
 }
 
+.activity-item-latest.activity-highlight,
+.activity-item-latest.activity-primary,
+.activity-item-latest.activity-error,
+.activity-item-latest.activity-debug {
+  background: transparent;
+  border-color: transparent;
+}
+
 .activity-running .activity-dot {
   animation: codex-pulse 1.25s ease-out infinite;
 }
@@ -1590,6 +1747,10 @@ export default {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+
+.message-artifacts-inline {
+  margin-top: 0;
 }
 
 .artifact-link {

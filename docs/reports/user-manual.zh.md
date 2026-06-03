@@ -171,6 +171,8 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 聊天历史和生成的 artifacts 在会话层级共享。智能体提示词会区分三类上下文：共享的 canonical trace、人的当前状态，以及智能体私有的探索状态。智能体的可视探索应使用 Agent Workspace，并且不应追加到人的动作 trace，除非你明确要求生成持久 artifacts 或 reasoning patches。
 
+Codex Chat 历史会在智能体流式输出时增量保存。如果你在长回合中刷新页面，或浏览器连接中断，已经收到的文本、活动更新和 artifact chip 会作为部分 transcript 重新加载，而不会消失。被中断的助手回合会标记为部分结果，已经生成的 artifact 仍然可以打开，因为它们保存在会话文件中。
+
 在 baseline 会话中，Codex Chat 使用 `/api/base/chat/...`，文件存储在 `.maniscope-chat/baseline-sessions/{sessionId}`。聊天面板会标记为 `Baseline`，Agent Workspace 入口、分析快捷按钮和右侧面板的 LLM Analysis 标签页都会隐藏，提示词只描述价格操纵分析任务和可用原始数据，不包含专门的 trace-analysis 指令。
 
 每个聊天会话根目录都包含用于临时脚本的项目模板：`pyproject.toml` 用于通过 `uv` 运行 Python，`package.json` 用于通过 `bun` 运行 JavaScript 或 TypeScript。智能体可以在该会话内添加依赖；生成的证据、报告和导出文件应放在 `artifacts/`。
@@ -183,9 +185,9 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 当 LLM Analysis 中已经有 `reasoning-graph.json` 后，**Update Analysis** 按钮会显示在 **Run Full Analysis** 右侧。它会发送增量分析 prompt，要求 Codex 对比最新 graph 或 patch anchor 与当前 live trace，只分析新增的交互和标注，在有新证据时写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`，验证 graph 与 patch，并同时给出技术审计和面向人的英文解释摘要。聊天历史中，这两个快捷请求会显示为简短标签，例如 `Run full analysis` 和 `Update analysis`，不会显示完整的隐藏 prompt 文本。
 
-在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。Agent Activity 默认折叠，只保留最新一条活动作为紧凑状态卡可见；你可以展开查看完整活动流。回合完成后，这些区域会再次折叠。
+在智能体回合中，临时的 Thinking 面板可能会显示在助手回复上方，用来展示实时进度。持久的 Agent Activity 会按照流式事件到达顺序嵌入到回复正文中。连续的活动事件默认折叠成一个小卡片，只显示该序列中的最新活动；展开卡片后可以查看完整活动流，以及可用的命令输出。
 
-助手回复可以包含 Markdown 文本、生成的 artifact、JSON 文件、Markdown 报告和图片预览。当智能体在回复中提到本地图片、Markdown 或 JSON 路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的 artifact 根目录下，ManiScope 会通过会话 artifact 接口生成链接。有效图片会被复制到会话的 `artifacts/` 文件夹用于预览；Markdown 和 JSON 输出会显示为可下载的 artifact 链接。聊天中生成的文件通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析 artifact 则应保存到对应 trace 的 `analysis-results/` 文件夹。
+助手回复可以包含 Markdown 文本、生成的 artifact、JSON 文件、Markdown 报告和图片预览。生成的 artifact chip 会出现在 ManiScope 收到它们的对应位置，因此你可以看到某个文件是在某条状态更新或解释之后创建的。当智能体在回复中提到本地图片、Markdown 或 JSON 路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的 artifact 根目录下，ManiScope 会通过会话 artifact 接口生成链接。有效图片会被复制到会话的 `artifacts/` 文件夹用于预览；Markdown 和 JSON 输出会显示为可下载的 artifact 链接。聊天中生成的文件通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析 artifact 则应保存到对应 trace 的 `analysis-results/` 文件夹。
 
 对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。bridge 会先等待 Agent Workspace 的可视化数据完成加载，再提取当前渲染参数。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
 
