@@ -35,7 +35,6 @@ REASONING_GRAPH_NAME = "reasoning-graph.json"
 REASONING_GRAPH_PATCH_RE = re.compile(r"^reasoning-graph-patch(?:-.+)?\.json$")
 SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
-DEBUG_TRACE_API_ENV = "MANISCOPE_ENABLE_DEBUG_TRACE_API"
 
 
 def _now_iso() -> str:
@@ -157,10 +156,6 @@ def _trace_anchor(session_id: str, live_session: dict[str, Any]) -> dict[str, An
     if last_annotation_id is not None:
         anchor["lastAnnotationId"] = last_annotation_id
     return anchor
-
-
-def _debug_trace_api_enabled() -> bool:
-    return os.environ.get(DEBUG_TRACE_API_ENV, "").lower() in {"1", "true", "yes", "on"}
 
 
 def _analysis_artifact_info(
@@ -524,26 +519,6 @@ def _process_current_state_images(
             processed[view_name] = value
             image_count += 1
     current_state["majorViewScreenshots"] = processed
-    return image_count
-
-
-def _process_imported_image_map(session_dir: Path, images: Any) -> int:
-    if images is None:
-        return 0
-    if not isinstance(images, dict):
-        raise HTTPException(status_code=400, detail="images must be an object mapping image paths to data URLs")
-    image_count = 0
-    base_dir = session_dir.resolve()
-    for relative_path, data_url in images.items():
-        if not isinstance(relative_path, str) or not relative_path.startswith("images/"):
-            raise HTTPException(status_code=400, detail="Imported image paths must be relative images/ paths")
-        target_path = (session_dir / relative_path).resolve()
-        try:
-            target_path.relative_to(base_dir)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Imported image path escapes the session directory")
-        if _write_data_url_image(session_dir, relative_path, data_url):
-            image_count += 1
     return image_count
 
 
@@ -913,64 +888,6 @@ def _get_session_versions(session_id: str, limit: int = 50, session_mode: str = 
         "sessionId": session_id,
         "sessionMode": session_mode,
         "versions": versions,
-    }
-
-
-@router.post("/{session_id}/debug/trace/append-import")
-def append_imported_trace_slice(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
-    if not _debug_trace_api_enabled():
-        raise HTTPException(status_code=404, detail="Debug trace API is disabled")
-
-    appended_actions = copy.deepcopy(body.get("userActionSequence") or [])
-    appended_annotations = copy.deepcopy(body.get("annotationRecords") or [])
-    current_state = copy.deepcopy(body.get("currentState") or {})
-    if not isinstance(appended_actions, list):
-        raise HTTPException(status_code=400, detail="userActionSequence must be an array")
-    if not isinstance(appended_annotations, list):
-        raise HTTPException(status_code=400, detail="annotationRecords must be an array")
-    if not isinstance(current_state, dict):
-        raise HTTPException(status_code=400, detail="currentState must be an object")
-
-    session_dir, meta, _ = _ensure_session(session_id, coin=body.get("coin"), session_mode="specialized")
-    live_session = _load_live_session(session_dir, session_id, coin=body.get("coin"))
-    existing_current_state = _read_json(session_dir / "current-state.json") or {}
-    before_anchor = _trace_anchor(session_id, live_session)
-    actions, annotations = _normalize_trace_lists(live_session)
-    actions.extend(appended_actions)
-    annotations.extend(appended_annotations)
-    imported_image_count = _process_imported_image_map(session_dir, body.get("images"))
-
-    _apply_trace_context(
-        live_session,
-        existing_current_state,
-        {
-            "coin": body.get("coin"),
-            "annotationSeqId": body.get("annotationSeqId"),
-            "snapshotCategories": body.get("snapshotCategories"),
-            "snapshotQuality": body.get("snapshotQuality"),
-            "currentState": current_state,
-        },
-    )
-    result = _write_trace_state(
-        session_id,
-        session_dir,
-        meta,
-        live_session,
-        existing_current_state,
-        "trace_append_import",
-        {
-            "coin": body.get("coin"),
-            "appendedActions": len(appended_actions),
-            "appendedAnnotations": len(appended_annotations),
-        },
-    )
-    return {
-        **result,
-        "beforeAnchor": before_anchor,
-        "afterAnchor": result["traceAnchor"],
-        "appendedActionCount": len(appended_actions),
-        "appendedAnnotationCount": len(appended_annotations),
-        "importedImageCount": imported_image_count,
     }
 
 

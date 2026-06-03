@@ -4,7 +4,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 
 SERVER_DIR = Path(__file__).resolve().parents[1]
@@ -177,67 +176,6 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
                 with self.assertRaises(Exception) as symlink_error:
                     module.get_session_artifact("abcde", "escape.png")
                 self.assertEqual(symlink_error.exception.status_code, 400)
-            finally:
-                module.SESSIONS_DIR = original_sessions_dir
-
-    def test_debug_append_import_is_disabled_by_default(self):
-        module = load_chat_session_service()
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            original_sessions_dir = module.SESSIONS_DIR
-            try:
-                module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
-                with patch.dict(os.environ, {module.DEBUG_TRACE_API_ENV: ""}, clear=False):
-                    with self.assertRaises(Exception) as error:
-                        module.append_imported_trace_slice("abcde", {"userActionSequence": []})
-                self.assertEqual(error.exception.status_code, 404)
-            finally:
-                module.SESSIONS_DIR = original_sessions_dir
-
-    def test_debug_append_import_preserves_trace_slice_and_returns_anchors(self):
-        module = load_chat_session_service()
-        png_data_url = "data:image/png;base64,iVBORw0KGgo="
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            original_sessions_dir = module.SESSIONS_DIR
-            try:
-                module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
-                with patch.dict(os.environ, {module.DEBUG_TRACE_API_ENV: "true"}, clear=False):
-                    result = module.append_imported_trace_slice(
-                        "abcde",
-                        {
-                            "coin": "ACT",
-                            "userActionSequence": [
-                                {
-                                    "actionType": "select_card",
-                                    "sourceView": "kline_chart",
-                                    "sourceSnapshot": [
-                                        {"viewName": "kline_chart", "dataUrl": png_data_url}
-                                    ],
-                                }
-                            ],
-                            "annotationRecords": [
-                                {
-                                    "id": 7,
-                                    "sourceView": "behavior_details",
-                                    "sketchDataUrl": png_data_url,
-                                }
-                            ],
-                            "images": {
-                                "images/imported-extra.png": png_data_url,
-                            },
-                            "currentState": {"selectedUsers": ["wallet"]},
-                        },
-                    )
-
-                live_session = module._read_json(module.SESSIONS_DIR / "abcde" / "live-session.json")
-                self.assertEqual(result["beforeAnchor"]["traceRevision"], 0)
-                self.assertEqual(result["afterAnchor"]["traceRevision"], 1)
-                self.assertEqual(result["afterAnchor"]["actionCount"], 1)
-                self.assertEqual(result["afterAnchor"]["annotationCount"], 1)
-                self.assertEqual(live_session["traceAnchor"], result["afterAnchor"])
-                self.assertEqual(live_session["userActionSequence"][0]["sourceSnapshot"][0]["imagePath"], "images/action-0001-source-kline_chart-01.png")
-                self.assertEqual(live_session["annotationRecords"][0]["sketchImagePath"], "images/annotation-0007-behavior_details.png")
-                self.assertTrue((module.SESSIONS_DIR / "abcde" / "images" / "imported-extra.png").exists())
-                self.assertTrue(result["git"]["committed"])
             finally:
                 module.SESSIONS_DIR = original_sessions_dir
 

@@ -7,6 +7,7 @@ import argparse
 import base64
 import json
 import shutil
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,14 @@ def copy_referenced_images(trace_dir: Path, output_dir: Path, payload: dict[str,
         shutil.copy2(source_path, target_path)
 
 
+def write_zip_from_dir(source_dir: Path, zip_path: Path) -> None:
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(source_dir.rglob("*")):
+            if path.is_file():
+                archive.write(path, path.relative_to(source_dir))
+
+
 def append_image_map(trace_dir: Path, payload: dict[str, Any]) -> dict[str, str]:
     images: dict[str, str] = {}
     for image_path in sorted(set(iter_image_paths(payload))):
@@ -89,23 +98,33 @@ def main() -> None:
     part_a["annotationRecords"] = annotations[:annotation_cut]
 
     append_payload = {
+        "exportVersion": source.get("exportVersion") or "1.0",
+        "exportFormat": "patch-trace-only-for-testing",
+        "exportedAt": source.get("exportedAt"),
+        "isPatchTraceOnlyForTesting": True,
         "coin": source.get("coin"),
+        "includesSnapshots": True,
+        "imageDirectory": "images",
         "annotationSeqId": source.get("annotationSeqId"),
-        "snapshotCategories": (source.get("config") or {}).get("snapshotCategories"),
-        "snapshotQuality": (source.get("config") or {}).get("snapshotQuality"),
+        "config": source.get("config") or {},
         "userActionSequence": actions[action_cut:],
         "annotationRecords": annotations[annotation_cut:],
     }
     append_payload["images"] = append_image_map(trace_dir, append_payload)
+    append_payload["imageCount"] = len(append_payload["images"])
 
     output_dir = args.output_dir.resolve()
     part_a_dir = output_dir / "part-a"
     write_json(part_a_dir / "session.json", part_a)
     copy_referenced_images(trace_dir, part_a_dir, part_a)
-    write_json(output_dir / "part-b-append-import.json", append_payload)
+    part_a_zip = output_dir / "part-a-session.zip"
+    write_zip_from_dir(part_a_dir, part_a_zip)
+    part_b_path = output_dir / "part-b-patch-import.json"
+    write_json(part_b_path, append_payload)
 
     print(f"Wrote {part_a_dir / 'session.json'}")
-    print(f"Wrote {output_dir / 'part-b-append-import.json'}")
+    print(f"Wrote {part_a_zip}")
+    print(f"Wrote {part_b_path}")
     print(f"Part A actions/annotations: {len(part_a['userActionSequence'])}/{len(part_a['annotationRecords'])}")
     print(f"Part B actions/annotations: {len(append_payload['userActionSequence'])}/{len(append_payload['annotationRecords'])}")
 

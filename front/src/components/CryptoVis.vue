@@ -1241,6 +1241,10 @@ export default {
       if (!file) return
       try {
         const parsed = await parseImportFile(file)
+        if (parsed.isPatchTraceOnlyForTesting) {
+          this.applyPatchTraceImport(parsed)
+          return
+        }
         const isEmpty =
           this.userActionSequence.length === 0 &&
           this.annotationRecords.length === 0
@@ -1261,6 +1265,29 @@ export default {
     cancelImport() {
       this.showImportConflictDialog = false
       this.pendingImportPayload = null
+    },
+    applyPatchTraceImport(parsed) {
+      if (this.isAgentWorkspace || !parsed) return
+      this.userActionSequence = [
+        ...this.userActionSequence,
+        ...(parsed.userActionSequence || []),
+      ]
+      this.annotationRecords = [
+        ...this.annotationRecords,
+        ...(parsed.annotationRecords || []),
+      ]
+      const maxId = this.annotationRecords.reduce(
+        (m, a) => (Number.isFinite(a?.id) && a.id > m ? a.id : m),
+        -1
+      )
+      this._annotationSeqId = Math.max(
+        Number.isFinite(parsed.annotationSeqId) ? parsed.annotationSeqId : 0,
+        maxId + 1
+      )
+      this.showImportConflictDialog = false
+      this.pendingImportPayload = null
+      this.activeBottomTab = 'tree'
+      this.scheduleLiveTraceSync(0)
     },
     // ezio: replace current session with imported payload
     applyImport() {

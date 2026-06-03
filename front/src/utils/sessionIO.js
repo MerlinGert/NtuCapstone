@@ -46,6 +46,19 @@ function dataUrlToBytes(dataUrl) {
   return bytes
 }
 
+function uint8ToBase64(bytes) {
+  let binary = ''
+  const chunkSize = 8192
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+function imageBytesToDataUrl(bytes) {
+  return `data:image/png;base64,${uint8ToBase64(bytes)}`
+}
+
 function extractSnapshotImages(actions, images) {
   return actions.map((action, actionIndex) => {
     const copy = { ...action }
@@ -192,74 +205,71 @@ function validatePayload(obj) {
     throw new Error('Invalid session file: annotationRecords must be an array')
 }
 
+function restoreReferencedImages(payload, imageDataUrls) {
+  if (!imageDataUrls || Object.keys(imageDataUrls).length === 0) return payload
+
+  payload.userActionSequence = payload.userActionSequence.map((action) => {
+    const copy = { ...action }
+    ;['sourceSnapshot', 'targetSnapshot'].forEach((field) => {
+      if (!Array.isArray(copy[field])) return
+      copy[field] = copy[field].map((snapshot) => {
+        if (!snapshot || !snapshot.imagePath) return snapshot
+        const dataUrl = imageDataUrls[snapshot.imagePath]
+        if (!dataUrl) return snapshot
+        const s = { ...snapshot, dataUrl }
+        delete s.imagePath
+        return s
+      })
+    })
+    return copy
+  })
+
+  payload.annotationRecords = payload.annotationRecords.map((anno) => {
+    if (!anno.sketchImagePath) return anno
+    const dataUrl = imageDataUrls[anno.sketchImagePath]
+    if (!dataUrl) return anno
+    const a = { ...anno, sketchDataUrl: dataUrl }
+    delete a.sketchImagePath
+    return a
+  })
+
+  return payload
+}
+
+export function normalizeImportPayload(parsed, imageDataUrls = {}) {
+  validatePayload(parsed)
+  const payload = cloneJson(parsed)
+  restoreReferencedImages(payload, imageDataUrls)
+
+  const maxAnnId = payload.annotationRecords.reduce(
+    (m, a) => (Number.isFinite(a?.id) && a.id > m ? a.id : m),
+    -1
+  )
+  return {
+    userActionSequence: payload.userActionSequence,
+    annotationRecords: payload.annotationRecords,
+    annotationSeqId: Number.isFinite(payload.annotationSeqId)
+      ? payload.annotationSeqId
+      : maxAnnId + 1,
+    isPatchTraceOnlyForTesting: payload.isPatchTraceOnlyForTesting === true,
+    meta: {
+      exportVersion: payload.exportVersion,
+      exportedAt: payload.exportedAt || null,
+      coin: payload.coin || null,
+      includesSnapshots: !!payload.includesSnapshots,
+      config: payload.config || null,
+    },
+  }
+}
+
 export function parseImportFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('Failed to read file'))
 
-    const uint8ToBase64 = (bytes) => {
-      let binary = ''
-      const chunkSize = 8192
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-      }
-      return btoa(binary)
-    }
-
-    const processPayload = (parsed, imageFiles) => {
+    const processPayload = (parsed, imageDataUrls) => {
       try {
-        validatePayload(parsed)
-
-        // Restore image dataUrls from zip image files if available
-        if (imageFiles && Object.keys(imageFiles).length > 0) {
-          // Restore snapshots in actions
-          parsed.userActionSequence = parsed.userActionSequence.map((action) => {
-            const copy = { ...action }
-            ;['sourceSnapshot', 'targetSnapshot'].forEach((field) => {
-              if (!Array.isArray(copy[field])) return
-              copy[field] = copy[field].map((snapshot) => {
-                if (!snapshot || !snapshot.imagePath) return snapshot
-                const imgBytes = imageFiles[snapshot.imagePath]
-                if (!imgBytes) return snapshot
-                const b64 = uint8ToBase64(imgBytes)
-                const s = { ...snapshot, dataUrl: `data:image/png;base64,${b64}` }
-                delete s.imagePath
-                return s
-              })
-            })
-            return copy
-          })
-
-          // Restore sketchDataUrl in annotations
-          parsed.annotationRecords = parsed.annotationRecords.map((anno) => {
-            if (!anno.sketchImagePath) return anno
-            const imgBytes = imageFiles[anno.sketchImagePath]
-            if (!imgBytes) return anno
-            const b64 = uint8ToBase64(imgBytes)
-            const a = { ...anno, sketchDataUrl: `data:image/png;base64,${b64}` }
-            delete a.sketchImagePath
-            return a
-          })
-        }
-
-        const maxAnnId = parsed.annotationRecords.reduce(
-          (m, a) => (Number.isFinite(a?.id) && a.id > m ? a.id : m),
-          -1
-        )
-        resolve({
-          userActionSequence: parsed.userActionSequence,
-          annotationRecords: parsed.annotationRecords,
-          annotationSeqId: Number.isFinite(parsed.annotationSeqId)
-            ? parsed.annotationSeqId
-            : maxAnnId + 1,
-          meta: {
-            exportVersion: parsed.exportVersion,
-            exportedAt: parsed.exportedAt || null,
-            coin: parsed.coin || null,
-            includesSnapshots: !!parsed.includesSnapshots,
-            config: parsed.config || null,
-          },
-        })
+        resolve(normalizeImportPayload(parsed, imageDataUrls))
       } catch (err) {
         reject(err instanceof Error ? err : new Error(String(err)))
       }
@@ -278,14 +288,14 @@ export function parseImportFile(file) {
           const parsed = JSON.parse(jsonText)
 
           // Collect image files: keys that start with "images/"
-          const imageFiles = {}
+          const imageDataUrls = {}
           Object.keys(unzipped).forEach((key) => {
             if (key.startsWith('images/')) {
-              imageFiles[key] = unzipped[key]
+              imageDataUrls[key] = imageBytesToDataUrl(unzipped[key])
             }
           })
 
-          processPayload(parsed, imageFiles)
+          processPayload(parsed, imageDataUrls)
         } catch (err) {
           reject(err instanceof Error ? err : new Error(String(err)))
         }
@@ -295,7 +305,10 @@ export function parseImportFile(file) {
       reader.onload = () => {
         try {
           const parsed = JSON.parse(String(reader.result || ''))
-          processPayload(parsed, {})
+          const imageDataUrls = parsed && typeof parsed.images === 'object' && parsed.images
+            ? parsed.images
+            : {}
+          processPayload(parsed, imageDataUrls)
         } catch (err) {
           reject(err instanceof Error ? err : new Error(String(err)))
         }
