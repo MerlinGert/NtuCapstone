@@ -181,7 +181,7 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 消息输入框上方的 **Run Full Analysis** 按钮会发送一个预设请求：`please run a pass of full trace analysis with a subagent for finding counter-evidence.` 这是启动完整 trace 分析流程的快捷方式，不需要手动输入这段 prompt。
 
-当 LLM Analysis 中已经有 `reasoning-graph.json` 后，**Update Analysis** 按钮会显示在 **Run Full Analysis** 右侧。它会发送增量分析 prompt，要求 Codex 对比最新 graph 或 patch anchor 与当前 live trace，只分析新增的交互和标注，在有新证据时写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`，验证 graph 与 patch，并同时给出技术审计和面向人的英文解释摘要。
+当 LLM Analysis 中已经有 `reasoning-graph.json` 后，**Update Analysis** 按钮会显示在 **Run Full Analysis** 右侧。它会发送增量分析 prompt，要求 Codex 对比最新 graph 或 patch anchor 与当前 live trace，只分析新增的交互和标注，在有新证据时写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`，验证 graph 与 patch，并同时给出技术审计和面向人的英文解释摘要。聊天历史中，这两个快捷请求会显示为简短标签，例如 `Run full analysis` 和 `Update analysis`，不会显示完整的隐藏 prompt 文本。
 
 在智能体回合中，Thinking 和 Agent Activity 会显示在助手回复上方。Agent Activity 默认折叠，只保留最新一条活动作为紧凑状态卡可见；你可以展开查看完整活动流。回合完成后，这些区域会再次折叠。
 

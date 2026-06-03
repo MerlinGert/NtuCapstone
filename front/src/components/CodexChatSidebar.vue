@@ -102,7 +102,13 @@
             class="message-markdown"
             v-html="renderMarkdown(message.content)"
           ></div>
-          <div v-else-if="message.content" class="message-text">{{ message.content }}</div>
+          <div
+            v-else-if="message.content"
+            class="message-text"
+            :class="{ 'message-preset-text': message.presetKind }"
+          >
+            {{ message.content }}
+          </div>
           <div v-if="message.artifacts && message.artifacts.length" class="message-artifacts">
             <a
               v-for="artifact in message.artifacts"
@@ -608,6 +614,7 @@ export default {
           ? message.activity.map((activity, index) => this.normalizeActivity(activity, `${fallbackId}-${index + 1}`))
           : [],
         artifacts: Array.isArray(message.artifacts) ? message.artifacts : [],
+        presetKind: String(message.presetKind || ''),
         activityOpen: Boolean(message.activityOpen),
         threadId: message.threadId || '',
         createdAt: message.createdAt || '',
@@ -624,6 +631,7 @@ export default {
         attachments: message.attachments || [],
         activity: (message.activity || []).filter((activity) => !activity.ephemeral),
         artifacts: message.artifacts || [],
+        presetKind: message.presetKind || '',
         activityOpen: Boolean(message.activityOpen),
         threadId: message.threadId || '',
         createdAt: message.createdAt || '',
@@ -1027,6 +1035,8 @@ export default {
     async sendFullAnalysisPrompt() {
       await this.sendMessage({
         contentOverride: FULL_ANALYSIS_PROMPT,
+        displayContent: 'Run full analysis',
+        presetKind: 'full_analysis',
         includeAttachments: false,
         clearDraft: false,
       })
@@ -1035,15 +1045,20 @@ export default {
       if (!this.analysisGraphAvailable) return
       await this.sendMessage({
         contentOverride: UPDATE_ANALYSIS_PROMPT,
+        displayContent: 'Update analysis',
+        presetKind: 'update_analysis',
         includeAttachments: false,
         clearDraft: false,
       })
     },
     async sendMessage(options = {}) {
       const contentOverride = typeof options.contentOverride === 'string' ? options.contentOverride : null
+      const displayContentOverride = typeof options.displayContent === 'string' ? options.displayContent : null
+      const presetKind = typeof options.presetKind === 'string' ? options.presetKind : ''
       const includeAttachments = options.includeAttachments !== false
       const clearDraft = options.clearDraft !== false
       const content = (contentOverride ?? this.draft).trim()
+      const displayContent = (displayContentOverride ?? content).trim()
       const attachmentSource = includeAttachments ? this.attachments : []
       if (this.sending || (!content && attachmentSource.length === 0)) return
 
@@ -1058,8 +1073,9 @@ export default {
       this.messages.push({
         id: this.nextMessageId++,
         role: 'user',
-        content,
+        content: displayContent,
         attachments,
+        presetKind,
         createdAt: new Date().toISOString(),
       })
       if (clearDraft) this.draft = ''
@@ -1308,6 +1324,27 @@ export default {
 
 .message-text {
   white-space: pre-wrap;
+}
+
+.message-preset-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  padding: 2px 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.message-preset-text::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.75;
 }
 
 .message-status-stack {
