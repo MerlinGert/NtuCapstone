@@ -414,6 +414,14 @@ Evidence discipline:
 - For major Hypotheses and high-level Findings, include a disconfirmation pass. When functions.spawn_agent is available, spawn a skeptical subagent as a full-context fork by passing fork_context: true and a bounded message only. Do not specify agent_type, model, or reasoning_effort. Tell the subagent to read ${relativeSessionRoot}/skills/maniscope-disconfirmation/SKILL.md first. Verify candidate negative Findings before adding "contradicts", "refines", or Reasoning Gap entries.
 - If a conclusion is uncertain, say what would confirm, weaken, or falsify it.
 
+Parallel subagent orchestration:
+- During full analysis, after writing and validating the base reasoning-graph.json and forming the recommendation or investigation plan, consider spawning 2-4 high-value evidence-only subagents for independent branches.
+- Use subagents for support evidence for major user Hypotheses, answer evidence for central AnalyticQuestions, executed Hypothesis Expansion branches, and skeptical or counterevidence review.
+- Spawn subagents only as full-context forks with fork_context: true and a bounded assignment message. Do not specify agent_type, model, reasoning_effort, or other extra config.
+- Subagents may read trace, data, screenshots, and artifacts; run scripts; render visual evidence; and write uniquely named evidence files under ${relativeSessionRoot}/artifacts.
+- Subagents must not edit reasoning-graph.json or any reasoning-graph-patch*.json file. They should report candidate Findings, evidence paths, suggested relations, uncertainty, rejected checks, deferred checks, and any files they created.
+- The main agent owns graph integrity: verify subagent outputs, resolve conflicts, write all graph patch files, and run validation before reporting completion.
+
 # Visualization Tools
 
 Major ManiScope views:
@@ -483,15 +491,16 @@ Full trace-level analysis pipeline:
 1. Refresh the canonical trace, Human Workspace state, Agent Workspace state, session git history, screenshots, annotations, and any existing analysis artifacts.
 2. Build and write ${relativeSessionRoot}/artifacts/reasoning-graph.json first from user Interactions upward through Tasks, AnalyticQuestions, AnalyticActivities, low-level Findings, mid-level answer Findings, high-level synthesis Findings, and Hypotheses.
 3. Validate reasoning-graph.json with bun trace_analysis_tools/reasoning_graph/cli.ts artifacts. Fix graph errors and missing user Finding nodes before continuing.
-4. Run a disconfirmation pass for major Hypotheses and high-level Findings. Prefer spawning a skeptical subagent with fork_context: true and message only. Do not specify agent_type, model, or reasoning_effort. Verify its candidate negative Findings before integrating them.
-5. Identify Reasoning Gaps where observed user evidence does not sufficiently support a Finding, Hypothesis, or implied AnalyticQuestion.
-6. Build Recommendation Plan Forests for Evidence Completion and Hypothesis Expansion when applicable. Plans must be top-down: Hypothesis or AnalyticQuestion -> InvestigationStrategy -> AnalyticActivity -> Interaction -> ExpectedFinding.
+4. Identify Reasoning Gaps where observed user evidence does not sufficiently support a Finding, Hypothesis, or implied AnalyticQuestion.
+5. Build Recommendation Plan Forests for Evidence Completion and Hypothesis Expansion when applicable. Plans must be top-down: Hypothesis or AnalyticQuestion -> InvestigationStrategy -> AnalyticActivity -> Interaction -> ExpectedFinding.
+6. Decide which branches can run in parallel. Prefer evidence-only subagents for independent support-seeking, answer-seeking, adjacent-hypothesis investigation, and skeptical review. Keep graph and patch writing in the main thread.
 7. Execute the highest-value recommended InvestigationStrategies instead of stopping at recommendations. Use Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions as needed.
 8. Generate rendered visual evidence with the Python helper for visual claims, compute exact statistics for quantitative claims, and vary model or render parameters when robustness matters.
-9. Record follow-up evidence as Reasoning Graph Patches.
-10. For each executed Hypothesis Expansion branch, decide whether the proposed adjacent Hypothesis is supported, rejected, deferred, or unsupported. Supported adjacent Hypotheses must become new agent-authored Hypothesis nodes with supporting Finding edges and add_root operations. Rejected, deferred, or unsupported branches must be stated explicitly.
-11. Validate reasoning-graph.json plus all reasoning-graph-patch*.json files together.
-12. Save durable artifacts under ${relativeSessionRoot}/artifacts, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
+9. Review subagent outputs, verify their evidence, reject or defer weak branches, and integrate only verified candidate Findings.
+10. Record follow-up evidence as Reasoning Graph Patches.
+11. For each executed Hypothesis Expansion branch, decide whether the proposed adjacent Hypothesis is supported, rejected, deferred, or unsupported. Supported adjacent Hypotheses must become new agent-authored Hypothesis nodes with supporting Finding edges and add_root operations. Rejected, deferred, or unsupported branches must be stated explicitly.
+12. Validate reasoning-graph.json plus all reasoning-graph-patch*.json files together.
+13. Save durable artifacts under ${relativeSessionRoot}/artifacts, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
 
 Incremental trace analysis pipeline:
 1. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest.

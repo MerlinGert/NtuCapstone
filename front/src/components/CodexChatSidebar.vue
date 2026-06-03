@@ -243,7 +243,13 @@
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 
-const FULL_ANALYSIS_PROMPT = 'please run a pass of full trace analysis with a subagent for finding counter-evidence.'
+const FULL_ANALYSIS_PROMPT = `Please run a pass of full trace analysis for the current session.
+
+After reconstructing the user reasoning graph and validating reasoning-graph.json, form the recommendation and investigation plan. When useful, spawn evidence-only subagents for independent branches such as support-seeking for major user Hypotheses, answer-seeking for central AnalyticQuestions, adjacent-hypothesis investigation, and skeptical or counterevidence review.
+
+Use subagents only as full-context forks with fork_context: true and no extra config. Subagents may create uniquely named evidence files under ./artifacts, but the main agent must verify their outputs and must be the only writer of reasoning-graph.json and reasoning-graph-patch*.json files.
+
+Execute the highest-value follow-up checks, validate the graph plus patches, and end with the key findings in plain English.`
 const UPDATE_ANALYSIS_PROMPT = `Please run an incremental trace analysis pass for the current session.
 
 Do not redo the full trace analysis unless incremental analysis is unsafe. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest. Compare the latest graph or patch trace anchor against the current live trace anchor.
