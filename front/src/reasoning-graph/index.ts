@@ -674,7 +674,9 @@ export function validateReasoningGraphPatch(
     if (op === 'add_root') requireString(operation.id, `operations[${index}].id`, fileName)
   })
 
-  if (isSkepticalPatchFile(fileName)) validateSkepticalPatchFindings(rawOperations, fileName)
+  if (patchType === 'skeptical' || isSkepticalPatchFile(fileName)) {
+    validateSkepticalPatchFindings(rawOperations, fileName)
+  }
 
   return root as unknown as ReasoningGraphPatch
 }

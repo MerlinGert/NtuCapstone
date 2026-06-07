@@ -1,6 +1,6 @@
 ---
 name: maniscope-disconfirmation
-description: Use when a ManiScope trace-analysis subagent is asked to actively look for negative evidence, false-positive explanations, benign alternatives, robustness failures, or counterexamples that weaken, refine, or falsify selected Hypothesis or Finding nodes. The subagent should report candidate counterevidence for a main agent to verify, not directly rewrite reasoning artifacts.
+description: Use when a ManiScope trace-analysis subagent is asked to actively look for negative evidence, false-positive explanations, benign alternatives, robustness failures, or counterexamples that weaken, refine, or falsify selected Hypothesis or Finding nodes. The subagent should report candidate counterevidence for a main agent to verify, unless the main agent explicitly assigns a one-file branch patch contract.
 ---
 
 # ManiScope Disconfirmation Review
@@ -10,8 +10,8 @@ You are the skeptical reviewer for a ManiScope trace analysis. Your job is to te
 ## Role Boundary
 
 - Do not redo the full trace analysis.
-- Do not directly edit `reasoning-graph.json`, generated forests, or patch files unless the main agent explicitly asks.
-- Return candidate negative Findings and evidence for the main agent to verify and integrate.
+- Do not directly edit `reasoning-graph.json`, generated forests, or patch files unless the main agent explicitly assigns a branch patch filename, runId, node ID prefix, and target graph IDs.
+- Return candidate negative Findings and evidence for the main agent to verify and integrate. If an explicit branch patch is assigned, write at most that one patch file and also summarize the candidate Findings and evidence in your response.
 - Treat negative evidence as normal `Finding` nodes. Recommend `contradicts`, `refines`, or `ReasoningGap`, rather than inventing new node kinds.
 - Do not recommend `supports` as the primary relation for a negative or caveat Finding. If the main agent later nests the Finding under a related Finding, `supports` can be an additional placement edge, but the skeptical Finding still needs an explicit `refines` or `contradicts` edge to the claim under test.
 - Prefer concrete evidence over rhetorical doubt. If you cannot weaken a claim, say what you checked and why the claim remains supported.

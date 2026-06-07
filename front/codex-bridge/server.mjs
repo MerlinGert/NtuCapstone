@@ -415,12 +415,21 @@ Evidence discipline:
 - If a conclusion is uncertain, say what would confirm, weaken, or falsify it.
 
 Parallel subagent orchestration:
-- During full analysis, after writing and validating the base reasoning-graph.json and forming the recommendation or investigation plan, consider spawning 2-4 high-value evidence-only subagents for independent branches.
+- During full analysis, after writing and validating the base reasoning-graph.json and forming the recommendation or investigation plan, prefer spawning 2-4 high-value patch-producing subagents for independent branches when the branches can be validated independently.
 - Use subagents for support evidence for major user Hypotheses, answer evidence for central AnalyticQuestions, executed Hypothesis Expansion branches, and skeptical or counterevidence review.
 - Spawn subagents only as full-context forks with fork_context: true and a bounded assignment message. Do not specify agent_type, model, reasoning_effort, or other extra config.
 - Subagents may read trace, data, screenshots, and artifacts; run scripts; render visual evidence; and write uniquely named evidence files under ${relativeSessionRoot}/artifacts.
-- Subagents must not edit reasoning-graph.json or any reasoning-graph-patch*.json file. They should report candidate Findings, evidence paths, suggested relations, uncertainty, rejected checks, deferred checks, and any files they created.
-- The main agent owns graph integrity: verify subagent outputs, resolve conflicts, write all graph patch files, and run validation before reporting completion.
+- The main agent must decide before spawning whether each subagent is report-only or patch-producing. After a plan is produced, use patch-producing subagents by default for independent planned branches to reduce latency in producing validated patch layers. Use report-only subagents only when the branch is exploratory, likely to need main-agent synthesis before graph integration, or too uncertain for a standalone patch.
+- For every patch-producing subagent, pre-allocate a unique short branchId and include it in the assignment message. Use a deterministic contract:
+  - patch file: ${relativeSessionRoot}/artifacts/reasoning-graph-patch-subagent-<branchId>.json
+  - runId: subagent-<branchId>
+  - new node ID prefix: SA_<branchId>_
+  - branch target: exact Hypothesis, Finding, AnalyticQuestion, or InvestigationStrategy IDs under investigation.
+- Patch-producing subagents may write at most one patch file, using the assigned filename, runId, and node prefix. They must not edit reasoning-graph.json, other patch files, generated forests, or another subagent's files.
+- A subagent patch may reference existing base/current graph node IDs and nodes it creates inside that same patch. It must not depend on another subagent patch. If cross-branch synthesis is needed, the main agent writes a later integration patch after validation.
+- Subagent patches must include complete patch node fields, unique node IDs, precise provenance, and a concise report of candidate Findings, evidence paths, suggested relations, uncertainty, rejected checks, deferred checks, and any files created.
+- For skeptical subagent patches, set patchType="skeptical" and use "refines" or "contradicts" as the semantic relation for each negative Finding. Do not use support-only skeptical Findings.
+- The main agent owns graph integrity: validate all subagent patches, resolve conflicts, remove or revise invalid patches, verify evidence before relying on it, and run validation before reporting completion.
 
 # Visualization Tools
 
@@ -466,7 +475,7 @@ Graph-first contract:
 - Write reasoning-graph.json first as the canonical source of truth. The frontend reads reasoning-graph.json plus every reasoning-graph-patch*.json file, validates them, applies patches in deterministic order, and renders the derived forest itself.
 - During full analysis, persist a complete valid ${relativeSessionRoot}/artifacts/reasoning-graph.json immediately after reconstructing the user's reasoning from the trace and before recommendation planning, autonomous follow-up investigation, or patch writing. Run the validator, fix base-graph errors, and only then continue. Do not hold the base graph in memory until the end of the turn.
 - Reasoning graphs should include analysisAnchor metadata for the live trace snapshot they cover. Incremental patches must include baseAnchor and targetAnchor metadata, plus patchType="incremental". Use reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json for incremental user-trace deltas.
-- Original trace evidence belongs in reasoning-graph.json. Agent follow-up evidence belongs in reasoning-graph-patch.json. Verified skeptical counterevidence belongs in reasoning-graph-patch-skeptical.json. Additional purpose-specific patch files may use reasoning-graph-patch-<purpose>.json.
+- Original trace evidence belongs in reasoning-graph.json. Agent follow-up evidence belongs in reasoning-graph-patch.json. Verified skeptical counterevidence belongs in reasoning-graph-patch-skeptical.json. Patch-producing subagents may write assigned branch files named reasoning-graph-patch-subagent-<branchId>.json. Additional purpose-specific patch files may use reasoning-graph-patch-<purpose>.json.
 - In reasoning-graph-patch-skeptical.json, every added Finding must have at least one outgoing "refines" or "contradicts" edge to the relevant Intention node. Use "refines" for evidence that narrows, qualifies, or caveats a claim; use "contradicts" for evidence that weakens or falsifies it. Do not encode a skeptical Finding with only "supports" edges.
 - user-reasoning-forest.json, augmented-reasoning-forest.json, and their Markdown forms are optional static exports. Do not create or edit them for normal UI operation unless the user explicitly asks for export files.
 
@@ -493,10 +502,10 @@ Full trace-level analysis pipeline:
 3. Validate reasoning-graph.json with bun trace_analysis_tools/reasoning_graph/cli.ts artifacts. Fix graph errors and missing user Finding nodes before continuing.
 4. Identify Reasoning Gaps where observed user evidence does not sufficiently support a Finding, Hypothesis, or implied AnalyticQuestion.
 5. Build Recommendation Plan Forests for Evidence Completion and Hypothesis Expansion when applicable. Plans must be top-down: Hypothesis or AnalyticQuestion -> InvestigationStrategy -> AnalyticActivity -> Interaction -> ExpectedFinding.
-6. Decide which branches can run in parallel. Prefer evidence-only subagents for independent support-seeking, answer-seeking, adjacent-hypothesis investigation, and skeptical review. Keep graph and patch writing in the main thread.
+6. Decide which planned branches can run in parallel. Prefer patch-producing subagents for independent support-seeking, answer-seeking, adjacent-hypothesis investigation, and skeptical review so that branch evidence can appear as patch files earlier. Pre-allocate branchIds for these subagents, and include each branchId's exact patch filename, runId, node ID prefix, and target IDs in the assignment. Use report-only subagents only for exploratory or synthesis-heavy branches.
 7. Execute the highest-value recommended InvestigationStrategies instead of stopping at recommendations. Use Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions as needed.
 8. Generate rendered visual evidence with the Python helper for visual claims, compute exact statistics for quantitative claims, and vary model or render parameters when robustness matters.
-9. Review subagent outputs, verify their evidence, reject or defer weak branches, and integrate only verified candidate Findings.
+9. Review subagent outputs and patch files, verify their evidence, reject or defer weak branches, resolve conflicts, and integrate only verified candidate Findings. If multiple subagent patches need synthesis, write a separate main-agent integration patch rather than making subagent patches depend on each other.
 10. Record follow-up evidence as Reasoning Graph Patches.
 11. For each executed Hypothesis Expansion branch, decide whether the proposed adjacent Hypothesis is supported, rejected, deferred, or unsupported. Supported adjacent Hypotheses must become new agent-authored Hypothesis nodes with supporting Finding edges and add_root operations. Rejected, deferred, or unsupported branches must be stated explicitly.
 12. Validate reasoning-graph.json plus all reasoning-graph-patch*.json files together.

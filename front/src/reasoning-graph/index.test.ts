@@ -259,6 +259,14 @@ describe('reasoning graph patches', () => {
     })).toThrow(/skeptical patch Finding F_SKEPTICAL_SUPPORT/)
   })
 
+  test('rejects support-only skeptical patch findings by patch type', () => {
+    const subagentPatch = patch('F_SKEPTICAL_SUBAGENT_SUPPORT', 'supports')
+    subagentPatch.patchType = 'skeptical'
+    expect(() => validateReasoningGraphPatch(subagentPatch, {
+      fileName: 'reasoning-graph-patch-subagent-ske1.json',
+    })).toThrow(/skeptical patch Finding F_SKEPTICAL_SUBAGENT_SUPPORT/)
+  })
+
   test('requires anchors for incremental patches', () => {
     const badPatch = patch('F_INCREMENTAL', 'supports')
     badPatch.patchType = 'incremental'
