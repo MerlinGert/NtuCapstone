@@ -97,9 +97,13 @@ def _ensure_workspace_dirs(session_dir: Path, session_mode: str = "specialized")
 
 def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
     tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    os.replace(tmp_path, path)
+    try:
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
 
 
 def _read_json(path: Path) -> dict[str, Any] | None:

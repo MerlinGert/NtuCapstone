@@ -62,14 +62,14 @@
             <button class="session-io-btn" @click="onClickExport" title="Export Actions & Annotations as JSON">
               Export
             </button>
-            <button class="session-io-btn" @click="$refs.importFileInput.click()" title="Import Session from JSON">
+            <button class="session-io-btn" @click="onClickImport" title="Import Session from JSON">
               Import
             </button>
             <input
               ref="importFileInput"
               type="file"
               accept=".json,application/json,.zip,application/zip"
-              style="display:none"
+              class="session-import-file-input"
               @change="onImportFileChosen"
             />
           </div>
@@ -1636,12 +1636,17 @@ export default {
         includeSnapshots: this.exportIncludeSnapshots,
       })
     },
+    getImportFileInput() {
+      const input = this.$refs.importFileInput
+      return Array.isArray(input) ? input[0] : input
+    },
     // ezio: trigger hidden file input
     onClickImport() {
       if (this.isAgentWorkspace) return
-      if (this.$refs.importFileInput) {
-        this.$refs.importFileInput.value = ''
-        this.$refs.importFileInput.click()
+      const input = this.getImportFileInput()
+      if (input && typeof input.click === 'function') {
+        input.value = ''
+        input.click()
       }
     },
     // ezio: parse the selected JSON file
@@ -1668,7 +1673,8 @@ export default {
       } catch (err) {
         window.alert('Invalid session file: ' + (err && err.message ? err.message : err))
       } finally {
-        if (this.$refs.importFileInput) this.$refs.importFileInput.value = ''
+        const input = this.getImportFileInput()
+        if (input) input.value = ''
       }
     },
     // ezio: user cancelled import
@@ -3399,6 +3405,15 @@ a {
 .session-io-btn.ghost {
   background: transparent;
   border-color: #e2e8f0;
+}
+.session-import-file-input {
+  position: fixed;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 .session-io-overlay {
   position: fixed;
