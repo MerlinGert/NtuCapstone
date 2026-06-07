@@ -220,6 +220,111 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
                 module.put_analysis_evaluations("not-valid", {"evaluations": {}})
             self.assertEqual(error.exception.status_code, 400)
 
+    def test_analysis_ui_state_get_returns_empty_payload_when_missing(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            payload = module.get_analysis_ui_state("abcde")
+
+            self.assertEqual(payload["sessionId"], "abcde")
+            self.assertEqual(payload["sessionMode"], "specialized")
+            self.assertIsNone(payload["updatedAt"])
+            self.assertIsNone(payload["activeRun"])
+            self.assertEqual(payload["newNodeIds"], {})
+
+    def test_analysis_ui_state_put_writes_valid_payload(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            payload = module.put_analysis_ui_state(
+                "abcde",
+                {
+                    "activeRun": {
+                        "runId": "run-1",
+                        "startedAt": "2026-06-07T00:00:00Z",
+                        "suppressNewBadges": False,
+                        "baselineVisibleNodeIds": ["H1", "F1"],
+                    },
+                    "newNodeIds": {
+                        "H2": {
+                            "nodeKind": "Hypothesis",
+                            "firstSeenAt": "2026-06-07T00:00:01Z",
+                            "runId": "run-1",
+                        },
+                        "F3": {
+                            "nodeKind": "Finding",
+                            "firstSeenAt": "2026-06-07T00:00:02Z",
+                            "runId": "run-1",
+                        },
+                    },
+                },
+            )
+
+            self.assertEqual(payload["activeRun"]["baselineVisibleNodeIds"], ["H1", "F1"])
+            self.assertEqual(payload["newNodeIds"]["H2"]["nodeKind"], "Hypothesis")
+            saved_path = module.SESSIONS_DIR / "abcde" / "llm-analysis-ui-state.json"
+            self.assertTrue(saved_path.exists())
+            reloaded = module.get_analysis_ui_state("abcde")
+            self.assertEqual(sorted(reloaded["newNodeIds"]), ["F3", "H2"])
+
+    def test_analysis_ui_state_rejects_malformed_payload(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            with self.assertRaises(Exception) as unsupported_kind:
+                module.put_analysis_ui_state(
+                    "abcde",
+                    {"newNodeIds": {"A1": {"nodeKind": "AnalyticActivity"}}},
+                )
+            self.assertEqual(unsupported_kind.exception.status_code, 400)
+
+            with self.assertRaises(Exception) as missing_suppression:
+                module.put_analysis_ui_state(
+                    "abcde",
+                    {"activeRun": {"runId": "run-1", "baselineVisibleNodeIds": ["H1"]}},
+                )
+            self.assertEqual(missing_suppression.exception.status_code, 400)
+
+    def test_analysis_ui_state_run_start_clears_old_badges(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+            module.put_analysis_ui_state(
+                "abcde",
+                {
+                    "activeRun": {
+                        "runId": "old-run",
+                        "startedAt": "2026-06-07T00:00:00Z",
+                        "suppressNewBadges": False,
+                        "baselineVisibleNodeIds": ["H1"],
+                    },
+                    "newNodeIds": {
+                        "F2": {
+                            "nodeKind": "Finding",
+                            "firstSeenAt": "2026-06-07T00:00:01Z",
+                            "runId": "old-run",
+                        },
+                    },
+                },
+            )
+
+            payload = module.start_analysis_ui_state_run(
+                "abcde",
+                {
+                    "runId": "new-run",
+                    "suppressNewBadges": True,
+                    "baselineVisibleNodeIds": ["H1", "F1"],
+                },
+            )
+
+            self.assertEqual(payload["activeRun"]["runId"], "new-run")
+            self.assertTrue(payload["activeRun"]["suppressNewBadges"])
+            self.assertEqual(payload["activeRun"]["baselineVisibleNodeIds"], ["H1", "F1"])
+            self.assertEqual(payload["newNodeIds"], {})
+
     def test_analysis_export_writes_session_artifact_with_stable_name(self):
         module = load_chat_session_service()
         with tempfile.TemporaryDirectory() as tmp_dir:

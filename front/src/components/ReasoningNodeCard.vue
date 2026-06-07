@@ -6,6 +6,7 @@
   >
     <div class="node-meta-row">
       <span class="node-type" :class="nodeTypeClass">{{ nodeTypeLabel }}</span>
+      <span v-if="isNewNode" class="node-new-badge">New</span>
       <label
         v-if="isEvaluableNode"
         class="node-evaluation-toggle"
@@ -65,6 +66,7 @@
         :nesting-level="nestingLevel + 1"
         :hide-patch-label="childHidePatchLabel"
         :node-evaluations="nodeEvaluations"
+        :new-node-ids="newNodeIds"
         @select-node="$emit('select-node', $event)"
         @toggle-evaluation="$emit('toggle-evaluation', $event)"
         @toggle-node="$emit('toggle-node', $event)"
@@ -96,6 +98,10 @@ export default {
       default: false,
     },
     nodeEvaluations: {
+      type: Object,
+      default: () => ({}),
+    },
+    newNodeIds: {
       type: Object,
       default: () => ({}),
     },
@@ -180,6 +186,11 @@ export default {
     },
     isDerivedHypothesis() {
       return this.node.type === 'Hypothesis' && this.node.source === 'patch'
+    },
+    isNewNode() {
+      if (!this.isEvaluableNode) return false
+      const key = evaluationKeyForNode(this.node)
+      return Boolean(key && this.newNodeIds?.[key])
     },
     nodeTypeLabel() {
       if (this.isDerivedHypothesis) return 'Derived Hypothesis'
@@ -306,6 +317,7 @@ export default {
 }
 
 .node-type,
+.node-new-badge,
 .relation-pill,
 .collapse-btn {
   display: inline-flex;
@@ -319,6 +331,7 @@ export default {
 }
 
 .node-type,
+.node-new-badge,
 .relation-pill,
 .collapse-btn {
   padding: 1px 6px;
@@ -364,6 +377,12 @@ export default {
   color: #be185d;
   background: #fce7f3;
   border-color: #f9a8d4;
+}
+
+.node-new-badge {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
 }
 
 .relation-pill {

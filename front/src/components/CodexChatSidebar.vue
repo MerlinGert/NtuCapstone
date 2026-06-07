@@ -347,6 +347,7 @@ const markdown = new MarkdownIt({
 })
 const PANEL_LAYOUT_STORAGE_KEY = 'maniscope.codexChat.panelLayout.v1'
 const PANEL_MARGIN = 8
+const CODEX_RUN_START_EVENT = 'maniscope-codex-run-start'
 
 export default {
   name: 'CodexChatSidebar',
@@ -895,6 +896,27 @@ export default {
         },
       }))
     },
+    createCodexRunId() {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID()
+      }
+      return `run-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    },
+    notifyCodexRunStart({ runId, presetKind = '', triggerType = 'manual', messageId = null } = {}) {
+      if (this.sessionMode === 'baseline' || !this.sessionId) return
+      window.dispatchEvent(new CustomEvent(CODEX_RUN_START_EVENT, {
+        detail: {
+          sessionId: this.sessionId,
+          sessionMode: this.sessionMode,
+          workspaceRole: this.workspaceRole,
+          runId,
+          presetKind,
+          triggerType,
+          messageId,
+          startedAt: new Date().toISOString(),
+        },
+      }))
+    },
     displayedSequenceActivities(part) {
       const activities = (part.activities || []).filter((activity) => !activity.ephemeral)
       if (part.open) return activities
@@ -1251,6 +1273,13 @@ export default {
         if (this.beforeSend) {
           await this.beforeSend()
         }
+        const codexRunId = this.createCodexRunId()
+        this.notifyCodexRunStart({
+          runId: codexRunId,
+          presetKind,
+          triggerType,
+          messageId: userMessageId,
+        })
         this.$emit('send', {
           content,
           attachments,

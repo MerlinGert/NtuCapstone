@@ -57,6 +57,7 @@
         <ReasoningNodeCard
           :node="tree"
           :node-evaluations="nodeEvaluations"
+          :new-node-ids="analysisUiState.newNodeIds"
           @select-node="handleNodeSelect"
           @toggle-node="handleNodeToggle"
           @toggle-evaluation="toggleNodeEvaluation"
@@ -162,8 +163,15 @@ import {
   normalizeNodeEvaluations,
   toggleNodeEvaluation as toggleNodeEvaluationMap,
 } from '../utils/llmAnalysisEvaluations.js'
+import {
+  buildAnalysisUiStatePayload,
+  collectVisibleNewBadgeNodes,
+  detectNewVisibleNodes,
+  normalizeAnalysisUiState,
+} from '../utils/llmAnalysisNewBadges.js'
 
 const ARTIFACT_UPDATE_EVENT = 'maniscope-session-artifact-updated'
+const CODEX_RUN_START_EVENT = 'maniscope-codex-run-start'
 const POLL_INTERVAL_MS = 5000
 
 export default {
@@ -203,6 +211,7 @@ export default {
       displayTrees: [],
       nodeEvaluations: {},
       nodeEvaluationsUpdatedAt: null,
+      analysisUiState: normalizeAnalysisUiState(),
       selectedNode: null,
       loadStarted: false,
       lastManifestSignature: '',
@@ -337,6 +346,7 @@ export default {
         this.displayTrees = []
         this.nodeEvaluations = {}
         this.nodeEvaluationsUpdatedAt = null
+        this.analysisUiState = normalizeAnalysisUiState()
         this.selectedNode = null
         this.lastManifestSignature = ''
         if (this.active) this.loadAnalysis({ force: true })
@@ -357,12 +367,14 @@ export default {
   },
   mounted() {
     window.addEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
+    window.addEventListener(CODEX_RUN_START_EVENT, this.handleCodexRunStart)
     window.addEventListener('keydown', this.handleKeydown)
     if (this.active && !this.isImportedMode) this.startPolling()
   },
   beforeUnmount() {
     this.stopPolling()
     window.removeEventListener(ARTIFACT_UPDATE_EVENT, this.handleArtifactUpdate)
+    window.removeEventListener(CODEX_RUN_START_EVENT, this.handleCodexRunStart)
     window.removeEventListener('keydown', this.handleKeydown)
   },
   methods: {
@@ -371,6 +383,10 @@ export default {
     },
     evaluationsUrl() {
       return `${this.sessionApiBase}/${this.sessionId}/analysis-evaluations`
+    },
+    analysisUiStateUrl(suffix = '') {
+      const path = `${this.sessionApiBase}/${this.sessionId}/analysis-ui-state`
+      return suffix ? `${path}/${suffix}` : path
     },
     encodeRelativePath(path) {
       return String(path)
@@ -403,10 +419,20 @@ export default {
       if (!response.ok) throw new Error(`Failed to load analysis evaluations: HTTP ${response.status}`)
       return response.json()
     },
+    async fetchAnalysisUiState() {
+      if (this.isImportedMode || !this.sessionId) return null
+      const response = await fetch(this.analysisUiStateUrl(), { cache: 'no-store' })
+      if (response.status === 404 || response.status === 400) return null
+      if (!response.ok) throw new Error(`Failed to load analysis UI state: HTTP ${response.status}`)
+      return response.json()
+    },
     applyNodeEvaluations(payload) {
       const normalized = normalizeNodeEvaluations(payload)
       this.nodeEvaluations = normalized.evaluations
       this.nodeEvaluationsUpdatedAt = normalized.updatedAt
+    },
+    applyAnalysisUiState(payload) {
+      this.analysisUiState = normalizeAnalysisUiState(payload)
     },
     artifactInfoUrl(info) {
       if (!info) return ''
@@ -483,6 +509,7 @@ export default {
       this.validationWarnings = []
       this.displayTrees = displayForest
       this.applyNodeEvaluations(snapshot.nodeEvaluations)
+      this.applyAnalysisUiState(snapshot.analysisUiState)
       this.selectedNode = null
       this.lastManifestSignature = ''
       this.loadStarted = true
@@ -504,6 +531,7 @@ export default {
         augmentedReasoningGraph: this.cloneJson(this.augmentedReasoningGraph),
         displayForest: this.cloneJson(this.displayTrees),
         nodeEvaluations: this.currentNodeEvaluationsPayload(),
+        analysisUiState: this.currentAnalysisUiStatePayload(),
       }
     },
     displayForestStats(trees) {
@@ -671,6 +699,90 @@ export default {
         evaluations: this.nodeEvaluations,
       })
     },
+    currentAnalysisUiStatePayload() {
+      if (this.analysisPayload?.analysisUiState) {
+        return buildAnalysisUiStatePayload({
+          sessionId: this.analysisPayload.sessionId || null,
+          sessionMode: this.analysisPayload.sessionMode || 'specialized',
+          updatedAt: this.analysisUiState.updatedAt,
+          activeRun: this.analysisUiState.activeRun,
+          newNodeIds: this.analysisUiState.newNodeIds,
+        })
+      }
+      return buildAnalysisUiStatePayload({
+        sessionId: this.sessionId || null,
+        sessionMode: this.sessionMode,
+        updatedAt: this.analysisUiState.updatedAt,
+        activeRun: this.analysisUiState.activeRun,
+        newNodeIds: this.analysisUiState.newNodeIds,
+      })
+    },
+    visibleNewBadgeNodeIds(trees = this.displayTrees) {
+      return collectVisibleNewBadgeNodes(trees).map((node) => node.id)
+    },
+    async persistAnalysisUiState(payload = this.currentAnalysisUiStatePayload()) {
+      if (this.isImportedMode || !this.sessionId) return null
+      const response = await fetch(this.analysisUiStateUrl(), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const persisted = await response.json()
+      this.applyAnalysisUiState(persisted)
+      return persisted
+    },
+    async detectAndPersistNewBadges(displayTrees) {
+      if (this.isImportedMode || !this.sessionId) return
+      const result = detectNewVisibleNodes(this.analysisUiState, displayTrees)
+      if (!result.changed) return
+      this.applyAnalysisUiState(result.state)
+      try {
+        await this.persistAnalysisUiState(result.state)
+      } catch (error) {
+        console.warn('Failed to persist LLM Analysis New badge state:', error)
+      }
+    },
+    async handleCodexRunStart(event) {
+      if (this.isImportedMode || this.sessionMode === 'baseline') return
+      const detail = event?.detail || {}
+      if (detail.sessionId && detail.sessionId !== this.sessionId) return
+      if (detail.sessionMode && detail.sessionMode !== this.sessionMode) return
+      const runId = String(detail.runId || '').trim()
+      if (!runId || !this.sessionId) return
+
+      try {
+        if (!this.displayTrees.length) {
+          await this.loadAnalysis({ force: true, silent: true, detectNewBadges: false })
+        }
+        const baselineVisibleNodeIds = this.visibleNewBadgeNodeIds()
+        const response = await fetch(this.analysisUiStateUrl('run-start'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            runId,
+            suppressNewBadges: baselineVisibleNodeIds.length === 0,
+            baselineVisibleNodeIds,
+          }),
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        this.applyAnalysisUiState(await response.json())
+      } catch (error) {
+        console.warn('Failed to initialize LLM Analysis New badge run:', error)
+        this.applyAnalysisUiState({
+          sessionId: this.sessionId,
+          sessionMode: this.sessionMode,
+          updatedAt: new Date().toISOString(),
+          activeRun: {
+            runId,
+            startedAt: new Date().toISOString(),
+            suppressNewBadges: this.visibleNewBadgeNodeIds().length === 0,
+            baselineVisibleNodeIds: this.visibleNewBadgeNodeIds(),
+          },
+          newNodeIds: {},
+        })
+      }
+    },
     async toggleNodeEvaluation(node) {
       const previousEvaluations = this.nodeEvaluations
       const previousUpdatedAt = this.nodeEvaluationsUpdatedAt
@@ -724,7 +836,7 @@ export default {
         this.error = 'No active ManiScope session.'
         return
       }
-      const { force = false, silent = false } = options
+      const { force = false, silent = false, detectNewBadges = true } = options
       if (this.loading && silent) return
       if (!silent) {
         this.loading = true
@@ -734,11 +846,13 @@ export default {
       const previousManifest = this.cloneJson(this.manifest)
       let previousSignature = this.lastManifestSignature
       try {
-        const [manifest, evaluations] = await Promise.all([
+        const [manifest, evaluations, analysisUiState] = await Promise.all([
           this.fetchManifest(),
           this.fetchNodeEvaluations(),
+          this.fetchAnalysisUiState(),
         ])
         this.applyNodeEvaluations(evaluations)
+        this.applyAnalysisUiState(analysisUiState)
         const signature = this.manifestSignature(manifest)
         if (!force && signature && signature === this.lastManifestSignature && this.reasoningGraph) return
         previousSignature = this.lastManifestSignature
@@ -791,6 +905,9 @@ export default {
           ...augmentedValidation.warnings,
         ]))
         this.displayTrees = displayTrees
+        if (detectNewBadges) {
+          await this.detectAndPersistNewBadges(displayTrees)
+        }
         this.maybeEmitAnalysisTrace({
           previousManifest,
           manifest,

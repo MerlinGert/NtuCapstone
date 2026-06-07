@@ -34,10 +34,13 @@ ANALYSIS_EXPORT_SUFFIXES = {".json", ".md"}
 REASONING_GRAPH_NAME = "reasoning-graph.json"
 REASONING_GRAPH_PATCH_RE = re.compile(r"^reasoning-graph-patch(?:-.+)?\.json$")
 LLM_ANALYSIS_EVALUATIONS_NAME = "llm-analysis-evaluations.json"
+LLM_ANALYSIS_UI_STATE_NAME = "llm-analysis-ui-state.json"
 SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 EVALUABLE_REASONING_NODE_KINDS = {"Hypothesis", "Finding"}
 EVALUATION_ENTRY_KEYS = {"checked", "nodeKind", "updatedAt"}
+ANALYSIS_UI_STATE_ENTRY_KEYS = {"nodeKind", "firstSeenAt", "runId"}
+ANALYSIS_UI_STATE_RUN_KEYS = {"runId", "startedAt", "suppressNewBadges", "baselineVisibleNodeIds"}
 ANALYSIS_EXPORT_FORMAT = "maniscope-llm-analysis-json"
 
 
@@ -949,6 +952,10 @@ def _analysis_evaluations_path(session_dir: Path) -> Path:
     return session_dir / LLM_ANALYSIS_EVALUATIONS_NAME
 
 
+def _analysis_ui_state_path(session_dir: Path) -> Path:
+    return session_dir / LLM_ANALYSIS_UI_STATE_NAME
+
+
 def _empty_analysis_evaluations(session_id: str, session_mode: str = "specialized") -> dict[str, Any]:
     return {
         "sessionId": session_id,
@@ -1024,6 +1031,167 @@ def _put_analysis_evaluations(
     payload = _normalize_analysis_evaluations_payload(session_id, body, session_mode=session_mode)
     payload["updatedAt"] = _now_iso()
     _atomic_write_json(_analysis_evaluations_path(session_dir), payload)
+    return payload
+
+
+def _empty_analysis_ui_state(session_id: str, session_mode: str = "specialized") -> dict[str, Any]:
+    return {
+        "sessionId": session_id,
+        "sessionMode": session_mode,
+        "updatedAt": None,
+        "activeRun": None,
+        "newNodeIds": {},
+    }
+
+
+def _normalize_node_id_list(value: Any, field_name: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise HTTPException(status_code=400, detail=f"{field_name} must be an array of node IDs")
+    node_ids: list[str] = []
+    for raw_id in value:
+        node_id = str(raw_id).strip()
+        if not node_id:
+            raise HTTPException(status_code=400, detail=f"{field_name} contains an empty node ID")
+        node_ids.append(node_id)
+    return node_ids
+
+
+def _normalize_analysis_ui_active_run(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise HTTPException(status_code=400, detail="activeRun must be an object or null")
+    unsupported = sorted(set(value) - ANALYSIS_UI_STATE_RUN_KEYS)
+    if unsupported:
+        raise HTTPException(status_code=400, detail=f"Unsupported activeRun fields: {', '.join(unsupported)}")
+    run_id = str(value.get("runId") or "").strip()
+    if not run_id:
+        raise HTTPException(status_code=400, detail="activeRun requires non-empty runId")
+    started_at = value.get("startedAt")
+    if started_at is not None and not isinstance(started_at, str):
+        raise HTTPException(status_code=400, detail="activeRun.startedAt must be a string")
+    suppress_new_badges = value.get("suppressNewBadges")
+    if not isinstance(suppress_new_badges, bool):
+        raise HTTPException(status_code=400, detail="activeRun.suppressNewBadges must be a boolean")
+    return {
+        "runId": run_id,
+        "startedAt": started_at,
+        "suppressNewBadges": suppress_new_badges,
+        "baselineVisibleNodeIds": _normalize_node_id_list(
+            value.get("baselineVisibleNodeIds"),
+            "activeRun.baselineVisibleNodeIds",
+        ),
+    }
+
+
+def _normalize_analysis_ui_state_payload(
+    session_id: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Analysis UI state payload must be a JSON object")
+    raw_new_node_ids = body.get("newNodeIds")
+    if raw_new_node_ids is None:
+        raw_new_node_ids = {}
+    if not isinstance(raw_new_node_ids, dict):
+        raise HTTPException(status_code=400, detail="newNodeIds must be an object keyed by canonical node ID")
+
+    new_node_ids: dict[str, Any] = {}
+    for raw_key, raw_entry in raw_new_node_ids.items():
+        node_id = str(raw_key).strip()
+        if not node_id:
+            raise HTTPException(status_code=400, detail="New-badge node IDs must be non-empty strings")
+        if not isinstance(raw_entry, dict):
+            raise HTTPException(status_code=400, detail=f"New-badge entry for {node_id} must be an object")
+        unsupported = sorted(set(raw_entry) - ANALYSIS_UI_STATE_ENTRY_KEYS)
+        if unsupported:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported new-badge fields for {node_id}: {', '.join(unsupported)}",
+            )
+        node_kind = raw_entry.get("nodeKind")
+        if node_kind not in EVALUABLE_REASONING_NODE_KINDS:
+            raise HTTPException(status_code=400, detail=f"New-badge entry for {node_id} has unsupported nodeKind")
+        first_seen_at = raw_entry.get("firstSeenAt")
+        if first_seen_at is not None and not isinstance(first_seen_at, str):
+            raise HTTPException(status_code=400, detail=f"New-badge entry for {node_id} has invalid firstSeenAt")
+        run_id = raw_entry.get("runId")
+        if run_id is not None:
+            run_id = str(run_id).strip()
+            if not run_id:
+                raise HTTPException(status_code=400, detail=f"New-badge entry for {node_id} has invalid runId")
+        new_node_ids[node_id] = {
+            "nodeKind": node_kind,
+            "firstSeenAt": first_seen_at,
+            "runId": run_id,
+        }
+
+    updated_at = body.get("updatedAt")
+    if updated_at is not None and not isinstance(updated_at, str):
+        raise HTTPException(status_code=400, detail="updatedAt must be a string")
+    return {
+        "sessionId": session_id,
+        "sessionMode": session_mode,
+        "updatedAt": updated_at,
+        "activeRun": _normalize_analysis_ui_active_run(body.get("activeRun")),
+        "newNodeIds": new_node_ids,
+    }
+
+
+def _get_analysis_ui_state(session_id: str, session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    payload = _read_json(_analysis_ui_state_path(session_dir))
+    if payload is None:
+        return _empty_analysis_ui_state(session_id, session_mode=session_mode)
+    return _normalize_analysis_ui_state_payload(session_id, payload, session_mode=session_mode)
+
+
+def _put_analysis_ui_state(
+    session_id: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    payload = _normalize_analysis_ui_state_payload(session_id, body, session_mode=session_mode)
+    payload["updatedAt"] = _now_iso()
+    _atomic_write_json(_analysis_ui_state_path(session_dir), payload)
+    return payload
+
+
+def _start_analysis_ui_state_run(
+    session_id: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Run-start payload must be a JSON object")
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    run_id = str(body.get("runId") or "").strip()
+    if not run_id:
+        raise HTTPException(status_code=400, detail="runId is required")
+    suppress_new_badges = body.get("suppressNewBadges", False)
+    if not isinstance(suppress_new_badges, bool):
+        raise HTTPException(status_code=400, detail="suppressNewBadges must be a boolean")
+    now = _now_iso()
+    payload = {
+        "sessionId": session_id,
+        "sessionMode": session_mode,
+        "updatedAt": now,
+        "activeRun": {
+            "runId": run_id,
+            "startedAt": now,
+            "suppressNewBadges": suppress_new_badges,
+            "baselineVisibleNodeIds": _normalize_node_id_list(
+                body.get("baselineVisibleNodeIds"),
+                "baselineVisibleNodeIds",
+            ),
+        },
+        "newNodeIds": {},
+    }
+    _atomic_write_json(_analysis_ui_state_path(session_dir), payload)
     return payload
 
 
@@ -1388,6 +1556,21 @@ def get_analysis_evaluations(session_id: str) -> dict[str, Any]:
 @router.put("/{session_id}/analysis-evaluations")
 def put_analysis_evaluations(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return _put_analysis_evaluations(session_id, body, session_mode="specialized")
+
+
+@router.get("/{session_id}/analysis-ui-state")
+def get_analysis_ui_state(session_id: str) -> dict[str, Any]:
+    return _get_analysis_ui_state(session_id, session_mode="specialized")
+
+
+@router.put("/{session_id}/analysis-ui-state")
+def put_analysis_ui_state(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _put_analysis_ui_state(session_id, body, session_mode="specialized")
+
+
+@router.post("/{session_id}/analysis-ui-state/run-start")
+def start_analysis_ui_state_run(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _start_analysis_ui_state_run(session_id, body, session_mode="specialized")
 
 
 @router.post("/{session_id}/analysis-export")
