@@ -353,6 +353,10 @@ def _empty_live_session(session_id: str, coin: str | None = None) -> dict[str, A
         "annotationSeqId": 0,
         "userActionSequence": [],
         "annotationRecords": [],
+        "studyInfo": {},
+        "analysisMilestones": [],
+        "chatbotLogs": [],
+        "llmAnalysisTrace": [],
     }
 
 
@@ -499,6 +503,36 @@ def _process_annotation_images(session_dir: Path, annotations: list[Any]) -> int
     return image_count
 
 
+def _process_chatbot_log_images(session_dir: Path, chatbot_logs: list[Any]) -> int:
+    image_count = 0
+    for log_index, log in enumerate(chatbot_logs):
+        if not isinstance(log, dict):
+            continue
+        attachments = log.get("promptAttachments")
+        if not isinstance(attachments, list):
+            continue
+        for attachment_index, attachment in enumerate(attachments):
+            if not isinstance(attachment, dict):
+                continue
+            data_url = attachment.pop("dataUrl", None)
+            if data_url:
+                file_name = "-".join(
+                    [
+                        "chat",
+                        str(log_index + 1).zfill(4),
+                        "prompt",
+                        str(attachment_index + 1).zfill(2),
+                        _safe_name_part(attachment.get("name") or "image"),
+                    ]
+                )
+                image_path = _write_data_url_image(session_dir, f"images/{file_name}.png", data_url)
+                if image_path:
+                    attachment["imagePath"] = image_path
+            if attachment.get("imagePath"):
+                image_count += 1
+    return image_count
+
+
 def _process_current_state_images(
     session_dir: Path,
     current_state: dict[str, Any],
@@ -560,6 +594,18 @@ def _hydrate_live_session_for_frontend(session_dir: Path, live_session: dict[str
         data_url = _data_url_for_image(session_dir, annotation.get("sketchImagePath"))
         if data_url:
             annotation["sketchDataUrl"] = data_url
+    for log in hydrated.get("chatbotLogs", []):
+        if not isinstance(log, dict):
+            continue
+        attachments = log.get("promptAttachments")
+        if not isinstance(attachments, list):
+            continue
+        for attachment in attachments:
+            if not isinstance(attachment, dict):
+                continue
+            data_url = _data_url_for_image(session_dir, attachment.get("imagePath"))
+            if data_url:
+                attachment["dataUrl"] = data_url
     return hydrated
 
 
@@ -586,6 +632,10 @@ def _event_context_from_body(body: dict[str, Any]) -> dict[str, Any]:
         "snapshotCategories": body.get("snapshotCategories"),
         "snapshotQuality": body.get("snapshotQuality"),
         "currentState": copy.deepcopy(body.get("currentState") or {}),
+        "studyInfo": copy.deepcopy(body.get("studyInfo") or {}),
+        "analysisMilestones": copy.deepcopy(body.get("analysisMilestones") or []),
+        "chatbotLogs": copy.deepcopy(body.get("chatbotLogs") or []),
+        "llmAnalysisTrace": copy.deepcopy(body.get("llmAnalysisTrace") or []),
     }
 
 
@@ -609,6 +659,14 @@ def _apply_trace_context(
     body_current_state = context.get("currentState")
     if isinstance(body_current_state, dict):
         current_state.update(body_current_state)
+    if isinstance(context.get("studyInfo"), dict):
+        live_session["studyInfo"] = context["studyInfo"]
+    if isinstance(context.get("analysisMilestones"), list):
+        live_session["analysisMilestones"] = context["analysisMilestones"]
+    if isinstance(context.get("chatbotLogs"), list):
+        live_session["chatbotLogs"] = context["chatbotLogs"]
+    if isinstance(context.get("llmAnalysisTrace"), list):
+        live_session["llmAnalysisTrace"] = context["llmAnalysisTrace"]
 
 
 def _write_trace_state(
@@ -624,6 +682,9 @@ def _write_trace_state(
     image_count = 0
     image_count += _process_action_images(session_dir, actions)
     image_count += _process_annotation_images(session_dir, annotations)
+    chatbot_logs = live_session.get("chatbotLogs")
+    if isinstance(chatbot_logs, list):
+        image_count += _process_chatbot_log_images(session_dir, chatbot_logs)
     if current_state is not None:
         image_count += _process_current_state_images(session_dir, current_state)
 
@@ -1230,6 +1291,9 @@ def _sync_session(session_id: str, body: dict[str, Any], session_mode: str = "sp
         "annotationSeqId": body.get("annotationSeqId", 0),
         "userActionSequence": actions,
         "annotationRecords": annotations,
+        "studyInfo": copy.deepcopy(body.get("studyInfo") or {}),
+        "analysisMilestones": copy.deepcopy(body.get("analysisMilestones") or []),
+        "chatbotLogs": copy.deepcopy(body.get("chatbotLogs") or []),
     }
     return _write_trace_state(
         session_id,

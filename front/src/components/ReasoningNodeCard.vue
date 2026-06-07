@@ -28,7 +28,7 @@
         class="collapse-btn"
         type="button"
         :aria-label="collapsed ? 'Expand node' : 'Collapse node'"
-        @click.stop="collapsed = !collapsed"
+        @click.stop="toggleCollapsed"
       >
         {{ collapsed ? '+' : '-' }}
       </button>
@@ -67,6 +67,7 @@
         :node-evaluations="nodeEvaluations"
         @select-node="$emit('select-node', $event)"
         @toggle-evaluation="$emit('toggle-evaluation', $event)"
+        @toggle-node="$emit('toggle-node', $event)"
       />
     </div>
   </div>
@@ -80,7 +81,7 @@ import {
 
 export default {
   name: 'ReasoningNodeCard',
-  emits: ['select-node', 'toggle-evaluation'],
+  emits: ['select-node', 'toggle-evaluation', 'toggle-node'],
   props: {
     node: {
       type: Object,
@@ -242,6 +243,14 @@ export default {
       return text
         .replace(/[_-]+/g, ' ')
         .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    },
+    toggleCollapsed() {
+      this.collapsed = !this.collapsed
+      this.$emit('toggle-node', {
+        node: this.node,
+        collapsed: this.collapsed,
+        nestingLevel: this.nestingLevel,
+      })
     },
   },
 }

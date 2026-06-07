@@ -57,7 +57,8 @@
         <ReasoningNodeCard
           :node="tree"
           :node-evaluations="nodeEvaluations"
-          @select-node="selectedNode = $event"
+          @select-node="handleNodeSelect"
+          @toggle-node="handleNodeToggle"
           @toggle-evaluation="toggleNodeEvaluation"
         />
       </section>
@@ -170,6 +171,7 @@ export default {
   components: {
     ReasoningNodeCard,
   },
+  emits: ['log-action', 'analysis-trace'],
   props: {
     sessionId: {
       type: String,
@@ -485,24 +487,116 @@ export default {
       this.lastManifestSignature = ''
       this.loadStarted = true
     },
-    async exportAnalysis() {
-      if (!this.canExportAnalysis) return
-      const payload = {
+    buildAnalysisExportPayload() {
+      if (!this.canExportAnalysis) return null
+      return {
         exportVersion: 1,
         exportFormat: 'maniscope-llm-analysis-json',
         exportedAt: new Date().toISOString(),
         sessionId: this.sessionId || this.analysisPayload?.sessionId || null,
         artifactSummary: this.artifactSummary || null,
         currentArtifacts: this.currentAnalysisArtifacts(),
-        reasoningGraph: this.reasoningGraph,
+        reasoningGraph: this.cloneJson(this.reasoningGraph),
         graphPatches: this.graphPatches.map((layer) => ({
           name: layer.name,
-          patch: layer.patch,
+          patch: this.cloneJson(layer.patch),
         })),
-        augmentedReasoningGraph: this.augmentedReasoningGraph,
-        displayForest: this.displayTrees,
+        augmentedReasoningGraph: this.cloneJson(this.augmentedReasoningGraph),
+        displayForest: this.cloneJson(this.displayTrees),
         nodeEvaluations: this.currentNodeEvaluationsPayload(),
       }
+    },
+    displayForestStats(trees) {
+      const stats = {
+        rootHypothesisCount: Array.isArray(trees) ? trees.length : 0,
+        totalNodeCount: 0,
+        findingCount: 0,
+        userFindingCount: 0,
+        agentFindingCount: 0,
+      }
+      const visit = (node) => {
+        if (!node) return
+        stats.totalNodeCount += 1
+        if (this.nodeType(node) === 'Finding') {
+          stats.findingCount += 1
+          if (node.source === 'patch') stats.agentFindingCount += 1
+          else stats.userFindingCount += 1
+        }
+        const children = Array.isArray(node.children) ? node.children : []
+        children.forEach((child) => visit(child))
+      }
+      ;(trees || []).forEach((tree) => visit(tree))
+      return stats
+    },
+    currentGraphInfo(manifest = this.manifest) {
+      const current = manifest?.current || {}
+      return current.reasoningGraph || manifest?.reasoningGraph || null
+    },
+    currentPatchInfos(manifest = this.manifest) {
+      const current = manifest?.current || {}
+      return Array.isArray(current.patches)
+        ? current.patches
+        : Array.isArray(manifest?.patches)
+          ? manifest.patches
+          : []
+    },
+    artifactVersionKey(info) {
+      if (!info) return ''
+      return [info.name || '', info.modifiedAt || info.mtime || ''].join('|')
+    },
+    maybeEmitAnalysisTrace({ previousManifest, manifest, displayTrees }) {
+      if (this.isImportedMode) return
+      const previousGraphInfo = this.currentGraphInfo(previousManifest)
+      const currentGraphInfo = this.currentGraphInfo(manifest)
+      const previousPatchInfos = this.currentPatchInfos(previousManifest)
+      const currentPatchInfos = this.currentPatchInfos(manifest)
+      const previousGraphKey = this.artifactVersionKey(previousGraphInfo)
+      const currentGraphKey = this.artifactVersionKey(currentGraphInfo)
+      const previousPatchByName = new Map(
+        previousPatchInfos
+          .filter((info) => info?.name)
+          .map((info) => [info.name, this.artifactVersionKey(info)]),
+      )
+      const stats = this.displayForestStats(displayTrees)
+      const basePayload = {
+        sessionId: this.sessionId || null,
+        sessionMode: this.sessionMode,
+        patchCount: currentPatchInfos.length,
+        stats,
+      }
+      const events = []
+      if (currentGraphKey && currentGraphKey !== previousGraphKey) {
+        events.push({
+          ...basePayload,
+          traceKey: `llm-graph:${currentGraphKey}`,
+          timestamp: new Date().toISOString(),
+          artifactModifiedAt: currentGraphInfo?.modifiedAt || null,
+          eventType: previousGraphKey ? 'llm_user_reasoning_graph_updated' : 'llm_user_reasoning_graph_received',
+          label: previousGraphKey ? 'User reasoning graph updated' : 'User reasoning graph received',
+          artifactName: currentGraphInfo?.name || 'reasoning-graph.json',
+        })
+      }
+      currentPatchInfos.forEach((patchInfo) => {
+        if (!patchInfo?.name) return
+        const currentPatchKey = this.artifactVersionKey(patchInfo)
+        const previousPatchKey = previousPatchByName.get(patchInfo.name) || ''
+        if (!currentPatchKey || currentPatchKey === previousPatchKey) return
+        events.push({
+          ...basePayload,
+          traceKey: `llm-patch:${currentPatchKey}`,
+          timestamp: new Date().toISOString(),
+          artifactModifiedAt: patchInfo.modifiedAt || null,
+          eventType: previousPatchKey ? 'llm_analysis_findings_updated' : 'llm_analysis_findings_added',
+          label: previousPatchKey ? 'LLM findings updated' : 'LLM findings added',
+          artifactName: patchInfo.name,
+          patchName: patchInfo.name,
+        })
+      })
+      events.forEach((event) => this.$emit('analysis-trace', event))
+    },
+    async exportAnalysis() {
+      const payload = this.buildAnalysisExportPayload()
+      if (!payload) return
       const fileName = this.buildAnalysisExportFileName()
       if (!this.isImportedMode && this.sessionId) {
         try {
@@ -637,6 +731,7 @@ export default {
         this.error = ''
       }
       this.loadStarted = true
+      const previousManifest = this.cloneJson(this.manifest)
       let previousSignature = this.lastManifestSignature
       try {
         const [manifest, evaluations] = await Promise.all([
@@ -685,6 +780,9 @@ export default {
           answeredQuestions: 'warn',
           fileName: 'augmented reasoning graph',
         })
+        const displayTrees = projectGraphToDisplayForest(augmentedGraph)
+          .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
+          .filter(Boolean)
         this.reasoningGraph = reasoningGraph
         this.augmentedReasoningGraph = augmentedGraph
         this.graphPatches = patchLayers
@@ -692,9 +790,12 @@ export default {
           ...baseValidation.warnings,
           ...augmentedValidation.warnings,
         ]))
-        this.displayTrees = projectGraphToDisplayForest(augmentedGraph)
-          .map((tree) => this.prepareNodeForDisplay(this.attachEvidenceImages(tree)))
-          .filter(Boolean)
+        this.displayTrees = displayTrees
+        this.maybeEmitAnalysisTrace({
+          previousManifest,
+          manifest,
+          displayTrees,
+        })
       } catch (error) {
         console.error('Failed to load LLM analysis artifacts:', error)
         if (this.hasAnalysis) {
@@ -735,6 +836,37 @@ export default {
     },
     closeSelectedNode() {
       this.selectedNode = null
+    },
+    handleNodeSelect(node) {
+      this.selectedNode = node
+      this.$emit('log-action', {
+        actionType: 'select_reasoning_node',
+        view: 'LLM Analysis',
+        targetObject: {
+          nodeId: node?.id || null,
+          instanceId: node?.instanceId || null,
+          label: node?.label || '',
+          nodeType: node?.type || '',
+          relation: node?.displayRelation || node?.relation || '',
+          source: node?.source || 'user',
+        },
+      })
+    },
+    handleNodeToggle(payload) {
+      const node = payload?.node || {}
+      this.$emit('log-action', {
+        actionType: payload?.collapsed ? 'collapse_reasoning_card' : 'expand_reasoning_card',
+        view: 'LLM Analysis',
+        targetObject: {
+          nodeId: node.id || null,
+          instanceId: node.instanceId || null,
+          label: node.label || '',
+          nodeType: node.type || '',
+          relation: node.displayRelation || node.relation || '',
+          source: node.source || 'user',
+          nestingLevel: Number.isFinite(payload?.nestingLevel) ? payload.nestingLevel : null,
+        },
+      })
     },
     isAnalysisArtifactName(name) {
       return name === 'reasoning-graph.json'
@@ -996,11 +1128,20 @@ export default {
         if (this.evidenceImagePathFromText(text)) refs.push(text)
       }
     },
+    isImageLikeUrl(text) {
+      const clean = String(text || '').trim().split(/[?#]/)[0]
+      return /\.(?:png|jpe?g|webp|gif)$/i.test(clean)
+    },
     evidenceImagePathFromText(text) {
       if (!text) return ''
-      const prefixed = text.match(/^(?:screenshot|render|image):(.+\.(?:png|jpe?g|webp))$/i)
+      const trimmed = text.trim()
+      if (/^data:image\//i.test(trimmed)) return trimmed
+      if (/^(https?:|blob:)/i.test(trimmed)) {
+        return this.isImageLikeUrl(trimmed) ? trimmed : ''
+      }
+      const prefixed = trimmed.match(/^(?:screenshot|render|image):(.+\.(?:png|jpe?g|webp|gif))$/i)
       if (prefixed) return prefixed[1].trim()
-      const bare = text.match(/^(.+\.(?:png|jpe?g|webp))$/i)
+      const bare = trimmed.match(/^(.+\.(?:png|jpe?g|webp|gif))$/i)
       return bare ? bare[1].trim() : ''
     },
     resolveEvidenceImageRef(ref) {
@@ -1035,6 +1176,8 @@ export default {
       return { url: this.artifactUrl(path), label: this.basename(path) }
     },
     basename(path) {
+      if (/^data:image\//i.test(String(path || '').trim())) return 'inline evidence image'
+      if (/^blob:/i.test(String(path || '').trim())) return 'blob evidence image'
       const cleanPath = String(path).split(/[?#]/)[0]
       return cleanPath.split('/').filter(Boolean).pop() || 'evidence image'
     },

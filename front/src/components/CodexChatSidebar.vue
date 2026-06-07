@@ -147,6 +147,7 @@
               :href="artifactHref(artifact)"
               target="_blank"
               rel="noreferrer"
+              @click="handleArtifactClick(message, artifact)"
             >
               <img
                 v-if="artifact.kind === 'image'"
@@ -381,7 +382,7 @@ export default {
       default: null,
     },
   },
-  emits: ['close', 'send'],
+  emits: ['close', 'send', 'assistant-finished', 'assistant-interaction'],
   data() {
     return {
       TIMELINE_PART_TYPES,
@@ -727,6 +728,22 @@ export default {
         return true
       })
     },
+    serializeSingleMessage(message) {
+      if (!message) return null
+      return {
+        id: message.id,
+        role: message.role,
+        content: compactLegacyContent(message.parts) || message.content || '',
+        attachments: message.attachments || [],
+        activity: this.serializedActivities(message),
+        artifacts: this.serializedArtifacts(message),
+        parts: message.role === 'assistant' ? this.serializedParts(message) : [],
+        activityOpen: Boolean(message.activityOpen),
+        presetKind: message.presetKind || '',
+        threadId: message.threadId || '',
+        createdAt: message.createdAt || '',
+      }
+    },
     async loadChatHistory(sessionId = this.sessionId) {
       const historyKey = `${this.sessionMode}:${sessionId}`
       if (!sessionId || this.historyLoadedForSession === historyKey) return
@@ -893,6 +910,22 @@ export default {
       if (part.open) return 'Hide details'
       const total = (part.activities || []).filter((activity) => !activity.ephemeral).length
       return `Show ${total}`
+    },
+    toggleActivity(message) {
+      if (!message) return
+      message.activityOpen = !message.activityOpen
+      this.$emit('assistant-interaction', {
+        type: 'toggle_response_details',
+        messageId: message.id,
+        expanded: Boolean(message.activityOpen),
+      })
+    },
+    handleArtifactClick(message, artifact) {
+      this.$emit('assistant-interaction', {
+        type: 'click_response_artifact',
+        messageId: message?.id || null,
+        artifact: artifact || null,
+      })
     },
     activityClass(activity) {
       return {
@@ -1165,6 +1198,7 @@ export default {
         presetKind: 'update_analysis',
         includeAttachments: false,
         clearDraft: false,
+        triggerType: 'analyze_with_me',
       })
     },
     async sendMessage(options = {}) {
@@ -1173,6 +1207,7 @@ export default {
       const presetKind = typeof options.presetKind === 'string' ? options.presetKind : ''
       const includeAttachments = options.includeAttachments !== false
       const clearDraft = options.clearDraft !== false
+      const triggerType = options.triggerType || 'manual'
       const content = (contentOverride ?? this.draft).trim()
       const displayContent = (displayContentOverride ?? content).trim()
       const attachmentSource = includeAttachments ? this.attachments : []
@@ -1194,6 +1229,7 @@ export default {
         presetKind,
         createdAt: new Date().toISOString(),
       })
+      const userMessageId = this.messages[this.messages.length - 1].id
       if (clearDraft) this.draft = ''
       this.sending = true
       this.stopRequested = false
@@ -1215,7 +1251,14 @@ export default {
         if (this.beforeSend) {
           await this.beforeSend()
         }
-        this.$emit('send', { content, attachments })
+        this.$emit('send', {
+          content,
+          attachments,
+          promptAttachments: codexAttachments,
+          createdAt: new Date().toISOString(),
+          triggerType,
+          messageId: userMessageId,
+        })
         const nextAssistantMessage = {
           id: this.nextMessageId++,
           role: 'assistant',
@@ -1277,6 +1320,11 @@ export default {
           assistantMessage.ephemeralReasoning = ''
           assistantMessage.thinkingOpen = false
           assistantMessage.activityOpen = false
+          this.$emit('assistant-finished', {
+            requestMessageId: userMessageId,
+            assistantMessageId: assistantMessage.id,
+            message: this.serializeSingleMessage(assistantMessage),
+          })
         }
         this.sending = false
         this.stopRequested = false

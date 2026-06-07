@@ -12,7 +12,7 @@ The dashboard fills the browser window. The current UI is arranged as three vert
 
 ```
 +---------------------------------------------------------------------------------------------+
-| ManiScope | Session | Human Workspace | Codex Chat | Coin: ACT PNUT | Export Import |
+| ManiScope | Session | Human Workspace | Analysis Import | Codex Chat | Coin: ACT PNUT | Study Info Export Import |
 +------------------+------------------------------+------------------------------+
 | Control Panel    | Token Distribution           | ACT or PNUT K-Line           |
 |                  |                              | round-trip cards             |
@@ -24,7 +24,7 @@ The dashboard fills the browser window. The current UI is arranged as three vert
 +------------------+------------------------------+------------------------------+
 ```
 
-The header contains the product name, the session chip, a workspace badge, the `Analysis Import` tag, the Codex Chat button, the ACT and PNUT radio buttons, and session import/export controls.
+The header contains the product name, the session chip, a workspace badge, the `Analysis Import` tag, the Codex Chat button, the ACT and PNUT radio buttons, and the `Study Info` / `Export` / `Import` controls.
 
 The left column is the Control Panel. The middle column contains the Token Distribution view on top and a tabbed investigation panel on the bottom. The right column contains the K-line and manipulation-card view on top and Behavior Details on the bottom.
 
@@ -250,12 +250,21 @@ Entering text and clicking Annotate saves the annotation, closes the snapshot di
 
 ## Exporting A Session
 
-The Export button in the header opens an Export Session dialog. The dialog shows the current action count and annotation count. It also offers an **Include snapshot images (PNG)** checkbox.
+The `Study Info` button in the header opens a dialog where you can enter experiment metadata such as `Participant ID`, `Session Order`, and free-form study notes. The condition is shown automatically as `baseline` or `full ManiScope`, and the dataset follows the current ACT / PNUT selection.
 
-- When the checkbox is enabled, the exported zip includes PNG files for action thumbnails and annotation sketches under `images/`. The JSON stores paths such as `images/action-0001-target-kline-chart-01.png` instead of inline image strings.
-- When the checkbox is disabled, the exported zip still contains the JSON file, but screenshot and sketch image payloads are stripped.
+The Export button in the header opens an `Export Study Package` dialog. The dialog shows the current action count, annotation count, and chat turn count. It also offers an **Include snapshot images (PNG)** checkbox.
 
-Click **Download ZIP** to save a file named like `maniscope-session-ACT-YYYYMMDD-HHMMSS.zip`. Inside the archive, `session.json` contains the action and annotation metadata, and `images/` contains exported PNG files when image export is enabled. The current Import button is disabled, so exported files are mainly for external review or later development workflows.
+- When the checkbox is enabled, the exported zip includes as much experiment material as possible, including action thumbnails, annotation sketches, current major-view screenshots captured at export time, chat image attachments, and accessible image artifacts returned in chat responses. The JSON stores paths such as `images/action-0001-target-kline-chart-01.png` instead of inline image strings.
+- For specialized sessions, the exported zip also includes an `llmAnalysis` snapshot containing the original reasoning graph, patch layers, the final display hierarchy of hypotheses and findings, and any image evidence referenced by those analysis nodes.
+- The zip also records `llmAnalysisTrace`: timestamps for when the user reasoning graph first arrives or updates, plus when later findings patches arrive. These events are also copied into `derivedTables.llmAnalysisTrace` for downstream reasoning-trace analysis.
+- When the checkbox is disabled, the exported zip still contains the full structured experiment logs and metadata, but screenshot and sketch image payloads are stripped.
+- In addition to the raw `userActionSequence` and `annotationRecords`, `session.json` now includes `studyInfo`, `analysisMilestones`, `chatbotLogs`, `llmAnalysisTrace`, the exported `currentState`, and analysis-friendly tables under `derivedTables.interactionTrace`, `derivedTables.userNotes`, `derivedTables.chatbotLogs`, and `derivedTables.llmAnalysisTrace`.
+
+Click **Download ZIP** to save a file named like `maniscope-session-ACT-YYYYMMDD-HHMMSS.zip`. Inside the archive, `session.json` is designed for downstream user-study analysis, and `images/` contains the corresponding exported evidence files when image export is enabled.
+
+The **Study Import** header tag opens a separate page for importing a study-package zip and restoring a read-only viewer. This page does not overwrite your live session. After import, you can inspect the restored workspace, export metadata, current-view screenshots, analysis milestones, chat logs, and the saved LLM Analysis contents from the archive.
+
+The **Trace Timeline** tab in the import page places user interactions, LLM request-to-response windows, assistant activity / reasoning events, and the return times of LLM Analysis reasoning-graph / findings-patch artifacts on the same timeline so you can inspect trace patterns. When the archive does not contain raw timestamps for activity events, the viewer estimates their positions inside that turn's request-response window and labels them as estimated.
 
 ## Coin Selector
 

@@ -14,3 +14,4 @@ __pycache__/
 *.pyc
 /front/server/__pycache__
 .playwright-mcp
+/exports

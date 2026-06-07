@@ -1,15 +1,18 @@
 <script>
 import CryptoVis from './components/CryptoVis.vue'
 import ImportedAnalysisWorkspace from './components/ImportedAnalysisWorkspace.vue'
+import ImportedStudyWorkspace from './components/ImportedStudyWorkspace.vue'
 
 const SESSION_ID_RE = /^[0-9a-f]{5}$/
 const WORKSPACE_ROLES = new Set(['human', 'agent'])
 const IMPORTED_ANALYSIS_ROUTE = '/analysis-import'
+const IMPORTED_STUDY_ROUTE = '/study-import'
 
 export default {
   components: {
     CryptoVis,
     ImportedAnalysisWorkspace,
+    ImportedStudyWorkspace,
   },
   data() {
     return {
@@ -28,6 +31,11 @@ export default {
       const path = window.location.pathname.replace(/\/+$/, '') || '/'
       if (path === IMPORTED_ANALYSIS_ROUTE) {
         this.routeMode = 'imported_analysis'
+        this.sessionId = null
+        return
+      }
+      if (path === IMPORTED_STUDY_ROUTE) {
+        this.routeMode = 'imported_study'
         this.sessionId = null
         return
       }
@@ -105,6 +113,7 @@ export default {
 
 <template>
   <ImportedAnalysisWorkspace v-if="routeMode === 'imported_analysis'" />
+  <ImportedStudyWorkspace v-else-if="routeMode === 'imported_study'" />
   <CryptoVis
     v-else-if="sessionId"
     :session-id="sessionId"
