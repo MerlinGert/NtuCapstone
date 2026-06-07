@@ -1,0 +1,3100 @@
+{
+  "exportVersion": "1.0",
+  "exportFormat": "zip-with-images",
+  "exportedAt": "2026-04-30T18:51:25.070Z",
+  "coin": "ACT",
+  "includesSnapshots": true,
+  "imageDirectory": "images",
+  "imageCount": 36,
+  "config": {
+    "snapshotCategories": [
+      {
+        "key": "hover",
+        "label": "Hover",
+        "enabled": false,
+        "actions": [
+          "hover_manipulation_card",
+          "hover_kline",
+          "hover_token_distribution_user",
+          "hover_behavior_manipulation_box",
+          "hover_behavior_user_label"
+        ]
+      },
+      {
+        "key": "zoom_scroll",
+        "label": "Zoom / Scroll",
+        "enabled": false,
+        "actions": [
+          "zoom_kline_chart",
+          "zoom_behavior_chart",
+          "scroll_manipulation_cards",
+          "sync_time_window"
+        ]
+      },
+      {
+        "key": "click_select",
+        "label": "Click / Select",
+        "enabled": true,
+        "actions": [
+          "click_manipulation_card",
+          "click_kline_align_cards",
+          "select_user_from_network",
+          "select_user_from_behavior_details"
+        ]
+      },
+      {
+        "key": "change_toggle",
+        "label": "Change / Toggle",
+        "enabled": true,
+        "actions": [
+          "change_coin",
+          "change_kline_granularity",
+          "scale_change",
+          "toggle_show_links",
+          "toggle_show_related_users",
+          "toggle_show_manipulation_boxes",
+          "toggle_sequential_time"
+        ]
+      },
+      {
+        "key": "system",
+        "label": "System",
+        "enabled": true,
+        "actions": [
+          "run_entity_detection",
+          "run_manipulation_detection",
+          "update_snapshot",
+          "update_link_detection",
+          "high_level_insight"
+        ]
+      }
+    ],
+    "snapshotQuality": "full"
+  },
+  "annotationSeqId": 20,
+  "userActionSequence": [
+    {
+      "timestamp": "2026-04-30T18:16:24.043Z",
+      "userId": "system",
+      "actionType": "update_snapshot",
+      "sourceView": "control_panel",
+      "targetView": "all_views",
+      "actionInfo": {
+        "config": {
+          "time": "2024-11-09 23:00:00 UTC",
+          "top_holder_threshold": 0.3,
+          "related_user_threshold": 0.2
+        }
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": null,
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": null,
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered update_snapshot",
+      "targetSnapshot": [
+        {
+          "viewName": "kline_chart",
+          "width": 1272,
+          "height": 781,
+          "capturedAt": "2026-04-30T18:17:02.207Z",
+          "imagePath": "images/action-0001-target-kline_chart-01.png"
+        },
+        {
+          "viewName": "token_distribution",
+          "width": 848,
+          "height": 749,
+          "capturedAt": "2026-04-30T18:17:02.257Z",
+          "imagePath": "images/action-0001-target-token_distribution-02.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:16:28.076Z",
+      "userId": "system",
+      "actionType": "toggle_show_links",
+      "sourceView": "token_distribution",
+      "targetView": "token_distribution",
+      "actionInfo": {
+        "enabled": false
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": null,
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": null,
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered toggle_show_links"
+    },
+    {
+      "timestamp": "2026-04-30T18:17:21.453Z",
+      "userId": "system",
+      "actionType": "toggle_show_links",
+      "sourceView": "token_distribution",
+      "targetView": "token_distribution",
+      "actionInfo": {
+        "enabled": true
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": null,
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": null,
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered toggle_show_links",
+      "sourceSnapshot": [
+        {
+          "viewName": "token_distribution",
+          "width": 848,
+          "height": 749,
+          "capturedAt": "2026-04-30T18:17:21.487Z",
+          "imagePath": "images/action-0003-source-token_distribution-01.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:19:48.720Z",
+      "userId": "6Z6RJJGrmVyndcPyTFhmLYHkHttiYtTccKpXFV9r2237",
+      "actionType": "select_user_from_network",
+      "sourceView": "token_distribution",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "targetUserId": "6Z6RJJGrmVyndcPyTFhmLYHkHttiYtTccKpXFV9r2237"
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "6Z6RJJGrmVyndcPyTFhmLYHkHttiYtTccKpXFV9r2237",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": null,
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered select_user_from_network",
+      "sourceSnapshot": [
+        {
+          "viewName": "token_distribution",
+          "width": 848,
+          "height": 749,
+          "capturedAt": "2026-04-30T18:19:48.763Z",
+          "imagePath": "images/action-0004-source-token_distribution-01.png"
+        }
+      ],
+      "targetSnapshot": [
+        {
+          "viewName": "behavior_details",
+          "width": 1252,
+          "height": 468,
+          "capturedAt": "2026-04-30T18:19:48.778Z",
+          "imagePath": "images/action-0004-target-behavior_details-01.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:21:07.947Z",
+      "userId": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+      "actionType": "select_user_from_network",
+      "sourceView": "token_distribution",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "targetUserId": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV"
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": null,
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered select_user_from_network",
+      "sourceSnapshot": [
+        {
+          "viewName": "token_distribution",
+          "width": 848,
+          "height": 749,
+          "capturedAt": "2026-04-30T18:21:07.974Z",
+          "imagePath": "images/action-0005-source-token_distribution-01.png"
+        }
+      ],
+      "targetSnapshot": [
+        {
+          "viewName": "behavior_details",
+          "width": 1252,
+          "height": 468,
+          "capturedAt": "2026-04-30T18:21:08.279Z",
+          "imagePath": "images/action-0005-target-behavior_details-01.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:21:22.515Z",
+      "userId": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+      "actionType": "zoom_behavior_chart",
+      "sourceView": "behavior_details",
+      "targetView": "behavior_details",
+      "actionInfo": [
+        {
+          "timeWindow": [
+            "2024-10-27T09:22:41.116Z",
+            "2024-11-08T17:19:47.710Z"
+          ]
+        },
+        {
+          "time": "2026-04-30T18:21:14.562Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T16:50:33.868Z",
+              "2024-11-07T17:13:49.173Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:14.818Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-27T09:22:41.116Z",
+              "2024-11-08T17:19:47.710Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:14.844Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:25.999Z",
+              "2024-11-09T23:00:00.000Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:14.859Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-11-09T23:00:00.000Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:14.899Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-11-09T23:00:00.000Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.396Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-27T09:05:28.115Z",
+              "2024-11-08T17:02:34.710Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.409Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T16:19:21.810Z",
+              "2024-11-07T16:42:37.115Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.428Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T17:41:26.348Z",
+              "2024-11-06T20:56:45.758Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.619Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T14:12:12.780Z",
+              "2024-11-06T04:48:00.755Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.634Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T06:51:54.721Z",
+              "2024-11-05T15:41:08.582Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.652Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T20:23:55.197Z",
+              "2024-11-05T05:02:00.382Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.841Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T07:23:28.520Z",
+              "2024-11-04T20:22:51.964Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.846Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T16:19:12.047Z",
+              "2024-11-04T13:21:11.587Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:15.871Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T23:34:20.703Z",
+              "2024-11-04T07:38:41.296Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.130Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T23:34:20.703Z",
+              "2024-11-04T07:38:41.296Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.188Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T23:31:31.357Z",
+              "2024-11-04T07:35:51.949Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.194Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T23:08:56.588Z",
+              "2024-11-04T07:13:17.180Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.204Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T22:40:43.126Z",
+              "2024-11-04T06:45:03.719Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.215Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T21:55:33.588Z",
+              "2024-11-04T05:59:54.181Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.221Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T20:59:06.666Z",
+              "2024-11-04T05:03:27.258Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.226Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T19:42:54.320Z",
+              "2024-11-04T03:47:14.912Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.235Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T18:40:48.705Z",
+              "2024-11-04T02:45:09.298Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.246Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T16:25:20.091Z",
+              "2024-11-04T00:29:40.683Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.252Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T14:29:36.899Z",
+              "2024-11-03T22:33:57.492Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.258Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T12:45:11.092Z",
+              "2024-11-03T20:49:31.685Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.271Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T11:54:22.862Z",
+              "2024-11-03T19:58:43.454Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.277Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T10:21:14.439Z",
+              "2024-11-03T18:25:35.032Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.289Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T08:45:16.671Z",
+              "2024-11-03T16:49:37.263Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.295Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T07:43:11.056Z",
+              "2024-11-03T15:47:31.648Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.301Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T06:26:58.710Z",
+              "2024-11-03T14:31:19.302Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.307Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T05:41:49.172Z",
+              "2024-11-03T13:46:09.764Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.320Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T05:10:46.364Z",
+              "2024-11-03T13:15:06.957Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.326Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T04:28:26.172Z",
+              "2024-11-03T12:32:46.765Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.331Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T03:57:23.365Z",
+              "2024-11-03T12:01:43.957Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.343Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T03:40:27.288Z",
+              "2024-11-03T11:44:47.881Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.349Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T03:29:09.903Z",
+              "2024-11-03T11:33:30.496Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.355Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T03:17:52.519Z",
+              "2024-11-03T11:22:13.111Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.367Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T03:15:03.173Z",
+              "2024-11-03T11:19:23.765Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.402Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T03:12:13.827Z",
+              "2024-11-03T11:16:34.419Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.411Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T02:55:17.750Z",
+              "2024-11-03T10:59:38.342Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.422Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T02:41:11.019Z",
+              "2024-11-03T10:45:31.612Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.428Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T02:07:18.866Z",
+              "2024-11-03T10:11:39.458Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.434Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T01:41:54.750Z",
+              "2024-11-03T09:46:15.343Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.446Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T00:56:45.212Z",
+              "2024-11-03T09:01:05.805Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.452Z",
+          "data": {
+            "timeWindow": [
+              "2024-11-01T00:05:56.982Z",
+              "2024-11-03T08:10:17.574Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.458Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T23:15:08.751Z",
+              "2024-11-03T07:19:29.344Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.471Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T22:41:16.598Z",
+              "2024-11-03T06:45:37.190Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.477Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T21:50:28.367Z",
+              "2024-11-03T05:54:48.960Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.483Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T21:10:57.521Z",
+              "2024-11-03T05:15:18.114Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.495Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T20:17:19.945Z",
+              "2024-11-03T04:21:40.537Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.501Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T18:58:18.253Z",
+              "2024-11-03T03:02:38.846Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.507Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T16:48:28.331Z",
+              "2024-11-03T00:52:48.923Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.519Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T15:20:58.601Z",
+              "2024-11-02T23:25:19.193Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.526Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.533Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.539Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.551Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.558Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.567Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.574Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.580Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:55:34.486Z",
+              "2024-11-02T22:59:55.078Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.844Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:41:27.755Z",
+              "2024-11-02T22:45:48.347Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.850Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T14:07:35.601Z",
+              "2024-11-02T22:11:56.194Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.858Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T12:51:23.256Z",
+              "2024-11-02T20:55:43.848Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.871Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T11:40:49.602Z",
+              "2024-11-02T19:45:10.195Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.876Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T09:19:42.296Z",
+              "2024-11-02T17:24:02.888Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.883Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T06:27:32.181Z",
+              "2024-11-02T14:31:52.774Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.895Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T02:50:12.529Z",
+              "2024-11-02T10:54:33.121Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.901Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-31T00:54:29.337Z",
+              "2024-11-02T08:58:49.930Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.907Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T22:02:19.223Z",
+              "2024-11-02T06:06:39.816Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.919Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T19:21:26.494Z",
+              "2024-11-02T03:25:47.086Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.925Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T17:03:08.533Z",
+              "2024-11-02T01:07:29.125Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:16.931Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T15:52:34.880Z",
+              "2024-11-01T23:56:55.472Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.234Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T15:52:34.880Z",
+              "2024-11-01T23:56:55.472Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.246Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T15:35:38.803Z",
+              "2024-11-01T23:39:59.395Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.252Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T15:01:46.649Z",
+              "2024-11-01T23:06:07.242Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.258Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T13:00:24.765Z",
+              "2024-11-01T21:04:45.358Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.270Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T10:08:14.651Z",
+              "2024-11-01T18:12:35.244Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.277Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T07:24:32.575Z",
+              "2024-11-01T15:28:53.168Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.283Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T04:29:33.115Z",
+              "2024-11-01T12:33:53.707Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.295Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-30T01:59:57.770Z",
+              "2024-11-01T10:04:18.362Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.301Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T23:07:47.656Z",
+              "2024-11-01T07:12:08.248Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.307Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T21:31:49.887Z",
+              "2024-11-01T05:36:10.480Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.319Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T19:27:38.657Z",
+              "2024-11-01T03:31:59.250Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.325Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T18:02:58.273Z",
+              "2024-11-01T02:07:18.866Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.331Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T16:15:43.120Z",
+              "2024-11-01T00:20:03.712Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.343Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T14:59:30.774Z",
+              "2024-10-31T23:03:51.367Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.350Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T13:43:18.429Z",
+              "2024-10-31T21:47:39.021Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.355Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T12:52:30.198Z",
+              "2024-10-31T20:56:50.791Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.367Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T12:24:16.737Z",
+              "2024-10-31T20:28:37.329Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.373Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T11:44:45.891Z",
+              "2024-10-31T19:49:06.484Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.379Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T11:25:00.468Z",
+              "2024-10-31T19:29:21.061Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.393Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T11:10:53.737Z",
+              "2024-10-31T19:15:14.330Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.398Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T11:02:25.699Z",
+              "2024-10-31T19:06:46.292Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.404Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T10:56:47.007Z",
+              "2024-10-31T19:01:07.599Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.410Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T10:53:57.661Z",
+              "2024-10-31T18:58:18.253Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.762Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T10:48:18.968Z",
+              "2024-10-31T18:52:39.561Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.773Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T10:22:54.853Z",
+              "2024-10-31T18:27:15.446Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.779Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T09:46:13.353Z",
+              "2024-10-31T17:50:33.946Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.792Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T08:30:01.008Z",
+              "2024-10-31T16:34:21.600Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.797Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T06:45:35.201Z",
+              "2024-10-31T14:49:55.793Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.804Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T05:43:29.586Z",
+              "2024-10-31T13:47:50.178Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.810Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T03:19:32.933Z",
+              "2024-10-31T11:23:53.525Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.822Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-29T00:24:33.473Z",
+              "2024-10-31T08:28:54.065Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.828Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T20:35:56.436Z",
+              "2024-10-31T04:40:17.028Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.834Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T17:40:56.975Z",
+              "2024-10-31T01:45:17.568Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.846Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T14:00:47.977Z",
+              "2024-10-30T22:05:08.569Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.852Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T11:19:55.247Z",
+              "2024-10-30T19:24:15.840Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.858Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T09:21:22.709Z",
+              "2024-10-30T17:25:43.302Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.870Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T07:34:07.556Z",
+              "2024-10-30T15:38:28.149Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.877Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T06:54:36.710Z",
+              "2024-10-30T14:58:57.303Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.882Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T06:26:23.249Z",
+              "2024-10-30T14:30:43.842Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.895Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T06:03:48.480Z",
+              "2024-10-30T14:08:09.073Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:17.901Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T06:00:59.134Z",
+              "2024-10-30T14:05:19.726Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.090Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T06:00:59.134Z",
+              "2024-10-30T14:05:19.726Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.101Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T05:55:20.442Z",
+              "2024-10-30T13:59:41.034Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.107Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T05:10:10.903Z",
+              "2024-10-30T13:14:31.496Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.119Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T04:19:22.673Z",
+              "2024-10-30T12:23:43.266Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.126Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T03:00:20.981Z",
+              "2024-10-30T11:04:41.574Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.131Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-28T00:53:20.405Z",
+              "2024-10-30T08:57:40.998Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.143Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-27T21:16:00.753Z",
+              "2024-10-30T05:20:21.345Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.150Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-27T17:01:59.601Z",
+              "2024-10-30T01:06:20.193Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.156Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-27T12:25:23.680Z",
+              "2024-10-29T20:29:44.272Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.162Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-27T07:03:38.220Z",
+              "2024-10-29T15:07:58.813Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.173Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-27T02:04:27.530Z",
+              "2024-10-29T10:08:48.122Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.179Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T21:41:58.339Z",
+              "2024-10-29T05:46:18.932Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.191Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:15:56.072Z",
+              "2024-10-29T02:20:16.664Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.198Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:06:06.149Z",
+              "2024-10-29T00:10:26.742Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.204Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:04:00.534Z",
+              "2024-10-28T23:08:21.127Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.211Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:30:08.381Z",
+              "2024-10-28T22:34:28.973Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.394Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:18:50.996Z",
+              "2024-10-28T22:23:11.589Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.404Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T13:56:16.227Z",
+              "2024-10-28T22:00:36.820Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.410Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T12:59:49.304Z",
+              "2024-10-28T21:04:09.897Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.422Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T10:52:48.728Z",
+              "2024-10-28T18:57:09.321Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.428Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T08:11:55.999Z",
+              "2024-10-28T16:16:16.591Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.434Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T03:35:20.078Z",
+              "2024-10-28T11:39:40.670Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.446Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T23:12:50.887Z",
+              "2024-10-28T07:17:11.480Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.453Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T19:24:13.850Z",
+              "2024-10-28T03:28:34.443Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.459Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.470Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.476Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.482Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.494Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.501Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.506Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.515Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-25T18:38:26.000Z",
+              "2024-10-28T02:42:46.592Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:18.979Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T00:28:42.052Z",
+              "2024-10-27T22:01:23.802Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:19.010Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T05:13:12.391Z",
+              "2024-10-27T18:12:50.716Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:19.339Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T08:38:25.559Z",
+              "2024-10-27T14:41:19.972Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:19.645Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T11:38:44.791Z",
+              "2024-10-27T12:03:09.717Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:19.670Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:05:12.738Z",
+              "2024-10-27T09:54:41.235Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.083Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:06:12.611Z",
+              "2024-10-27T09:55:41.108Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.094Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:09:12.229Z",
+              "2024-10-27T09:58:40.726Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.100Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:14:11.594Z",
+              "2024-10-27T10:03:40.091Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.112Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:21:10.704Z",
+              "2024-10-27T10:10:39.201Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.118Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:34:09.052Z",
+              "2024-10-27T10:23:37.549Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.124Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:42:08.035Z",
+              "2024-10-27T10:31:36.532Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.130Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T14:56:06.256Z",
+              "2024-10-27T10:45:34.753Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.143Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:06:04.985Z",
+              "2024-10-27T10:55:33.482Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.149Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:12:04.222Z",
+              "2024-10-27T11:01:32.719Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.155Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:16:03.714Z",
+              "2024-10-27T11:05:32.211Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.167Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:19:03.332Z",
+              "2024-10-27T11:08:31.829Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.173Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:21:03.078Z",
+              "2024-10-27T11:10:31.575Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.179Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:22:02.951Z",
+              "2024-10-27T11:11:31.448Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.194Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:23:02.824Z",
+              "2024-10-27T11:12:31.321Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.227Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:24:02.697Z",
+              "2024-10-27T11:13:31.194Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.252Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:25:02.570Z",
+              "2024-10-27T11:14:31.067Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.266Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:27:02.316Z",
+              "2024-10-27T11:16:30.812Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.276Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:29:02.061Z",
+              "2024-10-27T11:18:30.558Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.282Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:31:01.807Z",
+              "2024-10-27T11:20:30.304Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.294Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:34:01.426Z",
+              "2024-10-27T11:23:29.923Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.300Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:38:00.917Z",
+              "2024-10-27T11:27:29.414Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.306Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:40:00.663Z",
+              "2024-10-27T11:29:29.160Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.318Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:42:00.409Z",
+              "2024-10-27T11:31:28.906Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.324Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:44:00.155Z",
+              "2024-10-27T11:33:28.652Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.331Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:46:59.774Z",
+              "2024-10-27T11:36:28.270Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.343Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T15:53:58.884Z",
+              "2024-10-27T11:43:27.381Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.349Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:03:57.613Z",
+              "2024-10-27T11:53:26.110Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.355Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:14:56.215Z",
+              "2024-10-27T12:04:24.712Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.367Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:26:54.690Z",
+              "2024-10-27T12:16:23.186Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.374Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:38:53.164Z",
+              "2024-10-27T12:28:21.661Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.380Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:42:52.656Z",
+              "2024-10-27T12:32:21.153Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.386Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:47:52.020Z",
+              "2024-10-27T12:37:20.517Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.397Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:49:51.766Z",
+              "2024-10-27T12:39:20.263Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.403Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:51:51.512Z",
+              "2024-10-27T12:41:20.009Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.523Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:52:51.385Z",
+              "2024-10-27T12:42:19.882Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.531Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:55:51.004Z",
+              "2024-10-27T12:45:19.501Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.543Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T16:58:50.622Z",
+              "2024-10-27T12:48:19.119Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.549Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:02:50.114Z",
+              "2024-10-27T12:52:18.611Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.557Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:08:49.351Z",
+              "2024-10-27T12:58:17.848Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.564Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:22:47.572Z",
+              "2024-10-27T13:12:16.069Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.571Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:28:46.809Z",
+              "2024-10-27T13:18:15.306Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.579Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:36:45.793Z",
+              "2024-10-27T13:26:14.289Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.587Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:38:45.538Z",
+              "2024-10-27T13:28:14.035Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.595Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:40:45.284Z",
+              "2024-10-27T13:30:13.781Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.740Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:41:45.157Z",
+              "2024-10-27T13:31:13.654Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.754Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:43:44.903Z",
+              "2024-10-27T13:33:13.400Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.767Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:48:44.267Z",
+              "2024-10-27T13:38:12.764Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.773Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:51:43.886Z",
+              "2024-10-27T13:41:12.383Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.779Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:54:43.505Z",
+              "2024-10-27T13:44:12.002Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.791Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:57:43.123Z",
+              "2024-10-27T13:47:11.620Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.797Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T17:58:42.996Z",
+              "2024-10-27T13:48:11.493Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.803Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:00:42.742Z",
+              "2024-10-27T13:50:11.239Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.815Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:02:42.488Z",
+              "2024-10-27T13:52:10.985Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.821Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:04:42.234Z",
+              "2024-10-27T13:54:10.731Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.828Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:07:41.852Z",
+              "2024-10-27T13:57:10.349Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.835Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:10:41.471Z",
+              "2024-10-27T14:00:09.968Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.846Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:15:40.836Z",
+              "2024-10-27T14:05:09.333Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.852Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:18:40.454Z",
+              "2024-10-27T14:08:08.951Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.864Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:21:40.073Z",
+              "2024-10-27T14:11:08.570Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.870Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:23:39.819Z",
+              "2024-10-27T14:13:08.316Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.876Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:24:39.692Z",
+              "2024-10-27T14:14:08.189Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.890Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:25:39.565Z",
+              "2024-10-27T14:15:08.062Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.912Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:26:39.438Z",
+              "2024-10-27T14:16:07.934Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.918Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:28:39.183Z",
+              "2024-10-27T14:18:07.680Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.924Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:31:38.802Z",
+              "2024-10-27T14:21:07.299Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.931Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:34:38.421Z",
+              "2024-10-27T14:24:06.918Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.943Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:37:38.039Z",
+              "2024-10-27T14:27:06.536Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.949Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:40:37.658Z",
+              "2024-10-27T14:30:06.155Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.955Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:44:37.150Z",
+              "2024-10-27T14:34:05.647Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.967Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:46:36.896Z",
+              "2024-10-27T14:36:05.392Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.974Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:49:36.514Z",
+              "2024-10-27T14:39:05.011Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.980Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:52:36.133Z",
+              "2024-10-27T14:42:04.630Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.991Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:58:35.370Z",
+              "2024-10-27T14:48:03.867Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:20.997Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:04:34.608Z",
+              "2024-10-27T14:54:03.105Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.003Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:07:34.226Z",
+              "2024-10-27T14:57:02.723Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.015Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:12:33.591Z",
+              "2024-10-27T15:02:02.088Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.021Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:17:32.955Z",
+              "2024-10-27T15:07:01.452Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.028Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:20:32.574Z",
+              "2024-10-27T15:10:01.071Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.040Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:21:32.447Z",
+              "2024-10-27T15:11:00.944Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.228Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:18:32.828Z",
+              "2024-10-27T15:08:01.325Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.235Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:15:33.210Z",
+              "2024-10-27T15:05:01.707Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.242Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:10:33.845Z",
+              "2024-10-27T15:00:02.342Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.252Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:06:34.354Z",
+              "2024-10-27T14:56:02.850Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.258Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T19:01:34.989Z",
+              "2024-10-27T14:51:03.486Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.270Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:55:35.752Z",
+              "2024-10-27T14:45:04.249Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.276Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:51:36.260Z",
+              "2024-10-27T14:41:04.757Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.282Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:46:36.896Z",
+              "2024-10-27T14:36:05.392Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.294Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:43:37.277Z",
+              "2024-10-27T14:33:05.774Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.300Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:42:37.404Z",
+              "2024-10-27T14:32:05.901Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.307Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:41:37.531Z",
+              "2024-10-27T14:31:06.028Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.322Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:40:37.658Z",
+              "2024-10-27T14:30:06.155Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.347Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:40:37.658Z",
+              "2024-10-27T14:30:06.155Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.355Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:38:37.912Z",
+              "2024-10-27T14:28:06.409Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.367Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:37:38.039Z",
+              "2024-10-27T14:27:06.536Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.373Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:36:38.167Z",
+              "2024-10-27T14:26:06.663Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.523Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T20:21:33.123Z",
+              "2024-10-27T12:27:42.356Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:21.563Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T21:46:46.216Z",
+              "2024-10-27T10:51:31.864Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:22.027Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T20:21:42.253Z",
+              "2024-10-27T12:27:51.486Z"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:21:22.515Z",
+          "data": {
+            "timeWindow": [
+              "2024-10-26T18:37:54.743Z",
+              "2024-10-27T14:27:23.240Z"
+            ]
+          }
+        }
+      ],
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered zoom_behavior_chart"
+    },
+    {
+      "timestamp": "2026-04-30T18:21:26.995Z",
+      "userId": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+      "actionType": "toggle_sequential_time",
+      "sourceView": "behavior_details",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "enabled": true
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered toggle_sequential_time",
+      "sourceSnapshot": [
+        {
+          "viewName": "behavior_details",
+          "width": 1252,
+          "height": 468,
+          "capturedAt": "2026-04-30T18:21:27.019Z",
+          "imagePath": "images/action-0007-source-behavior_details-01.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:22:33.088Z",
+      "userId": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+      "actionType": "select_user_from_network",
+      "sourceView": "token_distribution",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "targetUserId": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji"
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered select_user_from_network",
+      "sourceSnapshot": [
+        {
+          "viewName": "token_distribution",
+          "width": 848,
+          "height": 749,
+          "capturedAt": "2026-04-30T18:22:33.110Z",
+          "imagePath": "images/action-0008-source-token_distribution-01.png"
+        }
+      ],
+      "targetSnapshot": [
+        {
+          "viewName": "behavior_details",
+          "width": 1252,
+          "height": 468,
+          "capturedAt": "2026-04-30T18:22:33.137Z",
+          "imagePath": "images/action-0008-target-behavior_details-01.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:22:39.570Z",
+      "userId": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+      "actionType": "toggle_show_related_users",
+      "sourceView": "behavior_details",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "enabled": true
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "DNLFULTWBTkpfwpXZeMA7ckMbQntHuLqxZq6RH6xnaji",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered toggle_show_related_users",
+      "sourceSnapshot": [
+        {
+          "viewName": "behavior_details",
+          "width": 1252,
+          "height": 468,
+          "capturedAt": "2026-04-30T18:22:39.647Z",
+          "imagePath": "images/action-0009-source-behavior_details-01.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:27:26.828Z",
+      "userId": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "actionType": "select_user_from_behavior_details",
+      "sourceView": "system",
+      "targetView": "system",
+      "actionInfo": {
+        "targetUserId": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered select_user_from_behavior_details"
+    },
+    {
+      "timestamp": "2026-04-30T18:27:28.204Z",
+      "userId": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "actionType": "toggle_show_related_users",
+      "sourceView": "behavior_details",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "enabled": true
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered toggle_show_related_users",
+      "sourceSnapshot": [
+        {
+          "viewName": "behavior_details",
+          "width": 1252,
+          "height": 468,
+          "capturedAt": "2026-04-30T18:27:28.274Z",
+          "imagePath": "images/action-0011-source-behavior_details-01.png"
+        }
+      ]
+    },
+    {
+      "timestamp": "2026-04-30T18:27:26.484Z",
+      "userId": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "actionType": "hover_behavior_user_label",
+      "sourceView": "behavior_details",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "hoveredUserId": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH"
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "selectedCardUsers": [],
+        "klineTimeWindow": null,
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered hover_behavior_user_label"
+    },
+    {
+      "timestamp": "2026-04-30T18:42:39.970Z",
+      "userId": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+      "actionType": "scroll_manipulation_cards",
+      "sourceView": "kline_chart",
+      "targetView": "kline_chart",
+      "actionInfo": [
+        {
+          "type": "same_direction",
+          "visibleCards": [
+            "10/19 - 10/20",
+            "10/20 - 10/20",
+            "10/21 - 10/22",
+            "10/22 - 10/22",
+            "10/23 - 10/23",
+            "10/24 - 10/25"
+          ]
+        },
+        {
+          "time": "2026-04-30T18:42:35.465Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/21 - 10/22",
+              "10/22 - 10/22",
+              "10/23 - 10/23",
+              "10/24 - 10/25",
+              "10/25 - 10/26",
+              "10/26 - 10/27"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:35.627Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/21 - 10/22",
+              "10/22 - 10/22",
+              "10/23 - 10/23",
+              "10/24 - 10/25",
+              "10/25 - 10/26",
+              "10/26 - 10/27"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:35.858Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/21 - 10/22",
+              "10/22 - 10/22",
+              "10/23 - 10/23",
+              "10/24 - 10/25",
+              "10/25 - 10/26",
+              "10/26 - 10/27"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:36.213Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/25 - 10/26",
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:36.638Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01",
+              "11/01 - 11/02"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:37.771Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01",
+              "11/01 - 11/02"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:38.196Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:39.033Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/25 - 10/26",
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:39.282Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/25 - 10/26",
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:39.446Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/25 - 10/26",
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:39.616Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/25 - 10/26",
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:39.797Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/25 - 10/26",
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        },
+        {
+          "time": "2026-04-30T18:42:39.970Z",
+          "data": {
+            "type": "same_direction",
+            "visibleCards": [
+              "10/25 - 10/26",
+              "10/26 - 10/27",
+              "10/27 - 10/28",
+              "10/28 - 10/28",
+              "10/30 - 10/31",
+              "10/31 - 11/01"
+            ]
+          }
+        }
+      ],
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+        "selectedCardUsers": [],
+        "klineTimeWindow": [
+          "2024-10-19T00:00:00.000Z",
+          "2024-11-10T00:00:00.000Z"
+        ],
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered scroll_manipulation_cards"
+    },
+    {
+      "timestamp": "2026-04-30T18:42:58.336Z",
+      "userId": "system",
+      "actionType": "click_manipulation_card",
+      "sourceView": "kline_chart",
+      "targetView": "behavior_details",
+      "actionInfo": {
+        "cardUsers": [
+          "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+          "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+          "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+          "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+          "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+          "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+          "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+        ]
+      },
+      "relatedViewWithViewState": {
+        "coin": "ACT",
+        "snapshotTime": "2024-11-09 23:00:00 UTC",
+        "selectedUser": null,
+        "selectedCardUsers": [
+          "5RA23pdRqxPHjGZT9kUCdywx5QgQ3NFo5NXiNSsCCVEz",
+          "CqWVLXaj8r6vud5SfFr81SzmFoqXa5daLi1WbpQZxuhV",
+          "5WF1V6TBDHxrZvPhh6doyE5ZEb8BaFFgqg7wR81zmZEw",
+          "DmJRzwcmFFFKhJ5dSJuSU3Lns4bfiMb8b1V3vhJG7uLH",
+          "35NoW8F4Q3Gcqf3Wf4RMmoAgS7FHchCjv3R2F241zuPQ",
+          "22JYebQtQSLchTXiRJVCx7hpPamN1YzLJKHET52S6eBm",
+          "EnMAi9raXU8KMBP3YLKAsLL1EnucWrggtBAxZAsmLBZ3",
+          "BgBmwgMG1cRQxHKkgYd42Gz8rpXtSNcnqgazWGPfdDon",
+          "5YPynSvVjWB6EQeFNg3WiKoGsm7J9doxpBY3sVMy1xYv"
+        ],
+        "klineTimeWindow": [
+          "2024-10-19T00:00:00.000Z",
+          "2024-11-10T00:00:00.000Z"
+        ],
+        "behaviorTimeWindow": [
+          "2024-10-26T18:37:54.743Z",
+          "2024-10-27T14:27:23.240Z"
+        ],
+        "hasEntityResults": true,
+        "hasManipulationResults": true
+      },
+      "actionEffect": "Triggered click_manipulation_card",
+      "sourceSnapshot": [
+        {
+          "viewName": "kline_chart",
+          "width": 1272,
+          "height": 781,
+          "capturedAt": "2026-04-30T18:42:58.622Z",
+          "imagePath": "images/action-0014-source-kline_chart-01.png"
+        }
+      ],
+      "targetSnapshot": [
+        {
+          "viewName": "behavior_details",
+          "width": 1252,
+          "height": 467,
+          "capturedAt": "2026-04-30T18:42:58.661Z",
+          "imagePath": "images/action-0014-target-behavior_details-01.png"
+        }
+      ]
+    }
+  ],
+  "annotationRecords": [
+    {
+      "id": 0,
+      "timestamp": "2026-04-30T18:17:05.017Z",
+      "sourceView": "token_distribution",
+      "text": "Approximately 51 users hold 30% of the token supply \u2014 highly centralized. Most are marked with red circles, indicating prior suspicious behavior.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0000-token_distribution.png"
+    },
+    {
+      "id": 1,
+      "timestamp": "2026-04-30T18:17:44.271Z",
+      "sourceView": "token_distribution",
+      "text": "Several large, dark-colored nodes are grouped by three orange dashed circles, representing entities detected by the system's rules. These three entities collectively hold substantial funds. Notably, each entity contains at least one account that appears normal alongside several suspicious ones \u2014 likely an intentional strategy to maintain a \"clean-looking\" account.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0001-token_distribution.png"
+    },
+    {
+      "id": 2,
+      "timestamp": "2026-04-30T18:18:30.110Z",
+      "sourceView": "token_distribution",
+      "text": "Two of the three entities, along with several other holders, are connected within a single component (community). This token carries a high manipulation risk \u2014 a poor initial impression.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0002-token_distribution.png"
+    },
+    {
+      "id": 3,
+      "timestamp": "2026-04-30T18:19:04.639Z",
+      "sourceView": "system",
+      "text": " A small number of whales control the vast majority of the circulating supply, while retail holders occupy only peripheral positions.",
+      "selectedItems": [
+        0,
+        1,
+        2
+      ],
+      "isInsight": true
+    },
+    {
+      "id": 4,
+      "timestamp": "2026-04-30T18:19:42.163Z",
+      "sourceView": "token_distribution",
+      "text": "Top holder 6z6 holds 10M tokens but shows no manipulative behavior.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0004-token_distribution.png"
+    },
+    {
+      "id": 5,
+      "timestamp": "2026-04-30T18:20:09.593Z",
+      "sourceView": "behavior_details",
+      "text": "A whale, but not a manipulator \u2014 tokens were acquired through transfers.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0005-behavior_details.png"
+    },
+    {
+      "id": 6,
+      "timestamp": "2026-04-30T18:21:03.711Z",
+      "sourceView": "token_distribution",
+      "text": "Same-direction manipulation detected, but no entity affiliation.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0006-token_distribution.png"
+    },
+    {
+      "id": 7,
+      "timestamp": "2026-04-30T18:21:38.892Z",
+      "sourceView": "behavior_details",
+      "text": "The holder progressively accumulates tokens; four purchases within a short window triggered a same-direction ramp detection. Upon closer review, this appears to be a normal holder",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0007-behavior_details.png"
+    },
+    {
+      "id": 8,
+      "timestamp": "2026-04-30T18:22:26.669Z",
+      "sourceView": "token_distribution",
+      "text": "Located within the flagged component. Frequently buys and transfers out tokens \u2014 appears to be a functional account serving an entity.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0008-token_distribution.png"
+    },
+    {
+      "id": 9,
+      "timestamp": "2026-04-30T18:22:54.330Z",
+      "sourceView": "behavior_details",
+      "text": "Direct transfers to another seemingly normal account are observed \u2014 likely used to avoid detection.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0009-behavior_details.png"
+    },
+    {
+      "id": 10,
+      "timestamp": "2026-04-30T18:28:12.825Z",
+      "sourceView": "behavior_details",
+      "text": "Another address bought a similar amount during the same period; investigating whether this affected the price \u2014 confirmed: it did.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0010-behavior_details.png"
+    },
+    {
+      "id": 12,
+      "timestamp": "2026-04-30T18:42:24.008Z",
+      "sourceView": "candlestick_chart",
+      "text": "This clearly affected the price.",
+      "selectedItems": [],
+      "sketchImagePath": "images/annotation-0012-candlestick_chart.png"
+    }
+  ]
+}
