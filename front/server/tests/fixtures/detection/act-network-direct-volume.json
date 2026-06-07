@@ -1,0 +1,140 @@
+{
+  "normalizedOutput": {
+    "entity_results": [
+      {
+        "relations": [
+          {
+            "count": 2,
+            "description": "Direct transfer: volume >= 250000 (650000.00)",
+            "type": "direct_transfer",
+            "volume": 650000.0
+          }
+        ],
+        "users": [
+          "A",
+          "X"
+        ]
+      }
+    ],
+    "relations": {
+      "target_related_relations_for_entity": {
+        "A-X": [
+          {
+            "count": 2,
+            "description": "Direct transfer: volume >= 250000 (650000.00)",
+            "type": "direct_transfer",
+            "volume": 650000.0
+          }
+        ]
+      },
+      "target_related_relations_for_links": {
+        "A-X": [
+          {
+            "count": 2,
+            "description": "Direct transfer: volume >= 250000 (650000.00)",
+            "type": "direct_transfer",
+            "volume": 650000.0
+          }
+        ]
+      },
+      "target_relations_for_entity": {},
+      "target_relations_for_links": {}
+    }
+  },
+  "scenario": {
+    "coin": "ACT",
+    "detect_entity": true,
+    "detect_link": true,
+    "entity_detection_config": {
+      "enable_manipulation_based": false,
+      "enable_network_based": true,
+      "enable_similarity_based": false,
+      "manipulation_based_params": {
+        "max_time_diff": 2
+      },
+      "similarity_based_params": {
+        "balance_sequence_params": {
+          "balance_granularity": "1h",
+          "balance_similarity_threshold": 0.6
+        },
+        "earning_sequence_params": {
+          "earning_granularity": "1h",
+          "earning_similarity_threshold": 0.6
+        },
+        "enable_balance_sequence": false,
+        "enable_earning_sequence": false,
+        "enable_trading_action_sequence": false,
+        "trading_action_sequence_params": {
+          "amount_similarity": 0.7,
+          "max_time_diff": 120,
+          "min_seq_length": 3,
+          "price_similarity": 0.7,
+          "type": "action_only"
+        }
+      },
+      "transfer_network_based_params": {
+        "direct_transfer_params": {
+          "enable_min_count": false,
+          "enable_min_volume": true,
+          "min_tx_count": 3,
+          "min_tx_volume": 250000
+        },
+        "enable_direct_transfer": true,
+        "enable_funding_relationship": false,
+        "enable_same_recipient": false,
+        "enable_same_sender": false
+      }
+    },
+    "link_detection_config": {
+      "enable_manipulation_based": false,
+      "enable_network_based": true,
+      "enable_similarity_based": false,
+      "manipulation_based_params": {
+        "max_time_diff": 2
+      },
+      "similarity_based_params": {
+        "balance_sequence_params": {
+          "balance_granularity": "1h",
+          "balance_similarity_threshold": 0.6
+        },
+        "earning_sequence_params": {
+          "earning_granularity": "1h",
+          "earning_similarity_threshold": 0.6
+        },
+        "enable_balance_sequence": false,
+        "enable_earning_sequence": false,
+        "enable_trading_action_sequence": false,
+        "trading_action_sequence_params": {
+          "amount_similarity": 0.7,
+          "max_time_diff": 120,
+          "min_seq_length": 3,
+          "price_similarity": 0.7,
+          "type": "action_only"
+        }
+      },
+      "transfer_network_based_params": {
+        "direct_transfer_params": {
+          "enable_min_count": false,
+          "enable_min_volume": true,
+          "min_tx_count": 3,
+          "min_tx_volume": 250000
+        },
+        "enable_direct_transfer": true,
+        "enable_funding_relationship": false,
+        "enable_same_recipient": false,
+        "enable_same_sender": false
+      }
+    },
+    "name": "act-network-direct-volume",
+    "related_users": {
+      "X": 70.0,
+      "Y": 60.0
+    },
+    "snapshot_time": "2024-01-01 00:03:00 UTC",
+    "target_users": {
+      "A": 100.0,
+      "B": 90.0,
+      "C": 80.0
+    }
+  }
+}

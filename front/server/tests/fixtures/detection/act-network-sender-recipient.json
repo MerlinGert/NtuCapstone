@@ -1,0 +1,223 @@
+{
+  "normalizedOutput": {
+    "entity_results": [
+      {
+        "relations": [
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          }
+        ],
+        "users": [
+          "A",
+          "B",
+          "X"
+        ]
+      }
+    ],
+    "relations": {
+      "target_related_relations_for_entity": {
+        "A-X": [
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          }
+        ],
+        "B-X": [
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          }
+        ]
+      },
+      "target_related_relations_for_links": {
+        "A-X": [
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          }
+        ],
+        "B-X": [
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          }
+        ]
+      },
+      "target_relations_for_entity": {
+        "A-B": [
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          }
+        ]
+      },
+      "target_relations_for_links": {
+        "A-B": [
+          {
+            "description": "Same recipient: R1",
+            "recipient": "R1",
+            "type": "same_recipient"
+          },
+          {
+            "description": "Same sender: S1",
+            "sender": "S1",
+            "type": "same_sender"
+          }
+        ]
+      }
+    }
+  },
+  "scenario": {
+    "coin": "ACT",
+    "detect_entity": true,
+    "detect_link": true,
+    "entity_detection_config": {
+      "enable_manipulation_based": false,
+      "enable_network_based": true,
+      "enable_similarity_based": false,
+      "manipulation_based_params": {
+        "max_time_diff": 2
+      },
+      "similarity_based_params": {
+        "balance_sequence_params": {
+          "balance_granularity": "1h",
+          "balance_similarity_threshold": 0.6
+        },
+        "earning_sequence_params": {
+          "earning_granularity": "1h",
+          "earning_similarity_threshold": 0.6
+        },
+        "enable_balance_sequence": false,
+        "enable_earning_sequence": false,
+        "enable_trading_action_sequence": false,
+        "trading_action_sequence_params": {
+          "amount_similarity": 0.7,
+          "max_time_diff": 120,
+          "min_seq_length": 3,
+          "price_similarity": 0.7,
+          "type": "action_only"
+        }
+      },
+      "transfer_network_based_params": {
+        "direct_transfer_params": {
+          "enable_min_count": true,
+          "enable_min_volume": false,
+          "min_tx_count": 3,
+          "min_tx_volume": 100000
+        },
+        "enable_direct_transfer": false,
+        "enable_funding_relationship": false,
+        "enable_same_recipient": true,
+        "enable_same_sender": true
+      }
+    },
+    "link_detection_config": {
+      "enable_manipulation_based": false,
+      "enable_network_based": true,
+      "enable_similarity_based": false,
+      "manipulation_based_params": {
+        "max_time_diff": 2
+      },
+      "similarity_based_params": {
+        "balance_sequence_params": {
+          "balance_granularity": "1h",
+          "balance_similarity_threshold": 0.6
+        },
+        "earning_sequence_params": {
+          "earning_granularity": "1h",
+          "earning_similarity_threshold": 0.6
+        },
+        "enable_balance_sequence": false,
+        "enable_earning_sequence": false,
+        "enable_trading_action_sequence": false,
+        "trading_action_sequence_params": {
+          "amount_similarity": 0.7,
+          "max_time_diff": 120,
+          "min_seq_length": 3,
+          "price_similarity": 0.7,
+          "type": "action_only"
+        }
+      },
+      "transfer_network_based_params": {
+        "direct_transfer_params": {
+          "enable_min_count": true,
+          "enable_min_volume": false,
+          "min_tx_count": 3,
+          "min_tx_volume": 100000
+        },
+        "enable_direct_transfer": false,
+        "enable_funding_relationship": false,
+        "enable_same_recipient": true,
+        "enable_same_sender": true
+      }
+    },
+    "name": "act-network-sender-recipient",
+    "related_users": {
+      "X": 70.0,
+      "Y": 60.0
+    },
+    "snapshot_time": "2024-01-01 00:03:00 UTC",
+    "target_users": {
+      "A": 100.0,
+      "B": 90.0,
+      "C": 80.0
+    }
+  }
+}

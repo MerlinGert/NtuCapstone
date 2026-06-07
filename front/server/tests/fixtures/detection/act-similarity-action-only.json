@@ -1,0 +1,259 @@
+{
+  "normalizedOutput": {
+    "entity_results": [
+      {
+        "relations": [
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:00 UTC",
+              "start_time_2": "2024-01-01 00:00:20 UTC",
+              "u1": "A",
+              "u2": "X"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          },
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:00 UTC",
+              "start_time_2": "2024-01-01 00:00:30 UTC",
+              "u1": "A",
+              "u2": "B"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          },
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:30 UTC",
+              "start_time_2": "2024-01-01 00:00:20 UTC",
+              "u1": "B",
+              "u2": "X"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          }
+        ],
+        "users": [
+          "A",
+          "B",
+          "X"
+        ]
+      }
+    ],
+    "relations": {
+      "target_related_relations_for_entity": {
+        "A-X": [
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:00 UTC",
+              "start_time_2": "2024-01-01 00:00:20 UTC",
+              "u1": "A",
+              "u2": "X"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          }
+        ],
+        "B-X": [
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:30 UTC",
+              "start_time_2": "2024-01-01 00:00:20 UTC",
+              "u1": "B",
+              "u2": "X"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          }
+        ]
+      },
+      "target_related_relations_for_links": {
+        "A-X": [
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:00 UTC",
+              "start_time_2": "2024-01-01 00:00:20 UTC",
+              "u1": "A",
+              "u2": "X"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          }
+        ],
+        "B-X": [
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:30 UTC",
+              "start_time_2": "2024-01-01 00:00:20 UTC",
+              "u1": "B",
+              "u2": "X"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          }
+        ]
+      },
+      "target_relations_for_entity": {
+        "A-B": [
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:00 UTC",
+              "start_time_2": "2024-01-01 00:00:30 UTC",
+              "u1": "A",
+              "u2": "B"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          }
+        ]
+      },
+      "target_relations_for_links": {
+        "A-B": [
+          {
+            "description": "Found matching sequence (trading_action_sequence): buy,sell,buy...",
+            "details": {
+              "actions_summary": "buy,sell,buy",
+              "length": 3,
+              "score": 3,
+              "start_time_1": "2024-01-01 00:00:00 UTC",
+              "start_time_2": "2024-01-01 00:00:30 UTC",
+              "u1": "A",
+              "u2": "B"
+            },
+            "score": 3,
+            "type": "trading_action_sequence"
+          }
+        ]
+      }
+    }
+  },
+  "scenario": {
+    "coin": "ACT",
+    "detect_entity": true,
+    "detect_link": true,
+    "entity_detection_config": {
+      "enable_manipulation_based": false,
+      "enable_network_based": false,
+      "enable_similarity_based": true,
+      "manipulation_based_params": {
+        "max_time_diff": 2
+      },
+      "similarity_based_params": {
+        "balance_sequence_params": {
+          "balance_granularity": "1h",
+          "balance_similarity_threshold": 0.6
+        },
+        "earning_sequence_params": {
+          "earning_granularity": "1h",
+          "earning_similarity_threshold": 0.6
+        },
+        "enable_balance_sequence": false,
+        "enable_earning_sequence": false,
+        "enable_trading_action_sequence": true,
+        "trading_action_sequence_params": {
+          "amount_similarity": 0.7,
+          "max_time_diff": 120,
+          "min_seq_length": 3,
+          "price_similarity": 0.7,
+          "type": "action_only"
+        }
+      },
+      "transfer_network_based_params": {
+        "direct_transfer_params": {
+          "enable_min_count": true,
+          "enable_min_volume": false,
+          "min_tx_count": 3,
+          "min_tx_volume": 100000
+        },
+        "enable_direct_transfer": false,
+        "enable_funding_relationship": false,
+        "enable_same_recipient": false,
+        "enable_same_sender": false
+      }
+    },
+    "link_detection_config": {
+      "enable_manipulation_based": false,
+      "enable_network_based": false,
+      "enable_similarity_based": true,
+      "manipulation_based_params": {
+        "max_time_diff": 2
+      },
+      "similarity_based_params": {
+        "balance_sequence_params": {
+          "balance_granularity": "1h",
+          "balance_similarity_threshold": 0.6
+        },
+        "earning_sequence_params": {
+          "earning_granularity": "1h",
+          "earning_similarity_threshold": 0.6
+        },
+        "enable_balance_sequence": false,
+        "enable_earning_sequence": false,
+        "enable_trading_action_sequence": true,
+        "trading_action_sequence_params": {
+          "amount_similarity": 0.7,
+          "max_time_diff": 120,
+          "min_seq_length": 3,
+          "price_similarity": 0.7,
+          "type": "action_only"
+        }
+      },
+      "transfer_network_based_params": {
+        "direct_transfer_params": {
+          "enable_min_count": true,
+          "enable_min_volume": false,
+          "min_tx_count": 3,
+          "min_tx_volume": 100000
+        },
+        "enable_direct_transfer": false,
+        "enable_funding_relationship": false,
+        "enable_same_recipient": false,
+        "enable_same_sender": false
+      }
+    },
+    "name": "act-similarity-action-only",
+    "related_users": {
+      "X": 70.0,
+      "Y": 60.0
+    },
+    "snapshot_time": "2024-01-01 00:03:00 UTC",
+    "target_users": {
+      "A": 100.0,
+      "B": 90.0,
+      "C": 80.0
+    }
+  }
+}

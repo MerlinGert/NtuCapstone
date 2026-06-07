@@ -1,0 +1,186 @@
+{
+  "normalizedOutput": {
+    "results": [
+      {
+        "detection_method": "round_trip",
+        "features": {
+          "earning_usd": 1.0,
+          "net_position_change": 0.0,
+          "time_diff_min": 1.0,
+          "trade_count": 2
+        },
+        "manipulation_time": [
+          "2024-01-01 00:00:00",
+          "2024-01-01 00:01:00"
+        ],
+        "participants": [
+          "A"
+        ],
+        "suspicious_users": [
+          "A"
+        ],
+        "transactions": [
+          {
+            "action_type": "buy",
+            "amount": 100,
+            "amount_usd": 100,
+            "timestamp": "2024-01-01 00:00:00",
+            "trader": "A"
+          },
+          {
+            "action_type": "sell",
+            "amount": 100,
+            "amount_usd": 101,
+            "timestamp": "2024-01-01 00:01:00",
+            "trader": "A"
+          }
+        ]
+      },
+      {
+        "detection_method": "same_direction",
+        "features": {
+          "direction": "buy",
+          "duration_min": 2.0,
+          "ignored_different_direction_count": 0,
+          "same_direction_count": 3,
+          "trade_count": 3
+        },
+        "manipulation_time": [
+          "2024-01-01 00:02:00",
+          "2024-01-01 00:04:00"
+        ],
+        "participants": [
+          "B"
+        ],
+        "suspicious_users": [
+          "B"
+        ],
+        "transactions": [
+          {
+            "action_type": "buy",
+            "amount": 50,
+            "amount_usd": 50,
+            "timestamp": "2024-01-01 00:02:00",
+            "trader": "B"
+          },
+          {
+            "action_type": "buy",
+            "amount": 60,
+            "amount_usd": 60,
+            "timestamp": "2024-01-01 00:03:00",
+            "trader": "B"
+          },
+          {
+            "action_type": "buy",
+            "amount": 70,
+            "amount_usd": 70,
+            "timestamp": "2024-01-01 00:04:00",
+            "trader": "B"
+          }
+        ]
+      },
+      {
+        "detection_method": "same_direction_entity_group",
+        "features": {
+          "direction": "buy",
+          "duration_min": 4.0,
+          "ignored_different_direction_count": 1,
+          "same_direction_count": 4,
+          "trade_count": 5
+        },
+        "manipulation_time": [
+          "2024-01-01 00:00:00",
+          "2024-01-01 00:04:00"
+        ],
+        "participants": [
+          "A",
+          "B"
+        ],
+        "suspicious_users": [
+          "A",
+          "B"
+        ],
+        "transactions": [
+          {
+            "action_type": "buy",
+            "amount": 100,
+            "amount_usd": 100,
+            "timestamp": "2024-01-01 00:00:00",
+            "trader": "A"
+          },
+          {
+            "action_type": "buy",
+            "amount": 50,
+            "amount_usd": 50,
+            "timestamp": "2024-01-01 00:02:00",
+            "trader": "B"
+          },
+          {
+            "action_type": "buy",
+            "amount": 60,
+            "amount_usd": 60,
+            "timestamp": "2024-01-01 00:03:00",
+            "trader": "B"
+          },
+          {
+            "action_type": "buy",
+            "amount": 70,
+            "amount_usd": 70,
+            "timestamp": "2024-01-01 00:04:00",
+            "trader": "B"
+          },
+          {
+            "action_type": "sell",
+            "amount": 100,
+            "amount_usd": 101,
+            "timestamp": "2024-01-01 00:01:00",
+            "trader": "A"
+          }
+        ]
+      }
+    ]
+  },
+  "scenario": {
+    "coin": "ACT",
+    "entity_results": [
+      {
+        "relations": [
+          {
+            "type": "fixture"
+          }
+        ],
+        "users": [
+          "A",
+          "B"
+        ]
+      }
+    ],
+    "manipulation_config": {
+      "enable_entity_based": true,
+      "enable_round_trip_detection": true,
+      "enable_same_direction_detection": true,
+      "round_trip_params": {
+        "enable_entity_based": true,
+        "max_earning": 5000,
+        "max_position_diff": 1000,
+        "max_time_diff": 240
+      },
+      "same_direction_params": {
+        "enable_entity_based": true,
+        "max_diff_direction": 1,
+        "max_time_diff": 30,
+        "min_seq_length": 3
+      }
+    },
+    "name": "act-manipulation-loose-thresholds",
+    "related_users": {
+      "X": 70.0,
+      "Y": 60.0
+    },
+    "target_users": {
+      "A": 100.0,
+      "B": 90.0,
+      "C": 80.0
+    }
+  }
+}

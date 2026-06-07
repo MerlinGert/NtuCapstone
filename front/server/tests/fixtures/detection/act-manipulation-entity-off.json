@@ -1,0 +1,84 @@
+{
+  "normalizedOutput": {
+    "results": [
+      {
+        "detection_method": "round_trip",
+        "features": {
+          "earning_usd": 1.0,
+          "net_position_change": 0.0,
+          "time_diff_min": 1.0,
+          "trade_count": 2
+        },
+        "manipulation_time": [
+          "2024-01-01 00:00:00",
+          "2024-01-01 00:01:00"
+        ],
+        "participants": [
+          "A"
+        ],
+        "suspicious_users": [
+          "A"
+        ],
+        "transactions": [
+          {
+            "action_type": "buy",
+            "amount": 100,
+            "amount_usd": 100,
+            "timestamp": "2024-01-01 00:00:00",
+            "trader": "A"
+          },
+          {
+            "action_type": "sell",
+            "amount": 100,
+            "amount_usd": 101,
+            "timestamp": "2024-01-01 00:01:00",
+            "trader": "A"
+          }
+        ]
+      }
+    ]
+  },
+  "scenario": {
+    "coin": "ACT",
+    "entity_results": [
+      {
+        "relations": [
+          {
+            "type": "fixture"
+          }
+        ],
+        "users": [
+          "A",
+          "B"
+        ]
+      }
+    ],
+    "manipulation_config": {
+      "enable_entity_based": false,
+      "enable_round_trip_detection": true,
+      "enable_same_direction_detection": true,
+      "round_trip_params": {
+        "enable_entity_based": false,
+        "max_earning": 1000,
+        "max_position_diff": 100,
+        "max_time_diff": 120
+      },
+      "same_direction_params": {
+        "enable_entity_based": false,
+        "max_diff_direction": 0,
+        "max_time_diff": 10,
+        "min_seq_length": 5
+      }
+    },
+    "name": "act-manipulation-entity-off",
+    "related_users": {
+      "X": 70.0,
+      "Y": 60.0
+    },
+    "target_users": {
+      "A": 100.0,
+      "B": 90.0,
+      "C": 80.0
+    }
+  }
+}

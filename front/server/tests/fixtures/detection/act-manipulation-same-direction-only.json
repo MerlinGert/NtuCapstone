@@ -1,0 +1,48 @@
+{
+  "normalizedOutput": {
+    "results": []
+  },
+  "scenario": {
+    "coin": "ACT",
+    "entity_results": [
+      {
+        "relations": [
+          {
+            "type": "fixture"
+          }
+        ],
+        "users": [
+          "A",
+          "B"
+        ]
+      }
+    ],
+    "manipulation_config": {
+      "enable_entity_based": true,
+      "enable_round_trip_detection": false,
+      "enable_same_direction_detection": true,
+      "round_trip_params": {
+        "enable_entity_based": true,
+        "max_earning": 1000,
+        "max_position_diff": 100,
+        "max_time_diff": 120
+      },
+      "same_direction_params": {
+        "enable_entity_based": true,
+        "max_diff_direction": 0,
+        "max_time_diff": 10,
+        "min_seq_length": 5
+      }
+    },
+    "name": "act-manipulation-same-direction-only",
+    "related_users": {
+      "X": 70.0,
+      "Y": 60.0
+    },
+    "target_users": {
+      "A": 100.0,
+      "B": 90.0,
+      "C": 80.0
+    }
+  }
+}

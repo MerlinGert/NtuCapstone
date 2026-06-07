@@ -13,5 +13,6 @@ front/src/assets/user_behavior_sequences.json
 __pycache__/
 *.pyc
 /front/server/__pycache__
+/front/server/artifacts/
 .playwright-mcp
 /exports
