@@ -26,6 +26,11 @@ def load_chat_session_service():
 
 
 class AnalysisArtifactManifestTests(unittest.TestCase):
+    def configure_temp_sessions(self, module, tmp_dir):
+        module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
+        module.ensure_session_tools = lambda _session_dir, _session_id: None
+        module._commit_trace_history = lambda **_kwargs: None
+
     def test_manifest_returns_graph_and_ordered_patches(self):
         module = load_chat_session_service()
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -139,6 +144,113 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
                 self.assertEqual(Path(response.path).resolve(), artifact_path.resolve())
             finally:
                 module.SESSIONS_DIR = original_sessions_dir
+
+    def test_analysis_evaluations_get_returns_empty_payload_when_missing(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            payload = module.get_analysis_evaluations("abcde")
+
+            self.assertEqual(payload["sessionId"], "abcde")
+            self.assertEqual(payload["sessionMode"], "specialized")
+            self.assertIsNone(payload["updatedAt"])
+            self.assertEqual(payload["evaluations"], {})
+
+    def test_analysis_evaluations_put_writes_valid_payload(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            payload = module.put_analysis_evaluations(
+                "abcde",
+                {
+                    "evaluations": {
+                        "H1": {
+                            "checked": True,
+                            "nodeKind": "Hypothesis",
+                            "updatedAt": "2026-06-07T00:00:00Z",
+                        },
+                        "F23": {
+                            "checked": True,
+                            "nodeKind": "Finding",
+                            "updatedAt": "2026-06-07T00:00:01Z",
+                        },
+                    },
+                },
+            )
+
+            self.assertEqual(payload["evaluations"]["H1"]["nodeKind"], "Hypothesis")
+            self.assertTrue(payload["evaluations"]["F23"]["checked"])
+            saved_path = module.SESSIONS_DIR / "abcde" / "llm-analysis-evaluations.json"
+            self.assertTrue(saved_path.exists())
+            reloaded = module.get_analysis_evaluations("abcde")
+            self.assertEqual(sorted(reloaded["evaluations"]), ["F23", "H1"])
+
+    def test_analysis_evaluations_reject_malformed_payload(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            with self.assertRaises(Exception) as missing_checked:
+                module.put_analysis_evaluations("abcde", {"evaluations": {"H1": {"nodeKind": "Hypothesis"}}})
+            self.assertEqual(missing_checked.exception.status_code, 400)
+
+            with self.assertRaises(Exception) as unsupported_field:
+                module.put_analysis_evaluations(
+                    "abcde",
+                    {
+                        "evaluations": {
+                            "H1": {
+                                "checked": True,
+                                "nodeKind": "Hypothesis",
+                                "comment": "not supported",
+                            }
+                        }
+                    },
+                )
+            self.assertEqual(unsupported_field.exception.status_code, 400)
+
+    def test_analysis_evaluations_invalid_session_id_is_rejected(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            with self.assertRaises(Exception) as error:
+                module.put_analysis_evaluations("not-valid", {"evaluations": {}})
+            self.assertEqual(error.exception.status_code, 400)
+
+    def test_analysis_export_writes_session_artifact_with_stable_name(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            result = module.write_analysis_export(
+                "abcde",
+                {
+                    "payload": {
+                        "exportVersion": 1,
+                        "exportFormat": "maniscope-llm-analysis-json",
+                        "sessionId": "abcde",
+                        "displayForest": [],
+                    }
+                },
+            )
+
+            self.assertTrue(result["name"].startswith("maniscope-llm-analysis-abcde-"))
+            self.assertTrue(result["name"].endswith(".json"))
+            self.assertEqual(result["url"], f"/api/sessions/abcde/artifacts/{result['name']}")
+            saved_path = module.SESSIONS_DIR / "abcde" / "artifacts" / result["name"]
+            self.assertTrue(saved_path.exists())
+
+    def test_analysis_export_rejects_malformed_payload(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+
+            with self.assertRaises(Exception) as error:
+                module.write_analysis_export("abcde", {"payload": {"exportFormat": "wrong"}})
+            self.assertEqual(error.exception.status_code, 400)
 
     def test_session_image_file_can_be_served(self):
         module = load_chat_session_service()

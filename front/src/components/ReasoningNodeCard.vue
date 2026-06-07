@@ -6,6 +6,19 @@
   >
     <div class="node-meta-row">
       <span class="node-type" :class="nodeTypeClass">{{ nodeTypeLabel }}</span>
+      <label
+        v-if="isEvaluableNode"
+        class="node-evaluation-toggle"
+        title="Mark as valuable and valid"
+        aria-label="Mark this finding or hypothesis as valuable and valid"
+        @click.stop
+      >
+        <input
+          type="checkbox"
+          :checked="isNodeEvaluated"
+          @change.stop="$emit('toggle-evaluation', node)"
+        />
+      </label>
       <span v-if="relationLabel" class="relation-pill" :class="relationClass">
         {{ relationLabel }}
       </span>
@@ -51,15 +64,23 @@
         :node="child"
         :nesting-level="nestingLevel + 1"
         :hide-patch-label="childHidePatchLabel"
+        :node-evaluations="nodeEvaluations"
         @select-node="$emit('select-node', $event)"
+        @toggle-evaluation="$emit('toggle-evaluation', $event)"
       />
     </div>
   </div>
 </template>
 
 <script>
+import {
+  evaluationKeyForNode,
+  isEvaluableAnalysisNode,
+} from '../utils/llmAnalysisEvaluations.js'
+
 export default {
   name: 'ReasoningNodeCard',
+  emits: ['select-node', 'toggle-evaluation'],
   props: {
     node: {
       type: Object,
@@ -72,6 +93,10 @@ export default {
     hidePatchLabel: {
       type: Boolean,
       default: false,
+    },
+    nodeEvaluations: {
+      type: Object,
+      default: () => ({}),
     },
   },
   data() {
@@ -89,6 +114,15 @@ export default {
   computed: {
     hasChildren() {
       return Array.isArray(this.node.children) && this.node.children.length > 0
+    },
+    isEvaluableNode() {
+      return isEvaluableAnalysisNode(this.node)
+    },
+    evaluationKey() {
+      return evaluationKeyForNode(this.node)
+    },
+    isNodeEvaluated() {
+      return Boolean(this.evaluationKey && this.nodeEvaluations?.[this.evaluationKey]?.checked)
     },
     childHidePatchLabel() {
       return this.hidePatchLabel
@@ -279,6 +313,24 @@ export default {
 .relation-pill,
 .collapse-btn {
   padding: 1px 6px;
+}
+
+.node-evaluation-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.node-evaluation-toggle input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #2563eb;
 }
 
 .node-type {

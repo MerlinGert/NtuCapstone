@@ -54,7 +54,12 @@
         :key="tree.instanceId || tree.id"
         class="hypothesis-tree"
       >
-        <ReasoningNodeCard :node="tree" @select-node="selectedNode = $event" />
+        <ReasoningNodeCard
+          :node="tree"
+          :node-evaluations="nodeEvaluations"
+          @select-node="selectedNode = $event"
+          @toggle-evaluation="toggleNodeEvaluation"
+        />
       </section>
     </div>
 
@@ -151,6 +156,11 @@ import {
   projectGraphToDisplayForest,
   validateReasoningGraph,
 } from '../reasoning-graph'
+import {
+  buildNodeEvaluationsPayload,
+  normalizeNodeEvaluations,
+  toggleNodeEvaluation as toggleNodeEvaluationMap,
+} from '../utils/llmAnalysisEvaluations.js'
 
 const ARTIFACT_UPDATE_EVENT = 'maniscope-session-artifact-updated'
 const POLL_INTERVAL_MS = 5000
@@ -189,6 +199,8 @@ export default {
       graphPatches: [],
       validationWarnings: [],
       displayTrees: [],
+      nodeEvaluations: {},
+      nodeEvaluationsUpdatedAt: null,
       selectedNode: null,
       loadStarted: false,
       lastManifestSignature: '',
@@ -321,6 +333,8 @@ export default {
         this.graphPatches = []
         this.validationWarnings = []
         this.displayTrees = []
+        this.nodeEvaluations = {}
+        this.nodeEvaluationsUpdatedAt = null
         this.selectedNode = null
         this.lastManifestSignature = ''
         if (this.active) this.loadAnalysis({ force: true })
@@ -353,6 +367,9 @@ export default {
     manifestUrl() {
       return `${this.sessionApiBase}/${this.sessionId}/analysis-artifacts`
     },
+    evaluationsUrl() {
+      return `${this.sessionApiBase}/${this.sessionId}/analysis-evaluations`
+    },
     encodeRelativePath(path) {
       return String(path)
         .split('/')
@@ -376,6 +393,18 @@ export default {
       if (response.status === 404 || response.status === 400) return null
       if (!response.ok) throw new Error(`Failed to load analysis artifact manifest: HTTP ${response.status}`)
       return response.json()
+    },
+    async fetchNodeEvaluations() {
+      if (this.isImportedMode || !this.sessionId) return null
+      const response = await fetch(this.evaluationsUrl(), { cache: 'no-store' })
+      if (response.status === 404 || response.status === 400) return null
+      if (!response.ok) throw new Error(`Failed to load analysis evaluations: HTTP ${response.status}`)
+      return response.json()
+    },
+    applyNodeEvaluations(payload) {
+      const normalized = normalizeNodeEvaluations(payload)
+      this.nodeEvaluations = normalized.evaluations
+      this.nodeEvaluationsUpdatedAt = normalized.updatedAt
     },
     artifactInfoUrl(info) {
       if (!info) return ''
@@ -451,11 +480,12 @@ export default {
       this.graphPatches = patchLayers
       this.validationWarnings = []
       this.displayTrees = displayForest
+      this.applyNodeEvaluations(snapshot.nodeEvaluations)
       this.selectedNode = null
       this.lastManifestSignature = ''
       this.loadStarted = true
     },
-    exportAnalysis() {
+    async exportAnalysis() {
       if (!this.canExportAnalysis) return
       const payload = {
         exportVersion: 1,
@@ -471,16 +501,49 @@ export default {
         })),
         augmentedReasoningGraph: this.augmentedReasoningGraph,
         displayForest: this.displayTrees,
+        nodeEvaluations: this.currentNodeEvaluationsPayload(),
       }
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
+      const fileName = this.buildAnalysisExportFileName()
+      if (!this.isImportedMode && this.sessionId) {
+        try {
+          const response = await fetch(`${this.sessionApiBase}/${this.sessionId}/analysis-export`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ payload }),
+          })
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          const result = await response.json()
+          this.downloadFromUrl(
+            this.cacheBustedUrl(result.url, result.modifiedAt || Date.now()),
+            result.name || fileName,
+          )
+          window.dispatchEvent(new CustomEvent(ARTIFACT_UPDATE_EVENT, {
+            detail: {
+              sessionId: this.sessionId,
+              sessionMode: this.sessionMode,
+              artifact: result.artifact || { title: result.name },
+            },
+          }))
+          return
+        } catch (error) {
+          console.error('Failed to save LLM analysis export as a session artifact:', error)
+        }
+      }
+      this.downloadJsonPayload(payload, fileName)
+    },
+    downloadJsonPayload(payload, fileName) {
+      const file = new File([JSON.stringify(payload, null, 2)], fileName, { type: 'application/json' })
+      const url = URL.createObjectURL(file)
+      this.downloadFromUrl(url, fileName)
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    },
+    downloadFromUrl(url, fileName) {
       const link = document.createElement('a')
       link.href = url
-      link.download = this.buildAnalysisExportFileName()
+      link.download = fileName
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     },
     currentAnalysisArtifacts() {
       if (this.analysisPayload?.currentArtifacts) {
@@ -496,6 +559,52 @@ export default {
       return {
         reasoningGraph: graphInfo,
         patches: patchInfos,
+      }
+    },
+    currentNodeEvaluationsPayload() {
+      if (this.analysisPayload?.nodeEvaluations) {
+        return buildNodeEvaluationsPayload({
+          sessionId: this.analysisPayload.sessionId || null,
+          sessionMode: this.analysisPayload.sessionMode || 'specialized',
+          updatedAt: this.nodeEvaluationsUpdatedAt,
+          evaluations: this.nodeEvaluations,
+        })
+      }
+      return buildNodeEvaluationsPayload({
+        sessionId: this.sessionId || null,
+        sessionMode: this.sessionMode,
+        updatedAt: this.nodeEvaluationsUpdatedAt,
+        evaluations: this.nodeEvaluations,
+      })
+    },
+    async toggleNodeEvaluation(node) {
+      const previousEvaluations = this.nodeEvaluations
+      const previousUpdatedAt = this.nodeEvaluationsUpdatedAt
+      const nextEvaluations = toggleNodeEvaluationMap(previousEvaluations, node)
+      const updatedAt = new Date().toISOString()
+      this.nodeEvaluations = nextEvaluations
+      this.nodeEvaluationsUpdatedAt = updatedAt
+      if (this.isImportedMode) return
+
+      try {
+        const response = await fetch(this.evaluationsUrl(), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            buildNodeEvaluationsPayload({
+              sessionId: this.sessionId,
+              sessionMode: this.sessionMode,
+              updatedAt,
+              evaluations: nextEvaluations,
+            }),
+          ),
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        this.applyNodeEvaluations(await response.json())
+      } catch (error) {
+        console.error('Failed to persist LLM analysis evaluation:', error)
+        this.nodeEvaluations = previousEvaluations
+        this.nodeEvaluationsUpdatedAt = previousUpdatedAt
       }
     },
     buildAnalysisExportFileName() {
@@ -530,7 +639,11 @@ export default {
       this.loadStarted = true
       let previousSignature = this.lastManifestSignature
       try {
-        const manifest = await this.fetchManifest()
+        const [manifest, evaluations] = await Promise.all([
+          this.fetchManifest(),
+          this.fetchNodeEvaluations(),
+        ])
+        this.applyNodeEvaluations(evaluations)
         const signature = this.manifestSignature(manifest)
         if (!force && signature && signature === this.lastManifestSignature && this.reasoningGraph) return
         previousSignature = this.lastManifestSignature

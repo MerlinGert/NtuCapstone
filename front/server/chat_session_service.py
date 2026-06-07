@@ -33,8 +33,12 @@ BASELINE_WORKSPACE_ROLES = {"human"}
 ANALYSIS_EXPORT_SUFFIXES = {".json", ".md"}
 REASONING_GRAPH_NAME = "reasoning-graph.json"
 REASONING_GRAPH_PATCH_RE = re.compile(r"^reasoning-graph-patch(?:-.+)?\.json$")
+LLM_ANALYSIS_EVALUATIONS_NAME = "llm-analysis-evaluations.json"
 SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+EVALUABLE_REASONING_NODE_KINDS = {"Hypothesis", "Finding"}
+EVALUATION_ENTRY_KEYS = {"checked", "nodeKind", "updatedAt"}
+ANALYSIS_EXPORT_FORMAT = "maniscope-llm-analysis-json"
 
 
 def _now_iso() -> str:
@@ -876,6 +880,121 @@ def _get_analysis_artifact_manifest(session_id: str, session_mode: str = "specia
     return _analysis_artifact_manifest(session_id, session_dir, session_mode=session_mode)
 
 
+def _analysis_evaluations_path(session_dir: Path) -> Path:
+    return session_dir / LLM_ANALYSIS_EVALUATIONS_NAME
+
+
+def _empty_analysis_evaluations(session_id: str, session_mode: str = "specialized") -> dict[str, Any]:
+    return {
+        "sessionId": session_id,
+        "sessionMode": session_mode,
+        "updatedAt": None,
+        "evaluations": {},
+    }
+
+
+def _normalize_analysis_evaluations_payload(
+    session_id: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Evaluation payload must be a JSON object")
+    raw_evaluations = body.get("evaluations")
+    if raw_evaluations is None:
+        raw_evaluations = {}
+    if not isinstance(raw_evaluations, dict):
+        raise HTTPException(status_code=400, detail="evaluations must be an object keyed by canonical node ID")
+
+    evaluations: dict[str, Any] = {}
+    for raw_key, raw_entry in raw_evaluations.items():
+        node_id = str(raw_key).strip()
+        if not node_id:
+            raise HTTPException(status_code=400, detail="Evaluation node IDs must be non-empty strings")
+        if not isinstance(raw_entry, dict):
+            raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} must be an object")
+        unsupported = sorted(set(raw_entry) - EVALUATION_ENTRY_KEYS)
+        if unsupported:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported evaluation fields for {node_id}: {', '.join(unsupported)}",
+            )
+        checked = raw_entry.get("checked")
+        if not isinstance(checked, bool):
+            raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} requires boolean checked")
+        node_kind = raw_entry.get("nodeKind")
+        if node_kind is not None and node_kind not in EVALUABLE_REASONING_NODE_KINDS:
+            raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} has unsupported nodeKind")
+        updated_at = raw_entry.get("updatedAt")
+        if updated_at is not None and not isinstance(updated_at, str):
+            raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} has invalid updatedAt")
+        evaluations[node_id] = {
+            "checked": checked,
+            "nodeKind": node_kind or "Finding",
+            "updatedAt": updated_at,
+        }
+
+    return {
+        "sessionId": session_id,
+        "sessionMode": session_mode,
+        "updatedAt": body.get("updatedAt") if isinstance(body.get("updatedAt"), str) else None,
+        "evaluations": evaluations,
+    }
+
+
+def _get_analysis_evaluations(session_id: str, session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    payload = _read_json(_analysis_evaluations_path(session_dir))
+    if payload is None:
+        return _empty_analysis_evaluations(session_id, session_mode=session_mode)
+    return _normalize_analysis_evaluations_payload(session_id, payload, session_mode=session_mode)
+
+
+def _put_analysis_evaluations(
+    session_id: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    payload = _normalize_analysis_evaluations_payload(session_id, body, session_mode=session_mode)
+    payload["updatedAt"] = _now_iso()
+    _atomic_write_json(_analysis_evaluations_path(session_dir), payload)
+    return payload
+
+
+def _analysis_export_file_name(session_id: str) -> str:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    return f"maniscope-llm-analysis-{_safe_name_part(session_id)}-{stamp}.json"
+
+
+def _write_analysis_export(session_id: str, body: dict[str, Any], session_mode: str = "specialized") -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    payload = body.get("payload") if isinstance(body, dict) and isinstance(body.get("payload"), dict) else body
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Analysis export payload must be a JSON object")
+    if payload.get("exportFormat") != ANALYSIS_EXPORT_FORMAT:
+        raise HTTPException(status_code=400, detail="Analysis export payload has unsupported exportFormat")
+    file_path = session_dir / "artifacts" / _analysis_export_file_name(session_id)
+    _atomic_write_json(file_path, payload)
+    artifact = _analysis_artifact_info(
+        session_id,
+        file_path,
+        "analysisExport",
+        "Analysis Export",
+        0,
+        session_mode=session_mode,
+    )
+    return {
+        "sessionId": session_id,
+        "sessionMode": session_mode,
+        "artifact": artifact,
+        "name": artifact["name"],
+        "path": artifact["path"],
+        "url": artifact["url"],
+        "modifiedAt": artifact["modifiedAt"],
+    }
+
+
 def _get_session_versions(session_id: str, limit: int = 50, session_mode: str = "specialized") -> dict[str, Any]:
     session_dir = _session_dir(session_id, session_mode=session_mode)
     if not session_dir.exists():
@@ -1191,6 +1310,21 @@ def get_analysis_artifact_manifest(session_id: str) -> dict[str, Any]:
 @baseline_router.get("/{session_id}/analysis-artifacts")
 def get_baseline_analysis_artifact_manifest(session_id: str) -> dict[str, Any]:
     return _get_analysis_artifact_manifest(session_id, session_mode="baseline")
+
+
+@router.get("/{session_id}/analysis-evaluations")
+def get_analysis_evaluations(session_id: str) -> dict[str, Any]:
+    return _get_analysis_evaluations(session_id, session_mode="specialized")
+
+
+@router.put("/{session_id}/analysis-evaluations")
+def put_analysis_evaluations(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _put_analysis_evaluations(session_id, body, session_mode="specialized")
+
+
+@router.post("/{session_id}/analysis-export")
+def write_analysis_export(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _write_analysis_export(session_id, body, session_mode="specialized")
 
 
 @router.get("/{session_id}/versions")
