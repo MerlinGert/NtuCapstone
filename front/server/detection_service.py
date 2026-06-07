@@ -4,6 +4,7 @@ import logging
 import os
 import threading
 from collections import OrderedDict
+from itertools import combinations
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -45,11 +46,16 @@ def get_data_dir(coin: str) -> str:
 
 
 DETECTION_RESULT_CACHE_MAX_SIZE = 64
+MANISCOPE_USE_OPTIMIZED_DETECTION = "MANISCOPE_USE_OPTIMIZED_DETECTION"
 
 _cache_lock = threading.RLock()
 _csv_file_cache: Dict[str, pd.DataFrame] = {}
 _json_file_cache: Dict[str, Any] = {}
 _detection_result_cache: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+_optimized_detection_result_cache: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+_prepared_transfer_cache: Dict[str, pd.DataFrame] = {}
+_prepared_user_relations_cache: Dict[str, Dict[str, Any]] = {}
+_prepared_user_actions_cache: Dict[str, Dict[str, list]] = {}
 
 
 def _load_csv_file(path: str) -> Optional[pd.DataFrame]:
@@ -135,10 +141,48 @@ def _set_detection_result_cache(cache_key: str, result: Dict[str, Any]) -> None:
             _detection_result_cache.popitem(last=False)
 
 
+def _env_enabled(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def clear_optimized_detection_caches() -> None:
+    """Clear optimized detection caches for equivalence tests and benchmarks."""
+    with _cache_lock:
+        _optimized_detection_result_cache.clear()
+        _prepared_transfer_cache.clear()
+        _prepared_user_relations_cache.clear()
+        _prepared_user_actions_cache.clear()
+
+
+def _get_optimized_detection_result_from_cache(cache_key: str) -> Optional[Dict[str, Any]]:
+    with _cache_lock:
+        cached = _optimized_detection_result_cache.get(cache_key)
+        if cached is None:
+            return None
+        _optimized_detection_result_cache.move_to_end(cache_key)
+        return copy.deepcopy(cached)
+
+
+def _set_optimized_detection_result_cache(cache_key: str, result: Dict[str, Any]) -> None:
+    with _cache_lock:
+        _optimized_detection_result_cache[cache_key] = copy.deepcopy(result)
+        _optimized_detection_result_cache.move_to_end(cache_key)
+        while len(_optimized_detection_result_cache) > DETECTION_RESULT_CACHE_MAX_SIZE:
+            _optimized_detection_result_cache.popitem(last=False)
+
+
 @router.post("/run")
 async def run_detection(request: DetectionRequest):
     try:
-        results = process_detection(
+        detector = (
+            process_detection_optimized
+            if _env_enabled(MANISCOPE_USE_OPTIMIZED_DETECTION, default=True)
+            else process_detection
+        )
+        results = detector(
             request.target_users,
             request.related_users,
             request.entity_detection_config,
@@ -191,6 +235,774 @@ def process_detection(
     )
     _set_detection_result_cache(cache_key, result)
     return result
+
+
+def process_detection_optimized(
+    target_users: Dict[str, float],
+    related_users: Dict[str, float],
+    entity_detection_config: Dict[str, Any],
+    link_detection_config: Dict[str, Any],
+    snapshot_time: Optional[str] = None,
+    detect_entity: bool = True,
+    detect_link: bool = True,
+    coin: str = "ACT",
+) -> Dict[str, Any]:
+    cache_key = "optimized:" + _make_detection_cache_key(
+        target_users,
+        related_users,
+        entity_detection_config,
+        link_detection_config,
+        snapshot_time,
+        detect_entity,
+        detect_link,
+        coin,
+    )
+    cached = _get_optimized_detection_result_from_cache(cache_key)
+    if cached is not None:
+        logger.info("Optimized detection result cache hit.")
+        return cached
+
+    result = _process_detection_uncached_optimized(
+        target_users,
+        related_users,
+        entity_detection_config,
+        link_detection_config,
+        snapshot_time,
+        detect_entity,
+        detect_link,
+        coin,
+    )
+    _set_optimized_detection_result_cache(cache_key, result)
+    return result
+
+
+def _relation_key(u, v) -> str:
+    return "-".join(sorted([str(u), str(v)]))
+
+
+def _merge_relations_optimized(base_relations, new_relations):
+    for k, reasons in new_relations.items():
+        if k not in base_relations:
+            base_relations[k] = []
+        base_relations[k].extend(reasons)
+    return base_relations
+
+
+def _network_rule_enabled(config: Dict[str, Any], rule_name: str) -> bool:
+    return bool(
+        config.get("enable_network_based", False)
+        and config.get("transfer_network_based_params", {}).get(rule_name, False)
+    )
+
+
+def _load_prepared_transfers(coin: str) -> Optional[pd.DataFrame]:
+    with _cache_lock:
+        cached = _prepared_transfer_cache.get(coin)
+        if cached is not None:
+            return cached
+
+    transfers_path = os.path.join(get_data_dir(coin), "sorted_transfers.csv")
+    df = _load_csv_file(transfers_path)
+    if df is None:
+        return None
+
+    prepared = df.copy()
+    if "timestamp" in prepared.columns:
+        prepared["timestamp_dt"] = pd.to_datetime(prepared["timestamp"], errors="coerce")
+    if "amount" in prepared.columns:
+        prepared["amount_numeric"] = pd.to_numeric(prepared["amount"], errors="coerce").fillna(0.0)
+    else:
+        prepared["amount_numeric"] = 0.0
+
+    with _cache_lock:
+        return _prepared_transfer_cache.setdefault(coin, prepared)
+
+
+def _filter_transfers_to_snapshot(
+    transfers: Optional[pd.DataFrame], snapshot_time: Optional[str]
+) -> Optional[pd.DataFrame]:
+    if transfers is None:
+        return None
+    if not snapshot_time or "timestamp_dt" not in transfers.columns:
+        return transfers
+    try:
+        snap_dt = pd.to_datetime(snapshot_time)
+    except Exception as e:
+        logger.warning(f"Time filtering failed: {e}")
+        return transfers
+    return transfers[transfers["timestamp_dt"] <= snap_dt]
+
+
+def _direct_transfer_stats_vectorized(
+    transfers: pd.DataFrame,
+    target_user_set: set,
+    related_user_set: set,
+):
+    empty_stats = {}
+    if transfers is None or transfers.empty:
+        return empty_stats, empty_stats
+    if "from_owner" not in transfers.columns or "to_owner" not in transfers.columns:
+        return empty_stats, empty_stats
+
+    owners = transfers[["from_owner", "to_owner", "amount_numeric"]].dropna(
+        subset=["from_owner", "to_owner"]
+    )
+    if owners.empty:
+        return empty_stats, empty_stats
+
+    from_owner = owners["from_owner"].astype(str)
+    to_owner = owners["to_owner"].astype(str)
+    from_target = from_owner.isin(target_user_set)
+    to_target = to_owner.isin(target_user_set)
+    from_related = from_owner.isin(related_user_set)
+    to_related = to_owner.isin(related_user_set)
+
+    tt_mask = from_target & to_target
+    tr_mask = (from_target & to_related) | (from_related & to_target)
+
+    def grouped_stats(mask):
+        subset = owners.loc[mask, ["amount_numeric"]].copy()
+        if subset.empty:
+            return {}
+        left = from_owner[mask]
+        right = to_owner[mask]
+        subset["pair_key"] = left.where(left <= right, right) + "-" + right.where(
+            left <= right, left
+        )
+        grouped = subset.groupby("pair_key", sort=False)["amount_numeric"].agg(["count", "sum"])
+        return {
+            key: {"count": int(row["count"]), "volume": float(row["sum"])}
+            for key, row in grouped.iterrows()
+        }
+
+    return grouped_stats(tt_mask), grouped_stats(tr_mask)
+
+
+def _check_direct_transfer_criteria(count, volume, config):
+    net_params = config.get("transfer_network_based_params", {})
+    if not config.get("enable_network_based", False) or not net_params.get(
+        "enable_direct_transfer", False
+    ):
+        return False, None
+
+    direct_params = net_params.get("direct_transfer_params", {})
+    min_count = direct_params.get("min_tx_count", 0)
+    min_volume = direct_params.get("min_tx_volume", 0)
+    enable_count = direct_params.get("enable_min_count", True)
+    enable_volume = direct_params.get("enable_min_volume", True)
+
+    reason_desc = []
+    count_passed = True
+    if enable_count:
+        if count < min_count:
+            count_passed = False
+        else:
+            reason_desc.append(f"count >= {min_count} ({count})")
+
+    volume_passed = True
+    if enable_volume:
+        if volume < min_volume:
+            volume_passed = False
+        else:
+            reason_desc.append(f"volume >= {min_volume} ({volume:.2f})")
+
+    if count_passed and volume_passed:
+        return True, ", ".join(reason_desc)
+    return False, None
+
+
+def _direct_stats_to_relations_optimized(stats_map, config):
+    res = {}
+    for key, stats in stats_map.items():
+        passed, desc = _check_direct_transfer_criteria(
+            stats["count"], stats["volume"], config
+        )
+        if passed:
+            res[key] = [
+                {
+                    "type": "direct_transfer",
+                    "count": stats["count"],
+                    "volume": stats["volume"],
+                    "description": f"Direct transfer: {desc}",
+                }
+            ]
+    return res
+
+
+def _load_prepared_user_relations(coin: str) -> Dict[str, Any]:
+    with _cache_lock:
+        cached = _prepared_user_relations_cache.get(coin)
+        if cached is not None:
+            return cached
+
+    relations_path = os.path.join(get_data_dir(coin), "user_relations.json")
+    raw_relations = _load_json_file(relations_path, {}) or {}
+
+    prepared = {"senders": {}, "recipients": {}}
+    for relation_kind in ("senders", "recipients"):
+        for user, records in raw_relations.get(relation_kind, {}).items():
+            parsed_records = []
+            for record in records:
+                try:
+                    parsed_records.append(
+                        {
+                            "timestamp": pd.to_datetime(record["timestamp"]),
+                            "address": record["address"],
+                        }
+                    )
+                except (ValueError, TypeError, KeyError):
+                    pass
+            prepared[relation_kind][user] = parsed_records
+
+    with _cache_lock:
+        return _prepared_user_relations_cache.setdefault(coin, prepared)
+
+
+def _valid_relation_addresses(records, snap_dt):
+    if not snap_dt:
+        return [record["address"] for record in records]
+    valid = []
+    for record in records:
+        if record["timestamp"] <= snap_dt:
+            valid.append(record["address"])
+        else:
+            break
+    return valid
+
+
+def _collect_prepared_network_relations(
+    target_user_set: set,
+    related_user_set: set,
+    entity_detection_config: Dict[str, Any],
+    link_detection_config: Dict[str, Any],
+    snapshot_time: Optional[str],
+    detect_entity: bool,
+    detect_link: bool,
+    coin: str,
+):
+    target_relations_for_entity = {}
+    target_relations_for_links = {}
+    target_related_relations_for_entity = {}
+    target_related_relations_for_links = {}
+
+    need_direct_transfer = (
+        detect_entity and _network_rule_enabled(entity_detection_config, "enable_direct_transfer")
+    ) or (
+        detect_link and _network_rule_enabled(link_detection_config, "enable_direct_transfer")
+    )
+    need_funding_relationship = (
+        detect_entity
+        and _network_rule_enabled(entity_detection_config, "enable_funding_relationship")
+    ) or (
+        detect_link and _network_rule_enabled(link_detection_config, "enable_funding_relationship")
+    )
+    need_same_sender = (
+        detect_entity and _network_rule_enabled(entity_detection_config, "enable_same_sender")
+    ) or (detect_link and _network_rule_enabled(link_detection_config, "enable_same_sender"))
+    need_same_recipient = (
+        detect_entity and _network_rule_enabled(entity_detection_config, "enable_same_recipient")
+    ) or (
+        detect_link and _network_rule_enabled(link_detection_config, "enable_same_recipient")
+    )
+
+    if need_direct_transfer:
+        transfers = _filter_transfers_to_snapshot(_load_prepared_transfers(coin), snapshot_time)
+        tt_stats, tr_stats = _direct_transfer_stats_vectorized(
+            transfers, target_user_set, related_user_set
+        )
+        if detect_entity and _network_rule_enabled(
+            entity_detection_config, "enable_direct_transfer"
+        ):
+            _merge_relations_optimized(
+                target_relations_for_entity,
+                _direct_stats_to_relations_optimized(tt_stats, entity_detection_config),
+            )
+            _merge_relations_optimized(
+                target_related_relations_for_entity,
+                _direct_stats_to_relations_optimized(tr_stats, entity_detection_config),
+            )
+        if detect_link and _network_rule_enabled(link_detection_config, "enable_direct_transfer"):
+            _merge_relations_optimized(
+                target_relations_for_links,
+                _direct_stats_to_relations_optimized(tt_stats, link_detection_config),
+            )
+            _merge_relations_optimized(
+                target_related_relations_for_links,
+                _direct_stats_to_relations_optimized(tr_stats, link_detection_config),
+            )
+
+    if need_funding_relationship or need_same_sender or need_same_recipient:
+        all_tracked_users = target_user_set.union(related_user_set)
+        prepared_relations = _load_prepared_user_relations(coin)
+        snap_dt = None
+        if snapshot_time:
+            try:
+                snap_dt = pd.to_datetime(snapshot_time)
+            except (ValueError, TypeError):
+                snap_dt = None
+
+        funding_senders = {}
+        recipients = {}
+        for user in all_tracked_users:
+            sender_records = prepared_relations.get("senders", {}).get(user, [])
+            valid_senders = _valid_relation_addresses(sender_records, snap_dt)
+            if valid_senders:
+                funding_senders[user] = valid_senders
+
+            recipient_records = prepared_relations.get("recipients", {}).get(user, [])
+            valid_recipients = _valid_relation_addresses(recipient_records, snap_dt)
+            if valid_recipients:
+                recipients[user] = valid_recipients
+
+        funding_tt = {}
+        funding_tr = {}
+        same_sender_tt = {}
+        same_sender_tr = {}
+
+        if need_funding_relationship:
+            for user in target_user_set:
+                if user not in funding_senders:
+                    continue
+                sender = funding_senders[user][0]
+                if sender in target_user_set:
+                    funding_tt.setdefault(_relation_key(user, sender), []).append(
+                        {
+                            "type": "funding",
+                            "description": f"Direct funded by {sender}",
+                            "direction": f"{sender}->{user}",
+                        }
+                    )
+                elif sender in related_user_set:
+                    funding_tr.setdefault(_relation_key(user, sender), []).append(
+                        {
+                            "type": "funding",
+                            "description": f"Direct funded by {sender}",
+                            "direction": f"{sender}->{user}",
+                        }
+                    )
+
+            first_sender_to_users = {}
+            for user, senders in funding_senders.items():
+                if senders:
+                    first_sender_to_users.setdefault(senders[0], []).append(user)
+
+            for sender, users in first_sender_to_users.items():
+                for u1, u2 in combinations(sorted(set(users)), 2):
+                    u1_t = u1 in target_user_set
+                    u2_t = u2 in target_user_set
+                    u1_r = u1 in related_user_set
+                    u2_r = u2 in related_user_set
+                    if u1_t and u2_t:
+                        funding_tt.setdefault(_relation_key(u1, u2), []).append(
+                            {
+                                "type": "co_funded",
+                                "description": f"Co-funded by {sender}",
+                                "sender": sender,
+                            }
+                        )
+                    elif (u1_t and u2_r) or (u1_r and u2_t):
+                        funding_tr.setdefault(_relation_key(u1, u2), []).append(
+                            {
+                                "type": "co_funded",
+                                "description": f"Co-funded by {sender}",
+                                "sender": sender,
+                            }
+                        )
+
+        if need_same_sender:
+            sender_to_users = {}
+            for user, senders in funding_senders.items():
+                for sender in senders:
+                    sender_to_users.setdefault(sender, []).append(user)
+            for sender, users in sender_to_users.items():
+                for u1, u2 in combinations(sorted(set(users)), 2):
+                    u1_t = u1 in target_user_set
+                    u2_t = u2 in target_user_set
+                    u1_r = u1 in related_user_set
+                    u2_r = u2 in related_user_set
+                    if u1_t and u2_t:
+                        same_sender_tt.setdefault(_relation_key(u1, u2), []).append(
+                            {
+                                "type": "same_sender",
+                                "description": f"Same sender: {sender}",
+                                "sender": sender,
+                            }
+                        )
+                    elif (u1_t and u2_r) or (u1_r and u2_t):
+                        same_sender_tr.setdefault(_relation_key(u1, u2), []).append(
+                            {
+                                "type": "same_sender",
+                                "description": f"Same sender: {sender}",
+                                "sender": sender,
+                            }
+                        )
+
+        if need_same_recipient:
+            recipient_to_users = {}
+            for user, recipient_list in recipients.items():
+                for recipient in recipient_list:
+                    recipient_to_users.setdefault(recipient, []).append(user)
+            for recipient, users in recipient_to_users.items():
+                for u1, u2 in combinations(sorted(set(users)), 2):
+                    u1_t = u1 in target_user_set
+                    u2_t = u2 in target_user_set
+                    u1_r = u1 in related_user_set
+                    u2_r = u2 in related_user_set
+                    if u1_t and u2_t:
+                        same_sender_tt.setdefault(_relation_key(u1, u2), []).append(
+                            {
+                                "type": "same_recipient",
+                                "description": f"Same recipient: {recipient}",
+                                "recipient": recipient,
+                            }
+                        )
+                    elif (u1_t and u2_r) or (u1_r and u2_t):
+                        same_sender_tr.setdefault(_relation_key(u1, u2), []).append(
+                            {
+                                "type": "same_recipient",
+                                "description": f"Same recipient: {recipient}",
+                                "recipient": recipient,
+                            }
+                        )
+
+        if detect_entity:
+            params = entity_detection_config.get("transfer_network_based_params", {})
+            if params.get("enable_funding_relationship", False):
+                _merge_relations_optimized(target_relations_for_entity, funding_tt)
+                _merge_relations_optimized(target_related_relations_for_entity, funding_tr)
+            if params.get("enable_same_sender", False) or params.get(
+                "enable_same_recipient", False
+            ):
+                _merge_relations_optimized(target_relations_for_entity, same_sender_tt)
+                _merge_relations_optimized(target_related_relations_for_entity, same_sender_tr)
+
+        if detect_link:
+            params = link_detection_config.get("transfer_network_based_params", {})
+            if params.get("enable_funding_relationship", False):
+                _merge_relations_optimized(target_relations_for_links, funding_tt)
+                _merge_relations_optimized(target_related_relations_for_links, funding_tr)
+            if params.get("enable_same_sender", False) or params.get(
+                "enable_same_recipient", False
+            ):
+                _merge_relations_optimized(target_relations_for_links, same_sender_tt)
+                _merge_relations_optimized(target_related_relations_for_links, same_sender_tr)
+
+    return {
+        "target_relations_for_entity": target_relations_for_entity,
+        "target_relations_for_links": target_relations_for_links,
+        "target_related_relations_for_entity": target_related_relations_for_entity,
+        "target_related_relations_for_links": target_related_relations_for_links,
+    }
+
+
+def _load_prepared_user_actions(coin: str, users=None) -> Dict[str, list]:
+    user_actions_path = os.path.join(get_data_dir(coin), "user_actions.json")
+    raw_actions = _load_json_file(user_actions_path, {}) or {}
+
+    with _cache_lock:
+        prepared_for_coin = _prepared_user_actions_cache.setdefault(coin, {})
+
+    requested_users = list(users) if users is not None else list(raw_actions.keys())
+    for user in requested_users:
+        with _cache_lock:
+            if user in prepared_for_coin:
+                continue
+        actions = raw_actions.get(user)
+        if actions is None:
+            continue
+        parsed = []
+        for item in actions:
+            try:
+                parsed.append({**item, "_ts": pd.to_datetime(item["timestamp"]).timestamp()})
+            except (ValueError, TypeError, KeyError):
+                pass
+        with _cache_lock:
+            prepared_for_coin[user] = parsed
+
+    with _cache_lock:
+        return {
+            user: prepared_for_coin[user]
+            for user in requested_users
+            if user in prepared_for_coin
+        }
+
+
+def _merge_detection_results_optimized(base_map, new_results, rel_type="trading_action_sequence"):
+    for key, result in new_results.items():
+        if key not in base_map:
+            base_map[key] = []
+        base_map[key].append(
+            {
+                "type": rel_type,
+                "score": result["score"],
+                "description": f"Found matching sequence ({rel_type}): {result['actions_summary']}...",
+                "details": result,
+            }
+        )
+
+
+def _build_detection_response_from_relations(
+    target_relations_for_entity,
+    target_relations_for_links,
+    target_related_relations_for_entity,
+    target_related_relations_for_links,
+) -> Dict[str, Any]:
+    adj = {}
+
+    def add_edge(u, v, rel_info):
+        if u not in adj:
+            adj[u] = []
+        if v not in adj:
+            adj[v] = []
+        adj[u].append((v, rel_info))
+        adj[v].append((u, rel_info))
+
+    for key, relations in target_relations_for_entity.items():
+        parts = key.split("-")
+        if len(parts) >= 2:
+            add_edge(parts[0], parts[1], relations)
+
+    for key, relations in target_related_relations_for_entity.items():
+        parts = key.split("-")
+        if len(parts) >= 2:
+            add_edge(parts[0], parts[1], relations)
+
+    visited = set()
+    entities = []
+    for user in adj:
+        if user in visited:
+            continue
+        component_users = {user}
+        queue = [user]
+        visited.add(user)
+        while queue:
+            curr = queue.pop(0)
+            for neighbor, _rels in adj.get(curr, []):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    component_users.add(neighbor)
+                    queue.append(neighbor)
+
+        comp_rels = []
+        processed_keys = set()
+        for key, value in target_relations_for_entity.items():
+            if key in processed_keys:
+                continue
+            parts = key.split("-")
+            if len(parts) >= 2 and parts[0] in component_users and parts[1] in component_users:
+                comp_rels.extend(value)
+                processed_keys.add(key)
+        for key, value in target_related_relations_for_entity.items():
+            if key in processed_keys:
+                continue
+            parts = key.split("-")
+            if len(parts) >= 2 and parts[0] in component_users and parts[1] in component_users:
+                comp_rels.extend(value)
+                processed_keys.add(key)
+
+        entities.append({"users": list(component_users), "relations": comp_rels})
+
+    return {
+        "entity_results": entities,
+        "relations": {
+            "target_relations_for_entity": target_relations_for_entity,
+            "target_relations_for_links": target_relations_for_links,
+            "target_related_relations_for_entity": target_related_relations_for_entity,
+            "target_related_relations_for_links": target_related_relations_for_links,
+        },
+    }
+
+
+def _process_detection_uncached_optimized(
+    target_users: Dict[str, float],
+    related_users: Dict[str, float],
+    entity_detection_config: Dict[str, Any],
+    link_detection_config: Dict[str, Any],
+    snapshot_time: Optional[str] = None,
+    detect_entity: bool = True,
+    detect_link: bool = True,
+    coin: str = "ACT",
+) -> Dict[str, Any]:
+    logger.info(
+        f"Starting optimized detection process (Entity: {detect_entity}, Link: {detect_link})..."
+    )
+
+    target_relations_for_entity = {}
+    target_relations_for_links = {}
+    target_related_relations_for_entity = {}
+    target_related_relations_for_links = {}
+
+    need_network_detection = (
+        detect_entity and entity_detection_config.get("enable_network_based", False)
+    ) or (detect_link and link_detection_config.get("enable_network_based", False))
+    need_similarity_detection = (
+        detect_entity and entity_detection_config.get("enable_similarity_based", False)
+    ) or (detect_link and link_detection_config.get("enable_similarity_based", False))
+
+    if need_network_detection:
+        relation_maps = _collect_prepared_network_relations(
+            set(target_users.keys()),
+            set(related_users.keys()),
+            entity_detection_config,
+            link_detection_config,
+            snapshot_time,
+            detect_entity,
+            detect_link,
+            coin,
+        )
+        target_relations_for_entity = relation_maps["target_relations_for_entity"]
+        target_relations_for_links = relation_maps["target_relations_for_links"]
+        target_related_relations_for_entity = relation_maps[
+            "target_related_relations_for_entity"
+        ]
+        target_related_relations_for_links = relation_maps[
+            "target_related_relations_for_links"
+        ]
+    else:
+        logger.info("Network-based detection not enabled. Skipping transfer data loading.")
+
+    if need_similarity_detection:
+        entity_similarity_params = entity_detection_config.get("similarity_based_params", {})
+        link_similarity_params = link_detection_config.get("similarity_based_params", {})
+        need_action_sequence = (
+            detect_entity
+            and entity_detection_config.get("enable_similarity_based", False)
+            and entity_similarity_params.get("enable_trading_action_sequence", False)
+        ) or (
+            detect_link
+            and link_detection_config.get("enable_similarity_based", False)
+            and link_similarity_params.get("enable_trading_action_sequence", False)
+        )
+        need_balance_sequence = (
+            detect_entity
+            and entity_detection_config.get("enable_similarity_based", False)
+            and entity_similarity_params.get("enable_balance_sequence", False)
+        ) or (
+            detect_link
+            and link_detection_config.get("enable_similarity_based", False)
+            and link_similarity_params.get("enable_balance_sequence", False)
+        )
+        need_earning_sequence = (
+            detect_entity
+            and entity_detection_config.get("enable_similarity_based", False)
+            and entity_similarity_params.get("enable_earning_sequence", False)
+        ) or (
+            detect_link
+            and link_detection_config.get("enable_similarity_based", False)
+            and link_similarity_params.get("enable_earning_sequence", False)
+        )
+
+        if need_action_sequence:
+            user_actions = _load_prepared_user_actions(
+                coin, list(target_users.keys()) + list(related_users.keys())
+            )
+            if user_actions:
+                target_seqs = {u: user_actions[u] for u in target_users if u in user_actions}
+                related_seqs = {u: user_actions[u] for u in related_users if u in user_actions}
+
+                if detect_entity and entity_detection_config.get("enable_similarity_based", False):
+                    params = entity_detection_config.get("similarity_based_params", {})
+                    if params.get("enable_trading_action_sequence", False):
+                        matches = detect_trading_action_sequence_optimized(
+                            target_seqs, related_seqs, params
+                        )
+                        _merge_detection_results_optimized(
+                            target_relations_for_entity, matches["tt"]
+                        )
+                        _merge_detection_results_optimized(
+                            target_related_relations_for_entity, matches["tr"]
+                        )
+
+                if detect_link and link_detection_config.get("enable_similarity_based", False):
+                    params = link_detection_config.get("similarity_based_params", {})
+                    if params.get("enable_trading_action_sequence", False):
+                        matches = detect_trading_action_sequence_optimized(
+                            target_seqs, related_seqs, params
+                        )
+                        _merge_detection_results_optimized(
+                            target_relations_for_links, matches["tt"]
+                        )
+                        _merge_detection_results_optimized(
+                            target_related_relations_for_links, matches["tr"]
+                        )
+
+        if need_balance_sequence:
+            if detect_entity and entity_detection_config.get("enable_similarity_based", False):
+                params = entity_detection_config.get("similarity_based_params", {})
+                if params.get("enable_balance_sequence", False):
+                    matches = detect_balance_sequence_optimized(
+                        list(target_users.keys()),
+                        list(related_users.keys()),
+                        params,
+                        snapshot_time,
+                        coin,
+                    )
+                    _merge_detection_results_optimized(
+                        target_relations_for_entity, matches["tt"], "balance_sequence"
+                    )
+                    _merge_detection_results_optimized(
+                        target_related_relations_for_entity, matches["tr"], "balance_sequence"
+                    )
+
+            if detect_link and link_detection_config.get("enable_similarity_based", False):
+                params = link_detection_config.get("similarity_based_params", {})
+                if params.get("enable_balance_sequence", False):
+                    matches = detect_balance_sequence_optimized(
+                        list(target_users.keys()),
+                        list(related_users.keys()),
+                        params,
+                        snapshot_time,
+                        coin,
+                    )
+                    _merge_detection_results_optimized(
+                        target_relations_for_links, matches["tt"], "balance_sequence"
+                    )
+                    _merge_detection_results_optimized(
+                        target_related_relations_for_links, matches["tr"], "balance_sequence"
+                    )
+
+        if need_earning_sequence:
+            if detect_entity and entity_detection_config.get("enable_similarity_based", False):
+                params = entity_detection_config.get("similarity_based_params", {})
+                if params.get("enable_earning_sequence", False):
+                    matches = detect_earning_sequence_optimized(
+                        list(target_users.keys()),
+                        list(related_users.keys()),
+                        params,
+                        snapshot_time,
+                        coin,
+                    )
+                    _merge_detection_results_optimized(
+                        target_relations_for_entity, matches["tt"], "earning_sequence"
+                    )
+                    _merge_detection_results_optimized(
+                        target_related_relations_for_entity, matches["tr"], "earning_sequence"
+                    )
+
+            if detect_link and link_detection_config.get("enable_similarity_based", False):
+                params = link_detection_config.get("similarity_based_params", {})
+                if params.get("enable_earning_sequence", False):
+                    matches = detect_earning_sequence_optimized(
+                        list(target_users.keys()),
+                        list(related_users.keys()),
+                        params,
+                        snapshot_time,
+                        coin,
+                    )
+                    _merge_detection_results_optimized(
+                        target_relations_for_links, matches["tt"], "earning_sequence"
+                    )
+                    _merge_detection_results_optimized(
+                        target_related_relations_for_links, matches["tr"], "earning_sequence"
+                    )
+
+    logger.info("Optimized detection process completed.")
+    return _build_detection_response_from_relations(
+        target_relations_for_entity,
+        target_relations_for_links,
+        target_related_relations_for_entity,
+        target_related_relations_for_links,
+    )
 
 
 def _process_detection_uncached(
@@ -1195,6 +2007,162 @@ def detect_trading_action_sequence(target_users_sequences, related_users_sequenc
     return results
 
 
+def detect_trading_action_sequence_optimized(
+    target_users_sequences, related_users_sequences, params
+):
+    config = params.get("trading_action_sequence_params", params)
+
+    sequence_type = config.get("type", "action_only")
+    min_seq_length = config.get("min_seq_length", 5)
+    max_time_diff = config.get("max_time_diff", 2)
+    amount_similarity = config.get("amount_similarity", 0.7)
+    price_similarity = config.get("price_similarity", 0.7)
+
+    def compare_actions(a1, a2):
+        act1 = a1.get("action_type", a1.get("action"))
+        act2 = a2.get("action_type", a2.get("action"))
+        if act1 != act2:
+            return False
+        if sequence_type == "action_only":
+            return True
+        try:
+            amt1 = float(a1.get("amount", 0))
+            amt2 = float(a2.get("amount", 0))
+            if "amount" in sequence_type:
+                if max(amt1, amt2) == 0:
+                    sim = 1.0 if amt1 == amt2 else 0.0
+                else:
+                    sim = 1.0 - abs(amt1 - amt2) / max(amt1, amt2)
+                if sim < amount_similarity:
+                    return False
+
+            p1 = float(a1.get("price", 0))
+            p2 = float(a2.get("price", 0))
+            if "price" in sequence_type:
+                if max(p1, p2) == 0:
+                    sim = 1.0 if p1 == p2 else 0.0
+                else:
+                    sim = 1.0 - abs(p1 - p2) / max(p1, p2)
+                if sim < price_similarity:
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def parse_seq(seq):
+        parsed = []
+        for item in seq:
+            if "_ts" in item:
+                parsed.append(item)
+                continue
+            try:
+                parsed.append({**item, "_ts": pd.to_datetime(item["timestamp"]).timestamp()})
+            except (ValueError, TypeError, KeyError):
+                pass
+        return parsed
+
+    t_parsed = {u: parse_seq(s) for u, s in target_users_sequences.items()}
+    r_parsed = {u: parse_seq(s) for u, s in related_users_sequences.items()}
+    results = {"tt": {}, "tr": {}}
+
+    def find_match(u1, u2, s1, s2):
+        n1 = len(s1)
+        n2 = len(s2)
+        if n1 == 0 or n2 == 0:
+            return None
+
+        matches = []
+        start_j = 0
+        end_j = 0
+        for i, action in enumerate(s1):
+            ts = action["_ts"]
+            while start_j < n2 and s2[start_j]["_ts"] < ts - max_time_diff:
+                start_j += 1
+            while end_j < n2 and s2[end_j]["_ts"] <= ts + max_time_diff:
+                end_j += 1
+            if start_j >= n2:
+                break
+            for j in range(start_j, end_j):
+                if compare_actions(action, s2[j]):
+                    matches.append((i, j))
+
+        if not matches:
+            return None
+
+        matches.sort(key=lambda x: (x[0], -x[1]))
+        tails = []
+        parent = [-1] * len(matches)
+
+        for k, match in enumerate(matches):
+            j_val = match[1]
+            left, right = 0, len(tails)
+            while left < right:
+                mid = (left + right) // 2
+                if matches[tails[mid]][1] < j_val:
+                    left = mid + 1
+                else:
+                    right = mid
+            if left == len(tails):
+                tails.append(k)
+            else:
+                tails[left] = k
+            if left > 0:
+                parent[k] = tails[left - 1]
+
+        length = len(tails)
+        if length < min_seq_length:
+            return None
+
+        path_indices = []
+        curr = tails[-1]
+        while curr != -1:
+            path_indices.append(curr)
+            curr = parent[curr]
+        path_indices.reverse()
+        final_matches = [matches[k] for k in path_indices]
+        first_m = final_matches[0]
+        actions_str = ",".join(
+            [
+                str(s1[i].get("action_type", s1[i].get("action")))
+                for i, _j in final_matches[:5]
+            ]
+        )
+        if length > 5:
+            actions_str += "..."
+
+        return {
+            "u1": u1,
+            "u2": u2,
+            "start_time_1": s1[first_m[0]]["timestamp"],
+            "start_time_2": s2[first_m[1]]["timestamp"],
+            "length": length,
+            "actions_summary": actions_str,
+            "score": length,
+        }
+
+    target_users = list(t_parsed.keys())
+    for i in range(len(target_users)):
+        for j in range(i + 1, len(target_users)):
+            u1, u2 = target_users[i], target_users[j]
+            match = find_match(u1, u2, t_parsed[u1], t_parsed[u2])
+            if match:
+                results["tt"][_relation_key(u1, u2)] = match
+
+    related_users = list(r_parsed.keys())
+    for u1 in target_users:
+        for u2 in related_users:
+            if u1 == u2:
+                continue
+            match = find_match(u1, u2, t_parsed[u1], r_parsed[u2])
+            if match:
+                results["tr"][_relation_key(u1, u2)] = match
+
+    logger.info(
+        f"Found {len(results['tt'])} optimized TT matches and {len(results['tr'])} optimized TR matches"
+    )
+    return results
+
+
 def calculate_sequence_correlation(seq1, seq2, freq_str, value_col="balance", snapshot_time=None):
     if not seq1 or not seq2:
         return 0.0
@@ -1451,3 +2419,15 @@ def detect_earning_sequence(
         f"Found {len(results['tt'])} TT earning matches and {len(results['tr'])} TR earning matches"
     )
     return results
+
+
+def detect_balance_sequence_optimized(
+    target_users_list, related_users_list, params, snapshot_time=None, coin="ACT"
+):
+    return detect_balance_sequence(target_users_list, related_users_list, params, snapshot_time, coin)
+
+
+def detect_earning_sequence_optimized(
+    target_users_list, related_users_list, params, snapshot_time=None, coin="ACT"
+):
+    return detect_earning_sequence(target_users_list, related_users_list, params, snapshot_time, coin)
