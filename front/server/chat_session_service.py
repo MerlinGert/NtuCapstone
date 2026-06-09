@@ -35,6 +35,7 @@ REASONING_GRAPH_NAME = "reasoning-graph.json"
 REASONING_GRAPH_PATCH_RE = re.compile(r"^reasoning-graph-patch(?:-.+)?\.json$")
 LLM_ANALYSIS_EVALUATIONS_NAME = "llm-analysis-evaluations.json"
 LLM_ANALYSIS_UI_STATE_NAME = "llm-analysis-ui-state.json"
+ANALYSIS_RUNS_DIR_NAME = "analysis-runs"
 SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 EVALUABLE_REASONING_NODE_KINDS = {"Hypothesis", "Finding"}
@@ -51,6 +52,9 @@ EVALUATION_ENTRY_KEYS = {
 }
 ANALYSIS_UI_STATE_ENTRY_KEYS = {"nodeKind", "firstSeenAt", "runId"}
 ANALYSIS_UI_STATE_RUN_KEYS = {"runId", "startedAt", "suppressNewBadges", "baselineVisibleNodeIds"}
+ANALYSIS_RUN_MODES = {"full_analysis", "incremental_analysis", "manual_chat"}
+ANALYSIS_RUN_STATUSES = {"running", "completed", "stopped", "failed", "interrupted"}
+ANALYSIS_RUN_ID_RE = re.compile(r"^[a-zA-Z0-9_.-]{1,120}$")
 ANALYSIS_EXPORT_FORMAT = "maniscope-llm-analysis-json"
 
 
@@ -205,6 +209,131 @@ def _trace_anchor(session_id: str, live_session: dict[str, Any]) -> dict[str, An
     if last_annotation_id is not None:
         anchor["lastAnnotationId"] = last_annotation_id
     return anchor
+
+
+def _current_trace_anchor(session_id: str, session_dir: Path) -> dict[str, Any]:
+    live_session = _read_json(session_dir / "live-session.json")
+    if not isinstance(live_session, dict):
+        live_session = _empty_live_session(session_id)
+    anchor = live_session.get("traceAnchor")
+    if isinstance(anchor, dict):
+        return copy.deepcopy(anchor)
+    return _trace_anchor(session_id, live_session)
+
+
+def _analysis_run_id() -> str:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"run-{stamp}-{secrets.token_hex(4)}"
+
+
+def _normalize_analysis_run_id(value: Any, *, required: bool = True) -> str:
+    run_id = str(value or "").strip()
+    if not run_id:
+        if required:
+            raise HTTPException(status_code=400, detail="runId is required")
+        return ""
+    if not ANALYSIS_RUN_ID_RE.fullmatch(run_id) or "/" in run_id or "\\" in run_id:
+        raise HTTPException(status_code=400, detail="runId contains unsupported characters")
+    return run_id
+
+
+def _analysis_runs_dir(session_dir: Path) -> Path:
+    path = session_dir / ANALYSIS_RUNS_DIR_NAME
+    path.mkdir(exist_ok=True)
+    return path
+
+
+def _analysis_run_path(session_dir: Path, run_id: str) -> Path:
+    safe_run_id = _normalize_analysis_run_id(run_id)
+    return _analysis_runs_dir(session_dir) / f"{safe_run_id}.json"
+
+
+def _analysis_run_mode_from_body(body: dict[str, Any]) -> str:
+    mode = str(body.get("mode") or "").strip()
+    if mode:
+        if mode not in ANALYSIS_RUN_MODES:
+            raise HTTPException(status_code=400, detail="analysis run mode is unsupported")
+        return mode
+    preset_kind = str(body.get("presetKind") or "").strip()
+    if preset_kind == "full_analysis":
+        return "full_analysis"
+    if preset_kind == "update_analysis":
+        return "incremental_analysis"
+    return "manual_chat"
+
+
+def _trace_advanced(start_anchor: dict[str, Any] | None, end_anchor: dict[str, Any] | None) -> bool:
+    if not isinstance(start_anchor, dict) or not isinstance(end_anchor, dict):
+        return False
+    for key in ("traceRevision", "actionCount", "annotationCount"):
+        try:
+            if int(end_anchor.get(key) or 0) > int(start_anchor.get(key) or 0):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
+def _start_analysis_run(
+    session_id: str,
+    body: dict[str, Any],
+    session_mode: str = "specialized",
+) -> dict[str, Any]:
+    if session_mode != "specialized":
+        raise HTTPException(status_code=400, detail="Analysis runs are only supported for specialized sessions")
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Analysis run payload must be a JSON object")
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    requested_run_id = _normalize_analysis_run_id(body.get("runId"), required=False)
+    run_id = requested_run_id or _analysis_run_id()
+    run_path = _analysis_run_path(session_dir, run_id)
+    if run_path.exists():
+        raise HTTPException(status_code=409, detail="Analysis run already exists")
+    now = _now_iso()
+    payload = {
+        "version": 1,
+        "sessionId": session_id,
+        "sessionMode": session_mode,
+        "runId": run_id,
+        "mode": _analysis_run_mode_from_body(body),
+        "presetKind": str(body.get("presetKind") or ""),
+        "status": "running",
+        "startedAt": now,
+        "completedAt": None,
+        "startAnchor": _current_trace_anchor(session_id, session_dir),
+        "endAnchor": None,
+        "traceAdvanced": False,
+    }
+    _atomic_write_json(run_path, payload)
+    return payload
+
+
+def _finish_analysis_run(
+    session_id: str,
+    run_id: str,
+    status: str,
+    session_mode: str = "specialized",
+) -> dict[str, Any] | None:
+    if session_mode != "specialized":
+        return None
+    if status not in ANALYSIS_RUN_STATUSES:
+        raise HTTPException(status_code=400, detail="Analysis run status is unsupported")
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode=session_mode)
+    run_path = _analysis_run_path(session_dir, run_id)
+    if not run_path.exists():
+        return None
+    payload = _read_json(run_path)
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("status") in {"completed", "stopped", "failed", "interrupted"}:
+        return payload
+    end_anchor = _current_trace_anchor(session_id, session_dir)
+    payload["status"] = status
+    payload["completedAt"] = _now_iso()
+    payload["endAnchor"] = end_anchor
+    payload["traceAdvanced"] = _trace_advanced(payload.get("startAnchor"), end_anchor)
+    _atomic_write_json(run_path, payload)
+    return payload
 
 
 def _analysis_artifact_info(
@@ -1652,6 +1781,20 @@ def put_analysis_ui_state(session_id: str, body: dict[str, Any]) -> dict[str, An
 @router.post("/{session_id}/analysis-ui-state/run-start")
 def start_analysis_ui_state_run(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return _start_analysis_ui_state_run(session_id, body, session_mode="specialized")
+
+
+@router.post("/{session_id}/analysis-runs/start")
+def start_analysis_run(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _start_analysis_run(session_id, body, session_mode="specialized")
+
+
+def finish_analysis_run(
+    session_id: str,
+    run_id: str,
+    status: str,
+    session_mode: str = "specialized",
+) -> dict[str, Any] | None:
+    return _finish_analysis_run(session_id, run_id, status, session_mode=session_mode)
 
 
 @router.post("/{session_id}/analysis-export")

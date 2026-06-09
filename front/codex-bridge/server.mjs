@@ -82,6 +82,44 @@ function validateWorkspaceRole(workspaceRole, sessionMode = 'specialized') {
   return workspaceRole
 }
 
+function sanitizeAnalysisRun(value, sessionMode = 'specialized') {
+  if (sessionMode !== 'specialized' || !value || typeof value !== 'object') return null
+  const runId = String(value.runId || '').trim()
+  if (!/^[a-zA-Z0-9_.-]{1,120}$/.test(runId)) return null
+  const analysisRun = {
+    runId,
+    mode: String(value.mode || ''),
+    presetKind: String(value.presetKind || ''),
+    status: String(value.status || ''),
+    startedAt: String(value.startedAt || ''),
+  }
+  if (value.startAnchor && typeof value.startAnchor === 'object' && !Array.isArray(value.startAnchor)) {
+    analysisRun.startAnchor = value.startAnchor
+  }
+  return analysisRun
+}
+
+function formatAnalysisRunContext(analysisRun) {
+  if (!analysisRun?.runId) return ''
+  const startAnchorText = analysisRun.startAnchor
+    ? JSON.stringify(analysisRun.startAnchor, null, 2)
+    : 'No startAnchor was provided.'
+  return `# Current Analysis Run Window
+
+This turn has a backend-owned closed trace window.
+- runId: ${analysisRun.runId}
+- mode: ${analysisRun.mode || 'manual_chat'}
+- presetKind: ${analysisRun.presetKind || ''}
+- startedAt: ${analysisRun.startedAt || ''}
+- startAnchor:
+
+\`\`\`json
+${startAnchorText}
+\`\`\`
+
+Use this startAnchor as the maximum trace boundary for this turn. You may reread live-session.json to notice whether newer user actions arrived after this run started, but those later Interactions and annotations are out of scope for this run. Do not revise the plan, graph, patches, or subagent assignments to include trace records beyond the startAnchor. If the live trace advanced during the run, mention that those later records were deferred and should be handled by Update Analysis.`
+}
+
 function activeTurnKey(sessionMode, sessionId, threadKey) {
   return `${sessionMode}:${sessionId}:${threadKey}`
 }
@@ -279,7 +317,7 @@ function setThreadEntry(sessionId, threadKey, threadId, sessionMode = 'specializ
   writeJson(cachePath, cache)
 }
 
-function buildSpecializedThreadBootstrapPrompt(sessionId, userMessage, workspaceRole = 'human') {
+function buildSpecializedThreadBootstrapPrompt(sessionId, userMessage, workspaceRole = 'human', analysisRun = null) {
   const relativeSessionRoot = '.'
   const sessionRoot = sessionDir(sessionId, 'specialized')
   const actRawDataDir = RAW_DATA_DIRS[0]
@@ -330,6 +368,19 @@ Use session git history as a quick change index when trace versioning is enabled
 If HEAD~1 is unavailable, inspect the latest full trace files directly. If you do not know which session commit was last analyzed, say you are refreshing from the latest full trace, then inspect the latest trace state directly.
 
 Treat new user Interactions, annotations, settings changes, imports, and trace reorders as updates to the User Reasoning Forest. Treat evidence that you produce through follow-up analysis as agent follow-up evidence, which should be added through a Reasoning Graph Patch when durable artifacts are requested.
+
+# Closed Trace Window
+
+When a Current Analysis Run Window is provided, it is the source of truth for the trace scope of this turn.
+
+- Full trace analysis must reconstruct the user reasoning only up to the run startAnchor. Set reasoning-graph.json.analysisAnchor exactly to that startAnchor.
+- Incremental trace analysis must use the run startAnchor as the targetAnchor for the new incremental patch. Later live trace changes are outside the patch target and must be deferred.
+- Manual trace-dependent answers should answer against the run startAnchor when the question is analysis-run scoped, while noting any newer trace records only as out-of-scope updates.
+- Do not revise an ongoing analysis plan merely because live-session.json changed after the run started.
+- Patch-producing subagents must receive this same closed trace window, including runId, mode, and startAnchor, and must not analyze Interactions or annotations beyond it.
+- If the current live trace has advanced beyond the run startAnchor, mention in the technical audit or final answer that those later records were not included and should be handled by Update Analysis.
+
+${formatAnalysisRunContext(analysisRun)}
 
 Screenshots and generated evidence are under:
 - ${relativeSessionRoot}/images
@@ -615,6 +666,7 @@ function buildInput(
   attachmentPaths,
   workspaceRole = 'human',
   sessionMode = 'specialized',
+  analysisRun = null,
 ) {
   const text =
     userMessage ||
@@ -624,16 +676,18 @@ function buildInput(
     const promptText =
       sessionMode === 'baseline'
         ? buildBaselinePrompt(sessionId, text)
-        : buildSpecializedThreadBootstrapPrompt(sessionId, text, workspaceRole)
+        : buildSpecializedThreadBootstrapPrompt(sessionId, text, workspaceRole, analysisRun)
     if (attachmentPaths.length === 0) return promptText
     return [
       { type: 'text', text: promptText },
       ...attachmentPaths.map((imagePath) => ({ type: 'local_image', path: imagePath })),
     ]
   }
-  if (attachmentPaths.length === 0) return text
+  const runContext = sessionMode === 'specialized' ? formatAnalysisRunContext(analysisRun) : ''
+  const turnText = runContext ? `${runContext}\n\n---\n\n# User Message\n\n${text}` : text
+  if (attachmentPaths.length === 0) return turnText
   return [
-    { type: 'text', text },
+    { type: 'text', text: turnText },
     ...attachmentPaths.map((imagePath) => ({ type: 'local_image', path: imagePath })),
   ]
 }
@@ -995,6 +1049,7 @@ async function handleChat(req, res, sessionId) {
   const threadKey = validateThreadKey(String(body.threadKey || 'trace-analysis'))
   const workspaceRole = validateWorkspaceRole(String(body.workspaceRole || 'human'), sessionMode)
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
+  const analysisRun = sanitizeAnalysisRun(body.analysisRun, sessionMode)
   const includeCurrentViews = body.includeCurrentViews !== false
   if (!message && attachments.length === 0) {
     sendJson(res, 400, { error: 'message or image attachment is required' })
@@ -1031,6 +1086,7 @@ async function handleChat(req, res, sessionId) {
     inputImagePaths,
     workspaceRole,
     sessionMode,
+    analysisRun,
   )
   const turnKey = activeTurnKey(sessionMode, sessionId, threadKey)
   if (activeTurns.has(turnKey)) {

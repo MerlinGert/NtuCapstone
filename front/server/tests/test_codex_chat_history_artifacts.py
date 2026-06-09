@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,11 +11,18 @@ CODEX_CHAT_SERVICE_PATH = SERVER_DIR / "codex_chat_service.py"
 
 
 def load_codex_chat_service():
-    spec = importlib.util.spec_from_file_location("codex_chat_service_template", CODEX_CHAT_SERVICE_PATH)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
+    sys.path.insert(0, str(SERVER_DIR))
+    try:
+        spec = importlib.util.spec_from_file_location("codex_chat_service_template", CODEX_CHAT_SERVICE_PATH)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        try:
+            sys.path.remove(str(SERVER_DIR))
+        except ValueError:
+            pass
 
 
 class CodexChatHistoryArtifactTests(unittest.TestCase):
@@ -202,6 +210,7 @@ class CodexChatHistoryArtifactTests(unittest.TestCase):
                     history_counters=counters,
                     thread_key="trace-analysis",
                     session_mode="specialized",
+                    analysis_run=None,
                 )
             )
 
@@ -252,6 +261,7 @@ class CodexChatHistoryArtifactTests(unittest.TestCase):
                     history_counters=counters,
                     thread_key="trace-analysis",
                     session_mode="specialized",
+                    analysis_run=None,
                 )
             )
 
@@ -260,6 +270,79 @@ class CodexChatHistoryArtifactTests(unittest.TestCase):
             self.assertEqual(saved_assistant["content"], "Partial result.")
             self.assertEqual(saved_assistant["turnState"], "interrupted")
             self.assertIn("Turn interrupted", [activity["title"] for activity in saved_assistant["activity"]])
+
+    def test_stream_completion_finalizes_analysis_run(self):
+        module = load_codex_chat_service()
+
+        class FakeResponse:
+            status_code = 200
+            reason = "OK"
+            text = ""
+            encoding = "utf-8"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, _exc_type, _exc, _tb):
+                return False
+
+            def iter_lines(self, chunk_size=1, decode_unicode=True):
+                yield 'data: {"type":"done","threadId":"thread-1"}'
+                yield ""
+
+        finalized = []
+
+        def fake_finish(session_id, run_id, status, session_mode="specialized"):
+            finalized.append(
+                {
+                    "sessionId": session_id,
+                    "runId": run_id,
+                    "status": status,
+                    "sessionMode": session_mode,
+                }
+            )
+            return {}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self.configure_temp_sessions(module, temp_dir)
+            messages, assistant_message, counters = module._start_stream_history_turn(
+                "abcde",
+                "trace-analysis",
+                "specialized",
+                {
+                    "displayMessage": "Run full analysis",
+                    "attachments": [],
+                    "analysisRun": {"runId": "run-1", "mode": "full_analysis"},
+                },
+                "Analyze",
+            )
+            module.requests.post = lambda *_args, **_kwargs: FakeResponse()
+            module.finish_analysis_run = fake_finish
+
+            list(
+                module._stream_codex_response(
+                    "abcde",
+                    {"message": "Analyze"},
+                    history_messages=messages,
+                    assistant_message=assistant_message,
+                    history_counters=counters,
+                    thread_key="trace-analysis",
+                    session_mode="specialized",
+                    analysis_run={"runId": "run-1", "mode": "full_analysis"},
+                )
+            )
+
+        self.assertEqual(
+            finalized,
+            [
+                {
+                    "sessionId": "abcde",
+                    "runId": "run-1",
+                    "status": "completed",
+                    "sessionMode": "specialized",
+                }
+            ],
+        )
 
 
 if __name__ == "__main__":

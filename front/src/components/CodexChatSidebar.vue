@@ -284,10 +284,10 @@ import {
   normalizeMessageParts,
 } from '../utils/chatTimeline.js'
 
-const FULL_ANALYSIS_PROMPT = `Please run the full trace-analysis pipeline for the current session. Write and validate ./artifacts/reasoning-graph.json first, then plan and execute follow-up checks. Use 2-4 evidence-only subagents with fork_context: true when useful. The main agent alone writes reasoning-graph-patch*.json. Validate before reporting, and end with a plain-language summary or explanation in my language.`
+const FULL_ANALYSIS_PROMPT = `Please run the full trace-analysis pipeline for the current session using the closed trace window captured for this run. Write and validate ./artifacts/reasoning-graph.json first, with analysisAnchor equal to the run startAnchor, then plan and execute follow-up checks. If the live trace advances while you work, defer those later records to Update Analysis instead of revising this run. Use 2-4 evidence-only subagents with fork_context: true when useful, and give every subagent the same closed trace window. The main agent alone writes reasoning-graph-patch*.json. Validate before reporting, and end with a plain-language summary or explanation in my language.`
 const UPDATE_ANALYSIS_PROMPT = `Please run an incremental trace analysis pass for the current session.
 
-Do not redo the full trace analysis unless incremental analysis is unsafe. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest. Compare the latest graph or patch trace anchor against the current live trace anchor.
+Do not redo the full trace analysis unless incremental analysis is unsafe. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest. Compare the latest graph or patch trace anchor against the closed trace window startAnchor for this run. Use that startAnchor as targetAnchor and defer any later live trace changes.
 
 If reasoning-graph-patch*.json files already exist, first run:
 
@@ -1117,7 +1117,38 @@ export default {
         if (done) break
       }
     },
-    async sendToCodex({ content, displayContent, presetKind, codexAttachments, attachmentMetadata, assistantMessage }) {
+    analysisRunModeForPreset(presetKind) {
+      if (presetKind === 'full_analysis') return 'full_analysis'
+      if (presetKind === 'update_analysis') return 'incremental_analysis'
+      return 'manual_chat'
+    },
+    async startCodexAnalysisRun({ presetKind = '', triggerType = 'manual' } = {}) {
+      if (this.sessionMode === 'baseline' || !this.sessionId) return null
+      const response = await fetch(`${this.sessionApiBase}/${this.sessionId}/analysis-runs/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: this.analysisRunModeForPreset(presetKind),
+          presetKind,
+          triggerType,
+          workspaceRole: this.workspaceRole,
+        }),
+      })
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || `Failed to start analysis run: HTTP ${response.status}`)
+      }
+      return response.json()
+    },
+    async sendToCodex({
+      content,
+      displayContent,
+      presetKind,
+      codexAttachments,
+      attachmentMetadata,
+      assistantMessage,
+      analysisRun,
+    }) {
       if (!this.sessionId) {
         throw new Error('No ManiScope session is active yet.')
       }
@@ -1138,6 +1169,7 @@ export default {
           includeCurrentViews: true,
           workspaceRole: this.workspaceRole,
           sessionMode: this.sessionMode,
+          analysisRun,
         }),
       })
 
@@ -1273,7 +1305,8 @@ export default {
         if (this.beforeSend) {
           await this.beforeSend()
         }
-        const codexRunId = this.createCodexRunId()
+        const analysisRun = await this.startCodexAnalysisRun({ presetKind, triggerType })
+        const codexRunId = analysisRun?.runId || this.createCodexRunId()
         this.notifyCodexRunStart({
           runId: codexRunId,
           presetKind,
@@ -1311,6 +1344,7 @@ export default {
           codexAttachments,
           attachmentMetadata: attachments,
           assistantMessage,
+          analysisRun,
         })
         assistantMessage.loading = false
         assistantMessage.ephemeralReasoning = ''

@@ -185,6 +185,8 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 当 LLM Analysis 中已经有 `reasoning-graph.json` 后，**Update Analysis** 按钮会显示在 **Run Full Analysis** 右侧。它会发送增量分析 prompt，要求 Codex 对比最新 graph 或 patch anchor 与当前 live trace，只分析新增的交互和标注，在有新证据时写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`，验证 graph 与 patch，并同时给出技术审计和使用用户语言的面向人解释摘要。聊天历史中，这两个快捷请求会显示为简短标签，例如 `Run full analysis` 和 `Update analysis`，不会显示完整的隐藏 prompt 文本。
 
+专门的 Codex Chat 回合会使用封闭的 trace window。消息发送时，ManiScope 会把当时的 trace anchor 写入 `.maniscope-chat/sessions/{sessionId}/analysis-runs/{runId}.json`，并把这个 anchor 传给智能体。完整分析会把 `reasoning-graph.json.analysisAnchor` 设置为该回合开始时的 anchor；增量分析会把该回合开始时的 anchor 作为 patch 的 `targetAnchor`。如果你在 Codex 仍在工作时继续操作 ManiScope，这些后续动作不会被合并进当前回合。请在当前回合结束后使用 **Update Analysis** 来分析这些被延后的 trace 变化。
+
 在智能体回合中，临时的 Thinking 面板可能会显示在助手回复上方，用来展示实时进度。持久的 Agent Activity 会按照流式事件到达顺序嵌入到回复正文中。连续的活动事件默认折叠成一个小卡片，只显示该序列中的最新活动；展开卡片后可以查看完整活动流，以及可用的命令输出。
 
 助手回复可以包含 Markdown 文本、生成的 artifact、JSON 文件、Markdown 报告和图片预览。生成的 artifact chip 会出现在 ManiScope 收到它们的对应位置，因此你可以看到某个文件是在某条状态更新或解释之后创建的。当智能体在回复中提到本地图片、Markdown 或 JSON 路径时，如果该文件位于当前会话文件夹、项目文件夹，或显式允许的 artifact 根目录下，ManiScope 会通过会话 artifact 接口生成链接。有效图片会被复制到会话的 `artifacts/` 文件夹用于预览；Markdown 和 JSON 输出会显示为可下载的 artifact 链接。聊天中生成的文件通常应保存到会话 `artifacts/` 文件夹；需要长期保存的 trace 分析 artifact 则应保存到对应 trace 的 `analysis-results/` 文件夹。

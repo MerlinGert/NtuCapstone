@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 from collections.abc import Iterator
@@ -11,13 +12,16 @@ import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from chat_session_service import finish_analysis_run
 from session_tool_service import ensure_baseline_session_tools, ensure_session_tools
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 baseline_router = APIRouter(prefix="/api/base/chat", tags=["base-chat"])
+logger = logging.getLogger(__name__)
 
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{5}$")
 THREAD_KEY_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+ANALYSIS_RUN_ID_RE = re.compile(r"^[a-zA-Z0-9_.-]{1,120}$")
 WORKSPACE_ROLES = {"human", "agent"}
 SESSION_MODES = {"specialized", "baseline"}
 ARTIFACT_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
@@ -335,6 +339,28 @@ def _sanitize_attachment_metadata(body: dict[str, Any]) -> list[dict[str, Any]]:
     return attachments
 
 
+def _sanitize_analysis_run(body: dict[str, Any], session_mode: str) -> dict[str, Any] | None:
+    if session_mode != "specialized":
+        return None
+    source = body.get("analysisRun")
+    if not isinstance(source, dict):
+        return None
+    run_id = str(source.get("runId") or "").strip()
+    if not run_id or not ANALYSIS_RUN_ID_RE.fullmatch(run_id):
+        return None
+    sanitized: dict[str, Any] = {
+        "runId": run_id,
+        "mode": str(source.get("mode") or ""),
+        "presetKind": str(source.get("presetKind") or ""),
+        "status": str(source.get("status") or ""),
+        "startedAt": str(source.get("startedAt") or ""),
+    }
+    start_anchor = source.get("startAnchor")
+    if isinstance(start_anchor, dict):
+        sanitized["startAnchor"] = start_anchor
+    return sanitized
+
+
 def _normalize_activity(activity: Any, fallback_id: int) -> dict[str, Any]:
     if isinstance(activity, str):
         return {
@@ -494,6 +520,9 @@ def _start_stream_history_turn(
         "threadId": "",
         "createdAt": now,
     }
+    analysis_run = _sanitize_analysis_run(body, session_mode)
+    if analysis_run:
+        user_message["analysisRun"] = analysis_run
     assistant_message = {
         "id": next_message_id + 1,
         "role": "assistant",
@@ -666,6 +695,7 @@ def _stream_codex_response(
     history_counters: dict[str, int],
     thread_key: str,
     session_mode: str,
+    analysis_run: dict[str, Any] | None,
 ) -> Iterator[str]:
     url = f"{CODEX_BRIDGE_URL.rstrip('/')}/chat/{session_id}/message"
     pending_event_lines: list[str] = []
@@ -759,6 +789,19 @@ def _stream_codex_response(
                     "The Codex stream ended before a completion event.",
                 )
         persist()
+        if analysis_run and analysis_run.get("runId"):
+            run_status = str(assistant_message.get("turnState") or "")
+            if run_status not in {"completed", "stopped", "failed", "interrupted"}:
+                run_status = "failed" if saw_error else "interrupted"
+            try:
+                finish_analysis_run(
+                    session_id,
+                    str(analysis_run["runId"]),
+                    run_status,
+                    session_mode=session_mode,
+                )
+            except Exception as exc:
+                logger.warning("Failed to finalize analysis run %s: %s", analysis_run["runId"], exc)
 
 
 def _stop_codex_turn(session_id: str, thread_key: str, session_mode: str = "specialized") -> dict[str, Any]:
@@ -803,6 +846,9 @@ def _send_chat_message(session_id: str, body: dict[str, Any], session_mode: str 
         "workspaceRole": workspace_role,
         "sessionMode": session_mode,
     }
+    analysis_run = _sanitize_analysis_run(body, session_mode)
+    if analysis_run:
+        payload["analysisRun"] = analysis_run
     history_messages, assistant_message, history_counters = _start_stream_history_turn(
         session_id,
         thread_key,
@@ -819,6 +865,7 @@ def _send_chat_message(session_id: str, body: dict[str, Any], session_mode: str 
             history_counters=history_counters,
             thread_key=thread_key,
             session_mode=session_mode,
+            analysis_run=analysis_run,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},

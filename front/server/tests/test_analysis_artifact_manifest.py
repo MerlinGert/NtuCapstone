@@ -192,9 +192,12 @@ class AnalysisArtifactManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             self.configure_temp_sessions(module, tmp_dir)
 
-            with self.assertRaises(Exception) as missing_checked:
-                module.put_analysis_evaluations("abcde", {"evaluations": {"H1": {"nodeKind": "Hypothesis"}}})
-            self.assertEqual(missing_checked.exception.status_code, 400)
+            with self.assertRaises(Exception) as invalid_checked:
+                module.put_analysis_evaluations(
+                    "abcde",
+                    {"evaluations": {"H1": {"nodeKind": "Hypothesis", "checked": "yes"}}},
+                )
+            self.assertEqual(invalid_checked.exception.status_code, 400)
 
             with self.assertRaises(Exception) as unsupported_field:
                 module.put_analysis_evaluations(
