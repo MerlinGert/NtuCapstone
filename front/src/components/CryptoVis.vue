@@ -664,6 +664,86 @@ export default {
     },
   },
   methods: {
+    behaviorLinkRelationMaps() {
+      if (!this.link_generation_results || typeof this.link_generation_results !== 'object') {
+        return []
+      }
+      return [
+        this.link_generation_results.target_relations_for_links,
+        this.link_generation_results.target_related_relations_for_links,
+      ].filter((map) => map && typeof map === 'object')
+    },
+    expandBehaviorUsersFromLinkRelations(seedUsers, relationTypes = null) {
+      const seeds = Array.from(seedUsers || []).filter(Boolean)
+      const expandedUsers = new Set(seeds)
+      if (seeds.length === 0) return expandedUsers
+
+      const allowedTypes =
+        Array.isArray(relationTypes) && relationTypes.length > 0
+          ? new Set(relationTypes)
+          : null
+
+      this.behaviorLinkRelationMaps().forEach((relationMap) => {
+        Object.entries(relationMap).forEach(([pairKey, relations]) => {
+          const [u1, u2] = pairKey.split('-')
+          if (!u1 || !u2) return
+          if (!seeds.includes(u1) && !seeds.includes(u2)) return
+
+          if (allowedTypes) {
+            const hasAllowedRelation =
+              Array.isArray(relations) &&
+              relations.some((relation) =>
+                allowedTypes.has(String(relation?.type || '')),
+              )
+            if (!hasAllowedRelation) return
+          }
+
+          expandedUsers.add(u1)
+          expandedUsers.add(u2)
+        })
+      })
+
+      return expandedUsers
+    },
+    async fetchBehaviorSequencesForUsers(users) {
+      const userList = Array.isArray(users)
+        ? users
+        : users instanceof Set
+          ? Array.from(users)
+          : users
+            ? [users]
+            : []
+      const normalizedUsers = Array.from(new Set(userList.filter(Boolean)))
+      if (normalizedUsers.length === 0) return {}
+
+      const response = await fetch('/api/user_behavior/sequences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          users: normalizedUsers,
+          coin: this.currentCoin,
+        }),
+      })
+      if (!response.ok) throw new Error('Network response was not ok')
+      return response.json()
+    },
+    expandBehaviorUsersFromTransferCounterparties(seedUsers, sequencesByUser) {
+      const expandedUsers = new Set(Array.from(seedUsers || []).filter(Boolean))
+
+      expandedUsers.forEach((user) => {
+        const events = Array.isArray(sequencesByUser?.[user]) ? sequencesByUser[user] : []
+        events.forEach((event) => {
+          if (event?.isTrade) return
+          const type = String(event?.type || '')
+          if (type !== 'transfer_in' && type !== 'transfer_out') return
+          const counterparty = String(event?.counterparty || '').trim()
+          if (!counterparty) return
+          expandedUsers.add(counterparty)
+        })
+      })
+
+      return expandedUsers
+    },
     async initializeManiScopeSession() {
       if (this.isImportedWorkspace) {
         this.applyImportedPayload(this.importedPayload)
@@ -2115,8 +2195,8 @@ export default {
     },
     // ezio: returns the fetch promise chain so callers can stash it on _targetReadyPromise;
     // trailing nextTicks make it resolve only after BehaviorDetails' drawChart has run.
-    generateBehaviorDetailData() {
-      if (!this.selectedUser) return Promise.resolve()
+    async generateBehaviorDetailData() {
+      if (!this.selectedUser) return
       const userSet = new Set([this.selectedUser])
       this.selectedEntityInfo = null
 
@@ -2133,60 +2213,61 @@ export default {
         }
       }
 
-      // Expand via link results
-      if (this.link_generation_results) {
-        const mapsToCheck = [
-          this.link_generation_results.target_relations_for_links,
-          this.link_generation_results.target_related_relations_for_links,
-        ]
-        mapsToCheck.forEach((map) => {
-          if (map) {
-            Object.keys(map).forEach((key) => {
-              const [u1, u2] = key.split('-')
-              if (u1 === this.selectedUser) userSet.add(u2)
-              if (u2 === this.selectedUser) userSet.add(u1)
-            })
-          }
-        })
-      }
+      // Expand via current link results for the selected holder.
+      this.expandBehaviorUsersFromLinkRelations([this.selectedUser]).forEach(
+        (user) => {
+          userSet.add(user)
+        },
+      )
 
-      // Fetch behavior sequences
-      return fetch('/api/user_behavior/sequences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          users: Array.from(userSet),
-          coin: this.currentCoin,
-        }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error('Network response was not ok')
-          return res.json()
+      // If the selected holder or its currently related users have direct transfers
+      // with additional holders, include one more hop so their behavior is visible too.
+      this.expandBehaviorUsersFromLinkRelations(userSet, ['direct_transfer']).forEach(
+        (user) => {
+          userSet.add(user)
+        },
+      )
+
+      try {
+        const initialSequences = await this.fetchBehaviorSequencesForUsers(userSet)
+
+        // The chart draws transfer arrows only when the transfer counterparty is also in view.
+        // Expand from the actual fetched transfer events so holder-to-holder arrows are preserved
+        // even when those counterparties were not part of the detector relation maps.
+        const expandedUserSet = this.expandBehaviorUsersFromTransferCounterparties(
+          userSet,
+          initialSequences,
+        )
+
+        const finalSequences =
+          expandedUserSet.size === userSet.size
+            ? initialSequences
+            : await this.fetchBehaviorSequencesForUsers(expandedUserSet)
+
+        const data = {}
+        Array.from(expandedUserSet).forEach((user) => {
+          const sequence = Array.isArray(finalSequences[user]) ? finalSequences[user] : []
+          const isSeedUser = userSet.has(user)
+          if (!isSeedUser && sequence.length === 0) return
+          data[user] = sequence
         })
-        .then((sequences) => {
-          const data = {}
-          Array.from(userSet).forEach((user) => {
-            data[user] = sequences[user] || []
-          })
-          // Use Object.freeze to prevent Vue from making this massive dataset deeply reactive
-          // Deep reactivity on 70,000+ objects freezes the main thread.
-          this.behaviorDetailData = Object.freeze(data)
-          console.log(
-            'CryptoVis: behaviorDetailData generated for users',
-            userSet,
-            this.behaviorDetailData,
-          )
-        })
+
+        // Use Object.freeze to prevent Vue from making this massive dataset deeply reactive
+        // Deep reactivity on 70,000+ objects freezes the main thread.
+        this.behaviorDetailData = Object.freeze(data)
+        console.log(
+          'CryptoVis: behaviorDetailData generated for users',
+          expandedUserSet,
+          this.behaviorDetailData,
+        )
+
         // ezio: BehaviorDetails' watcher wraps drawChart in a $nextTick — wait two ticks so
         // the promise only resolves once the new SVG is actually in the DOM.
-        .then(() => this.$nextTick())
-        .then(() => this.$nextTick())
-        .catch((err) => {
-          console.error(
-            'CryptoVis: failed to fetch user behavior sequences',
-            err,
-          )
-        })
+        await this.$nextTick()
+        await this.$nextTick()
+      } catch (err) {
+        console.error('CryptoVis: failed to fetch user behavior sequences', err)
+      }
     },
     // ezio: resolves after Vue flushes the watcher (TokenDistribution/KlineChart redraw)
     // and D3 force simulation has had ~1s to settle. Used to gate all_views screenshot
