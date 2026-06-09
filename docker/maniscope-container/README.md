@@ -12,14 +12,17 @@ The container uses published ports rather than host networking. It avoids port `
 Default host mappings:
 
 - Dev frontend: `http://127.0.0.1:3199` -> container `3099`
-- Study frontend: `http://127.0.0.1:3299` -> container `3099`
+- Study frontend: `0.0.0.0:3299` -> container `3099`
 - Backend: `http://127.0.0.1:8199` -> container `8099`
 - Codex bridge: `http://127.0.0.1:8877` -> container `8787`
+
+Use `http://127.0.0.1:3299` locally, or `http://<LAN-IP>:3299` from another machine on the same LAN. Backend and bridge stay localhost-only.
 
 Override them with environment variables before running `docker compose` or `just`:
 
 ```bash
 MANISCOPE_DEV_FRONTEND_HOST_PORT=3199
+MANISCOPE_STUDY_FRONTEND_HOST_BIND=0.0.0.0
 MANISCOPE_STUDY_FRONTEND_HOST_PORT=3299
 MANISCOPE_BACKEND_HOST_PORT=8199
 MANISCOPE_BRIDGE_HOST_PORT=8877

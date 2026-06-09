@@ -13,7 +13,8 @@ Use `docker/maniscope-container` to run the project in either development mode o
 Default URLs:
 
 - Dev frontend: `http://127.0.0.1:3199`
-- Study frontend: `http://127.0.0.1:3299`
+- Study frontend local: `http://127.0.0.1:3299`
+- Study frontend LAN: `http://<LAN-IP>:3299`
 - Backend: `http://127.0.0.1:8199`
 - Codex bridge: `http://127.0.0.1:8877`
 
