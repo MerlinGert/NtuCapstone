@@ -26,6 +26,21 @@ cd front
 bun run codex-bridge
 ```
 
+For the Docker development/user-study container, use `docker/maniscope-container`.
+The container still uses internal ManiScope service ports `3099`, `8099`, and
+`8787`, but publishes them to alternate host ports by default:
+
+- Dev frontend: `http://127.0.0.1:3199`
+- Study frontend: `http://127.0.0.1:3299`
+- Backend: `http://127.0.0.1:8199`
+- Codex bridge: `http://127.0.0.1:8877`
+
+The Docker setup intentionally avoids host networking and does not use port
+`8080`. Study mode serves production-built frontend assets through nginx on
+container port `3099`, while `/data/*` and `/data2/*` are served directly from
+the read-only `front/public/data*` bind mounts instead of copying the multi-GB
+raw data into `front/dist`.
+
 The frontend dev server is configured in `front/vite.config.js` to bind `127.0.0.1:3099` and proxy `/api/*` to `http://127.0.0.1:8099`.
 
 The backend direct-run default in `front/server/main.py` is `127.0.0.1:8099`, overridable with `MANISCOPE_BACKEND_HOST` and `MANISCOPE_BACKEND_PORT`.

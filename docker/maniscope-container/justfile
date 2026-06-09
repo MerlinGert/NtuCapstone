@@ -1,0 +1,46 @@
+compose := "sudo docker compose -f docker-compose.yml"
+
+default: dev
+
+build:
+    {{ compose }} --profile dev --profile study build
+
+up: dev
+
+dev:
+    {{ compose }} --profile dev up -d maniscope-dev
+
+study:
+    {{ compose }} --profile study up -d maniscope-study
+
+down:
+    {{ compose }} --profile dev --profile study down
+
+restart-dev:
+    {{ compose }} --profile dev restart maniscope-dev
+
+restart-study:
+    {{ compose }} --profile study restart maniscope-study
+
+logs-dev:
+    {{ compose }} --profile dev logs -f maniscope-dev
+
+logs-study:
+    {{ compose }} --profile study logs -f maniscope-study
+
+shell-dev:
+    {{ compose }} --profile dev exec -u maniscope maniscope-dev zsh
+
+shell-study:
+    {{ compose }} --profile study exec -u maniscope maniscope-study zsh
+
+bash:
+    {{ compose }} --profile dev exec -u maniscope -w /workspace/NtuCapstone maniscope-dev bash
+
+codex-login:
+    {{ compose }} --profile dev run --rm --no-deps --entrypoint "" -u maniscope maniscope-dev codex login --device-auth
+
+health:
+    curl -fsS http://127.0.0.1:${MANISCOPE_BACKEND_HOST_PORT:-8199}/
+    curl -fsS http://127.0.0.1:${MANISCOPE_BRIDGE_HOST_PORT:-8877}/health
+    (curl -fsS http://127.0.0.1:${MANISCOPE_DEV_FRONTEND_HOST_PORT:-3199}/ >/dev/null || curl -fsS http://127.0.0.1:${MANISCOPE_STUDY_FRONTEND_HOST_PORT:-3299}/ >/dev/null)

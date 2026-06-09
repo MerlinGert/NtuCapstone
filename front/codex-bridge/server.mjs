@@ -21,6 +21,8 @@ const CHAT_ROOT = path.join(REPO_ROOT, '.maniscope-chat')
 const SESSIONS_DIR = path.join(CHAT_ROOT, 'sessions')
 const BASELINE_SESSIONS_DIR = path.join(CHAT_ROOT, 'baseline-sessions')
 const DEFAULT_CODEX_BRIDGE_PORT = 8787
+const DEFAULT_CODEX_BRIDGE_HOST = '127.0.0.1'
+const HOST = process.env.CODEX_BRIDGE_HOST || DEFAULT_CODEX_BRIDGE_HOST
 const PORT = Number(process.env.CODEX_BRIDGE_PORT || DEFAULT_CODEX_BRIDGE_PORT)
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8099'
 const BACKEND_URL = process.env.MANISCOPE_BACKEND_URL || DEFAULT_BACKEND_URL
@@ -1360,8 +1362,8 @@ const server = http.createServer((req, res) => {
 try {
   const preflight = runStartupPreflight()
   console.log(`Codex bridge preflight passed. uv cache: ${preflight.uvCacheDir}`)
-  server.listen(PORT, '127.0.0.1', () => {
-    console.log(`Codex bridge listening on http://127.0.0.1:${PORT}`)
+  server.listen(PORT, HOST, () => {
+    console.log(`Codex bridge listening on http://${HOST}:${PORT}`)
   })
 } catch (error) {
   console.error(error?.message || String(error))

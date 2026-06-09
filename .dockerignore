@@ -1,0 +1,33 @@
+.git
+.gitignore
+.dockerignore
+
+# Large runtime data is bind-mounted into the container.
+front/public
+
+# Local dependency/build artifacts.
+front/node_modules
+front/dist
+front/dist-ssr
+front/server/.venv
+front/server/__pycache__
+front/server/artifacts
+**/__pycache__
+**/*.pyc
+
+# ManiScope runtime state and local outputs.
+.maniscope-chat
+.maniscope-dev
+.playwright-mcp
+exports
+
+# Logs and local environment files.
+*.log
+.env
+.env.*
+!.env.example
+
+# Editor and OS files.
+.vscode
+.idea
+.DS_Store

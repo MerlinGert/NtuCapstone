@@ -1,0 +1,91 @@
+name: maniscope
+
+x-maniscope-common: &maniscope-common
+  build:
+    context: ../..
+    dockerfile: docker/maniscope-container/Dockerfile
+    args:
+      MANISCOPE_UID: ${MANISCOPE_UID:-1000}
+      MANISCOPE_GID: ${MANISCOPE_GID:-1000}
+  image: maniscope-container:latest
+  restart: unless-stopped
+  environment:
+    MANISCOPE_REPO_ROOT: /workspace/NtuCapstone
+    MANISCOPE_BACKEND_HOST: 0.0.0.0
+    MANISCOPE_BACKEND_PORT: 8099
+    MANISCOPE_BACKEND_URL: http://127.0.0.1:8099
+    MANISCOPE_FRONTEND_HOST: 0.0.0.0
+    MANISCOPE_FRONTEND_PORT: 3099
+    MANISCOPE_FRONTEND_URL: http://127.0.0.1:3099
+    MANISCOPE_BACKEND_PROXY_TARGET: http://127.0.0.1:8099
+    CODEX_BRIDGE_HOST: 0.0.0.0
+    CODEX_BRIDGE_PORT: 8787
+    CODEX_BRIDGE_URL: http://127.0.0.1:8787
+    PLAYWRIGHT_BROWSERS_PATH: /home/maniscope/.cache/ms-playwright
+  volumes:
+    - ../..:/workspace/NtuCapstone
+    - ../../front/public/data:/workspace/NtuCapstone/front/public/data:ro
+    - ../../front/public/data2:/workspace/NtuCapstone/front/public/data2:ro
+    - maniscope_front_node_modules:/workspace/NtuCapstone/front/node_modules
+    - maniscope_front_dist:/workspace/NtuCapstone/front/dist
+    - maniscope_server_venv:/workspace/NtuCapstone/front/server/.venv
+    - maniscope_codex:/home/maniscope/.codex
+    - maniscope_bun_cache:/home/maniscope/.bun/install/cache
+    - maniscope_uv_cache:/home/maniscope/.cache/uv
+    - maniscope_playwright:/home/maniscope/.cache/ms-playwright
+
+services:
+  maniscope-dev:
+    <<: *maniscope-common
+    container_name: maniscope-dev
+    profiles: ["dev"]
+    environment:
+      MANISCOPE_MODE: dev
+      MANISCOPE_REPO_ROOT: /workspace/NtuCapstone
+      MANISCOPE_BACKEND_HOST: 0.0.0.0
+      MANISCOPE_BACKEND_PORT: 8099
+      MANISCOPE_BACKEND_URL: http://127.0.0.1:8099
+      MANISCOPE_FRONTEND_HOST: 0.0.0.0
+      MANISCOPE_FRONTEND_PORT: 3099
+      MANISCOPE_FRONTEND_URL: http://127.0.0.1:3099
+      MANISCOPE_BACKEND_PROXY_TARGET: http://127.0.0.1:8099
+      CODEX_BRIDGE_HOST: 0.0.0.0
+      CODEX_BRIDGE_PORT: 8787
+      CODEX_BRIDGE_URL: http://127.0.0.1:8787
+      PLAYWRIGHT_BROWSERS_PATH: /home/maniscope/.cache/ms-playwright
+    ports:
+      - "127.0.0.1:${MANISCOPE_DEV_FRONTEND_HOST_PORT:-3199}:3099"
+      - "127.0.0.1:${MANISCOPE_BACKEND_HOST_PORT:-8199}:8099"
+      - "127.0.0.1:${MANISCOPE_BRIDGE_HOST_PORT:-8877}:8787"
+
+  maniscope-study:
+    <<: *maniscope-common
+    container_name: maniscope-study
+    profiles: ["study"]
+    environment:
+      MANISCOPE_MODE: study
+      MANISCOPE_REPO_ROOT: /workspace/NtuCapstone
+      MANISCOPE_BACKEND_HOST: 0.0.0.0
+      MANISCOPE_BACKEND_PORT: 8099
+      MANISCOPE_BACKEND_URL: http://127.0.0.1:8099
+      MANISCOPE_FRONTEND_HOST: 0.0.0.0
+      MANISCOPE_FRONTEND_PORT: 3099
+      MANISCOPE_FRONTEND_URL: http://127.0.0.1:3099
+      MANISCOPE_BACKEND_PROXY_TARGET: http://127.0.0.1:8099
+      CODEX_BRIDGE_HOST: 0.0.0.0
+      CODEX_BRIDGE_PORT: 8787
+      CODEX_BRIDGE_URL: http://127.0.0.1:8787
+      PLAYWRIGHT_BROWSERS_PATH: /home/maniscope/.cache/ms-playwright
+    ports:
+      - "127.0.0.1:${MANISCOPE_STUDY_FRONTEND_HOST_PORT:-3299}:3099"
+      - "127.0.0.1:${MANISCOPE_BACKEND_HOST_PORT:-8199}:8099"
+      - "127.0.0.1:${MANISCOPE_BRIDGE_HOST_PORT:-8877}:8787"
+
+volumes:
+  maniscope_front_node_modules:
+  maniscope_front_dist:
+  maniscope_server_venv:
+  maniscope_codex:
+  maniscope_bun_cache:
+  maniscope_uv_cache:
+  maniscope_playwright:
