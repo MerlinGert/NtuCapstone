@@ -48,7 +48,7 @@ Baseline 会话用于评估通用 Codex 助手与专门的 ManiScope 智能体�
 - `/base/{sessionId}` 会恢复对应的 baseline 会话。
 - `/base/{sessionId}/agent` 不提供独立工作区，会跳回 `/base/{sessionId}`。
 
-Baseline 会话使用独立的存储根目录：`.maniscope-chat/baseline-sessions/{sessionId}`。它仍然会记录用户动作、标注、导入内容、截图、当前状态、聊天历史和 artifacts，但聊天提示词会刻意保持通用。Baseline 智能体可以查看原始数据、trace 文件、截图和当前状态，但不会获得专门的 reasoning-graph 方法、trace-analysis 工具、skeptical-review skill、Agent Workspace 或可任意重渲染可视化的 helper。
+Baseline 会话使用独立的存储根目录：`.maniscope-chat/baseline-sessions/{sessionId}`。它仍然会记录用户动作、标注、导入内容、截图、当前状态、聊天历史和 artifacts，但聊天提示词会刻意保持通用。Baseline 智能体可以查看原始数据、trace 文件、截图、当前状态，以及一份只介绍 ManiScope 视图和 capture-only helper 的 baseline 安全 UI 手册，但不会获得专门的 reasoning-graph 方法、trace-analysis 工具、skeptical-review skill、Agent Workspace 或可任意重渲染可视化的 helper。
 
 如果 baseline 智能体需要当前视图图片，会话中包含 `maniscope_baseline_views.py`。这个 helper 只能把最近同步的 Token Distribution、K-line 和 Behavior Details 截图复制到 `artifacts/`；它不能改变检测参数、选中用户、时间窗口、缩放比例、粒度或任何其他可视化状态。
 
@@ -173,7 +173,7 @@ Behavior Details 位于右列下方。在点击 Token Distribution 用户节点�
 
 Codex Chat 历史会在智能体流式输出时增量保存。如果你在长回合中刷新页面，或浏览器连接中断，已经收到的文本、活动更新和 artifact chip 会作为部分 transcript 重新加载，而不会消失。被中断的助手回合会标记为部分结果，已经生成的 artifact 仍然可以打开，因为它们保存在会话文件中。
 
-在 baseline 会话中，Codex Chat 使用 `/api/base/chat/...`，文件存储在 `.maniscope-chat/baseline-sessions/{sessionId}`。聊天面板会标记为 `Baseline`，Agent Workspace 入口、分析快捷按钮和右侧面板的 LLM Analysis 标签页都会隐藏，提示词只描述价格操纵分析任务和可用原始数据，不包含专门的 trace-analysis 指令。
+在 baseline 会话中，Codex Chat 使用 `/api/base/chat/...`，文件存储在 `.maniscope-chat/baseline-sessions/{sessionId}`。聊天面板会标记为 `Baseline`，Agent Workspace 入口、分析快捷按钮和右侧面板的 LLM Analysis 标签页都会隐藏。提示词会描述价格操纵分析任务、可用原始数据和 baseline 安全 UI 手册，但不包含专门的 trace-analysis 指令。
 
 每个聊天会话根目录都包含用于临时脚本的项目模板：`pyproject.toml` 用于通过 `uv` 运行 Python，`package.json` 用于通过 `bun` 运行 JavaScript 或 TypeScript。智能体可以在该会话内添加依赖；生成的证据、报告和导出文件应放在 `artifacts/`。
 

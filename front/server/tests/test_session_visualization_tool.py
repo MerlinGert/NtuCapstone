@@ -221,6 +221,8 @@ class SessionVisualizationToolTests(unittest.TestCase):
             references_dir = session_dir / "session-references"
             self.assertEqual((references_dir / "TOOL_VERSION").read_text(encoding="utf-8").strip(), service.TOOL_VERSION)
             self.assertTrue((references_dir / "README.md").exists())
+            self.assertTrue((references_dir / "manual-for-baseline-agent.md").exists())
+            self.assertFalse((references_dir / "manual-for-agent.md").exists())
             self.assertFalse((references_dir / "user-manual.en.md").exists())
             self.assertFalse((references_dir / "major-view-render-api.md").exists())
             content = tool_path.read_text(encoding="utf-8")

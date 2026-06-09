@@ -48,7 +48,7 @@ Baseline sessions are available for evaluating a general Codex assistant against
 - `/base/{sessionId}` restores that baseline session.
 - `/base/{sessionId}/agent` is not a separate workspace and redirects back to `/base/{sessionId}`.
 
-Baseline sessions use a separate storage root: `.maniscope-chat/baseline-sessions/{sessionId}`. They still record user actions, annotations, imports, screenshots, current state, chat history, and artifacts, but the chat prompt is intentionally general. The baseline agent can inspect raw data, trace files, screenshots, and current state, but it is not given the specialized reasoning-graph methodology, trace-analysis tools, skeptical-review skill, Agent Workspace, or arbitrary visualization-rendering helper.
+Baseline sessions use a separate storage root: `.maniscope-chat/baseline-sessions/{sessionId}`. They still record user actions, annotations, imports, screenshots, current state, chat history, and artifacts, but the chat prompt is intentionally general. The baseline agent can inspect raw data, trace files, screenshots, current state, and a baseline-safe UI manual that explains ManiScope views and the capture-only helper. It is not given the specialized reasoning-graph methodology, trace-analysis tools, skeptical-review skill, Agent Workspace, or arbitrary visualization-rendering helper.
 
 If the baseline agent needs current-view image files, the session includes `maniscope_baseline_views.py`. That helper only copies the latest synced screenshots for Token Distribution, K-line, and Behavior Details into `artifacts/`; it cannot change detector parameters, selected users, time windows, scale, granularity, or any other visualization state.
 
@@ -173,7 +173,7 @@ Chat history and generated artifacts are shared at the session level. The agent 
 
 Codex Chat history is saved incrementally while the agent is streaming. If you refresh the page or the browser disconnects during a long turn, already received text, activity updates, and artifact chips reload as a partial transcript instead of disappearing. The interrupted assistant turn is marked as partial, and generated artifacts can still be opened because they are stored as session files.
 
-In baseline sessions, Codex Chat uses `/api/base/chat/...` and stores files under `.maniscope-chat/baseline-sessions/{sessionId}`. The chat is labeled `Baseline`, the Agent Workspace shortcut, analysis shortcut buttons, and right-panel LLM Analysis tab are hidden, and the prompt describes the price-manipulation task and available raw data without specialized trace-analysis instructions.
+In baseline sessions, Codex Chat uses `/api/base/chat/...` and stores files under `.maniscope-chat/baseline-sessions/{sessionId}`. The chat is labeled `Baseline`, the Agent Workspace shortcut, analysis shortcut buttons, and right-panel LLM Analysis tab are hidden. The prompt describes the price-manipulation task, available raw data, and a baseline-safe UI manual without specialized trace-analysis instructions.
 
 Each chat session root contains project templates for ad hoc scripting: `pyproject.toml` for Python work with `uv`, and `package.json` for JavaScript or TypeScript work with `bun`. Agents can add dependencies inside that session when useful, while generated evidence and reports should be placed in `artifacts/`.
 

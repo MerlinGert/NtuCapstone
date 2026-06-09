@@ -21,6 +21,7 @@ PYPROJECT_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_pyproject.toml"
 PACKAGE_JSON_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_package.json"
 GITIGNORE_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_gitignore"
 AGENT_MANUAL_PATH = PROJECT_ROOT / "docs" / "reports" / "manual-for-agent.md"
+BASELINE_AGENT_MANUAL_PATH = PROJECT_ROOT / "docs" / "reports" / "manual-for-baseline-agent.md"
 MAJOR_VIEW_RENDER_API_PATH = PROJECT_ROOT / "docs" / "ui-analysis" / "major-view-render-api.md"
 TRACE_ANALYSIS_SKILL_DIR = PROJECT_ROOT / "skills" / "user-trace-analysis"
 REASONING_GRAPH_TS_SOURCE_DIR = PROJECT_ROOT / "front" / "src" / "reasoning-graph"
@@ -146,6 +147,7 @@ def _ensure_session_references(session_dir: Path, session_mode: str) -> None:
         shutil.copy2(MAJOR_VIEW_RENDER_API_PATH, references_dir / "major-view-render-api.md")
         (references_dir / "README.md").write_text(_specialized_references_readme(), encoding="utf-8")
     else:
+        shutil.copy2(BASELINE_AGENT_MANUAL_PATH, references_dir / "manual-for-baseline-agent.md")
         (references_dir / "README.md").write_text(_baseline_references_readme(), encoding="utf-8")
 
     version_path.write_text(f"{TOOL_VERSION}\n", encoding="utf-8")
@@ -187,6 +189,9 @@ Managed by ManiScope. Do not edit this session-local copy by hand.
 This baseline session is intentionally generic. It does not include specialized
 trace-analysis methodology, graph tooling, disconfirmation skills, or arbitrary
 visualization rendering helpers.
+
+- `manual-for-baseline-agent.md`: compact UI, data, trace, and current-view
+  screenshot helper semantics for baseline agents.
 
 Raw market data is available through the Codex sandbox as read-only-by-policy
 additional directories. The chat prompt gives their absolute ACT and PNUT
