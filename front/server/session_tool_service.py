@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-06-02.1"
+TOOL_VERSION = "2026-06-09.1"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
 BASELINE_VIEW_TOOL_NAME = "maniscope_baseline_views.py"
 SESSION_PYPROJECT_NAME = "pyproject.toml"
@@ -20,7 +20,7 @@ BASELINE_TEMPLATE_PATH = BASE_DIR / "session_tools" / BASELINE_VIEW_TOOL_NAME
 PYPROJECT_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_pyproject.toml"
 PACKAGE_JSON_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_package.json"
 GITIGNORE_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_gitignore"
-USER_MANUAL_EN_PATH = PROJECT_ROOT / "docs" / "reports" / "user-manual.en.md"
+AGENT_MANUAL_PATH = PROJECT_ROOT / "docs" / "reports" / "manual-for-agent.md"
 MAJOR_VIEW_RENDER_API_PATH = PROJECT_ROOT / "docs" / "ui-analysis" / "major-view-render-api.md"
 TRACE_ANALYSIS_SKILL_DIR = PROJECT_ROOT / "skills" / "user-trace-analysis"
 REASONING_GRAPH_TS_SOURCE_DIR = PROJECT_ROOT / "front" / "src" / "reasoning-graph"
@@ -142,7 +142,7 @@ def _ensure_session_references(session_dir: Path, session_mode: str) -> None:
     references_dir.mkdir(parents=True, exist_ok=True)
 
     if session_mode == "specialized":
-        shutil.copy2(USER_MANUAL_EN_PATH, references_dir / "user-manual.en.md")
+        shutil.copy2(AGENT_MANUAL_PATH, references_dir / "manual-for-agent.md")
         shutil.copy2(MAJOR_VIEW_RENDER_API_PATH, references_dir / "major-view-render-api.md")
         (references_dir / "README.md").write_text(_specialized_references_readme(), encoding="utf-8")
     else:
@@ -169,13 +169,13 @@ Managed by ManiScope. Do not edit this session-local copy by hand.
 The Codex chat sandbox is rooted at the active session directory. These copied
 references replace repo-root documentation reads:
 
-- `user-manual.en.md`: user-facing ManiScope workflow and UI semantics.
+- `manual-for-agent.md`: compact ManiScope workflow, view, and trace semantics for agents.
 - `major-view-render-api.md`: visual rendering API and evidence-generation notes.
 
 Trace-analysis schema references remain under `trace_analysis_tools/references/`.
 The skeptical-review skill remains under `skills/maniscope-disconfirmation/`.
-The uv cache at `~/.cache/uv` is available to package tooling only; do not use it
-for analysis outputs.
+The bridge configures a repo-local uv cache for package tooling only; do not use
+it for analysis outputs.
 """
 
 
@@ -192,7 +192,7 @@ Raw market data is available through the Codex sandbox as read-only-by-policy
 additional directories. The chat prompt gives their absolute ACT and PNUT
 paths for the current run.
 
-The uv cache at `~/.cache/uv` is available to package tooling only.
+The bridge configures a repo-local uv cache for package tooling only.
 
 Do not edit raw data files. Write scripts, derived data, summaries, and copied
 images inside this session directory, preferably under `artifacts/`.

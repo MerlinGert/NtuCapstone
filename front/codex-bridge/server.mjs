@@ -316,7 +316,7 @@ First choose the narrowest mode that satisfies the user request. If multiple mod
 # Always Refresh Context
 
 For every trace-dependent turn, read these files first:
-- session-references/user-manual.en.md
+- session-references/manual-for-agent.md
 - session-references/major-view-render-api.md
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
