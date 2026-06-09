@@ -2,24 +2,11 @@
   <div
     class="reasoning-node-card"
     :class="cardClasses"
-    @click.stop="$emit('select-node', node)"
+    @click.stop="handleCardClick"
   >
     <div class="node-meta-row">
       <span class="node-type" :class="nodeTypeClass">{{ nodeTypeLabel }}</span>
       <span v-if="isNewNode" class="node-new-badge">New</span>
-      <label
-        v-if="isEvaluableNode"
-        class="node-evaluation-toggle"
-        title="Mark as valuable and valid"
-        aria-label="Mark this finding or hypothesis as valuable and valid"
-        @click.stop
-      >
-        <input
-          type="checkbox"
-          :checked="isNodeEvaluated"
-          @change.stop="$emit('toggle-evaluation', node)"
-        />
-      </label>
       <span v-if="relationLabel" class="relation-pill" :class="relationClass">
         {{ relationLabel }}
       </span>
@@ -55,6 +42,97 @@
       <div v-if="extraImageCount > 0" class="thumbnail-count">+{{ extraImageCount }} more images</div>
     </div>
     <div
+      v-if="showEvaluationSection"
+      class="node-evaluation-panel"
+      @click.stop
+    >
+      <template v-if="node.type === 'Hypothesis'">
+        <div class="node-evaluation-field">
+          <div class="node-evaluation-label">Aligned with my analysis?</div>
+          <div class="node-evaluation-options">
+            <label
+              v-for="option in hypothesisAlignmentOptions"
+              :key="`align-${option.value}`"
+              class="node-evaluation-option"
+              @click.stop
+            >
+              <input
+                type="radio"
+                :name="`${evaluationKey || node.id}-aligned`"
+                :value="option.value"
+                :checked="activeEvaluation.hypothesisAligned === option.value"
+                @click.stop
+                @change.stop="updateHypothesisEvaluation('hypothesisAligned', option.value)"
+              />
+              <span>{{ option.label }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="node-evaluation-field">
+          <div class="node-evaluation-label">Associated findings sufficient for evaluation?</div>
+          <div class="node-evaluation-options node-evaluation-options-wide">
+            <label
+              v-for="option in hypothesisSufficiencyOptions"
+              :key="`sufficient-${option.value}`"
+              class="node-evaluation-option"
+              @click.stop
+            >
+              <input
+                type="radio"
+                :name="`${evaluationKey || node.id}-sufficiency`"
+                :value="option.value"
+                :checked="activeEvaluation.findingsSufficiency === option.value"
+                @click.stop
+                @change.stop="updateHypothesisEvaluation('findingsSufficiency', option.value)"
+              />
+              <span>{{ option.label }}</span>
+            </label>
+          </div>
+        </div>
+      </template>
+      <template v-else-if="node.type === 'Finding'">
+        <div class="node-evaluation-field">
+          <div class="node-evaluation-label">Associated hypothesis</div>
+          <select
+            class="node-evaluation-select"
+            :value="selectedAssociatedHypothesisValue"
+            @click.stop
+            @change.stop="updateFindingAssociation($event)"
+          >
+            <option value="" disabled>Select hypothesis</option>
+            <option
+              v-for="option in findingAssociationOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </option>
+          </select>
+        </div>
+        <div class="node-evaluation-field">
+          <div class="node-evaluation-label">Relevant to the associated hypothesis?</div>
+          <div class="node-evaluation-options">
+            <label
+              v-for="option in findingRelevanceOptions"
+              :key="`relevant-${option.value}`"
+              class="node-evaluation-option"
+              @click.stop
+            >
+              <input
+                type="radio"
+                :name="`${evaluationKey || node.id}-relevance`"
+                :value="option.value"
+                :checked="activeEvaluation.relevanceToHypothesis === option.value"
+                @click.stop
+                @change.stop="updateFindingEvaluation('relevanceToHypothesis', option.value)"
+              />
+              <span>{{ option.label }}</span>
+            </label>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div
       v-if="hasChildren && !collapsed"
       class="node-children"
       :class="{ 'node-children-single': node.children.length === 1 }"
@@ -67,8 +145,12 @@
         :hide-patch-label="childHidePatchLabel"
         :node-evaluations="nodeEvaluations"
         :new-node-ids="newNodeIds"
+        :hypothesis-options="hypothesisOptions"
+        :finding-associations="findingAssociations"
+        :expansion-command="expansionCommand"
+        :show-evaluation-ui="showEvaluationUi"
         @select-node="$emit('select-node', $event)"
-        @toggle-evaluation="$emit('toggle-evaluation', $event)"
+        @update-evaluation="$emit('update-evaluation', $event)"
         @toggle-node="$emit('toggle-node', $event)"
       />
     </div>
@@ -81,9 +163,35 @@ import {
   isEvaluableAnalysisNode,
 } from '../utils/llmAnalysisEvaluations.js'
 
+const HYPOTHESIS_ALIGNMENT_OPTIONS = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+  { value: 'unsure', label: 'Unsure' },
+]
+
+const HYPOTHESIS_SUFFICIENCY_OPTIONS = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+  { value: 'partially', label: 'Partially' },
+  { value: 'unsure', label: 'Unsure' },
+]
+
+const FINDING_RELEVANCE_OPTIONS = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+  { value: 'unsure', label: 'Unsure' },
+]
+
+const NONE_ASSOCIATED_HYPOTHESIS = '__none__'
+const EMPTY_EVALUATION = Object.freeze({})
+
+function cloneEvaluation(value) {
+  return value && typeof value === 'object' ? { ...value } : {}
+}
+
 export default {
   name: 'ReasoningNodeCard',
-  emits: ['select-node', 'toggle-evaluation', 'toggle-node'],
+  emits: ['select-node', 'update-evaluation', 'toggle-node'],
   props: {
     node: {
       type: Object,
@@ -105,17 +213,50 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    hypothesisOptions: {
+      type: Array,
+      default: () => [],
+    },
+    findingAssociations: {
+      type: Object,
+      default: () => ({}),
+    },
+    expansionCommand: {
+      type: Object,
+      default: null,
+    },
+    showEvaluationUi: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
       collapsed: this.shouldCollapseByDefault(),
+      localEvaluation: cloneEvaluation(this.nodeEvaluations?.[evaluationKeyForNode(this.node)]),
     }
   },
   watch: {
     node: {
       handler() {
         this.collapsed = this.shouldCollapseByDefault()
+        this.localEvaluation = cloneEvaluation(this.currentEvaluation)
       },
+    },
+    expansionCommand: {
+      handler(command) {
+        if (!command || !this.hasChildren) return
+        if (command.mode === 'expand') this.collapsed = false
+        if (command.mode === 'collapse') this.collapsed = true
+      },
+      deep: true,
+    },
+    currentEvaluation: {
+      handler(nextValue) {
+        this.localEvaluation = cloneEvaluation(nextValue)
+      },
+      deep: true,
+      immediate: true,
     },
   },
   computed: {
@@ -128,8 +269,15 @@ export default {
     evaluationKey() {
       return evaluationKeyForNode(this.node)
     },
-    isNodeEvaluated() {
-      return Boolean(this.evaluationKey && this.nodeEvaluations?.[this.evaluationKey]?.checked)
+    currentEvaluation() {
+      return this.evaluationKey && this.nodeEvaluations?.[this.evaluationKey]
+        ? this.nodeEvaluations[this.evaluationKey]
+        : EMPTY_EVALUATION
+    },
+    activeEvaluation() {
+      return this.localEvaluation && typeof this.localEvaluation === 'object'
+        ? this.localEvaluation
+        : {}
     },
     childHidePatchLabel() {
       return this.hidePatchLabel
@@ -157,6 +305,38 @@ export default {
     },
     extraImageCount() {
       return Math.max(0, this.evidenceImages.length - this.visibleEvidenceImages.length)
+    },
+    showEvaluationSection() {
+      return this.showEvaluationUi && this.isEvaluableNode && !this.collapsed
+    },
+    hypothesisAlignmentOptions() {
+      return HYPOTHESIS_ALIGNMENT_OPTIONS
+    },
+    hypothesisSufficiencyOptions() {
+      return HYPOTHESIS_SUFFICIENCY_OPTIONS
+    },
+    findingRelevanceOptions() {
+      return FINDING_RELEVANCE_OPTIONS
+    },
+    selectedAssociatedHypothesisValue() {
+      if (Object.prototype.hasOwnProperty.call(this.activeEvaluation, 'associatedHypothesisId')) {
+        return this.activeEvaluation.associatedHypothesisId == null
+          ? NONE_ASSOCIATED_HYPOTHESIS
+          : this.activeEvaluation.associatedHypothesisId
+      }
+      const fallback = this.defaultAssociatedHypothesis
+      return fallback?.value || ''
+    },
+    findingAssociationOptions() {
+      const options = (this.hypothesisOptions || []).map((option) => ({
+        value: option.value,
+        label: option.label,
+      }))
+      options.push({ value: NONE_ASSOCIATED_HYPOTHESIS, label: 'None' })
+      return options
+    },
+    defaultAssociatedHypothesis() {
+      return this.evaluationKey ? this.findingAssociations?.[this.evaluationKey] || null : null
     },
     displayExplanation() {
       const candidates = [
@@ -228,6 +408,13 @@ export default {
     },
   },
   methods: {
+    handleCardClick(event) {
+      const target = event?.target
+      if (target instanceof Element && target.closest('input, select, option, label, button, a, textarea')) {
+        return
+      }
+      this.$emit('select-node', this.node)
+    },
     shouldCollapseByDefault() {
       if (this.node.type === 'AnalyticActivity') return true
       const children = Array.isArray(this.node.children) ? this.node.children : []
@@ -261,6 +448,69 @@ export default {
         node: this.node,
         collapsed: this.collapsed,
         nestingLevel: this.nestingLevel,
+      })
+    },
+    updateHypothesisEvaluation(field, value) {
+      this.localEvaluation = {
+        ...this.activeEvaluation,
+        nodeKind: 'Hypothesis',
+        [field]: value,
+      }
+      this.$emit('update-evaluation', {
+        node: this.node,
+        patch: {
+          [field]: value,
+        },
+      })
+    },
+    updateFindingEvaluation(field, value) {
+      const patch = { [field]: value }
+      if (!Object.prototype.hasOwnProperty.call(this.activeEvaluation, 'associatedHypothesisId') && this.defaultAssociatedHypothesis) {
+        patch.associatedHypothesisId = this.defaultAssociatedHypothesis.value
+        patch.associatedHypothesisLabel = this.defaultAssociatedHypothesis.label
+      }
+      this.localEvaluation = {
+        ...this.activeEvaluation,
+        nodeKind: 'Finding',
+        ...patch,
+      }
+      this.$emit('update-evaluation', {
+        node: this.node,
+        patch,
+      })
+    },
+    updateFindingAssociation(event) {
+      const value = event?.target?.value || ''
+      if (!value) return
+      if (value === NONE_ASSOCIATED_HYPOTHESIS) {
+        this.localEvaluation = {
+          ...this.activeEvaluation,
+          nodeKind: 'Finding',
+          associatedHypothesisId: null,
+          associatedHypothesisLabel: 'None',
+        }
+        this.$emit('update-evaluation', {
+          node: this.node,
+          patch: {
+            associatedHypothesisId: null,
+            associatedHypothesisLabel: 'None',
+          },
+        })
+        return
+      }
+      const option = this.findingAssociationOptions.find((item) => item.value === value)
+      this.localEvaluation = {
+        ...this.activeEvaluation,
+        nodeKind: 'Finding',
+        associatedHypothesisId: value,
+        associatedHypothesisLabel: option?.label || value,
+      }
+      this.$emit('update-evaluation', {
+        node: this.node,
+        patch: {
+          associatedHypothesisId: value,
+          associatedHypothesisLabel: option?.label || value,
+        },
       })
     },
   },
@@ -335,24 +585,6 @@ export default {
 .relation-pill,
 .collapse-btn {
   padding: 1px 6px;
-}
-
-.node-evaluation-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.node-evaluation-toggle input {
-  width: 13px;
-  height: 13px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: #2563eb;
 }
 
 .node-type {
@@ -502,6 +734,61 @@ export default {
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.78);
   align-self: flex-start;
+}
+
+.node-evaluation-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.node-evaluation-field {
+  display: grid;
+  gap: 6px;
+}
+
+.node-evaluation-label {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.node-evaluation-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.node-evaluation-options-wide {
+  gap: 8px;
+}
+
+.node-evaluation-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #334155;
+  font-size: 11px;
+}
+
+.node-evaluation-option input {
+  margin: 0;
+  accent-color: #2563eb;
+}
+
+.node-evaluation-select {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2937;
+  font-size: 12px;
+  padding: 6px 8px;
+  box-sizing: border-box;
 }
 
 .node-children {

@@ -73,6 +73,15 @@
         Archive Contents
       </button>
       <button
+        v-if="evaluationSummary.hasData"
+        class="imported-study-tab"
+        :class="{ active: activeTab === 'evaluation_summary' }"
+        type="button"
+        @click="activeTab = 'evaluation_summary'"
+      >
+        Evaluation Summary
+      </button>
+      <button
         class="imported-study-tab"
         :class="{ active: activeTab === 'trace_timeline' }"
         type="button"
@@ -106,6 +115,68 @@
             :chatbot-logs="importedPayload.chatbotLogs"
             :llm-analysis-trace="importedPayload.llmAnalysisTrace"
           />
+        </section>
+      </div>
+
+      <div v-else-if="activeTab === 'evaluation_summary'" class="imported-study-contents">
+        <section class="imported-study-section">
+          <h3>Checklist Evaluation Summary</h3>
+          <div v-if="evaluationSummary.hasData" class="imported-study-grid">
+            <div
+              v-for="card in evaluationOverviewCards"
+              :key="card.key"
+              class="imported-study-card"
+            >
+              <div class="imported-study-label">{{ card.label }}</div>
+              <div class="imported-study-stat-value">{{ card.value }}</div>
+              <div class="imported-study-stat-hint">{{ card.hint }}</div>
+            </div>
+          </div>
+          <div v-else class="imported-study-empty-inline">
+            No checklist evaluations were saved in this archive.
+          </div>
+        </section>
+
+        <section v-if="evaluationSummary.hasData" class="imported-study-section">
+          <h3>Response Distributions</h3>
+          <div class="imported-study-grid">
+            <div
+              v-for="section in evaluationDistributionSections"
+              :key="section.key"
+              class="imported-study-card imported-study-card-wide"
+            >
+              <div class="imported-study-label">
+                {{ section.title }} · {{ section.total }} recorded
+              </div>
+              <div class="imported-study-stat-list">
+                <div
+                  v-for="item in section.items"
+                  :key="item.key"
+                  class="imported-study-stat-row"
+                >
+                  <span class="imported-study-stat-name">{{ item.label }}</span>
+                  <span class="imported-study-stat-count" :data-tone="item.tone">
+                    {{ item.count }} · {{ formatPercent(item.count, section.total) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="evaluationSummary.findings.associatedHypotheses.length" class="imported-study-section">
+          <h3>Most Linked Hypotheses</h3>
+          <div class="imported-study-grid">
+            <div
+              v-for="entry in evaluationSummary.findings.associatedHypotheses"
+              :key="entry.label"
+              class="imported-study-card"
+            >
+              <div class="imported-study-label">{{ entry.label }}</div>
+              <div class="imported-study-stat-value">{{ entry.count }}</div>
+              <div class="imported-study-stat-hint">findings linked to this hypothesis</div>
+            </div>
+          </div>
         </section>
       </div>
 
@@ -262,6 +333,111 @@
 import CryptoVis from './CryptoVis.vue'
 import TraceTimelineViewer from './TraceTimelineViewer.vue'
 import { parseImportFile } from '../utils/sessionIO'
+import { isNodeEvaluationComplete, normalizeNodeEvaluations } from '../utils/llmAnalysisEvaluations'
+
+const HYPOTHESIS_ALIGNMENT_ORDER = ['yes', 'no', 'unsure']
+const HYPOTHESIS_SUFFICIENCY_ORDER = ['yes', 'partially', 'no', 'unsure']
+const FINDING_RELEVANCE_ORDER = ['yes', 'no', 'unsure']
+
+function createCounter(keys) {
+  return keys.reduce((acc, key) => {
+    acc[key] = 0
+    return acc
+  }, {})
+}
+
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj || {}, key)
+}
+
+function incrementCounter(counter, value) {
+  if (!value || !hasOwn(counter, value)) return
+  counter[value] += 1
+}
+
+function extractImportedNodeEvaluations(payload) {
+  const rawNodeEvaluations = payload?.llmAnalysis?.nodeEvaluations
+  if (!rawNodeEvaluations || typeof rawNodeEvaluations !== 'object') {
+    return {
+      updatedAt: null,
+      evaluations: {},
+    }
+  }
+  if (rawNodeEvaluations.evaluations && typeof rawNodeEvaluations.evaluations === 'object') {
+    return normalizeNodeEvaluations(rawNodeEvaluations)
+  }
+  const evaluationEntries = {}
+  Object.entries(rawNodeEvaluations).forEach(([key, value]) => {
+    if (!key || key === 'updatedAt') return
+    evaluationEntries[key] = value
+  })
+  return normalizeNodeEvaluations({
+    updatedAt: typeof rawNodeEvaluations.updatedAt === 'string' ? rawNodeEvaluations.updatedAt : null,
+    evaluations: evaluationEntries,
+  })
+}
+
+function buildEvaluationSummary(payload) {
+  const normalized = extractImportedNodeEvaluations(payload)
+  const entries = Object.entries(normalized.evaluations)
+  const summary = {
+    hasData: entries.length > 0,
+    updatedAt: normalized.updatedAt,
+    totalRecorded: entries.length,
+    totalCompleted: 0,
+    hypotheses: {
+      total: 0,
+      completed: 0,
+      alignment: createCounter(HYPOTHESIS_ALIGNMENT_ORDER),
+      sufficiency: createCounter(HYPOTHESIS_SUFFICIENCY_ORDER),
+    },
+    findings: {
+      total: 0,
+      completed: 0,
+      association: {
+        linked: 0,
+        none: 0,
+        missing: 0,
+      },
+      relevance: createCounter(FINDING_RELEVANCE_ORDER),
+      associatedHypotheses: [],
+    },
+  }
+  const associatedHypothesisCounts = new Map()
+
+  entries.forEach(([, entry]) => {
+    if (isNodeEvaluationComplete(entry)) summary.totalCompleted += 1
+    if (entry.nodeKind === 'Hypothesis') {
+      summary.hypotheses.total += 1
+      if (isNodeEvaluationComplete(entry)) summary.hypotheses.completed += 1
+      incrementCounter(summary.hypotheses.alignment, entry.hypothesisAligned)
+      incrementCounter(summary.hypotheses.sufficiency, entry.findingsSufficiency)
+      return
+    }
+    if (entry.nodeKind === 'Finding') {
+      summary.findings.total += 1
+      if (isNodeEvaluationComplete(entry)) summary.findings.completed += 1
+      incrementCounter(summary.findings.relevance, entry.relevanceToHypothesis)
+      if (hasOwn(entry, 'associatedHypothesisId')) {
+        if (entry.associatedHypothesisId == null) {
+          summary.findings.association.none += 1
+        } else {
+          summary.findings.association.linked += 1
+          const label = entry.associatedHypothesisLabel || entry.associatedHypothesisId
+          associatedHypothesisCounts.set(label, (associatedHypothesisCounts.get(label) || 0) + 1)
+        }
+      } else {
+        summary.findings.association.missing += 1
+      }
+    }
+  })
+
+  summary.findings.associatedHypotheses = Array.from(associatedHypothesisCounts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+
+  return summary
+}
 
 export default {
   name: 'ImportedStudyWorkspace',
@@ -288,6 +464,108 @@ export default {
         .filter(([, value]) => typeof value === 'string' && value.startsWith('data:image/'))
         .map(([name, url]) => ({ name, url }))
     },
+    evaluationSummary() {
+      return buildEvaluationSummary(this.importedPayload)
+    },
+    evaluationOverviewCards() {
+      const summary = this.evaluationSummary
+      if (!summary.hasData) return []
+      return [
+        {
+          key: 'recorded',
+          label: 'Recorded checklist entries',
+          value: summary.totalRecorded,
+          hint: 'Saved evaluations imported from the archive',
+        },
+        {
+          key: 'completed',
+          label: 'Completed entries',
+          value: summary.totalCompleted,
+          hint: `${this.formatPercent(summary.totalCompleted, summary.totalRecorded)} completion`,
+        },
+        {
+          key: 'hypotheses',
+          label: 'Hypothesis evaluations',
+          value: summary.hypotheses.total,
+          hint: `${summary.hypotheses.completed} complete`,
+        },
+        {
+          key: 'findings',
+          label: 'Finding evaluations',
+          value: summary.findings.total,
+          hint: `${summary.findings.completed} complete`,
+        },
+        {
+          key: 'none',
+          label: 'Findings marked None',
+          value: summary.findings.association.none,
+          hint: 'Finding has no associated hypothesis',
+        },
+        {
+          key: 'updated',
+          label: 'Last evaluation update',
+          value: this.formatDate(summary.updatedAt),
+          hint: 'Timestamp stored in nodeEvaluations',
+        },
+      ]
+    },
+    evaluationDistributionSections() {
+      const summary = this.evaluationSummary
+      if (!summary.hasData) return []
+      return [
+        {
+          key: 'hypothesis-alignment',
+          title: 'Hypothesis Alignment',
+          total: summary.hypotheses.total,
+          items: [
+            { key: 'yes', label: 'Yes', count: summary.hypotheses.alignment.yes, tone: 'good' },
+            { key: 'no', label: 'No', count: summary.hypotheses.alignment.no, tone: 'bad' },
+            { key: 'unsure', label: 'Unsure', count: summary.hypotheses.alignment.unsure, tone: 'neutral' },
+          ],
+        },
+        {
+          key: 'finding-sufficiency',
+          title: 'Finding Sufficiency',
+          total: summary.hypotheses.total,
+          items: [
+            { key: 'yes', label: 'Yes', count: summary.hypotheses.sufficiency.yes, tone: 'good' },
+            { key: 'partially', label: 'Partially', count: summary.hypotheses.sufficiency.partially, tone: 'warn' },
+            { key: 'no', label: 'No', count: summary.hypotheses.sufficiency.no, tone: 'bad' },
+            { key: 'unsure', label: 'Unsure', count: summary.hypotheses.sufficiency.unsure, tone: 'neutral' },
+          ],
+        },
+        {
+          key: 'finding-association',
+          title: 'Finding Association',
+          total: summary.findings.total,
+          items: [
+            {
+              key: 'linked',
+              label: 'Linked hypothesis',
+              count: summary.findings.association.linked,
+              tone: 'good',
+            },
+            { key: 'none', label: 'None', count: summary.findings.association.none, tone: 'warn' },
+            {
+              key: 'missing',
+              label: 'Not answered',
+              count: summary.findings.association.missing,
+              tone: 'neutral',
+            },
+          ],
+        },
+        {
+          key: 'finding-relevance',
+          title: 'Finding Relevance',
+          total: summary.findings.total,
+          items: [
+            { key: 'yes', label: 'Yes', count: summary.findings.relevance.yes, tone: 'good' },
+            { key: 'no', label: 'No', count: summary.findings.relevance.no, tone: 'bad' },
+            { key: 'unsure', label: 'Unsure', count: summary.findings.relevance.unsure, tone: 'neutral' },
+          ],
+        },
+      ]
+    },
     derivedTableEntries() {
       const tables = this.importedMeta?.derivedTables || {}
       return Object.entries(tables).map(([key, value]) => {
@@ -310,7 +588,7 @@ export default {
         this.importedPayload = parsed
         this.importedMeta = parsed.meta || {}
         this.importError = ''
-        this.activeTab = 'workspace'
+        this.activeTab = buildEvaluationSummary(parsed).hasData ? 'evaluation_summary' : 'workspace'
         this.viewerKey += 1
       } catch (error) {
         this.importedPayload = null
@@ -339,6 +617,10 @@ export default {
     },
     toPrettyJson(value) {
       return JSON.stringify(value, null, 2)
+    },
+    formatPercent(value, total) {
+      if (!total) return '0%'
+      return `${Math.round((value / total) * 100)}%`
     },
   },
 }
@@ -506,6 +788,76 @@ export default {
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
+}
+
+.imported-study-stat-value {
+  font-size: 24px;
+  line-height: 1.15;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.imported-study-stat-hint {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.imported-study-stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.imported-study-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.imported-study-stat-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.imported-study-stat-name {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.imported-study-stat-count {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.imported-study-stat-count[data-tone='good'] {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.imported-study-stat-count[data-tone='warn'] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.imported-study-stat-count[data-tone='bad'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.imported-study-stat-count[data-tone='neutral'] {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .imported-study-notes {

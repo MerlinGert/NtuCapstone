@@ -1,15 +1,30 @@
 <template>
   <div class="llm-analysis-view">
     <div class="analysis-toolbar">
-      <div>
-        <div class="analysis-title">Reasoning Forest</div>
-        <div class="analysis-subtitle">
-          Findings hierarchy under top-level hypotheses, with agent patch findings overlaid.
-        </div>
-      </div>
       <div class="toolbar-actions">
         <button class="export-btn" :disabled="loading || !canExportAnalysis" @click="exportAnalysis">
           Export JSON
+        </button>
+        <button
+          class="refresh-btn"
+          :disabled="!hasAnalysis"
+          @click="toggleEvaluationUi"
+        >
+          {{ showEvaluationUi ? 'Hide Checklist' : 'Show Checklist' }}
+        </button>
+        <button
+          class="refresh-btn"
+          :disabled="!hasAnalysis"
+          @click="expandAllNodes"
+        >
+          Expand All
+        </button>
+        <button
+          class="refresh-btn"
+          :disabled="!hasAnalysis"
+          @click="collapseAllNodes"
+        >
+          Collapse All
         </button>
         <button
           v-if="!isImportedMode"
@@ -22,7 +37,9 @@
         <span v-else class="imported-mode-badge">Imported JSON</span>
       </div>
     </div>
-    <div v-if="artifactSummary" class="artifact-summary">{{ artifactSummary }}</div>
+    <div v-if="evaluationPersistenceError" class="evaluation-warning">
+      {{ evaluationPersistenceError }}
+    </div>
     <div v-if="validationWarnings.length" class="validation-warnings">
       <div class="validation-warning-title">Graph warnings</div>
       <ul>
@@ -58,9 +75,13 @@
           :node="tree"
           :node-evaluations="nodeEvaluations"
           :new-node-ids="analysisUiState.newNodeIds"
+          :hypothesis-options="evaluationHypothesisOptions"
+          :finding-associations="findingEvaluationAssociations"
+          :expansion-command="expansionCommand"
+          :show-evaluation-ui="showEvaluationUi"
           @select-node="handleNodeSelect"
           @toggle-node="handleNodeToggle"
-          @toggle-evaluation="toggleNodeEvaluation"
+          @update-evaluation="updateNodeEvaluationEntry"
         />
       </section>
     </div>
@@ -161,7 +182,7 @@ import {
 import {
   buildNodeEvaluationsPayload,
   normalizeNodeEvaluations,
-  toggleNodeEvaluation as toggleNodeEvaluationMap,
+  updateNodeEvaluation,
 } from '../utils/llmAnalysisEvaluations.js'
 import {
   buildAnalysisUiStatePayload,
@@ -216,6 +237,9 @@ export default {
       loadStarted: false,
       lastManifestSignature: '',
       pollTimer: null,
+      expansionCommand: null,
+      showEvaluationUi: false,
+      evaluationPersistenceError: '',
     }
   },
   computed: {
@@ -246,6 +270,47 @@ export default {
       const names = [graphName, ...patches.map((patch) => patch.name)].filter(Boolean)
       if (!names.length) return ''
       return `Showing ${names.join(' + ')}`
+    },
+    evaluationHypothesisOptions() {
+      const options = []
+      const seen = new Set()
+      const visit = (node) => {
+        if (!node) return
+        if (this.nodeType(node) === 'Hypothesis') {
+          const value = String(node.canonicalId || node.id || '').trim()
+          if (value && !seen.has(value)) {
+            seen.add(value)
+            options.push({
+              value,
+              label: node.label || value,
+            })
+          }
+        }
+        const children = Array.isArray(node.children) ? node.children : []
+        children.forEach((child) => visit(child))
+      }
+      this.displayTrees.forEach((tree) => visit(tree))
+      return options
+    },
+    findingEvaluationAssociations() {
+      const associations = {}
+      const visit = (node, activeHypothesis = null) => {
+        if (!node) return
+        const nextHypothesis = this.nodeType(node) === 'Hypothesis'
+          ? {
+              value: String(node.canonicalId || node.id || '').trim(),
+              label: node.label || String(node.canonicalId || node.id || '').trim(),
+            }
+          : activeHypothesis
+        const nodeId = String(node.canonicalId || node.id || '').trim()
+        if (this.nodeType(node) === 'Finding' && nodeId && nextHypothesis?.value) {
+          associations[nodeId] = nextHypothesis
+        }
+        const children = Array.isArray(node.children) ? node.children : []
+        children.forEach((child) => visit(child, nextHypothesis))
+      }
+      this.displayTrees.forEach((tree) => visit(tree, null))
+      return associations
     },
     selectedNodeDetails() {
       if (!this.selectedNode) return []
@@ -783,13 +848,30 @@ export default {
         })
       }
     },
-    async toggleNodeEvaluation(node) {
-      const previousEvaluations = this.nodeEvaluations
-      const previousUpdatedAt = this.nodeEvaluationsUpdatedAt
-      const nextEvaluations = toggleNodeEvaluationMap(previousEvaluations, node)
+    expandAllNodes() {
+      this.expansionCommand = {
+        mode: 'expand',
+        token: Date.now(),
+      }
+    },
+    toggleEvaluationUi() {
+      this.showEvaluationUi = !this.showEvaluationUi
+    },
+    collapseAllNodes() {
+      this.expansionCommand = {
+        mode: 'collapse',
+        token: Date.now(),
+      }
+    },
+    async updateNodeEvaluationEntry(payload) {
+      const node = payload?.node
+      const patch = payload?.patch || {}
+      if (!node) return
+      const nextEvaluations = updateNodeEvaluation(this.nodeEvaluations, node, patch)
       const updatedAt = new Date().toISOString()
       this.nodeEvaluations = nextEvaluations
       this.nodeEvaluationsUpdatedAt = updatedAt
+      this.evaluationPersistenceError = ''
       if (this.isImportedMode) return
 
       try {
@@ -805,12 +887,24 @@ export default {
             }),
           ),
         })
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        if (!response.ok) {
+          let message = `HTTP ${response.status}`
+          try {
+            const errorPayload = await response.json()
+            if (typeof errorPayload?.detail === 'string' && errorPayload.detail.trim()) {
+              message = `${message}: ${errorPayload.detail.trim()}`
+            }
+          } catch {
+            // Ignore JSON parse errors and keep the HTTP status message.
+          }
+          throw new Error(message)
+        }
         this.applyNodeEvaluations(await response.json())
+        this.evaluationPersistenceError = ''
       } catch (error) {
         console.error('Failed to persist LLM analysis evaluation:', error)
-        this.nodeEvaluations = previousEvaluations
-        this.nodeEvaluationsUpdatedAt = previousUpdatedAt
+        const detail = error instanceof Error && error.message ? error.message : 'Unknown error'
+        this.evaluationPersistenceError = `Checklist save failed; keeping local selection for now. ${detail}`
       }
     },
     buildAnalysisExportFileName() {
@@ -851,7 +945,9 @@ export default {
           this.fetchNodeEvaluations(),
           this.fetchAnalysisUiState(),
         ])
-        this.applyNodeEvaluations(evaluations)
+        if (!this.evaluationPersistenceError || !Object.keys(this.nodeEvaluations || {}).length) {
+          this.applyNodeEvaluations(evaluations)
+        }
         this.applyAnalysisUiState(analysisUiState)
         const signature = this.manifestSignature(manifest)
         if (!force && signature && signature === this.lastManifestSignature && this.reasoningGraph) return
@@ -1346,8 +1442,7 @@ export default {
 
 .analysis-toolbar {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -1372,23 +1467,15 @@ export default {
   padding: 2px 8px;
 }
 
-.analysis-title {
-  color: #334155;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.analysis-subtitle {
-  color: #718096;
+.evaluation-warning {
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
   font-size: 11px;
-  line-height: 1.3;
-  margin-top: 2px;
-}
-
-.artifact-summary {
-  color: #64748b;
-  font-size: 10px;
-  margin: -2px 0 8px;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  padding: 8px 10px;
 }
 
 .validation-warnings {

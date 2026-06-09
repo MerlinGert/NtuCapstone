@@ -38,10 +38,48 @@ LLM_ANALYSIS_UI_STATE_NAME = "llm-analysis-ui-state.json"
 SERVABLE_SESSION_FILE_SUFFIXES = {".json", ".md", ".png", ".jpg", ".jpeg", ".webp"}
 SERVABLE_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 EVALUABLE_REASONING_NODE_KINDS = {"Hypothesis", "Finding"}
-EVALUATION_ENTRY_KEYS = {"checked", "nodeKind", "updatedAt"}
+EVALUATION_ENTRY_KEYS = {
+    "checked",
+    "nodeKind",
+    "updatedAt",
+    "hypothesisAligned",
+    "findingsSufficiency",
+    "associatedHypothesisId",
+    "associatedHypothesisLabel",
+    "relevanceToHypothesis",
+    "note",
+}
 ANALYSIS_UI_STATE_ENTRY_KEYS = {"nodeKind", "firstSeenAt", "runId"}
 ANALYSIS_UI_STATE_RUN_KEYS = {"runId", "startedAt", "suppressNewBadges", "baselineVisibleNodeIds"}
 ANALYSIS_EXPORT_FORMAT = "maniscope-llm-analysis-json"
+
+
+HYPOTHESIS_ALIGNMENT_VALUES = {"yes", "no", "unsure"}
+HYPOTHESIS_SUFFICIENCY_VALUES = {"yes", "no", "partially", "unsure"}
+FINDING_RELEVANCE_VALUES = {"yes", "no", "unsure"}
+
+
+def _normalize_optional_choice(
+    value: Any,
+    allowed_values: set[str],
+    field_name: str,
+    node_id: str,
+) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if not text:
+        return None
+    if text not in allowed_values:
+        raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} has invalid {field_name}")
+    return text
+
+
+def _normalize_optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _now_iso() -> str:
@@ -991,20 +1029,63 @@ def _normalize_analysis_evaluations_payload(
                 status_code=400,
                 detail=f"Unsupported evaluation fields for {node_id}: {', '.join(unsupported)}",
             )
-        checked = raw_entry.get("checked")
-        if not isinstance(checked, bool):
-            raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} requires boolean checked")
         node_kind = raw_entry.get("nodeKind")
         if node_kind is not None and node_kind not in EVALUABLE_REASONING_NODE_KINDS:
             raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} has unsupported nodeKind")
         updated_at = raw_entry.get("updatedAt")
         if updated_at is not None and not isinstance(updated_at, str):
             raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} has invalid updatedAt")
-        evaluations[node_id] = {
-            "checked": checked,
+        checked = raw_entry.get("checked")
+        if checked is not None and not isinstance(checked, bool):
+            raise HTTPException(status_code=400, detail=f"Evaluation entry for {node_id} has invalid checked")
+        normalized_entry: dict[str, Any] = {
+            "checked": checked is True,
             "nodeKind": node_kind or "Finding",
             "updatedAt": updated_at,
         }
+
+        hypothesis_aligned = _normalize_optional_choice(
+            raw_entry.get("hypothesisAligned"),
+            HYPOTHESIS_ALIGNMENT_VALUES,
+            "hypothesisAligned",
+            node_id,
+        )
+        if hypothesis_aligned:
+            normalized_entry["hypothesisAligned"] = hypothesis_aligned
+
+        findings_sufficiency = _normalize_optional_choice(
+            raw_entry.get("findingsSufficiency"),
+            HYPOTHESIS_SUFFICIENCY_VALUES,
+            "findingsSufficiency",
+            node_id,
+        )
+        if findings_sufficiency:
+            normalized_entry["findingsSufficiency"] = findings_sufficiency
+
+        relevance_to_hypothesis = _normalize_optional_choice(
+            raw_entry.get("relevanceToHypothesis"),
+            FINDING_RELEVANCE_VALUES,
+            "relevanceToHypothesis",
+            node_id,
+        )
+        if relevance_to_hypothesis:
+            normalized_entry["relevanceToHypothesis"] = relevance_to_hypothesis
+
+        if "associatedHypothesisId" in raw_entry:
+            associated_hypothesis_id = raw_entry.get("associatedHypothesisId")
+            if associated_hypothesis_id is not None:
+                associated_hypothesis_id = str(associated_hypothesis_id).strip() or None
+            normalized_entry["associatedHypothesisId"] = associated_hypothesis_id
+
+        associated_hypothesis_label = _normalize_optional_text(raw_entry.get("associatedHypothesisLabel"))
+        if associated_hypothesis_label:
+            normalized_entry["associatedHypothesisLabel"] = associated_hypothesis_label
+
+        note = _normalize_optional_text(raw_entry.get("note"))
+        if note:
+            normalized_entry["note"] = note
+
+        evaluations[node_id] = normalized_entry
 
     return {
         "sessionId": session_id,
