@@ -6,6 +6,7 @@ This setup runs the ManiScope frontend, backend, and Codex bridge in one Docker 
 - `study`: production-built frontend served by nginx, with FastAPI and the Codex bridge.
 
 The container uses published ports rather than host networking. It avoids port `8080`.
+It runs with Docker's seccomp and AppArmor profiles disabled so Codex's bubblewrap sandbox can create user namespaces and complete its mount setup inside the container. The container is not privileged and does not add extra Linux capabilities.
 
 ## Ports
 
@@ -68,3 +69,14 @@ The repository is bind-mounted into `/workspace/NtuCapstone`. The large raw-data
 - `front/public/data2`
 
 Study mode builds the frontend with `MANISCOPE_DISABLE_PUBLIC_COPY=1`, so Vite does not copy the large public data into `front/dist`. nginx serves `/data/*` and `/data2/*` directly from `front/public`.
+
+## Codex Sandbox
+
+Codex agents run with `workspace-write` sandboxing. Docker's default seccomp profile blocks the user-namespace operations used by that sandbox, and Docker's default AppArmor profile can block bubblewrap's mount propagation setup. These show up as errors such as:
+
+```text
+bwrap: No permissions to create a new namespace
+bwrap: Failed to make / slave: Permission denied
+```
+
+The compose file sets `security_opt: seccomp=unconfined` and `security_opt: apparmor=unconfined` for the ManiScope app containers. This is the narrowest setting verified here to run Codex's bundled bubblewrap as the `maniscope` user while avoiding privileged mode and extra Linux capabilities.

@@ -36,6 +36,8 @@ just codex-login
 
 `just codex-login` uses the Codex device-code flow and stores auth in a Docker volume, so normal restarts and rebuilds keep the login.
 
+The container disables Docker's default seccomp and AppArmor profiles for the app services so Codex's bubblewrap sandbox can run without privileged mode or extra Linux capabilities.
+
 The large raw-data directories under `front/public/data` and `front/public/data2` are mounted read-only. In study mode, nginx serves production-built frontend assets on container port `3099` and serves `/data/*` plus `/data2/*` directly from `front/public`, so the build does not copy the multi-GB raw data into `front/dist`.
 
 See `docker/maniscope-container/README.md` for details and equivalent `docker compose` commands.

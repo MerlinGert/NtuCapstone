@@ -42,6 +42,10 @@ container port `3099` and publishes host port `3299` on all host interfaces for
 LAN/cloudflared access, while `/data/*` and `/data2/*` are served directly from
 the read-only `front/public/data*` bind mounts instead of copying the multi-GB
 raw data into `front/dist`. Backend and bridge host ports remain localhost-only.
+The Docker app containers set `security_opt: seccomp=unconfined` and
+`security_opt: apparmor=unconfined` so Codex's bubblewrap-based workspace
+sandbox can create user namespaces and complete mount setup inside Docker
+without running the container in privileged mode or adding extra capabilities.
 
 The frontend dev server is configured in `front/vite.config.js` to bind `127.0.0.1:3099` and proxy `/api/*` to `http://127.0.0.1:8099`.
 

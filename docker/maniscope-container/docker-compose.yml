@@ -9,6 +9,9 @@ x-maniscope-common: &maniscope-common
       MANISCOPE_GID: ${MANISCOPE_GID:-1000}
   image: maniscope-container:latest
   restart: unless-stopped
+  security_opt:
+    - seccomp=unconfined
+    - apparmor=unconfined
   environment:
     MANISCOPE_REPO_ROOT: /workspace/NtuCapstone
     MANISCOPE_BACKEND_HOST: 0.0.0.0
