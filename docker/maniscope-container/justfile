@@ -43,4 +43,4 @@ codex-login:
 health:
     curl -fsS http://127.0.0.1:${MANISCOPE_BACKEND_HOST_PORT:-8199}/
     curl -fsS http://127.0.0.1:${MANISCOPE_BRIDGE_HOST_PORT:-8877}/health
-    (curl -fsS http://127.0.0.1:${MANISCOPE_DEV_FRONTEND_HOST_PORT:-3199}/ >/dev/null || curl -fsS http://127.0.0.1:${MANISCOPE_STUDY_FRONTEND_HOST_PORT:-3299}/ >/dev/null)
+    (curl -fsS http://127.0.0.1:${MANISCOPE_DEV_FRONTEND_HOST_PORT:-3199}/ >/dev/null 2>/dev/null || curl -fsS http://127.0.0.1:${MANISCOPE_STUDY_FRONTEND_HOST_PORT:-3299}/ >/dev/null)
