@@ -194,7 +194,7 @@ Use a real Finding hierarchy when the trace contains enough evidence:
 - Mid-level Findings answer Analytic Questions by synthesizing one or more low-level Findings. These are the normal source nodes for `answers` edges.
 - High-level Findings synthesize several mid-level Findings into a session-level claim, caveat, or interpretation. They should support, refine, or contradict Hypotheses.
 
-Avoid connecting the same mid-level Finding directly to both an Analytic Question and that question's parent Hypothesis when a high-level Finding can synthesize the answer first. Prefer `low Finding -> mid Finding -> high Finding -> Hypothesis`, while keeping the explicit `mid Finding -> AnalyticQuestion` `answers` edge for traceability.
+Create a parent Finding only when it adds synthesis, qualification, scope, contrast, uncertainty, or aggregation across evidence. If one concrete Finding is already enough to answer an Analytic Question or support, refine, or contradict a Hypothesis, connect that Finding directly. Avoid both extremes: do not make a flat forest where every Finding directly supports a Hypothesis, and do not make single-child Finding chains where the parent only rephrases the child. Keep explicit `mid Finding -> AnalyticQuestion` `answers` edges for traceability.
 
 ## Validation Expectations
 

@@ -535,7 +535,8 @@ Graph quality requirements:
 - For every AnalyticQuestion node, create at least one evidence-backed mid-level Finding node that answers it unless the trace truly provides no answer. Add explicit "answers" edges from mid-level Finding to AnalyticQuestion.
 - Unanswered AnalyticQuestions in the base reasoning graph are validation warnings, not graph errors. Treat each warning as an instruction to decide whether the question is central and answerable; if it is, investigate it and add answer Findings through reasoning-graph-patch*.json.
 - Build a readable Finding hierarchy when the trace contains enough evidence: low-level Findings for concrete visual/statistical/model observations, mid-level Findings that synthesize those observations and answer AnalyticQuestions, and high-level Findings that synthesize multiple mid-level Findings before supporting Hypotheses.
-- Avoid flat forests where every Finding directly supports a Hypothesis. Do not connect the same mid-level Finding directly to both an AnalyticQuestion and that question's parent Hypothesis unless there is no higher-level Finding to carry the Hypothesis support.
+- Create a parent Finding only when it adds synthesis, qualification, scope, contrast, uncertainty, or aggregation across evidence. If one concrete Finding is already enough to answer an AnalyticQuestion or support, refine, or contradict a Hypothesis, connect that Finding directly.
+- Avoid both extremes: do not make a flat forest where every Finding directly supports a Hypothesis, and do not make single-child Finding chains where the parent only rephrases the child. Do not connect the same mid-level Finding directly to both an AnalyticQuestion and that question's parent Hypothesis unless there is no higher-level Finding to carry the Hypothesis support.
 - Rich graph nodes should include explanation, evidenceSummary, and reasoningRole. Agent-created patch nodes must also include patchRationale.
 
 Validation and artifact commands:
@@ -628,6 +629,7 @@ Filesystem access:
 Start trace-dependent answers by reading the current session files when they exist:
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
+- session-references/manual-for-baseline-agent.md
 - session-references/README.md
 
 Useful session folders:

@@ -261,7 +261,7 @@ Build a readable Finding hierarchy when the trace contains enough evidence:
 - **Mid-level Findings** synthesize low-level Findings and answer Analytic Questions. These should be the source of `answers` edges.
 - **High-level Findings** synthesize several mid-level Findings into a session-level interpretation, caveat, or claim, then support, refine, or contradict Hypotheses.
 
-Avoid flat forests where every Finding directly supports a Hypothesis. Prefer `low Finding -> mid Finding -> high Finding -> Hypothesis`, plus explicit `mid Finding -> AnalyticQuestion` `answers` edges. Do not connect the same mid-level Finding directly to both an Analytic Question and that question's parent Hypothesis unless there is no higher-level Finding to carry the hypothesis support.
+Create a parent Finding only when it adds synthesis, qualification, scope, contrast, uncertainty, or aggregation across evidence. If one concrete Finding is already enough to answer an Analytic Question or support, refine, or contradict a Hypothesis, connect that Finding directly. Avoid both extremes: do not make a flat forest where every Finding directly supports a Hypothesis, and do not make single-child Finding chains where the parent only rephrases the child. Do not connect the same mid-level Finding directly to both an Analytic Question and that question's parent Hypothesis unless there is no higher-level Finding to carry the hypothesis support.
 
 ### Recommendation and Follow-up Lifecycle
 
@@ -733,6 +733,7 @@ If the user asks for analysis-only, recommendation-only, or planning-only output
 - `reasoning-graph.json` and all `reasoning-graph-patch*.json` files must validate with the session-local TypeScript validator when available.
 - Every answerable `AnalyticQuestion` should have at least one incoming `answers` edge from a mid-level `Finding`. Missing `answers` edges are warnings, not graph errors, when the user trace does not answer the question.
 - Low-level Findings should feed mid-level Findings; mid-level Findings should answer Analytic Questions; high-level Findings should synthesize mid-level Findings before supporting Hypotheses when the trace evidence allows it.
+- Single-child Finding chains are allowed only when the parent Finding adds distinct synthesis, qualification, scope, contrast, uncertainty, or aggregation. Otherwise, connect the child Finding directly to the Analytic Question or Hypothesis target.
 - Every Interaction node in `reasoning-graph.json` must have `salience`.
 - Static forest exports, when produced, must be rooted at Hypotheses, preserve raw Interaction leaves by default, and duplicate shared canonical nodes mechanically while retaining `canonicalId`.
 - Recommendation Plan Forests must not present Expected Findings as evidence-backed Findings.

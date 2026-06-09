@@ -191,6 +191,7 @@ Graph-writing expectations:
 - Full analysis should write and validate `reasoning-graph.json` early.
 - Incremental analysis should write `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`.
 - Skeptical or counterevidence Findings should use `refines` or `contradicts`, not support-only edges.
+- Parent Findings should add synthesis, qualification, scope, contrast, uncertainty, or aggregation across evidence. If one concrete Finding is enough to answer an Analytic Question or support, refine, or contradict a Hypothesis, connect it directly instead of creating a single-child rephrasing chain.
 - `current-reasoning-graph.json` is a derived reading aid for agents and debugging, not the frontend source of truth.
 
 ## Evidence Discipline

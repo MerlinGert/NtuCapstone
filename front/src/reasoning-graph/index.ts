@@ -490,6 +490,35 @@ function unansweredAnalyticQuestionWarning(nodes: Map<string, ReasoningNode>, ed
   return `AnalyticQuestion nodes without incoming answers edges from Mid Findings: ${unansweredQuestions.sort().join(', ')}. This is allowed if the user trace does not answer them; if they are central and answerable, investigate them and add follow-up Findings in reasoning-graph-patch*.json.`
 }
 
+function thinFindingChainWarning(nodes: Map<string, ReasoningNode>, edges: ReasoningEdge[]): string | null {
+  const reasoningRelations = new Set<ReasoningRelation>(['answers', 'supports', 'refines', 'contradicts'])
+  const passThroughFindingIds = Array.from(nodes.entries())
+    .filter(([, node]) => node.kind === 'Finding')
+    .filter(([nodeId]) => {
+      const incomingFindingSupports = edges.filter((edge) => {
+        const source = nodes.get(edge.source)
+        return edge.target === nodeId && edge.relation === 'supports' && source?.kind === 'Finding'
+      })
+      if (incomingFindingSupports.length !== 1) return false
+
+      const outgoingReasoningEdges = edges.filter((edge) => edge.source === nodeId && reasoningRelations.has(edge.relation))
+      if (outgoingReasoningEdges.length !== 1) return false
+
+      const directNonFindingEvidence = edges.some((edge) => {
+        const source = nodes.get(edge.source)
+        return edge.target === nodeId
+          && source?.kind !== 'Finding'
+          && (edge.relation === 'produces' || edge.relation === 'derived_from')
+      })
+      return !directNonFindingEvidence
+    })
+    .map(([nodeId]) => nodeId)
+    .sort()
+
+  if (!passThroughFindingIds.length) return null
+  return `Possible pass-through Finding nodes in single-child Finding chains: ${passThroughFindingIds.join(', ')}. Each has exactly one incoming supports edge from another Finding and one outgoing reasoning edge, but no direct non-Finding evidence. Add distinct synthesis, qualification, scope, contrast, uncertainty, or aggregation to the parent Finding, or remove it and connect the child Finding directly to the parent target.`
+}
+
 export function validateReasoningGraph(
   graph: unknown,
   options: ValidationOptions = {},
@@ -546,6 +575,8 @@ export function validateReasoningGraph(
     if (answeredQuestions === 'error') fail(unansweredWarning, fileName)
     warnings.push(fileName ? `${fileName}: ${unansweredWarning}` : unansweredWarning)
   }
+  const thinFindingWarning = thinFindingChainWarning(nodes, edges)
+  if (thinFindingWarning) warnings.push(fileName ? `${fileName}: ${thinFindingWarning}` : thinFindingWarning)
   return { nodes, edges, roots, warnings }
 }
 

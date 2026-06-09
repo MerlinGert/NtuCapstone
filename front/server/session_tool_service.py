@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-06-09.1"
+TOOL_VERSION = "2026-06-09.3"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
 BASELINE_VIEW_TOOL_NAME = "maniscope_baseline_views.py"
 SESSION_PYPROJECT_NAME = "pyproject.toml"

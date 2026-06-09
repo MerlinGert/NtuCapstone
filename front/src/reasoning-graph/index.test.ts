@@ -216,6 +216,12 @@ describe('reasoning graph validation', () => {
   test('warns by default when analytic questions have no mid-level answer findings', () => {
     const graph = baseGraph()
     graph.edges = graph.edges.filter((edge) => edge.relation !== 'answers')
+    graph.edges.push({
+      source: 'AA1',
+      target: 'F_MID1',
+      relation: 'produces',
+      rationale: 'The activity directly produced the mid-level finding.',
+    })
     const result = validateReasoningGraph(graph)
     expect(result.warnings).toHaveLength(1)
     expect(result.warnings[0]).toContain('AnalyticQuestion nodes without incoming answers edges')
@@ -225,6 +231,71 @@ describe('reasoning graph validation', () => {
     const graph = baseGraph()
     graph.edges = graph.edges.filter((edge) => edge.relation !== 'answers')
     expect(() => validateReasoningGraph(graph, { answeredQuestions: 'error' })).toThrow(/without incoming answers edges/)
+  })
+
+  test('warns for thin single-child Finding chains', () => {
+    const graph = baseGraph()
+    graph.nodes = graph.nodes.filter((node) => ['H1', 'F_LOW1', 'F_MID1'].includes(node.id))
+    graph.nodes.push({
+      id: 'F_HIGH1',
+      kind: 'Finding',
+      space: 'Finding',
+      scope: 'High',
+      label: 'The selected wallets support the coordination hypothesis',
+      confidence: 'Inference',
+      provenance: ['screenshot:card.png'],
+      explanation: 'This high-level finding restates the same visual evidence.',
+    })
+    graph.edges = [
+      { source: 'F_LOW1', target: 'F_MID1', relation: 'supports', rationale: 'Low-level finding supports the mid-level finding.' },
+      { source: 'F_MID1', target: 'F_HIGH1', relation: 'supports', rationale: 'Mid-level finding supports the high-level finding.' },
+      { source: 'F_HIGH1', target: 'H1', relation: 'supports', rationale: 'High-level finding supports the hypothesis.' },
+    ]
+
+    const result = validateReasoningGraph(graph)
+
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]).toContain('Possible pass-through Finding nodes')
+    expect(result.warnings[0]).toContain('F_MID1')
+    expect(result.warnings[0]).toContain('F_HIGH1')
+  })
+
+  test('does not warn when a parent Finding has multiple child Findings', () => {
+    const graph = baseGraph()
+    graph.nodes = graph.nodes.filter((node) => ['H1', 'F_LOW1', 'F_MID1'].includes(node.id))
+    graph.nodes.push({
+      id: 'F_LOW2',
+      kind: 'Finding',
+      space: 'Finding',
+      scope: 'Low',
+      label: 'The selected card also shows repeated timing',
+      confidence: 'Direct evidence',
+      provenance: ['screenshot:card.png'],
+      explanation: 'A second low-level observation contributes distinct evidence.',
+    })
+    graph.edges = [
+      { source: 'F_LOW1', target: 'F_MID1', relation: 'supports', rationale: 'First low-level finding supports the synthesis.' },
+      { source: 'F_LOW2', target: 'F_MID1', relation: 'supports', rationale: 'Second low-level finding supports the synthesis.' },
+      { source: 'F_MID1', target: 'H1', relation: 'supports', rationale: 'The synthesis supports the hypothesis.' },
+    ]
+
+    const result = validateReasoningGraph(graph)
+
+    expect(result.warnings).toHaveLength(0)
+  })
+
+  test('does not warn when a parent Finding has direct non-Finding evidence', () => {
+    const graph = baseGraph()
+    graph.nodes = graph.nodes.filter((node) => ['H1', 'AA1', 'F_LOW1', 'F_MID1'].includes(node.id))
+    graph.edges = [
+      { source: 'AA1', target: 'F_MID1', relation: 'produces', rationale: 'The activity directly produced the mid-level finding.' },
+      { source: 'F_LOW1', target: 'F_MID1', relation: 'supports', rationale: 'The low-level finding supports the mid-level finding.' },
+      { source: 'F_MID1', target: 'H1', relation: 'supports', rationale: 'The mid-level finding supports the hypothesis.' },
+    ]
+
+    const result = validateReasoningGraph(graph)
+
+    expect(result.warnings).toHaveLength(0)
   })
 })
 
