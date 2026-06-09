@@ -27,6 +27,7 @@ Important session files:
 - `images/`: action, annotation, current-view, and attachment images.
 - `artifacts/`: generated analysis files, rendered evidence, scripts, reports, graph JSON, and patches.
 - `analysis-runs/{runId}.json`: closed trace-window metadata for a Codex analysis turn.
+- `session-references/`: compact manuals plus `agent-analysis-playbook.md` and `agent-analysis-l2-prompts.md` for detailed analysis workflow and L2 worker assignments.
 
 The Human Workspace is the source of truth for user trace changes. The Agent Workspace is independent visual-analysis state for the agent. Agent-side selections, zoom windows, detector settings, and rendered evidence must not overwrite the human page state or append to the human trace.
 
@@ -190,6 +191,7 @@ Graph-writing expectations:
 
 - Full analysis should write and validate `reasoning-graph.json` early.
 - Incremental analysis should write `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`.
+- Detailed graph-writing workflow, full and incremental analysis pipelines, background-task/L2 delegation, branch naming, and L2 worker assignment templates live in `agent-analysis-playbook.md` and `agent-analysis-l2-prompts.md`.
 - Skeptical or counterevidence Findings should use `refines` or `contradicts`, not support-only edges.
 - Parent Findings should add synthesis, qualification, scope, contrast, uncertainty, or aggregation across evidence. If one concrete Finding is enough to answer an Analytic Question or support, refine, or contradict a Hypothesis, connect it directly instead of creating a single-child rephrasing chain.
 - `current-reasoning-graph.json` is a derived reading aid for agents and debugging, not the frontend source of truth.

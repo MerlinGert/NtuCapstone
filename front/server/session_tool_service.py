@@ -2,9 +2,11 @@ import shutil
 from pathlib import Path
 
 
-TOOL_VERSION = "2026-06-09.3"
+TOOL_VERSION = "2026-06-10.3"
 VISUALIZATION_TOOL_NAME = "maniscope_visualization.py"
 BASELINE_VIEW_TOOL_NAME = "maniscope_baseline_views.py"
+FULL_ANALYSIS_SCRIPT_NAME = "run_full_analysis.py"
+INCREMENTAL_ANALYSIS_SCRIPT_NAME = "run_incremental_analysis.py"
 SESSION_PYPROJECT_NAME = "pyproject.toml"
 SESSION_PACKAGE_JSON_NAME = "package.json"
 SESSION_GITIGNORE_NAME = ".gitignore"
@@ -17,11 +19,15 @@ BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
 TEMPLATE_PATH = BASE_DIR / "session_tools" / VISUALIZATION_TOOL_NAME
 BASELINE_TEMPLATE_PATH = BASE_DIR / "session_tools" / BASELINE_VIEW_TOOL_NAME
+FULL_ANALYSIS_SCRIPT_TEMPLATE_PATH = BASE_DIR / "session_tools" / FULL_ANALYSIS_SCRIPT_NAME
+INCREMENTAL_ANALYSIS_SCRIPT_TEMPLATE_PATH = BASE_DIR / "session_tools" / INCREMENTAL_ANALYSIS_SCRIPT_NAME
 PYPROJECT_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_pyproject.toml"
 PACKAGE_JSON_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_package.json"
 GITIGNORE_TEMPLATE_PATH = BASE_DIR / "session_tools" / "session_gitignore"
 AGENT_MANUAL_PATH = PROJECT_ROOT / "docs" / "reports" / "manual-for-agent.md"
 BASELINE_AGENT_MANUAL_PATH = PROJECT_ROOT / "docs" / "reports" / "manual-for-baseline-agent.md"
+AGENT_ANALYSIS_PLAYBOOK_PATH = PROJECT_ROOT / "docs" / "reports" / "agent-analysis-playbook.md"
+AGENT_ANALYSIS_L2_PROMPTS_PATH = PROJECT_ROOT / "docs" / "reports" / "agent-analysis-l2-prompts.md"
 MAJOR_VIEW_RENDER_API_PATH = PROJECT_ROOT / "docs" / "ui-analysis" / "major-view-render-api.md"
 TRACE_ANALYSIS_SKILL_DIR = PROJECT_ROOT / "skills" / "user-trace-analysis"
 REASONING_GRAPH_TS_SOURCE_DIR = PROJECT_ROOT / "front" / "src" / "reasoning-graph"
@@ -51,6 +57,8 @@ SESSION_SCAFFOLD_EXCLUDE_ENTRIES = [
 ]
 GIT_EXCLUDE_ENTRIES = [
     f"/{VISUALIZATION_TOOL_NAME}",
+    f"/{FULL_ANALYSIS_SCRIPT_NAME}",
+    f"/{INCREMENTAL_ANALYSIS_SCRIPT_NAME}",
     f"/{SESSION_REFERENCES_DIR_NAME}/",
     f"/{TRACE_ANALYSIS_TOOLS_DIR_NAME}/",
     f"/{SESSION_SKILLS_DIR_NAME}/{DISCONFIRMATION_SKILL_NAME}/",
@@ -71,6 +79,12 @@ def ensure_session_tools(session_dir: Path, session_id: str) -> None:
     content = _render_tool(session_id)
     if _managed_tool_needs_update(target_path, session_id):
         target_path.write_text(content, encoding="utf-8")
+    _ensure_managed_script(session_dir / FULL_ANALYSIS_SCRIPT_NAME, FULL_ANALYSIS_SCRIPT_TEMPLATE_PATH, session_id)
+    _ensure_managed_script(
+        session_dir / INCREMENTAL_ANALYSIS_SCRIPT_NAME,
+        INCREMENTAL_ANALYSIS_SCRIPT_TEMPLATE_PATH,
+        session_id,
+    )
     _ensure_trace_analysis_tools(session_dir)
     _ensure_session_skills(session_dir)
     _ensure_git_exclude(session_dir, GIT_EXCLUDE_ENTRIES)
@@ -101,6 +115,16 @@ def _render_baseline_tool(session_id: str) -> str:
         template.replace("__MANISCOPE_TOOL_VERSION__", TOOL_VERSION)
         .replace("__MANISCOPE_SESSION_ID__", session_id)
     )
+
+
+def _ensure_managed_script(target_path: Path, template_path: Path, session_id: str) -> None:
+    content = (
+        template_path.read_text(encoding="utf-8")
+        .replace("__MANISCOPE_TOOL_VERSION__", TOOL_VERSION)
+        .replace("__MANISCOPE_SESSION_ID__", session_id)
+    )
+    if _managed_tool_needs_update(target_path, session_id):
+        target_path.write_text(content, encoding="utf-8")
 
 
 def _ensure_session_project_scaffold(session_dir: Path, session_id: str, session_mode: str) -> None:
@@ -145,6 +169,8 @@ def _ensure_session_references(session_dir: Path, session_mode: str) -> None:
     if session_mode == "specialized":
         shutil.copy2(AGENT_MANUAL_PATH, references_dir / "manual-for-agent.md")
         shutil.copy2(MAJOR_VIEW_RENDER_API_PATH, references_dir / "major-view-render-api.md")
+        shutil.copy2(AGENT_ANALYSIS_PLAYBOOK_PATH, references_dir / "agent-analysis-playbook.md")
+        shutil.copy2(AGENT_ANALYSIS_L2_PROMPTS_PATH, references_dir / "agent-analysis-l2-prompts.md")
         (references_dir / "README.md").write_text(_specialized_references_readme(), encoding="utf-8")
     else:
         shutil.copy2(BASELINE_AGENT_MANUAL_PATH, references_dir / "manual-for-baseline-agent.md")
@@ -173,9 +199,13 @@ references replace repo-root documentation reads:
 
 - `manual-for-agent.md`: compact ManiScope workflow, view, and trace semantics for agents.
 - `major-view-render-api.md`: visual rendering API and evidence-generation notes.
+- `agent-analysis-playbook.md`: specialized trace-analysis methodology and graph contract.
+- `agent-analysis-l2-prompts.md`: canonical templates for background task agents to spawn L2 workers.
 
 Trace-analysis schema references remain under `trace_analysis_tools/references/`.
 The skeptical-review skill remains under `skills/maniscope-disconfirmation/`.
+Use `run_full_analysis.py` and `run_incremental_analysis.py` from the session
+root to start, inspect, or stop bridge-owned background analysis tasks.
 The bridge configures a repo-local uv cache for package tooling only; do not use
 it for analysis outputs.
 """

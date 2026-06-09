@@ -7,6 +7,8 @@ export const REPO_ROOT = process.env.MANISCOPE_REPO_ROOT || path.resolve(FRONT_D
 export const CODEX_AGENT_MODEL = 'gpt-5.5'
 export const CODEX_AGENT_REASONING_EFFORT = 'xhigh'
 export const CODEX_AGENT_SERVICE_TIER = 'fast'
+export const CODEX_AGENT_MAX_THREADS = 6
+export const CODEX_AGENT_MAX_DEPTH = 2
 
 export function sharedUvCacheDirectory(repoRoot = REPO_ROOT) {
   return path.join(repoRoot, '.maniscope-chat', 'shared-uv-cache')
@@ -35,6 +37,13 @@ export function buildCodexClientOptions({
     },
     config: {
       service_tier: CODEX_AGENT_SERVICE_TIER,
+      features: {
+        multi_agent: true,
+      },
+      agents: {
+        max_threads: CODEX_AGENT_MAX_THREADS,
+        max_depth: CODEX_AGENT_MAX_DEPTH,
+      },
       sandbox_workspace_write: {
         writable_roots: [uvCacheDir],
         network_access: true,

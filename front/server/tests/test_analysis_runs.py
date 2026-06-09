@@ -41,6 +41,8 @@ class AnalysisRunTests(unittest.TestCase):
         module.SESSIONS_DIR = Path(tmp_dir) / "sessions"
         module.ensure_session_tools = lambda _session_dir, _session_id: None
         module._commit_trace_history = lambda **_kwargs: None
+        module._post_bridge_analysis_task_start = lambda _session_id, _task: {"status": "running"}
+        module._post_bridge_analysis_task_stop = lambda _session_id, _task_id: {"stopped": True}
 
     def test_start_analysis_run_stores_current_trace_anchor(self):
         module = load_chat_session_service()
@@ -124,6 +126,115 @@ class AnalysisRunTests(unittest.TestCase):
             self.assertEqual(finished["status"], "stopped")
             self.assertEqual(finished["endAnchor"], anchor)
             self.assertFalse(finished["traceAdvanced"])
+
+    def test_start_full_analysis_task_creates_run_and_task_with_fixed_anchor(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+            session_dir = module.SESSIONS_DIR / "abcde"
+            session_dir.mkdir(parents=True)
+            anchor = {
+                "sessionId": "abcde",
+                "traceRevision": 5,
+                "actionCount": 9,
+                "annotationCount": 4,
+                "traceDigest": "sha256:task",
+            }
+            (session_dir / "live-session.json").write_text(json.dumps(live_session(anchor)), encoding="utf-8")
+            calls = []
+            module._post_bridge_analysis_task_start = lambda session_id, task: calls.append((session_id, task)) or {
+                "status": "running",
+                "threadId": "thread-1",
+            }
+
+            task = module.start_full_analysis_task("abcde", {})
+
+            self.assertEqual(task["mode"], "full")
+            self.assertEqual(task["status"], "running")
+            self.assertEqual(task["startAnchor"], anchor)
+            self.assertEqual(task["threadId"], "thread-1")
+            self.assertTrue((session_dir / "analysis-tasks" / f"{task['taskId']}.json").exists())
+            self.assertTrue((session_dir / "analysis-runs" / f"{task['runId']}.json").exists())
+            self.assertEqual(calls[0][0], "abcde")
+            self.assertEqual(calls[0][1]["startAnchor"], anchor)
+
+    def test_start_analysis_task_reuses_existing_run(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+            session_dir = module.SESSIONS_DIR / "abcde"
+            session_dir.mkdir(parents=True)
+            anchor = {
+                "sessionId": "abcde",
+                "traceRevision": 7,
+                "actionCount": 16,
+                "annotationCount": 12,
+                "traceDigest": "sha256:reuse",
+            }
+            (session_dir / "live-session.json").write_text(json.dumps(live_session(anchor)), encoding="utf-8")
+            run = module.start_analysis_run("abcde", {"mode": "incremental_analysis", "presetKind": "update_analysis"})
+
+            task = module.start_incremental_analysis_task("abcde", {"runId": run["runId"]})
+
+            self.assertEqual(task["runId"], run["runId"])
+            self.assertEqual(task["mode"], "incremental")
+            self.assertEqual(task["startAnchor"], run["startAnchor"])
+            run_files = list((session_dir / "analysis-runs").glob("*.json"))
+            self.assertEqual(len(run_files), 1)
+
+    def test_analysis_task_status_list_and_stop(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+            session_dir = module.SESSIONS_DIR / "abcde"
+            session_dir.mkdir(parents=True)
+            anchor = {
+                "sessionId": "abcde",
+                "traceRevision": 1,
+                "actionCount": 2,
+                "annotationCount": 1,
+                "traceDigest": "sha256:stop",
+            }
+            (session_dir / "live-session.json").write_text(json.dumps(live_session(anchor)), encoding="utf-8")
+            task = module.start_full_analysis_task("abcde", {})
+
+            listed = module.list_analysis_tasks("abcde")
+            fetched = module.get_analysis_task("abcde", task["taskId"])
+            stopped = module.stop_analysis_task("abcde", task["taskId"])
+
+            self.assertEqual(listed["tasks"][0]["taskId"], task["taskId"])
+            self.assertEqual(fetched["taskId"], task["taskId"])
+            self.assertEqual(stopped["status"], "stopped")
+            run_payload = json.loads((session_dir / "analysis-runs" / f"{task['runId']}.json").read_text(encoding="utf-8"))
+            self.assertEqual(run_payload["status"], "stopped")
+
+    def test_analysis_task_event_completion_finalizes_run(self):
+        module = load_chat_session_service()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.configure_temp_sessions(module, tmp_dir)
+            session_dir = module.SESSIONS_DIR / "abcde"
+            session_dir.mkdir(parents=True)
+            anchor = {
+                "sessionId": "abcde",
+                "traceRevision": 2,
+                "actionCount": 3,
+                "annotationCount": 1,
+                "traceDigest": "sha256:complete",
+            }
+            (session_dir / "live-session.json").write_text(json.dumps(live_session(anchor)), encoding="utf-8")
+            task = module.start_full_analysis_task("abcde", {})
+
+            updated = module.update_analysis_task_event(
+                "abcde",
+                task["taskId"],
+                {"status": "completed", "threadId": "thread-2", "artifacts": [{"path": "artifacts/reasoning-graph.json"}]},
+            )
+
+            self.assertEqual(updated["status"], "completed")
+            self.assertEqual(updated["threadId"], "thread-2")
+            self.assertEqual(updated["artifacts"][0]["path"], "artifacts/reasoning-graph.json")
+            run_payload = json.loads((session_dir / "analysis-runs" / f"{task['runId']}.json").read_text(encoding="utf-8"))
+            self.assertEqual(run_payload["status"], "completed")
 
 
 if __name__ == "__main__":

@@ -142,15 +142,28 @@ class SessionVisualizationToolTests(unittest.TestCase):
             self.assertTrue((references_dir / "manual-for-agent.md").exists())
             self.assertFalse((references_dir / "user-manual.en.md").exists())
             self.assertTrue((references_dir / "major-view-render-api.md").exists())
+            self.assertTrue((references_dir / "agent-analysis-playbook.md").exists())
+            self.assertFalse((references_dir / "agent-analysis-l1-prompts.md").exists())
+            self.assertTrue((references_dir / "agent-analysis-l2-prompts.md").exists())
+            self.assertFalse((references_dir / "agent-analysis-prompts.md").exists())
 
             tool_path = session_dir / "maniscope_visualization.py"
             self.assertTrue(tool_path.exists())
             content = tool_path.read_text(encoding="utf-8")
             self.assertIn('SESSION_ID = "abcde"', content)
             self.assertIn(f'TOOL_VERSION = "{service.TOOL_VERSION}"', content)
+            self.assertTrue((session_dir / "run_full_analysis.py").exists())
+            self.assertTrue((session_dir / "run_incremental_analysis.py").exists())
+            self.assertIn('SESSION_ID = "abcde"', (session_dir / "run_full_analysis.py").read_text(encoding="utf-8"))
+            self.assertIn(
+                f'TOOL_VERSION = "{service.TOOL_VERSION}"',
+                (session_dir / "run_incremental_analysis.py").read_text(encoding="utf-8"),
+            )
 
             exclude = (session_dir / ".git" / "info" / "exclude").read_text(encoding="utf-8")
             self.assertIn("/maniscope_visualization.py", exclude)
+            self.assertIn("/run_full_analysis.py", exclude)
+            self.assertIn("/run_incremental_analysis.py", exclude)
             self.assertIn("/session-references/", exclude)
             self.assertIn("/trace_analysis_tools/", exclude)
             self.assertIn("/skills/maniscope-disconfirmation/", exclude)
@@ -225,10 +238,16 @@ class SessionVisualizationToolTests(unittest.TestCase):
             self.assertFalse((references_dir / "manual-for-agent.md").exists())
             self.assertFalse((references_dir / "user-manual.en.md").exists())
             self.assertFalse((references_dir / "major-view-render-api.md").exists())
+            self.assertFalse((references_dir / "agent-analysis-playbook.md").exists())
+            self.assertFalse((references_dir / "agent-analysis-l1-prompts.md").exists())
+            self.assertFalse((references_dir / "agent-analysis-l2-prompts.md").exists())
+            self.assertFalse((references_dir / "agent-analysis-prompts.md").exists())
             content = tool_path.read_text(encoding="utf-8")
             self.assertIn('SESSION_ID = "abcde"', content)
             self.assertIn(f'TOOL_VERSION = "{service.TOOL_VERSION}"', content)
             self.assertFalse((session_dir / "maniscope_visualization.py").exists())
+            self.assertFalse((session_dir / "run_full_analysis.py").exists())
+            self.assertFalse((session_dir / "run_incremental_analysis.py").exists())
             self.assertFalse((session_dir / "trace_analysis_tools").exists())
             self.assertFalse((session_dir / "skills" / "maniscope-disconfirmation").exists())
 
