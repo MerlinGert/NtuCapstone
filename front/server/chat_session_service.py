@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote_to_bytes
 
+import requests
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
@@ -55,7 +56,13 @@ ANALYSIS_UI_STATE_RUN_KEYS = {"runId", "startedAt", "suppressNewBadges", "baseli
 ANALYSIS_RUN_MODES = {"full_analysis", "incremental_analysis", "manual_chat"}
 ANALYSIS_RUN_STATUSES = {"running", "completed", "stopped", "failed", "interrupted"}
 ANALYSIS_RUN_ID_RE = re.compile(r"^[a-zA-Z0-9_.-]{1,120}$")
+ANALYSIS_TASKS_DIR_NAME = "analysis-tasks"
+ANALYSIS_TASK_MODES = {"full", "incremental"}
+ANALYSIS_TASK_STATUSES = {"starting", "running", "completed", "stopping", "stopped", "failed", "interrupted"}
+ANALYSIS_TASK_ID_RE = re.compile(r"^[a-zA-Z0-9_.-]{1,120}$")
 ANALYSIS_EXPORT_FORMAT = "maniscope-llm-analysis-json"
+DEFAULT_CODEX_BRIDGE_URL = "http://127.0.0.1:8787"
+CODEX_BRIDGE_URL = os.environ.get("CODEX_BRIDGE_URL", DEFAULT_CODEX_BRIDGE_URL)
 
 
 HYPOTHESIS_ALIGNMENT_VALUES = {"yes", "no", "unsure"}
@@ -334,6 +341,268 @@ def _finish_analysis_run(
     payload["traceAdvanced"] = _trace_advanced(payload.get("startAnchor"), end_anchor)
     _atomic_write_json(run_path, payload)
     return payload
+
+
+def _analysis_task_id() -> str:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"task-{stamp}-{secrets.token_hex(4)}"
+
+
+def _normalize_analysis_task_id(value: Any, *, required: bool = True) -> str:
+    task_id = str(value or "").strip()
+    if not task_id:
+        if required:
+            raise HTTPException(status_code=400, detail="taskId is required")
+        return ""
+    if not ANALYSIS_TASK_ID_RE.fullmatch(task_id) or "/" in task_id or "\\" in task_id:
+        raise HTTPException(status_code=400, detail="taskId contains unsupported characters")
+    return task_id
+
+
+def _analysis_tasks_dir(session_dir: Path) -> Path:
+    path = session_dir / ANALYSIS_TASKS_DIR_NAME
+    path.mkdir(exist_ok=True)
+    return path
+
+
+def _analysis_task_path(session_dir: Path, task_id: str) -> Path:
+    safe_task_id = _normalize_analysis_task_id(task_id)
+    return _analysis_tasks_dir(session_dir) / f"{safe_task_id}.json"
+
+
+def _analysis_task_mode_to_run_mode(mode: str) -> tuple[str, str]:
+    if mode == "full":
+        return "full_analysis", "full_analysis"
+    if mode == "incremental":
+        return "incremental_analysis", "update_analysis"
+    raise HTTPException(status_code=400, detail="analysis task mode is unsupported")
+
+
+def _analysis_task_expected_artifacts(mode: str) -> list[str]:
+    if mode == "full":
+        return [
+            "artifacts/reasoning-graph.json",
+            "artifacts/reasoning-graph-patch.json",
+            "artifacts/reasoning-graph-patch-skeptical.json",
+        ]
+    if mode == "incremental":
+        return [
+            "artifacts/reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json",
+            "artifacts/current-reasoning-graph.json",
+        ]
+    raise HTTPException(status_code=400, detail="analysis task mode is unsupported")
+
+
+def _read_analysis_task(session_dir: Path, task_id: str) -> dict[str, Any]:
+    task_path = _analysis_task_path(session_dir, task_id)
+    if not task_path.exists():
+        raise HTTPException(status_code=404, detail="Analysis task not found")
+    payload = _read_json(task_path)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=500, detail="Invalid analysis task record")
+    return payload
+
+
+def _write_analysis_task(session_dir: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    task_id = _normalize_analysis_task_id(payload.get("taskId"))
+    payload["updatedAt"] = _now_iso()
+    _atomic_write_json(_analysis_task_path(session_dir, task_id), payload)
+    return payload
+
+
+def _post_bridge_analysis_task_start(session_id: str, task: dict[str, Any]) -> dict[str, Any]:
+    url = f"{CODEX_BRIDGE_URL.rstrip('/')}/api/analysis-tasks/{session_id}/start"
+    try:
+        response = requests.post(url, json=task, timeout=5)
+    except requests.ConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail="Codex bridge is not running. Start it with `bun run codex-bridge` in front/.",
+        )
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="Timed out while starting the Codex analysis task.")
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Codex bridge analysis-task request failed: {exc}")
+
+    if not response.ok:
+        detail = response.text.strip() or response.reason
+        raise HTTPException(status_code=response.status_code, detail=detail)
+    try:
+        payload = response.json()
+    except ValueError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _post_bridge_analysis_task_stop(session_id: str, task_id: str) -> dict[str, Any]:
+    url = f"{CODEX_BRIDGE_URL.rstrip('/')}/api/analysis-tasks/{session_id}/{task_id}/stop"
+    try:
+        response = requests.post(url, json={}, timeout=5)
+    except requests.ConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail="Codex bridge is not running. Start it with `bun run codex-bridge` in front/.",
+        )
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="Timed out while stopping the Codex analysis task.")
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"Codex bridge analysis-task stop failed: {exc}")
+
+    if not response.ok:
+        detail = response.text.strip() or response.reason
+        raise HTTPException(status_code=response.status_code, detail=detail)
+    try:
+        payload = response.json()
+    except ValueError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _start_analysis_task(session_id: str, mode: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    if mode not in ANALYSIS_TASK_MODES:
+        raise HTTPException(status_code=400, detail="analysis task mode is unsupported")
+    body = body if isinstance(body, dict) else {}
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode="specialized")
+    run_mode, preset_kind = _analysis_task_mode_to_run_mode(mode)
+    requested_run_id = _normalize_analysis_run_id(body.get("runId"), required=False)
+    if requested_run_id and _analysis_run_path(session_dir, requested_run_id).exists():
+        run = _read_json(_analysis_run_path(session_dir, requested_run_id))
+        if not isinstance(run, dict):
+            raise HTTPException(status_code=500, detail="Invalid analysis run record")
+        if run.get("status") in {"completed", "stopped", "failed", "interrupted"}:
+            raise HTTPException(status_code=409, detail="Analysis run already finished")
+        if run.get("mode") != run_mode:
+            raise HTTPException(status_code=400, detail="Analysis run mode does not match task mode")
+    else:
+        run = _start_analysis_run(
+            session_id,
+            {
+                "mode": run_mode,
+                "presetKind": preset_kind,
+                "triggerType": "background_task",
+                "runId": requested_run_id,
+            },
+            session_mode="specialized",
+        )
+    task_id = _normalize_analysis_task_id(body.get("taskId"), required=False) or _analysis_task_id()
+    task_path = _analysis_task_path(session_dir, task_id)
+    if task_path.exists():
+        _finish_analysis_run(session_id, str(run["runId"]), "failed", session_mode="specialized")
+        raise HTTPException(status_code=409, detail="Analysis task already exists")
+    now = _now_iso()
+    task = {
+        "version": 1,
+        "sessionId": session_id,
+        "sessionMode": "specialized",
+        "taskId": task_id,
+        "runId": run["runId"],
+        "mode": mode,
+        "status": "starting",
+        "startedAt": now,
+        "updatedAt": now,
+        "completedAt": None,
+        "startAnchor": copy.deepcopy(run.get("startAnchor") or {}),
+        "statusPath": f"analysis-tasks/{task_id}.json",
+        "stopRequestedAt": None,
+        "threadId": None,
+        "latestEvent": None,
+        "artifacts": [],
+        "expectedArtifacts": _analysis_task_expected_artifacts(mode),
+        "error": None,
+    }
+    _atomic_write_json(task_path, task)
+    try:
+        bridge_payload = _post_bridge_analysis_task_start(session_id, task)
+    except HTTPException:
+        task["status"] = "failed"
+        task["completedAt"] = _now_iso()
+        task["error"] = "Failed to start the Codex bridge analysis task."
+        _write_analysis_task(session_dir, task)
+        _finish_analysis_run(session_id, str(run["runId"]), "failed", session_mode="specialized")
+        raise
+
+    latest_task = _read_json(task_path)
+    if isinstance(latest_task, dict):
+        task = latest_task
+    task["status"] = str(bridge_payload.get("status") or task.get("status") or "running")
+    if bridge_payload.get("threadId"):
+        task["threadId"] = str(bridge_payload["threadId"])
+    _write_analysis_task(session_dir, task)
+    return task
+
+
+def _list_analysis_tasks(session_id: str) -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode="specialized")
+    tasks = []
+    for path in sorted(_analysis_tasks_dir(session_dir).glob("*.json")):
+        payload = _read_json(path)
+        if isinstance(payload, dict):
+            tasks.append(payload)
+    tasks.sort(key=lambda item: str(item.get("startedAt") or ""), reverse=True)
+    return {"sessionId": session_id, "tasks": tasks}
+
+
+def _get_analysis_task(session_id: str, task_id: str) -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode="specialized")
+    return _read_analysis_task(session_dir, task_id)
+
+
+def _stop_analysis_task(session_id: str, task_id: str) -> dict[str, Any]:
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode="specialized")
+    task = _read_analysis_task(session_dir, task_id)
+    if task.get("status") in {"completed", "stopped", "failed", "interrupted"}:
+        return task
+    task["status"] = "stopping"
+    task["stopRequestedAt"] = _now_iso()
+    _write_analysis_task(session_dir, task)
+    try:
+        _post_bridge_analysis_task_stop(session_id, task_id)
+    except HTTPException as exc:
+        task["latestEvent"] = {
+            "type": "stop_error",
+            "message": str(exc.detail),
+            "at": _now_iso(),
+        }
+        _write_analysis_task(session_dir, task)
+        raise
+    task["status"] = "stopped"
+    task["completedAt"] = _now_iso()
+    task["latestEvent"] = {
+        "type": "stopped",
+        "message": "Stop requested by client.",
+        "at": _now_iso(),
+    }
+    _finish_analysis_run(session_id, str(task.get("runId") or ""), "stopped", session_mode="specialized")
+    return _write_analysis_task(session_dir, task)
+
+
+def _update_analysis_task_event(session_id: str, task_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Analysis task event payload must be a JSON object")
+    session_dir, _meta, _existed = _ensure_session(session_id, session_mode="specialized")
+    task = _read_analysis_task(session_dir, task_id)
+    if task.get("status") in {"completed", "stopped", "failed", "interrupted"}:
+        return task
+    status = str(body.get("status") or task.get("status") or "").strip()
+    if status and status not in ANALYSIS_TASK_STATUSES:
+        raise HTTPException(status_code=400, detail="analysis task status is unsupported")
+    if status:
+        task["status"] = status
+    if body.get("threadId"):
+        task["threadId"] = str(body["threadId"])
+    if isinstance(body.get("latestEvent"), dict):
+        task["latestEvent"] = copy.deepcopy(body["latestEvent"])
+    if isinstance(body.get("artifacts"), list):
+        task["artifacts"] = copy.deepcopy(body["artifacts"])
+    if body.get("error"):
+        task["error"] = str(body["error"])
+    if task.get("status") in {"completed", "stopped", "failed", "interrupted"} and not task.get("completedAt"):
+        task["completedAt"] = _now_iso()
+        run_status = str(task["status"])
+        if run_status == "stopping":
+            run_status = "stopped"
+        _finish_analysis_run(session_id, str(task.get("runId") or ""), run_status, session_mode="specialized")
+    return _write_analysis_task(session_dir, task)
 
 
 def _analysis_artifact_info(
@@ -1786,6 +2055,36 @@ def start_analysis_ui_state_run(session_id: str, body: dict[str, Any]) -> dict[s
 @router.post("/{session_id}/analysis-runs/start")
 def start_analysis_run(session_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return _start_analysis_run(session_id, body, session_mode="specialized")
+
+
+@router.post("/{session_id}/analysis-tasks/full/start")
+def start_full_analysis_task(session_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _start_analysis_task(session_id, "full", body)
+
+
+@router.post("/{session_id}/analysis-tasks/incremental/start")
+def start_incremental_analysis_task(session_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _start_analysis_task(session_id, "incremental", body)
+
+
+@router.get("/{session_id}/analysis-tasks")
+def list_analysis_tasks(session_id: str) -> dict[str, Any]:
+    return _list_analysis_tasks(session_id)
+
+
+@router.get("/{session_id}/analysis-tasks/{task_id}")
+def get_analysis_task(session_id: str, task_id: str) -> dict[str, Any]:
+    return _get_analysis_task(session_id, task_id)
+
+
+@router.post("/{session_id}/analysis-tasks/{task_id}/stop")
+def stop_analysis_task(session_id: str, task_id: str) -> dict[str, Any]:
+    return _stop_analysis_task(session_id, task_id)
+
+
+@router.post("/{session_id}/analysis-tasks/{task_id}/events")
+def update_analysis_task_event(session_id: str, task_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    return _update_analysis_task_event(session_id, task_id, body)
 
 
 def finish_analysis_run(

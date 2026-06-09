@@ -261,6 +261,22 @@ def _thread_cache_path(session_id: str, session_mode: str = "specialized") -> Pa
     return _session_dir(session_id, session_mode=session_mode) / "codex-threads.json"
 
 
+def _analysis_task_exists_for_run(session_id: str, run_id: str, session_mode: str = "specialized") -> bool:
+    if session_mode != "specialized" or not run_id:
+        return False
+    tasks_dir = _session_dir(session_id, session_mode=session_mode) / "analysis-tasks"
+    if not tasks_dir.exists():
+        return False
+    for path in tasks_dir.glob("*.json"):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict) and payload.get("runId") == run_id:
+            return True
+    return False
+
+
 def _sse_event(payload: dict[str, Any]) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
@@ -789,7 +805,12 @@ def _stream_codex_response(
                     "The Codex stream ended before a completion event.",
                 )
         persist()
-        if analysis_run and analysis_run.get("runId"):
+        background_task_preset = analysis_run and analysis_run.get("presetKind") in {"full_analysis", "update_analysis"}
+        background_task_started = bool(
+            background_task_preset
+            and _analysis_task_exists_for_run(session_id, str(analysis_run.get("runId") or ""), session_mode)
+        )
+        if analysis_run and analysis_run.get("runId") and not background_task_started:
             run_status = str(assistant_message.get("turnState") or "")
             if run_status not in {"completed", "stopped", "failed", "interrupted"}:
                 run_status = "failed" if saw_error else "interrupted"

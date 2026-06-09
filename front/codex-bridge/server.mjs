@@ -30,6 +30,7 @@ const RAW_DATA_DIRS = rawDataDirectories(FRONT_DIR)
 const ARTIFACT_POLL_INTERVAL_MS = 500
 const IMAGE_DATA_URL_RE = /^data:image\/(png|jpeg|jpg|webp);base64,/i
 const activeTurns = new Map()
+const activeAnalysisTasks = new Map()
 const agentBrowser = new AgentBrowserManager()
 
 function validateSessionMode(sessionMode) {
@@ -120,6 +121,56 @@ ${startAnchorText}
 \`\`\`
 
 Use this startAnchor as the maximum trace boundary for this turn. You may reread live-session.json to notice whether newer user actions arrived after this run started, but those later Interactions and annotations are out of scope for this run. Do not revise the plan, graph, patches, or subagent assignments to include trace records beyond the startAnchor. If the live trace advanced during the run, mention that those later records were deferred and should be handled by Update Analysis.`
+}
+
+function validateAnalysisTaskId(taskId) {
+  const value = String(taskId || '').trim()
+  if (!/^[a-zA-Z0-9_.-]{1,120}$/.test(value) || value.includes('/') || value.includes('\\')) {
+    const error = new Error('taskId contains unsupported characters')
+    error.statusCode = 400
+    throw error
+  }
+  return value
+}
+
+function validateAnalysisTaskMode(mode) {
+  const value = String(mode || '').trim()
+  if (value !== 'full' && value !== 'incremental') {
+    const error = new Error('analysis task mode must be full or incremental')
+    error.statusCode = 400
+    throw error
+  }
+  return value
+}
+
+function sanitizeAnalysisTask(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    const error = new Error('analysis task payload must be an object')
+    error.statusCode = 400
+    throw error
+  }
+  const task = {
+    taskId: validateAnalysisTaskId(value.taskId),
+    runId: String(value.runId || '').trim(),
+    mode: validateAnalysisTaskMode(value.mode),
+    status: String(value.status || 'starting'),
+    startedAt: String(value.startedAt || ''),
+    startAnchor:
+      value.startAnchor && typeof value.startAnchor === 'object' && !Array.isArray(value.startAnchor)
+        ? value.startAnchor
+        : {},
+    expectedArtifacts: Array.isArray(value.expectedArtifacts) ? value.expectedArtifacts.map(String) : [],
+  }
+  if (!/^[a-zA-Z0-9_.-]{1,120}$/.test(task.runId)) {
+    const error = new Error('runId contains unsupported characters')
+    error.statusCode = 400
+    throw error
+  }
+  return task
+}
+
+function analysisTaskKey(sessionId, taskId) {
+  return `specialized:${sessionId}:${taskId}`
 }
 
 function activeTurnKey(sessionMode, sessionId, threadKey) {
@@ -347,8 +398,8 @@ First choose the narrowest mode that satisfies the user request. If multiple mod
 
 - Lightweight chat: answer a narrow question directly. Refresh current trace files if the answer depends on trace state. Keep it concise and name evidence type and uncertainty.
 - Trace-dependent Q&A: when the user asks what changed, continues after using the UI, or asks a follow-up that may depend on new trace patches, inspect the live trace and session git history. If prior graph artifacts exist, compare their latest trace anchor with the current live traceAnchor.
-- Full trace analysis: trigger when the user asks for full, comprehensive, complete, end-to-end, or artifact-producing trace analysis, or asks to analyze a trace without scoping the request to a narrow question. Unless explicitly scoped down, run trace reconstruction, recommendation planning, skeptical review, follow-up investigation, graph patching, validation, and artifact writing.
-- Incremental trace analysis: trigger when the user asks what changed, asks to continue or refine an existing analysis, or when reasoning-graph.json already exists and the live trace has advanced beyond the latest graph or patch anchor.
+- Full trace analysis: trigger when the user asks for full, comprehensive, complete, end-to-end, or artifact-producing trace analysis, or asks to analyze a trace without scoping the request to a narrow question. Unless explicitly scoped down, start a bridge-owned background task with ${relativeSessionRoot}/run_full_analysis.py.
+- Incremental trace analysis: trigger when the user asks what changed, asks to continue or refine an existing analysis, or when reasoning-graph.json already exists and the live trace has advanced beyond the latest graph or patch anchor. Unless explicitly scoped down, start a bridge-owned background task with ${relativeSessionRoot}/run_incremental_analysis.py.
 - Recommendation planning: trigger when the user asks what to do next, asks for recommendations, or asks how to test a Hypothesis or AnalyticQuestion.
 - Autonomous investigation: trigger when the user asks you to investigate, explore, validate, test, or continue analysis. First state a short InvestigationStrategy plan, then execute the needed checks unless the user asks for planning-only.
 - Artifact writing: trigger when the user asks for files, durable analysis artifacts, graph JSON, patches, reports, exports, or persistent evidence.
@@ -358,6 +409,8 @@ First choose the narrowest mode that satisfies the user request. If multiple mod
 For every trace-dependent turn, read these files first:
 - session-references/manual-for-agent.md
 - session-references/major-view-render-api.md
+- session-references/agent-analysis-playbook.md
+- session-references/agent-analysis-l2-prompts.md
 - ${relativeSessionRoot}/live-session.json
 - ${relativeSessionRoot}/current-state.json
 - ${activeWorkspaceState}
@@ -390,6 +443,17 @@ Screenshots and generated evidence are under:
 
 The latest major-view screenshots are also attached to this turn as image inputs when available.
 
+# Background Analysis Tasks
+
+For full trace analysis and incremental trace analysis, the main chat agent should start bridge-owned background tasks through the session-local scripts by default.
+
+- For full analysis, run: uv run python run_full_analysis.py start
+- For incremental analysis, run: uv run python run_incremental_analysis.py start
+- Report the returned taskId, runId, startAnchor summary, statusPath, and expected artifacts.
+- Do not use spawn_agent for non-blocking full or incremental analysis. The bridge owns the independent background task lifecycle.
+- Do not run the heavy analysis inline unless the script fails and the user explicitly asks you to run inline.
+- The user can inspect or stop tasks with run_full_analysis.py status, run_full_analysis.py stop, run_incremental_analysis.py status, and run_incremental_analysis.py stop.
+
 # Workspace And Filesystem Boundaries
 
 - Your writable working directory is this active session directory: ${sessionRoot}
@@ -411,185 +475,24 @@ Workspace state model:
 - Agent visual exploration may change agent workspace state and generated artifacts, but must not alter the human workspace state or canonical user trace unless the user explicitly asks for a durable artifact or reasoning patch.
 - If the user asks you to analyze or export to a trace folder outside this session sandbox, explain that this chat agent can only write inside the active session directory. Ask the user to import or copy the trace into the session, or write a session-local artifact that the user can move later.
 
-# Methodology
+# Session Reference Playbooks
 
-Use three mapped analysis spaces:
-- Intention Space: Task, AnalyticQuestion, Hypothesis.
-- Action Space: Interaction, AnalyticActivity, InvestigationStrategy.
-- Finding Space: Finding.
+Detailed ManiScope methodology and task templates are session-local references. Read the relevant files before trace analysis, recommendation planning, autonomous investigation, graph writing, visual evidence generation, or subagent orchestration:
+- session-references/manual-for-agent.md
+- session-references/major-view-render-api.md
+- session-references/agent-analysis-playbook.md
+- session-references/agent-analysis-l2-prompts.md
 
-Use these mappings:
-- A Task motivates one or more Interactions and produces a local Finding.
-- An AnalyticQuestion motivates an AnalyticActivity and should be explicitly answered by one or more Findings when trace or follow-up evidence supports an answer.
-- A Hypothesis motivates an InvestigationStrategy and produces or revises a Finding.
-- State evidence and rationale when inferring an AnalyticQuestion, Hypothesis, or mid- or high-level Finding.
+The main bootstrap prompt intentionally keeps only runtime constraints inline. Do not duplicate or improvise the full methodology when the reference files are available.
 
-Use these Finding levels:
-- Low-level Findings are concrete observations from one Interaction or one narrow AnalyticActivity.
-- Mid-level Findings synthesize low-level Findings and answer AnalyticQuestions.
-- High-level Findings synthesize several mid-level Findings before supporting, refining, or contradicting Hypotheses when evidence allows it.
-
-Type low-level Interactions precisely:
-- Data Action: query, filter, retrieve, aggregate, or compute from data or model outputs, including statistics not displayed in the GUI.
-- Model Action: change detector parameters, rerun detection, change grouping rules, choose model settings, vary thresholds, or otherwise alter model outputs.
-- Visualization Action: inspect, navigate, select, zoom, compare, change display settings, read GUI-displayed statistics, or interpret trace screenshots and ManiScope views.
-- Synthesis Action: annotate, summarize, connect Findings, update a Hypothesis, write a note, or create a traceability link.
-
-Type AnalyticActivities by evidence:
-- Visual Analysis contains one or more Visualization Actions, and the Finding depends on visual inspection, screenshots, GUI-displayed evidence, rendered view evidence, or visual comparison.
-- Statistical Analysis contains no Visualization Actions; the Finding comes from data, model outputs, backend endpoints, scripts, command-line queries, or custom computation.
-- Model Actions and Synthesis Actions do not determine the AnalyticActivity type by themselves.
-- If one candidate activity mixes visual inspection and custom computation, split it into a Visual Analysis activity and a Statistical Analysis activity, then synthesize the results.
-
-Use reasoning forests when traceability matters:
-- Reasoning Support Graph: canonical shared-node graph of Interactions, Tasks, AnalyticQuestions, AnalyticActivities, Findings, Hypotheses, and InvestigationStrategies.
-- User Reasoning Forest: descriptive forest reconstructed from the user's trace, rooted at user-authored or analyst-inferred Hypotheses.
-- Recommendation Plan Forest: prescriptive forest of Reasoning Gaps, Expansion Rationales, InvestigationStrategies, AnalyticActivities, Recommended Interactions, and Expected Findings.
-- Follow-up Investigation Forest: descriptive forest of evidence produced by executing recommendations.
-- Reasoning Graph Patch: machine-readable additions or updates that merge follow-up evidence into the canonical graph.
-- Augmented Reasoning Forest: regenerated forest after applying Reasoning Graph Patches.
-
-# Evidence Routing
-
-Choose the evidence route before acting:
-- Use Visual Analysis when a claim depends on spatial clusters, visible grouping, detector boundaries, links, card alignment, price-window alignment, behavior timelines, manipulation boxes, balance shapes, screenshots, rendered images, or values displayed by the GUI.
-- Use Statistical Analysis when a claim depends on exact counts, exact timestamps, exact amounts, transfer paths, wallet overlap, cohort market share, profit/loss, final balances, medians, means, detector-output overlap, or other derived values not displayed by the GUI.
-- Use Model Actions when the claim depends on detector outputs, model-generated suspicious labels, entity groups, manipulation boxes, link construction, component membership, or threshold-sensitive groupings.
-- Use Synthesis Actions when the work is to record, compare, qualify, or connect evidence already produced by visual, data, or model work.
-- Use visual, statistical, model, and synthesis evidence together when the claim needs them, but keep them as distinct Interactions or AnalyticActivities. Do not default to script-side statistics.
-
-Evidence discipline:
-- Distinguish logged Interactions, derived UI state, trace screenshots, attached screenshots, user-authored annotations, user-authored Findings, newly rendered visual evidence, raw-data validation, model-output validation, and your own inferred analysis.
-- Use trace screenshots to reconstruct what the user actually saw.
-- Use current render APIs to generate new visual evidence when investigating a visual question. Do not merely copy trace screenshots and present them as new visual analysis.
-- Treat rendered views as qualitative evidence for timing, density, grouping, and visual comparison. Use raw data or backend endpoints for exact counts and amounts, especially when Behavior Details event dots may be downsampled.
-- For model-derived claims, such as suspicious labels, entity groups, manipulation boxes, links, components, and detector cards, consider a Model Action robustness check by varying parameters or rerunning detection. If that check is unavailable or unnecessary, explain why.
-- For major Hypotheses and high-level Findings, include a disconfirmation pass. When functions.spawn_agent is available, spawn a skeptical subagent as a full-context fork by passing fork_context: true and a bounded message only. Do not specify agent_type, model, or reasoning_effort. Tell the subagent to read ${relativeSessionRoot}/skills/maniscope-disconfirmation/SKILL.md first. Verify candidate negative Findings before adding "contradicts", "refines", or Reasoning Gap entries.
-- If a conclusion is uncertain, say what would confirm, weaken, or falsify it.
-
-Parallel subagent orchestration:
-- During full analysis, after writing and validating the base reasoning-graph.json and forming the recommendation or investigation plan, prefer spawning 2-4 high-value patch-producing subagents for independent branches when the branches can be validated independently.
-- Use subagents for support evidence for major user Hypotheses, answer evidence for central AnalyticQuestions, executed Hypothesis Expansion branches, and skeptical or counterevidence review.
-- Spawn subagents only as full-context forks with fork_context: true and a bounded assignment message. Do not specify agent_type, model, reasoning_effort, or other extra config.
-- Subagents may read trace, data, screenshots, and artifacts; run scripts; render visual evidence; and write uniquely named evidence files under ${relativeSessionRoot}/artifacts.
-- The main agent must decide before spawning whether each subagent is report-only or patch-producing. After a plan is produced, use patch-producing subagents by default for independent planned branches to reduce latency in producing validated patch layers. Use report-only subagents only when the branch is exploratory, likely to need main-agent synthesis before graph integration, or too uncertain for a standalone patch.
-- For every patch-producing subagent, pre-allocate a unique short branchId and include it in the assignment message. Use a deterministic contract:
-  - patch file: ${relativeSessionRoot}/artifacts/reasoning-graph-patch-subagent-<branchId>.json
-  - runId: subagent-<branchId>
-  - new node ID prefix: SA_<branchId>_
-  - branch target: exact Hypothesis, Finding, AnalyticQuestion, or InvestigationStrategy IDs under investigation.
-- Patch-producing subagents may write at most one patch file, using the assigned filename, runId, and node prefix. They must not edit reasoning-graph.json, other patch files, generated forests, or another subagent's files.
-- A subagent patch may reference existing base/current graph node IDs and nodes it creates inside that same patch. It must not depend on another subagent patch. If cross-branch synthesis is needed, the main agent writes a later integration patch after validation.
-- Subagent patches must include complete patch node fields, unique node IDs, precise provenance, and a concise report of candidate Findings, evidence paths, suggested relations, uncertainty, rejected checks, deferred checks, and any files created.
-- For skeptical subagent patches, set patchType="skeptical" and use "refines" or "contradicts" as the semantic relation for each negative Finding. Do not use support-only skeptical Findings.
-- The main agent owns graph integrity: validate all subagent patches, resolve conflicts, remove or revise invalid patches, verify evidence before relying on it, and run validation before reporting completion.
-
-# Visualization Tools
-
-Major ManiScope views:
-- Token Distribution View: use for holder distribution, suspicious clusters, entity boundaries, relationship links, connected components, selected or highlighted entities, and detector grouping structure.
-- K-Line View: use for price phases, manipulation windows, card timing, card cohorts, round-trip versus same-direction card placement, granularity changes, and alignment between suspicious behavior and price movement.
-- Behavior Details View: use for selected wallet or cohort timelines, buy/sell/transfer sequence, related users, sequential versus absolute time, manipulation boxes, balance areas, residual holdings, accumulation, exits, and role comparison.
-
-Rendering policy:
-- In this session, a Python helper is available at ${relativeSessionRoot}/maniscope_visualization.py. Run Python scripts from ${relativeSessionRoot} so "from maniscope_visualization import ..." works.
-- Prefer the Python helper for visual investigation. Do not manually attach to the browser, call Playwright yourself, or evaluate frontend JavaScript unless the helper fails and you explain why.
-- The helper calls the Codex bridge, which opens an isolated Agent Workspace browser page at /${sessionId}/agent and saves rendered PNGs into ${relativeSessionRoot}/artifacts without mutating the Human Workspace.
-- Use view-specific helper functions instead of generic view-name strings:
-  - Token Distribution: get_token_distribution_args(...), render_token_distribution(...)
-  - K-Line: get_kline_args(...), render_kline_chart(...)
-  - Behavior Details: fetch_behavior_sequences(...), get_behavior_details_args(...), render_behavior_details(...)
-- Treat get_*_args(...) outputs as editable starting templates, not constraints. They capture the current Agent Workspace data and render state so you can build a well-formed call, but they do not limit the investigation.
-- You may change any render-function or model input parameter that is semantically relevant to the question: time windows, selected users, cohorts, fetched behavior data, detector outputs, model thresholds, entity or link results, manipulation results, scale, link visibility, granularity, dimensions, card alignment, sequential-time mode, related-user visibility, and manipulation-box visibility.
-- Use the Human Workspace state to understand the user's current context, but do not restrict yourself to the Human or Agent Workspace's current parameters. For hypothesis testing, deliberately render alternative configurations or parameter variants when they can reveal, confirm, weaken, or falsify a claim.
-- Save rendered evidence images under ${relativeSessionRoot}/artifacts when they support a Finding, Hypothesis, recommendation, or Reasoning Graph Patch.
-
-Visual rendering workflow:
-1. Choose the view and evidence target.
-2. Call the matching get_*_args(...) function to extract current Agent Workspace data and render state.
-3. Modify the explicit arguments needed for the question, including alternative visual, statistical, or model-derived configurations when useful.
-4. Call the matching render_* function with a descriptive artifact_name.
-5. Use the returned artifact_path, artifact_url, dependencies, and render_metadata in your analysis.
-6. Mention the rendered image when it supports a Finding, Hypothesis, InvestigationStrategy, or recommendation.
-
-For a new visual investigation, render focused views rather than relying only on attached trace images. Existing trace screenshots are enough only when the question is specifically about what the user previously saw and the screenshot directly shows the needed evidence.
-
-# Graph And Artifact Contract
-
-This session includes:
-- Managed graph tools at ${relativeSessionRoot}/trace_analysis_tools.
-- A managed skeptical-review skill at ${relativeSessionRoot}/skills/maniscope-disconfirmation/SKILL.md.
-- Format references:
-  - trace_analysis_tools/references/reasoning-graph-format.md
-  - trace_analysis_tools/references/recommendation-plan-format.md
-  - trace_analysis_tools/references/reasoning-graph-patch-format.md
-
-Graph-first contract:
-- Write reasoning-graph.json first as the canonical source of truth. The frontend reads reasoning-graph.json plus every reasoning-graph-patch*.json file, validates them, applies patches in deterministic order, and renders the derived forest itself.
-- During full analysis, persist a complete valid ${relativeSessionRoot}/artifacts/reasoning-graph.json immediately after reconstructing the user's reasoning from the trace and before recommendation planning, autonomous follow-up investigation, or patch writing. Run the validator, fix base-graph errors, and only then continue. Do not hold the base graph in memory until the end of the turn.
-- Reasoning graphs should include analysisAnchor metadata for the live trace snapshot they cover. Incremental patches must include baseAnchor and targetAnchor metadata, plus patchType="incremental". Use reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json for incremental user-trace deltas.
-- Original trace evidence belongs in reasoning-graph.json. Agent follow-up evidence belongs in reasoning-graph-patch.json. Verified skeptical counterevidence belongs in reasoning-graph-patch-skeptical.json. Patch-producing subagents may write assigned branch files named reasoning-graph-patch-subagent-<branchId>.json. Additional purpose-specific patch files may use reasoning-graph-patch-<purpose>.json.
-- In reasoning-graph-patch-skeptical.json, every added Finding must have at least one outgoing "refines" or "contradicts" edge to the relevant Intention node. Use "refines" for evidence that narrows, qualifies, or caveats a claim; use "contradicts" for evidence that weakens or falsifies it. Do not encode a skeptical Finding with only "supports" edges.
-- user-reasoning-forest.json, augmented-reasoning-forest.json, and their Markdown forms are optional static exports. Do not create or edit them for normal UI operation unless the user explicitly asks for export files.
-
-Graph quality requirements:
-- User-authored annotations that contain claims must become Finding nodes in reasoning-graph.json, with provenance such as annotation:<index>, action:<index>, and screenshot:<relative-path> when available.
-- For every AnalyticQuestion node, create at least one evidence-backed mid-level Finding node that answers it unless the trace truly provides no answer. Add explicit "answers" edges from mid-level Finding to AnalyticQuestion.
-- Unanswered AnalyticQuestions in the base reasoning graph are validation warnings, not graph errors. Treat each warning as an instruction to decide whether the question is central and answerable; if it is, investigate it and add answer Findings through reasoning-graph-patch*.json.
-- Build a readable Finding hierarchy when the trace contains enough evidence: low-level Findings for concrete visual/statistical/model observations, mid-level Findings that synthesize those observations and answer AnalyticQuestions, and high-level Findings that synthesize multiple mid-level Findings before supporting Hypotheses.
-- Create a parent Finding only when it adds synthesis, qualification, scope, contrast, uncertainty, or aggregation across evidence. If one concrete Finding is already enough to answer an AnalyticQuestion or support, refine, or contradict a Hypothesis, connect that Finding directly.
-- Avoid both extremes: do not make a flat forest where every Finding directly supports a Hypothesis, and do not make single-child Finding chains where the parent only rephrases the child. Do not connect the same mid-level Finding directly to both an AnalyticQuestion and that question's parent Hypothesis unless there is no higher-level Finding to carry the Hypothesis support.
-- Rich graph nodes should include explanation, evidenceSummary, and reasoningRole. Agent-created patch nodes must also include patchRationale.
-
-Validation and artifact commands:
-- Write JSON, Markdown, rendered images, scripts, and durable outputs under ${relativeSessionRoot}/artifacts unless the user names a different session-local path.
-- Run bun trace_analysis_tools/reasoning_graph/cli.ts artifacts before finalizing live chat artifacts.
-- Run bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts when reasoning-graph-patch*.json files already exist and you need a complete current graph for global context. Read current-reasoning-graph.json as a derived aid only; keep writing new evidence as patch files.
-- Run bun trace_analysis_tools/reasoning_graph/cli.ts checkpoint artifacts when the active deduplicated patch count reaches 8 or the validator reports "Checkpoint recommended", unless the user explicitly asks to preserve the unsquashed patch stack.
-- The validator applies all reasoning-graph-patch*.json files. Fix validation errors before reporting completion.
-
-# Playbooks
-
-Full trace-level analysis pipeline:
-1. Refresh the canonical trace, Human Workspace state, Agent Workspace state, session git history, screenshots, annotations, and any existing analysis artifacts.
-2. Build and write ${relativeSessionRoot}/artifacts/reasoning-graph.json first from user Interactions upward through Tasks, AnalyticQuestions, AnalyticActivities, low-level Findings, mid-level answer Findings, high-level synthesis Findings, and Hypotheses.
-3. Validate reasoning-graph.json with bun trace_analysis_tools/reasoning_graph/cli.ts artifacts. Fix graph errors and missing user Finding nodes before continuing.
-4. Identify Reasoning Gaps where observed user evidence does not sufficiently support a Finding, Hypothesis, or implied AnalyticQuestion.
-5. Build Recommendation Plan Forests for Evidence Completion and Hypothesis Expansion when applicable. Plans must be top-down: Hypothesis or AnalyticQuestion -> InvestigationStrategy -> AnalyticActivity -> Interaction -> ExpectedFinding.
-6. Decide which planned branches can run in parallel. Prefer patch-producing subagents for independent support-seeking, answer-seeking, adjacent-hypothesis investigation, and skeptical review so that branch evidence can appear as patch files earlier. Pre-allocate branchIds for these subagents, and include each branchId's exact patch filename, runId, node ID prefix, and target IDs in the assignment. Use report-only subagents only for exploratory or synthesis-heavy branches.
-7. Execute the highest-value recommended InvestigationStrategies instead of stopping at recommendations. Use Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions as needed.
-8. Generate rendered visual evidence with the Python helper for visual claims, compute exact statistics for quantitative claims, and vary model or render parameters when robustness matters.
-9. Review subagent outputs and patch files, verify their evidence, reject or defer weak branches, resolve conflicts, and integrate only verified candidate Findings. If multiple subagent patches need synthesis, write a separate main-agent integration patch rather than making subagent patches depend on each other.
-10. Record follow-up evidence as Reasoning Graph Patches.
-11. For each executed Hypothesis Expansion branch, decide whether the proposed adjacent Hypothesis is supported, rejected, deferred, or unsupported. Supported adjacent Hypotheses must become new agent-authored Hypothesis nodes with supporting Finding edges and add_root operations. Rejected, deferred, or unsupported branches must be stated explicitly.
-12. Validate reasoning-graph.json plus all reasoning-graph-patch*.json files together.
-13. Save durable artifacts under ${relativeSessionRoot}/artifacts, including graph JSON, patch JSON, reports, trace-step maps, rendered images, and static forest or HTML exports when requested or useful.
-
-Incremental trace analysis pipeline:
-1. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest.
-2. Compare the latest applied graph anchor with the current live traceAnchor. Git history is useful audit context, but the semantic boundary is the trace anchor.
-3. If reasoning-graph-patch*.json files exist, run bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts first and read current-reasoning-graph.json to understand the full patched graph.
-4. If the prior anchor is missing or the old trace digest no longer matches the current trace prefix, do not guess. Explain that incremental analysis is unsafe and recommend full reanalysis or explicit reconciliation.
-5. Analyze only the new user Interactions and annotations after the baseAnchor, while using the current materialized graph as context.
-6. Write new evidence to reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json with patchType="incremental", baseAnchor, targetAnchor, explanation/evidenceSummary/reasoningRole/patchRationale on agent-created nodes, and precise provenance for the new trace range.
-7. Use update_node only to refine metadata on existing nodes; use add_node/add_edge for new Findings, Hypotheses, Interactions, and support/refine/contradict relationships.
-8. If the new trace adds no material evidence, report that no patch was produced and explain the checked delta.
-9. Validate graph plus patches. If checkpoint is recommended because the active patch count is at least 8, run checkpoint before reporting completion unless the user asked to keep the full patch stack.
-
-Recommendation planning flow:
-- Present recommendations top-down from Hypothesis or AnalyticQuestion to InvestigationStrategy, AnalyticActivity, Interaction, and ExpectedFinding.
-- Use precise terms: InvestigationStrategy, AnalyticActivity, and Interaction.
-- Distinguish Evidence Completion from Hypothesis Expansion. Evidence Completion fills a Reasoning Gap in the existing User Reasoning Forest. Hypothesis Expansion proposes a related new Hypothesis and grows a new branch or tree.
-- Each InvestigationStrategy must operationalize the Hypothesis through concrete targets, analytic contrasts, search concepts, decision criteria, or falsification criteria. Do not merely restate the Hypothesis.
-- Each recommended Interaction must be labeled Data Action, Model Action, Visualization Action, or Synthesis Action. Each recommended AnalyticActivity must be labeled Visual Analysis or Statistical Analysis.
-
-Autonomous investigation flow:
-- First state a short InvestigationStrategy plan unless the user asks for no planning.
-- Execute the needed Visual Analysis, Statistical Analysis, Model Actions, and Synthesis Actions unless the user asks for planning-only.
-- When a claim depends on visual evidence, write and run a small Python script in ${relativeSessionRoot} that imports maniscope_visualization.py and renders the needed focused view. Do this unless the existing trace screenshot is exactly the evidence needed.
-- For broad or deep investigations, ask the Codex runtime to spawn a subagent with functions.spawn_agent when available. Use a full-context fork by passing fork_context: true and a bounded message only. Do not specify agent_type, model, or reasoning_effort. Continue useful non-overlapping work locally. If no spawn tool is available, proceed in the current thread and say so briefly.
-- For Hypothesis Expansion work, do not stop at plausibility language. Produce concrete follow-up Findings from executed Interactions, then either promote the adjacent Hypothesis with a patch add_root operation or explicitly mark it rejected, deferred, or unsupported.
-- Report completed checks, blocked checks, evidence, Findings, and unresolved gaps.
+Hard invariants that override all templates:
+- Heavy full or incremental analysis should be started with the session-local background task scripts unless the user explicitly asks for inline blocking work.
+- Do not use spawn_agent as a fire-and-forget mechanism from the main chat agent.
+- Bridge-owned background task agents may spawn L2 workers with fork_context: true only and must wait for them. L2 subagents must not spawn additional agents.
+- Pass the same closed trace window, runId, session root, artifact directory, graph contract, branch naming rules, and validation requirements to every spawned L2 worker.
+- The background task agent is responsible for graph validation, conflict resolution, evidence verification, and final reporting.
+- For visual evidence, use maniscope_visualization.py and save supporting images under ${relativeSessionRoot}/artifacts.
+- The frontend source of truth is ${relativeSessionRoot}/artifacts/reasoning-graph.json plus valid ${relativeSessionRoot}/artifacts/reasoning-graph-patch*.json files.
 
 # Response Style
 
@@ -660,6 +563,114 @@ Keep responses conversational by default. Produce durable files only when they h
 
 User message:
 ${userMessage}`
+}
+
+function buildAnalysisTaskPrompt(sessionId, task) {
+  return task.mode === 'full'
+    ? buildFullAnalysisTaskPrompt(sessionId, task)
+    : buildIncrementalAnalysisTaskPrompt(sessionId, task)
+}
+
+function analysisTaskHeader(sessionId, task) {
+  const relativeSessionRoot = '.'
+  const sessionRoot = sessionDir(sessionId, 'specialized')
+  const startAnchorText = JSON.stringify(task.startAnchor || {}, null, 2)
+  return `# ManiScope Background Analysis Task
+
+You are an independent bridge-owned Codex task agent for a ManiScope specialized session. You are not the main chat agent. Complete the assigned analysis task in this thread. You may spawn L2 workers for independent subtasks, but you must wait for them and integrate or reject their outputs before finishing.
+
+Session root:
+- ${sessionRoot}
+
+Task metadata:
+- taskId: ${task.taskId}
+- runId: ${task.runId}
+- mode: ${task.mode}
+- startedAt: ${task.startedAt || ''}
+- expected artifacts: ${(task.expectedArtifacts || []).join(', ') || '(none listed)'}
+
+Closed trace window startAnchor:
+
+\`\`\`json
+${startAnchorText}
+\`\`\`
+
+Use this startAnchor as the maximum trace boundary. Later live trace changes are out of scope and must be deferred to a later Update Analysis task.
+
+Read these references first:
+- ${relativeSessionRoot}/session-references/manual-for-agent.md
+- ${relativeSessionRoot}/session-references/major-view-render-api.md
+- ${relativeSessionRoot}/session-references/agent-analysis-playbook.md
+- ${relativeSessionRoot}/session-references/agent-analysis-l2-prompts.md
+
+Do not look for an L1 prompt template. This bridge prompt is the task assignment. If you spawn L2 workers, use fork_context: true only. Do not specify agent_type, model, reasoning_effort, or other extra config. L2 workers must not spawn additional agents.
+
+Keep scripts, temporary files, generated evidence, reports, and outputs inside this session directory, preferably under ${relativeSessionRoot}/artifacts. Raw data directories are read-only by policy:
+- ACT raw data: ${RAW_DATA_DIRS[0]}
+- PNUT raw data: ${RAW_DATA_DIRS[1]}
+
+The frontend source of truth is ${relativeSessionRoot}/artifacts/reasoning-graph.json plus valid ${relativeSessionRoot}/artifacts/reasoning-graph-patch*.json files. Do not rely on generated forest JSON/Markdown as UI source data.`
+}
+
+function buildFullAnalysisTaskPrompt(sessionId, task) {
+  return `${analysisTaskHeader(sessionId, task)}
+
+# Assignment: Full Trace Analysis
+
+Own the full trace-analysis pipeline for the closed trace window. Reconstruct the user's reasoning only up to the run startAnchor. Write and validate ${'`artifacts/reasoning-graph.json`'} first, with ${'`analysisAnchor`'} exactly equal to the run startAnchor, so the LLM Analysis tab can render while you continue.
+
+The base graph must include user-authored annotation claims as Findings, explicit answer Findings for answerable AnalyticQuestions, and a readable Finding hierarchy without pass-through single-child rephrasing chains. If one concrete Finding is enough to answer an AnalyticQuestion or support, refine, or contradict a Hypothesis, connect it directly.
+
+Then plan follow-up checks, execute high-value visual/statistical/model/synthesis investigations, run skeptical review, write validated ${'`reasoning-graph-patch*.json`'} files, and save final artifacts under ${'`artifacts/`'}.
+
+Use L2 workers for independent visual, statistical, model-action, skeptical, or hypothesis-expansion subtasks when useful. Before spawning any patch-producing L2 worker, pre-allocate branch ID, exact patch filename ${'`artifacts/reasoning-graph-patch-subagent-<branchId>.json`'}, runId ${'`subagent-<branchId>`'}, node ID prefix ${'`SA_<branchId>_`'}, target graph IDs, and the same closed trace window. Child patches must not edit ${'`reasoning-graph.json`'}, depend on sibling patches, or modify generated forests.
+
+You own validation, conflict resolution, and integration of all L2 outputs. Validate ${'`reasoning-graph.json`'} plus all ${'`reasoning-graph-patch*.json`'} files before reporting completion. End with a concise plain-language summary in the user's language when inferable from the trace or prior chat; otherwise use English.`
+}
+
+function buildIncrementalAnalysisTaskPrompt(sessionId, task) {
+  return `${analysisTaskHeader(sessionId, task)}
+
+# Assignment: Incremental Trace Analysis
+
+Do not redo full trace analysis unless incremental analysis is unsafe. Refresh ${'`live-session.json`'}, ${'`current-state.json`'}, session git history, and the analysis artifact manifest. Compare the latest graph or patch trace anchor against the closed trace window startAnchor for this run. Use that startAnchor as ${'`targetAnchor`'} and defer any later live trace changes.
+
+If ${'`reasoning-graph-patch*.json`'} files already exist, first run:
+
+\`\`\`bash
+bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts
+\`\`\`
+
+Read ${'`current-reasoning-graph.json`'} as the complete patched context, but do not treat it as the source of truth. Analyze only new user Interactions and annotations after the latest applied anchor. Do not rewrite ${'`reasoning-graph.json`'} unless checkpointing is required.
+
+Write new evidence as ${'`reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`'} with ${'`patchType: "incremental"`'}, ${'`baseAnchor`'}, ${'`targetAnchor`'}, and precise provenance for the new trace range. If the new trace delta adds no material evidence, report that no patch was produced and explain what delta you checked.
+
+Use L2 workers as evidence or report producers by default. Allow an L2 worker to write a patch only when you assign a unique patch filename, runId, node ID prefix, valid anchors, and exact target graph IDs. Child patches must not depend on sibling patches.
+
+After writing any patch, run:
+
+\`\`\`bash
+bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
+\`\`\`
+
+Fix validation errors before reporting completion. If active patch count reaches 8 and the validator recommends checkpointing, run checkpoint unless the user explicitly asked to preserve the patch stack.
+
+Final response format:
+
+# Technical Audit
+
+- previous anchor:
+- new trace anchor:
+- analyzed action and annotation range:
+- patch file written:
+- supporting evidence files:
+- validation result:
+- checkpoint status:
+- unresolved warnings:
+
+# Plain-Language Summary
+
+Explain what new user behavior was analyzed, what evidence was found, which Hypotheses were strengthened, weakened, or refined, whether a new Hypothesis was created, what caveats matter, and what the analyst should watch next.`
 }
 
 function buildInput(
@@ -1020,6 +1031,103 @@ function startArtifactPolling(sessionId, sessionMode, res, shouldStop) {
   }, ARTIFACT_POLL_INTERVAL_MS)
 }
 
+async function postAnalysisTaskEvent(sessionId, taskId, event) {
+  try {
+    await fetch(`${BACKEND_URL.replace(/\/+$/, '')}/api/sessions/${sessionId}/analysis-tasks/${taskId}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    })
+  } catch (error) {
+    console.warn(`Codex bridge: failed to post analysis task event for ${taskId}`, error)
+  }
+}
+
+async function runAnalysisTask(sessionId, task, controller) {
+  const taskId = task.taskId
+  const dir = sessionDir(sessionId, 'specialized')
+  const codex = new Codex(buildCodexClientOptions())
+  const thread = codex.startThread(buildThreadOptions(dir))
+  let sawError = false
+  let latestEvent = null
+  let threadId = ''
+  try {
+    const input = buildAnalysisTaskPrompt(sessionId, task)
+    await postAnalysisTaskEvent(sessionId, taskId, {
+      status: 'running',
+      threadId: thread.id || null,
+      latestEvent: {
+        type: 'task_started',
+        title: 'Background analysis task started',
+        detail: `Running ${task.mode} analysis in an independent Codex thread.`,
+        at: new Date().toISOString(),
+      },
+      artifacts: listArtifacts(sessionId, 'specialized'),
+    })
+    const { events } = await thread.runStreamed(input, { signal: controller.signal })
+    for await (const event of events) {
+      if (controller.signal.aborted) break
+      const normalized = normalizeEvent(event)
+      if (!normalized) continue
+      const materialized = materializeAgentMessageEvent(sessionId, 'specialized', normalized)
+      latestEvent = materialized.event
+      if (latestEvent.type === 'error') sawError = true
+      threadId = thread.id || threadId
+      await postAnalysisTaskEvent(sessionId, taskId, {
+        status: 'running',
+        threadId: threadId || null,
+        latestEvent,
+        artifacts: listArtifacts(sessionId, 'specialized'),
+      })
+    }
+    threadId = thread.id || threadId
+    if (controller.signal.aborted) {
+      await postAnalysisTaskEvent(sessionId, taskId, {
+        status: 'stopped',
+        threadId: threadId || null,
+        latestEvent: {
+          type: 'stopped',
+          title: 'Background analysis task stopped',
+          detail: 'The task was stopped before completion.',
+          at: new Date().toISOString(),
+        },
+        artifacts: listArtifacts(sessionId, 'specialized'),
+      })
+      return
+    }
+    await postAnalysisTaskEvent(sessionId, taskId, {
+      status: sawError ? 'failed' : 'completed',
+      threadId: threadId || null,
+      latestEvent:
+        latestEvent || {
+          type: 'completed',
+          title: 'Background analysis task completed',
+          detail: 'The task finished.',
+          at: new Date().toISOString(),
+        },
+      artifacts: listArtifacts(sessionId, 'specialized'),
+    })
+  } catch (error) {
+    const status = controller.signal.aborted ? 'stopped' : 'failed'
+    await postAnalysisTaskEvent(sessionId, taskId, {
+      status,
+      threadId: thread.id || threadId || null,
+      latestEvent: {
+        type: status,
+        title: status === 'stopped' ? 'Background analysis task stopped' : 'Background analysis task failed',
+        detail: error?.message || String(error),
+        at: new Date().toISOString(),
+      },
+      artifacts: listArtifacts(sessionId, 'specialized'),
+      error: status === 'failed' ? error?.message || String(error) : null,
+    })
+  } finally {
+    const key = analysisTaskKey(sessionId, taskId)
+    const activeTask = activeAnalysisTasks.get(key)
+    if (activeTask?.controller === controller) activeAnalysisTasks.delete(key)
+  }
+}
+
 function materializeAgentMessageEvent(sessionId, sessionMode, event) {
   if (!event || event.type !== 'agent_message' || !event.text) {
     return { event, artifacts: [] }
@@ -1229,6 +1337,47 @@ async function handleStop(req, res, sessionId, threadKey) {
   sendJson(res, 200, { sessionId, threadKey, stopped: true })
 }
 
+async function handleAnalysisTaskStart(req, res, sessionId) {
+  const dir = existingSessionDir(sessionId, 'specialized')
+  const task = sanitizeAnalysisTask(await readBody(req))
+  const key = analysisTaskKey(sessionId, task.taskId)
+  if (activeAnalysisTasks.has(key)) {
+    sendJson(res, 409, { error: 'analysis task is already running' })
+    return
+  }
+  const controller = new AbortController()
+  activeAnalysisTasks.set(key, {
+    controller,
+    sessionId,
+    taskId: task.taskId,
+    mode: task.mode,
+    sessionDir: dir,
+    startedAt: new Date().toISOString(),
+  })
+  runAnalysisTask(sessionId, task, controller).catch((error) => {
+    console.warn(`Codex bridge: background analysis task ${task.taskId} failed`, error)
+  })
+  sendJson(res, 202, {
+    sessionId,
+    taskId: task.taskId,
+    runId: task.runId,
+    status: 'running',
+  })
+}
+
+async function handleAnalysisTaskStop(_req, res, sessionId, taskId) {
+  existingSessionDir(sessionId, 'specialized')
+  const safeTaskId = validateAnalysisTaskId(taskId)
+  const key = analysisTaskKey(sessionId, safeTaskId)
+  const activeTask = activeAnalysisTasks.get(key)
+  if (!activeTask) {
+    sendJson(res, 200, { sessionId, taskId: safeTaskId, stopped: false })
+    return
+  }
+  activeTask.controller.abort()
+  sendJson(res, 200, { sessionId, taskId: safeTaskId, stopped: true })
+}
+
 function objectPayload(value, fallback = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback
   return value
@@ -1299,6 +1448,10 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`)
   const chatMatch = url.pathname.match(/^\/chat\/([0-9a-f]{5})\/message$/)
   const stopMatch = url.pathname.match(/^\/chat\/([0-9a-f]{5})\/threads\/([a-zA-Z0-9_-]{1,64})\/stop$/)
+  const analysisTaskStartMatch = url.pathname.match(/^\/api\/analysis-tasks\/([0-9a-f]{5})\/start$/)
+  const analysisTaskStopMatch = url.pathname.match(
+    /^\/api\/analysis-tasks\/([0-9a-f]{5})\/([a-zA-Z0-9_.-]{1,120})\/stop$/,
+  )
   const agentHealthMatch = url.pathname.match(/^\/api\/agent-browser\/([0-9a-f]{5})\/health$/)
   const agentViewMatch = url.pathname.match(
     /^\/api\/agent-browser\/([0-9a-f]{5})\/(token-distribution|kline|behavior-details)\/(render|current-args|fetch-sequences)$/,
@@ -1349,6 +1502,20 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  if (req.method === 'POST' && analysisTaskStartMatch) {
+    handleAnalysisTaskStart(req, res, analysisTaskStartMatch[1]).catch((error) => {
+      sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
+    })
+    return
+  }
+
+  if (req.method === 'POST' && analysisTaskStopMatch) {
+    handleAnalysisTaskStop(req, res, analysisTaskStopMatch[1], analysisTaskStopMatch[2]).catch((error) => {
+      sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
+    })
+    return
+  }
+
   if (req.method === 'POST' && stopMatch) {
     handleStop(req, res, stopMatch[1], stopMatch[2]).catch((error) => {
       sendJson(res, error.statusCode || 500, { error: error?.message || String(error) })
@@ -1371,6 +1538,9 @@ try {
 }
 
 async function shutdown() {
+  for (const activeTask of activeAnalysisTasks.values()) {
+    activeTask.controller.abort()
+  }
   await agentBrowser.close()
   server.close(() => {
     process.exit(0)

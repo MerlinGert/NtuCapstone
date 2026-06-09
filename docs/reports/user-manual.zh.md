@@ -181,9 +181,9 @@ Codex Chat 智能体会从当前会话目录运行，而不是从仓库根目录
 
 Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部两个角可以调整大小。面板的位置和大小会保存在当前浏览器中。
 
-消息输入框上方的 **Run Full Analysis** 按钮会发送一个完整 trace-analysis 流程的预设请求。它要求 Codex 先写入并验证 `reasoning-graph.json`，在有用时使用只收集证据的 subagent 执行后续检查，由主智能体写入 graph patch，并在汇报前完成验证，最后用用户使用的语言给出面向人的解释摘要。
+消息输入框上方的 **Run Full Analysis** 按钮会发送一个完整 trace-analysis 流程的预设请求，并启动一个由 bridge 管理的后台完整分析任务。聊天智能体会很快返回 task ID，因此你可以在任务运行期间继续聊天。分析按钮右侧会显示一个紧凑的状态标记，说明后台分析正在启动、运行、停止、已完成、已停止、失败或被中断；当后台分析仍在运行时，两个分析按钮都会禁用，以避免重叠启动多个分析任务。后台任务会先写入并验证 `reasoning-graph.json`，执行后续检查，并且可以为独立的可视、统计、模型动作、skeptical 或 hypothesis-expansion 子任务派生 L2 worker；随后它会验证 graph patch，并用用户使用的语言给出面向人的解释摘要。L2 worker 是受限子任务，不能继续派生更深层的智能体。高级用户或智能体可以在会话根目录中使用 `uv run python run_full_analysis.py status` 和 `uv run python run_full_analysis.py stop` 查看或停止该任务。
 
-当 LLM Analysis 中已经有 `reasoning-graph.json` 后，**Update Analysis** 按钮会显示在 **Run Full Analysis** 右侧。它会发送增量分析 prompt，要求 Codex 对比最新 graph 或 patch anchor 与当前 live trace，只分析新增的交互和标注，在有新证据时写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`，验证 graph 与 patch，并同时给出技术审计和使用用户语言的面向人解释摘要。聊天历史中，这两个快捷请求会显示为简短标签，例如 `Run full analysis` 和 `Update analysis`，不会显示完整的隐藏 prompt 文本。
+当 LLM Analysis 中已经有 `reasoning-graph.json` 后，**Update Analysis** 按钮会显示在 **Run Full Analysis** 右侧。它会启动一个由 bridge 管理的后台增量分析任务。该任务会对比最新 graph 或 patch anchor 与当前 live trace，只分析新增的交互和标注，在有新证据时写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`，验证 graph 与 patch，并同时给出技术审计和使用用户语言的面向人解释摘要。高级用户或智能体可以使用 `uv run python run_incremental_analysis.py status` 和 `uv run python run_incremental_analysis.py stop` 查看或停止该任务。聊天历史中，这两个快捷请求会显示为简短标签，例如 `Run full analysis` 和 `Update analysis`，不会显示完整的隐藏 prompt 文本。
 
 专门的 Codex Chat 回合会使用封闭的 trace window。消息发送时，ManiScope 会把当时的 trace anchor 写入 `.maniscope-chat/sessions/{sessionId}/analysis-runs/{runId}.json`，并把这个 anchor 传给智能体。完整分析会把 `reasoning-graph.json.analysisAnchor` 设置为该回合开始时的 anchor；增量分析会把该回合开始时的 anchor 作为 patch 的 `targetAnchor`。如果你在 Codex 仍在工作时继续操作 ManiScope，这些后续动作不会被合并进当前回合。请在当前回合结束后使用 **Update Analysis** 来分析这些被延后的 trace 变化。
 
@@ -193,7 +193,7 @@ Codex Chat 面板是浮动的。拖动标题栏可以移动面板，拖动底部
 
 对于可视化后续调查，每个会话还会包含一个托管的 Python helper：`maniscope_visualization.py`。智能体可以从会话文件夹导入它，通过隔离的 Agent Workspace 浏览器页面渲染 Token Distribution、K-line 和 Behavior Details 图片。bridge 会先等待 Agent Workspace 的可视化数据完成加载，再提取当前渲染参数。这些渲染结果会以 PNG 证据保存到共享的会话 `artifacts/` 文件夹，并且不会改变 Human Workspace 的状态。
 
-对于完整的 trace 分析，每个会话还会包含一个托管的 skeptical-review skill。可用时，智能体可以派生一个聚焦的子智能体，专门寻找削弱主要假设的负面证据、误报、良性解释或模型参数不稳定性。主智能体需要先验证这些候选负面发现，然后才会把它们作为 `contradicts`、`refines` 或 Reasoning Gap 条目加入分析 artifact。
+对于完整的 trace 分析，每个会话还会包含一个托管的 skeptical-review skill。可用时，analysis task agent 可以派生一个聚焦的 worker，专门寻找削弱主要假设的负面证据、误报、良性解释或模型参数不稳定性。analysis owner 需要先验证这些候选负面发现，然后才会把它们作为 `contradicts`、`refines` 或 Reasoning Gap 条目加入分析 artifact。
 
 当已有分析结果存在，而你继续在界面里分析并产生新的 trace 时，智能体可以执行增量 trace 分析，而不是重新计算全部内容。ManiScope 会为每个实时 trace 版本保存 trace anchor，智能体会把它和 `reasoning-graph.json` 以及 patch 文件中的 anchor 对比。新证据会写入 `reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json`。如果 patch 文件累积较多，智能体可以先 materialize 出 `current-reasoning-graph.json` 作为完整图的阅读辅助；当活跃 patch 数达到 8 个时，可以 checkpoint 这组 patch。
 

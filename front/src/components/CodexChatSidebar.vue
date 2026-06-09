@@ -183,8 +183,8 @@
         <button
           class="codex-chat-preset-btn"
           type="button"
-          title="Run full trace analysis with counter-evidence search"
-          :disabled="sending"
+          :title="fullAnalysisButtonTitle"
+          :disabled="fullAnalysisDisabled"
           @click="sendFullAnalysisPrompt"
         >
           Run Full Analysis
@@ -192,12 +192,21 @@
         <button
           class="codex-chat-preset-btn codex-chat-update-btn"
           type="button"
-          :title="analysisGraphAvailable ? 'Run incremental analysis against the current graph' : 'Available after reasoning-graph.json is present in LLM Analysis'"
-          :disabled="sending || !analysisGraphAvailable"
+          :title="updateAnalysisButtonTitle"
+          :disabled="updateAnalysisDisabled"
           @click="sendUpdateAnalysisPrompt"
         >
           Update Analysis
         </button>
+        <div
+          v-if="analysisStatusBadge"
+          class="analysis-task-status-badge"
+          :class="`analysis-task-status-${analysisStatusBadge.tone}`"
+          :title="analysisStatusBadge.title"
+        >
+          <span class="analysis-task-status-dot"></span>
+          <span>{{ analysisStatusBadge.label }}</span>
+        </div>
       </div>
       <textarea
         ref="inputEl"
@@ -274,6 +283,13 @@
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 import {
+  analysisTaskStatusLabel,
+  analysisTaskStatusTone,
+  analysisTaskTooltip,
+  isActiveAnalysisTaskStatus,
+  selectAnalysisTaskForBadge,
+} from '../utils/analysisTaskStatus.js'
+import {
   TIMELINE_PART_TYPES,
   appendActivityToTimeline,
   appendArtifactPart,
@@ -284,63 +300,16 @@ import {
   normalizeMessageParts,
 } from '../utils/chatTimeline.js'
 
-const FULL_ANALYSIS_PROMPT = `Please run the full trace-analysis pipeline for the current session using the closed trace window captured for this run. Write and validate ./artifacts/reasoning-graph.json first, with analysisAnchor equal to the run startAnchor, then plan and execute follow-up checks. If the live trace advances while you work, defer those later records to Update Analysis instead of revising this run. Use 2-4 evidence-only subagents with fork_context: true when useful, and give every subagent the same closed trace window. The main agent alone writes reasoning-graph-patch*.json. Validate before reporting, and end with a plain-language summary or explanation in my language.`
-const UPDATE_ANALYSIS_PROMPT = `Please run an incremental trace analysis pass for the current session.
+const FULL_ANALYSIS_PROMPT = `Start a bridge-owned full trace-analysis background task by running this exact command with the Current Analysis Run Window runId from this chat turn:
 
-Do not redo the full trace analysis unless incremental analysis is unsafe. Refresh live-session.json, current-state.json, session git history, and the analysis artifact manifest. Compare the latest graph or patch trace anchor against the closed trace window startAnchor for this run. Use that startAnchor as targetAnchor and defer any later live trace changes.
+uv run python run_full_analysis.py start --run-id __ANALYSIS_RUN_ID__
 
-If reasoning-graph-patch*.json files already exist, first run:
+Report the returned taskId, runId, startAnchor summary, statusPath, and expected artifacts. Do not perform the full analysis in this chat turn unless the script fails and I explicitly ask you to run inline. Tell me I can keep chatting while the background task runs, and mention that I can inspect or stop it with run_full_analysis.py status or run_full_analysis.py stop.`
+const UPDATE_ANALYSIS_PROMPT = `Start a bridge-owned incremental trace-analysis background task by running this exact command with the Current Analysis Run Window runId from this chat turn:
 
-bun trace_analysis_tools/reasoning_graph/cli.ts materialize artifacts
+uv run python run_incremental_analysis.py start --run-id __ANALYSIS_RUN_ID__
 
-Read current-reasoning-graph.json as the complete patched context, but do not treat it as the source of truth.
-
-Analyze only the new user Interactions and annotations after the latest applied anchor. Use the existing materialized graph as context. Do not rewrite reasoning-graph.json unless checkpointing is required.
-
-Write any new evidence as:
-
-reasoning-graph-patch-incremental-<fromRevision>-<toRevision>.json
-
-The patch must include patchType: "incremental", baseAnchor, targetAnchor, and precise provenance for the new trace range. Add new Findings, Hypotheses, Interactions, and edges only when they are supported by the new trace delta or by follow-up checks triggered by that delta.
-
-Use update_node only to refine metadata on existing nodes. Use add_node/add_edge for new evidence and relationships. Agent-created nodes must include explanation, evidenceSummary, reasoningRole, and patchRationale.
-
-If the new trace delta adds no material evidence, report that no patch was produced and explain exactly what delta you checked.
-
-After writing the patch, run:
-
-bun trace_analysis_tools/reasoning_graph/cli.ts artifacts
-
-Fix validation errors before reporting completion. If the validator recommends checkpointing because active patch count reaches 8, run checkpoint unless I explicitly ask to preserve the patch stack.
-
-Final response format:
-
-# Technical Audit
-
-Report the operational details here:
-- previous anchor,
-- new trace anchor,
-- analyzed action and annotation range,
-- patch file written,
-- supporting evidence files,
-- validation result,
-- checkpoint status,
-- unresolved warnings.
-
-Keep this section concise and factual.
-
-# Plain-Language Summary
-
-Explain the analytical meaning for the human analyst in my language:
-- what new user behavior was analyzed,
-- what the user seemed to be checking,
-- what new evidence was found,
-- which Hypotheses were strengthened, weakened, or refined,
-- whether a new Hypothesis was created or not,
-- what caveats matter,
-- what the analyst should pay attention to next.
-
-Do not lead this section with revision numbers, digests, patch filenames, node IDs, or validation counts. Use human-readable names for Hypotheses and Findings.`
+Report the returned taskId, runId, startAnchor summary, statusPath, and expected patch artifacts. Do not perform incremental analysis in this chat turn unless the script fails and I explicitly ask you to run inline. Tell me I can keep chatting while the background task runs, and mention that I can inspect or stop it with run_incremental_analysis.py status or run_incremental_analysis.py stop.`
 const markdown = new MarkdownIt({
   breaks: true,
   linkify: true,
@@ -348,6 +317,9 @@ const markdown = new MarkdownIt({
 const PANEL_LAYOUT_STORAGE_KEY = 'maniscope.codexChat.panelLayout.v1'
 const PANEL_MARGIN = 8
 const CODEX_RUN_START_EVENT = 'maniscope-codex-run-start'
+const ANALYSIS_TASK_ACTIVE_POLL_MS = 1000
+const ANALYSIS_TASK_IDLE_POLL_MS = 5000
+const ANALYSIS_TASK_START_GRACE_MS = 15000
 
 export default {
   name: 'CodexChatSidebar',
@@ -406,6 +378,14 @@ export default {
       panelDragState: null,
       panelResizeState: null,
       analysisGraphAvailable: false,
+      activeAnalysisRun: null,
+      activeAnalysisTask: null,
+      analysisTaskStatus: '',
+      analysisTaskMode: '',
+      analysisTaskError: '',
+      analysisTaskPendingSince: null,
+      analysisTaskPollTimer: null,
+      analysisTaskPollInFlight: false,
     }
   },
   computed: {
@@ -441,15 +421,60 @@ export default {
         height: `${this.panelHeight}px`,
       }
     },
+    hasBlockingAnalysisTask() {
+      return isActiveAnalysisTaskStatus(this.analysisTaskStatus)
+    },
+    fullAnalysisDisabled() {
+      return this.sending || this.hasBlockingAnalysisTask
+    },
+    updateAnalysisDisabled() {
+      return this.sending || this.hasBlockingAnalysisTask || !this.analysisGraphAvailable
+    },
+    fullAnalysisButtonTitle() {
+      if (this.hasBlockingAnalysisTask) return 'An analysis task is already running.'
+      if (this.sending) return 'Codex is preparing the current turn.'
+      return 'Run full trace analysis with counter-evidence search'
+    },
+    updateAnalysisButtonTitle() {
+      if (this.hasBlockingAnalysisTask) return 'An analysis task is already running.'
+      if (this.sending) return 'Codex is preparing the current turn.'
+      if (!this.analysisGraphAvailable) return 'Available after reasoning-graph.json is present in LLM Analysis'
+      return 'Run incremental analysis against the current graph'
+    },
+    analysisStatusBadge() {
+      if (this.sessionMode === 'baseline' || !this.analysisTaskStatus) return null
+      const status = this.analysisTaskStatus
+      const task = this.activeAnalysisTask || {}
+      const label = analysisTaskStatusLabel({
+        status,
+        mode: this.analysisTaskMode,
+      })
+      if (!label) return null
+      return {
+        label,
+        tone: analysisTaskStatusTone(status),
+        title: analysisTaskTooltip(
+          {
+            ...task,
+            status,
+            error: this.analysisTaskError || task.error,
+          },
+          this.activeAnalysisRun,
+        ),
+      }
+    },
   },
   mounted() {
     this.restorePanelLayout()
     window.addEventListener('resize', this.clampPanelToViewport)
     window.addEventListener('maniscope-session-artifact-updated', this.handleSessionArtifactUpdated)
     this.refreshAnalysisAvailability()
+    this.refreshAnalysisTaskStatus({ silent: true })
+    if (this.open) this.startAnalysisTaskPolling()
   },
   beforeUnmount() {
     this.attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url))
+    this.stopAnalysisTaskPolling()
     this.detachPanelPointerListeners()
     window.removeEventListener('resize', this.clampPanelToViewport)
     window.removeEventListener('maniscope-session-artifact-updated', this.handleSessionArtifactUpdated)
@@ -458,6 +483,7 @@ export default {
     sessionId: {
       immediate: true,
       handler(sessionId) {
+        this.resetAnalysisTaskState()
         if (sessionId) {
           this.loadChatHistory(sessionId)
         } else {
@@ -466,15 +492,26 @@ export default {
           this.analysisGraphAvailable = false
         }
         this.refreshAnalysisAvailability()
+        this.refreshAnalysisTaskStatus({ silent: true })
+        if (this.open) this.startAnalysisTaskPolling()
       },
     },
     sessionMode() {
       this.historyLoadedForSession = ''
+      this.resetAnalysisTaskState()
       if (this.sessionId) this.loadChatHistory(this.sessionId)
       this.refreshAnalysisAvailability()
+      this.refreshAnalysisTaskStatus({ silent: true })
+      if (this.open) this.startAnalysisTaskPolling()
     },
     open(isOpen) {
-      if (isOpen) this.refreshAnalysisAvailability()
+      if (isOpen) {
+        this.refreshAnalysisAvailability()
+        this.refreshAnalysisTaskStatus({ silent: true })
+        this.startAnalysisTaskPolling()
+      } else {
+        this.stopAnalysisTaskPolling()
+      }
     },
   },
   methods: {
@@ -876,6 +913,107 @@ export default {
         this.analysisGraphAvailable = false
       }
     },
+    analysisTasksUrl() {
+      return `${this.sessionApiBase}/${this.sessionId}/analysis-tasks`
+    },
+    isAnalysisPresetKind(presetKind) {
+      return ['full_analysis', 'update_analysis'].includes(String(presetKind || ''))
+    },
+    analysisTaskModeForPreset(presetKind) {
+      return String(presetKind || '') === 'update_analysis' ? 'incremental' : 'full'
+    },
+    resetAnalysisTaskState() {
+      this.stopAnalysisTaskPolling()
+      this.activeAnalysisRun = null
+      this.activeAnalysisTask = null
+      this.analysisTaskStatus = ''
+      this.analysisTaskMode = ''
+      this.analysisTaskError = ''
+      this.analysisTaskPendingSince = null
+      this.analysisTaskPollInFlight = false
+    },
+    markAnalysisRunStarting(analysisRun, presetKind) {
+      if (!analysisRun?.runId || !this.isAnalysisPresetKind(presetKind)) return
+      this.activeAnalysisRun = {
+        ...analysisRun,
+        runId: String(analysisRun.runId),
+        presetKind,
+      }
+      this.activeAnalysisTask = null
+      this.analysisTaskStatus = 'starting'
+      this.analysisTaskMode = this.analysisTaskModeForPreset(presetKind)
+      this.analysisTaskError = ''
+      this.analysisTaskPendingSince = Date.now()
+      this.startAnalysisTaskPolling(ANALYSIS_TASK_ACTIVE_POLL_MS)
+    },
+    applyAnalysisTask(task) {
+      if (!task || typeof task !== 'object') return
+      const status = String(task.status || '').trim()
+      if (!status) return
+      this.activeAnalysisTask = task
+      this.activeAnalysisRun = {
+        ...(this.activeAnalysisRun || {}),
+        runId: String(task.runId || this.activeAnalysisRun?.runId || ''),
+        mode: task.mode || this.activeAnalysisRun?.mode || '',
+        startedAt: task.startedAt || this.activeAnalysisRun?.startedAt || '',
+      }
+      this.analysisTaskStatus = status
+      this.analysisTaskMode = String(task.mode || this.analysisTaskMode || 'full')
+      this.analysisTaskError = String(task.error || '')
+      this.analysisTaskPendingSince = null
+    },
+    maybeMarkAnalysisTaskMissing() {
+      if (!this.activeAnalysisRun?.runId || this.analysisTaskStatus !== 'starting') return
+      const pendingSince = Number(this.analysisTaskPendingSince || Date.now())
+      if (this.sending || Date.now() - pendingSince < ANALYSIS_TASK_START_GRACE_MS) return
+      this.activeAnalysisTask = null
+      this.analysisTaskStatus = 'not_started'
+      this.analysisTaskError = 'No background analysis task was created for this analysis run.'
+    },
+    async refreshAnalysisTaskStatus({ silent = false } = {}) {
+      if (!this.sessionId || this.sessionMode === 'baseline') {
+        this.resetAnalysisTaskState()
+        return
+      }
+      if (this.analysisTaskPollInFlight) return
+      this.analysisTaskPollInFlight = true
+      try {
+        const response = await fetch(this.analysisTasksUrl(), { cache: 'no-store' })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const payload = await response.json()
+        const tasks = Array.isArray(payload.tasks) ? payload.tasks : []
+        const selected = selectAnalysisTaskForBadge(tasks, this.activeAnalysisRun?.runId || '')
+        if (selected) {
+          this.applyAnalysisTask(selected)
+        } else {
+          this.maybeMarkAnalysisTaskMissing()
+        }
+      } catch (error) {
+        if (!silent) {
+          console.warn('CodexChatSidebar: failed to refresh analysis task status', error)
+        }
+      } finally {
+        this.analysisTaskPollInFlight = false
+      }
+    },
+    currentAnalysisTaskPollDelay() {
+      return this.hasBlockingAnalysisTask ? ANALYSIS_TASK_ACTIVE_POLL_MS : ANALYSIS_TASK_IDLE_POLL_MS
+    },
+    startAnalysisTaskPolling(delay = null) {
+      if (this.sessionMode === 'baseline' || !this.sessionId || !this.open) return
+      this.stopAnalysisTaskPolling()
+      const pollDelay = Number.isFinite(Number(delay)) ? Number(delay) : this.currentAnalysisTaskPollDelay()
+      this.analysisTaskPollTimer = window.setTimeout(async () => {
+        this.analysisTaskPollTimer = null
+        await this.refreshAnalysisTaskStatus({ silent: true })
+        this.startAnalysisTaskPolling()
+      }, pollDelay)
+    },
+    stopAnalysisTaskPolling() {
+      if (!this.analysisTaskPollTimer) return
+      window.clearTimeout(this.analysisTaskPollTimer)
+      this.analysisTaskPollTimer = null
+    },
     handleSessionArtifactUpdated(event) {
       const detail = event?.detail || {}
       if (detail.sessionId && detail.sessionId !== this.sessionId) return
@@ -1236,6 +1374,7 @@ export default {
       }
     },
     async sendFullAnalysisPrompt() {
+      if (this.fullAnalysisDisabled) return
       await this.sendMessage({
         contentOverride: FULL_ANALYSIS_PROMPT,
         displayContent: 'Run full analysis',
@@ -1245,7 +1384,7 @@ export default {
       })
     },
     async sendUpdateAnalysisPrompt() {
-      if (!this.analysisGraphAvailable) return
+      if (this.updateAnalysisDisabled) return
       await this.sendMessage({
         contentOverride: UPDATE_ANALYSIS_PROMPT,
         displayContent: 'Update analysis',
@@ -1262,7 +1401,7 @@ export default {
       const includeAttachments = options.includeAttachments !== false
       const clearDraft = options.clearDraft !== false
       const triggerType = options.triggerType || 'manual'
-      const content = (contentOverride ?? this.draft).trim()
+      let content = (contentOverride ?? this.draft).trim()
       const displayContent = (displayContentOverride ?? content).trim()
       const attachmentSource = includeAttachments ? this.attachments : []
       if (this.sending || (!content && attachmentSource.length === 0)) return
@@ -1306,6 +1445,10 @@ export default {
           await this.beforeSend()
         }
         const analysisRun = await this.startCodexAnalysisRun({ presetKind, triggerType })
+        if (analysisRun?.runId) {
+          content = content.replaceAll('__ANALYSIS_RUN_ID__', analysisRun.runId)
+          this.markAnalysisRunStarting(analysisRun, presetKind)
+        }
         const codexRunId = analysisRun?.runId || this.createCodexRunId()
         this.notifyCodexRunStart({
           runId: codexRunId,
@@ -1969,6 +2112,7 @@ export default {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .codex-chat-preset-btn {
@@ -2003,6 +2147,67 @@ export default {
 .codex-chat-preset-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.analysis-task-status-badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+.analysis-task-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+.analysis-task-status-running {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.analysis-task-status-running .analysis-task-status-dot {
+  animation: codex-pulse 1.25s ease-out infinite;
+}
+
+.analysis-task-status-warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.analysis-task-status-success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.analysis-task-status-error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.analysis-task-status-muted {
+  border-color: #dbe3ec;
+  background: #f8fafc;
+  color: #64748b;
 }
 
 .panel-resize-handle {
